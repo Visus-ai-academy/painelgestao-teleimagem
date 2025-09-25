@@ -1048,9 +1048,13 @@ export default function DemonstrativoFaturamento() {
           let valorPortalTotal = 0;
           let valorIntegracaoTotal = 0;
           let valorImpostosTotal = 0;
+          let totalExamesGeral = 0;
           
           // Extrair valores das observações de cada cliente
           clientes.forEach(cliente => {
+            // Somar exames
+            totalExamesGeral += cliente.total_exames || 0;
+            
             if (cliente.observacoes) {
               const franquiaMatch = cliente.observacoes.match(/Franquia: R\$ ([\d.,]+)/);
               const portalMatch = cliente.observacoes.match(/Portal: R\$ ([\d.,]+)/);
@@ -1068,6 +1072,7 @@ export default function DemonstrativoFaturamento() {
           const valorTotalGeral = valorExamesGeral + valorFranquiasTotal + valorPortalTotal + valorIntegracaoTotal;
           
           console.log('🧮 Resumo calculado via fallback:', {
+            totalExamesGeral,
             valorExamesGeral,
             valorFranquiasTotal,
             valorPortalTotal, 
@@ -1078,7 +1083,7 @@ export default function DemonstrativoFaturamento() {
           
           return {
             clientes_processados: clientes.length,
-            total_exames_geral: clientes.reduce((sum, c) => sum + (c.total_exames || 0), 0),
+            total_exames_geral: totalExamesGeral,
             valor_exames_geral: valorExamesGeral,
             valor_franquias_geral: valorFranquiasTotal,
             valor_portal_geral: valorPortalTotal,     

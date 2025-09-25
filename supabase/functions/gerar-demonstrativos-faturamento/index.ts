@@ -2,6 +2,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.51.0";
 import { corsHeaders } from "../_shared/cors.ts";
+
 interface DemonstrativoCliente {
   cliente_id: string;
   cliente_nome: string;
@@ -48,52 +49,54 @@ serve(async (req) => {
         nome_mobilemed,
         ativo,
         parametros_faturamento(
-          status,
-          tipo_faturamento
+          id,
+          aplicar_franquia,
+          valor_franquia,
+          volume_franquia,
+          frequencia_continua,
+          frequencia_por_volume,
+          valor_acima_franquia,
+          valor_integracao,
+          portal_laudos,
+          cobrar_integracao,
+          impostos_ab_min,
+          percentual_iss,
+          simples
+        ),
+        contratos_clientes(
+          tipo_faturamento,
+          numero_contrato
         )
       `)
       .eq('ativo', true)
       .order('nome');
 
     if (clientesError) {
-      throw new Error(`Erro ao buscar clientes: ${clientesError.message}`);
+      console.error('Erro ao buscar clientes:', clientesError);
+      throw clientesError;
     }
 
-    console.log(`Total de clientes ativos: ${clientes?.length || 0}`);
+    if (!clientes || clientes.length === 0) {
+      throw new Error('Nenhum cliente ativo encontrado');
+    }
 
-    // Aplicar filtro opcional de clientes
-    const clientesProcessar = (clientesFiltro && Array.isArray(clientesFiltro) && clientesFiltro.length > 0)
-      ? (clientes || []).filter((c: any) => {
-          const nomes = [c.nome, c.nome_fantasia, c.nome_mobilemed]
-            .filter(Boolean)
-            .map((n: string) => n.trim());
-          return clientesFiltro.some((f: string) => nomes.includes(f));
-        })
-      : (clientes || []);
+    console.log(`Total de clientes ativos: ${clientes.length}`);
 
     const demonstrativos: DemonstrativoCliente[] = [];
 
-    for (const cliente of clientesProcessar) {
-      console.log(`Processando cliente: ${cliente.nome_fantasia || cliente.nome}`);
+    for (const cliente of clientes) {
+      const parametros = cliente.parametros_faturamento?.[0];
+      const contrato = cliente.contratos_clientes?.[0];
+      const tipoFaturamento = contrato?.tipo_faturamento || 'CO-FT';
 
-      // Buscar parâmetros ativos
-      const paramList = Array.isArray(cliente.parametros_faturamento)
-        ? cliente.parametros_faturamento
-        : (cliente.parametros_faturamento ? [cliente.parametros_faturamento] : []);
-      const parametroAtivo = paramList.find((p: any) => p && p.status === 'A');
-      const tipoFaturamento = parametroAtivo?.tipo_faturamento || 'CO-FT';
+      console.log(`Processando cliente: ${cliente.nome}`);
 
-      // Pular clientes NC-NF
-      if (tipoFaturamento === 'NC-NF') {
-        console.log(`Pulando cliente NC-NF: ${cliente.nome}`);
-        continue;
-      }
-
-      // Buscar volumetria do cliente
-      const nomesBusca = [cliente.nome, cliente.nome_fantasia, cliente.nome_mobilemed]
-        .filter(Boolean)
-        .map(n => n?.trim())
-        .filter(n => n && n.length > 0);
+      // Buscar volumetria para este cliente no período
+      const nomesBusca = [
+        cliente.nome,
+        cliente.nome_fantasia || cliente.nome,
+        cliente.nome_mobilemed || cliente.nome
+      ].filter(Boolean);
 
       let { data: volumetria } = await supabase
         .from('volumetria_mobilemed')
@@ -198,16 +201,16 @@ serve(async (req) => {
               // 3. Última tentativa: buscar por modalidade/especialidade apenas
               const { data: precoBasico } = await supabase
                 .from('precos_servicos')
-                .select('valor_base, valor_urgencia')
+                .select('valor_base, valor_urgencia, prioridade')
                 .eq('cliente_id', cliente.id)
                 .eq('modalidade', grupo.modalidade)
                 .eq('especialidade', grupo.especialidade)
                 .eq('ativo', true)
-                .limit(1)
-                .maybeSingle();
-                
-              if (precoBasico) {
-                precoUnitario = Number(precoBasico.valor_base || 0);
+                .limit(1);
+              
+              if (precoBasico && precoBasico.length > 0) {
+                const preco = precoBasico[0];
+                precoUnitario = Number(preco.valor_base || 0);
                 console.log(`Preço básico encontrado para ${key}: R$ ${precoUnitario}`);
               }
             }
@@ -216,8 +219,6 @@ serve(async (req) => {
           const valorTotal = precoUnitario * grupo.quantidade;
           valorExamesCalculado += valorTotal;
           
-          console.log(`Calculado para ${key}: ${grupo.quantidade} x R$ ${precoUnitario} = R$ ${valorTotal}`);
-          
           detalhesExames.push({
             modalidade: grupo.modalidade,
             especialidade: grupo.especialidade,
@@ -225,78 +226,73 @@ serve(async (req) => {
             prioridade: grupo.prioridade,
             quantidade: grupo.quantidade,
             valor_unitario: precoUnitario,
-            valor_total: valorTotal
+            valor_total: valorTotal,
+            status: precoUnitario > 0 ? 'com_preco' : 'sem_preco'
           });
+          
+          console.log(`Calculado para ${key}: ${grupo.quantidade} x R$ ${precoUnitario} = R$ ${valorTotal}`);
         } catch (error) {
-          console.error(`Erro ao calcular preço para ${key}:`, error);
+          console.error(`Erro no cálculo de preço de ${key}:`, error);
         }
       }
 
-      // Buscar parâmetros de faturamento para calcular franquia, portal e integração
-      const { data: parametros } = await supabase
-        .from('parametros_faturamento')
-        .select('*')
-        .eq('cliente_id', cliente.id)
-        .eq('status', 'A')
-        .maybeSingle();
+      // Calcular faturamento completo usando função do banco
+      const { data: calculoCompleto } = await supabase.rpc('calcular_faturamento_completo', {
+        p_cliente_id: cliente.id,
+        p_periodo: periodo,
+        p_volume_total: totalExames
+      });
 
       let valorFranquia = 0;
-      let valorPortal = 0;
+      let valorPortalLaudos = 0;
       let valorIntegracao = 0;
+      let detalhesFranquia = {};
 
-      if (parametros) {
-        // Calcular franquia
-        if (parametros.aplicar_franquia) {
-          if (parametros.frequencia_continua) {
-            valorFranquia = parametros.frequencia_por_volume && totalExames > (parametros.volume_franquia || 0)
-              ? (parametros.valor_acima_franquia || parametros.valor_franquia || 0)
-              : (parametros.valor_franquia || 0);
-          } else if (totalExames > 0) {
-            valorFranquia = parametros.frequencia_por_volume && totalExames > (parametros.volume_franquia || 0)
-              ? (parametros.valor_acima_franquia || parametros.valor_franquia || 0)
-              : (parametros.valor_franquia || 0);
-          }
-        }
-
-        // Calcular portal de laudos
-        if (parametros.portal_laudos) {
-          valorPortal = parametros.valor_integracao || 0;
-        }
-
-        // Calcular integração
-        if (parametros.cobrar_integracao) {
-          valorIntegracao = parametros.valor_integracao || 0;
-        }
+      if (calculoCompleto && calculoCompleto.length > 0) {
+        const calculo = calculoCompleto[0];
+        valorFranquia = Number(calculo.valor_franquia || 0);
+        valorPortalLaudos = Number(calculo.valor_portal_laudos || 0);
+        valorIntegracao = Number(calculo.valor_integracao || 0);
+        detalhesFranquia = calculo.detalhes_franquia || {};
       }
 
-      const valorBruto = valorExamesCalculado + valorFranquia + valorPortal + valorIntegracao;
-      const valorImpostos = valorBruto * 0.0615; // 6.15% de impostos
-      const valorTotal = valorBruto - valorImpostos;
+      // Calcular impostos baseado no contrato
+      const valorBruto = valorExamesCalculado + valorFranquia + valorPortalLaudos + valorIntegracao;
+      let valorISS = 0;
+      let valorIRRF = 0;
 
-      // Criar demonstrativo com valores calculados
+      if (parametros) {
+        if (parametros.simples && parametros.impostos_ab_min) {
+          valorISS = Math.max(valorBruto * (parametros.percentual_iss / 100 || 0), parametros.impostos_ab_min);
+        } else if (parametros.percentual_iss) {
+          valorISS = valorBruto * (parametros.percentual_iss / 100);
+        }
+        
+        valorIRRF = valorBruto * 0.015; // 1,5% padrão
+      }
+
+      const valorTotal = valorBruto + valorISS + valorIRRF;
+
       const demonstrativo: DemonstrativoCliente = {
         cliente_id: cliente.id,
-        cliente_nome: cliente.nome_fantasia || cliente.nome,
+        cliente_nome: cliente.nome,
         periodo,
         total_exames: totalExames,
         valor_exames: valorExamesCalculado,
         valor_franquia: valorFranquia,
-        valor_portal_laudos: valorPortal,
+        valor_portal_laudos: valorPortalLaudos,
         valor_integracao: valorIntegracao,
         valor_bruto: valorBruto,
-        valor_impostos: valorImpostos,
+        valor_impostos: valorISS + valorIRRF,
         valor_total: valorTotal,
-        detalhes_franquia: {
-          aplicar: parametros?.aplicar_franquia || false,
-          valor_base: parametros?.valor_franquia || 0,
-          frequencia_continua: parametros?.frequencia_continua || false
-        },
+        detalhes_franquia: detalhesFranquia,
         detalhes_exames: detalhesExames,
         detalhes_tributacao: {
-          percentual_total: 6.15,
-          pis: valorBruto * 0.0065,
-          cofins: valorBruto * 0.03,
-          csll: valorBruto * 0.01,
+          simples_nacional: parametros?.simples || false,
+          percentual_iss: parametros?.percentual_iss,
+          valor_iss: valorISS,
+          base_calculo: valorBruto,
+          impostos_ab_min: parametros?.impostos_ab_min || 0,
           irrf: valorBruto * 0.015
         },
         tipo_faturamento: tipoFaturamento
@@ -308,15 +304,31 @@ serve(async (req) => {
 
     console.log(`Total de demonstrativos gerados: ${demonstrativos.length}`);
 
+    // Calcular resumo completo dos demonstrativos
+    const resumo = {
+      clientes_processados: demonstrativos.length,
+      total_clientes_processados: demonstrativos.length,
+      periodo,
+      // Calcular totais agregados
+      total_exames_geral: demonstrativos.reduce((acc, dem) => acc + (dem.total_exames || 0), 0),
+      valor_exames_geral: demonstrativos.reduce((acc, dem) => acc + (dem.valor_exames || 0), 0),
+      valor_franquias_geral: demonstrativos.reduce((acc, dem) => acc + (dem.valor_franquia || 0), 0),
+      valor_portal_geral: demonstrativos.reduce((acc, dem) => acc + (dem.valor_portal_laudos || 0), 0),
+      valor_integracao_geral: demonstrativos.reduce((acc, dem) => acc + (dem.valor_integracao || 0), 0),
+      valor_bruto_geral: demonstrativos.reduce((acc, dem) => acc + (dem.valor_bruto || 0), 0),
+      valor_impostos_geral: demonstrativos.reduce((acc, dem) => acc + (dem.valor_impostos || 0), 0),
+      valor_total_geral: demonstrativos.reduce((acc, dem) => acc + (dem.valor_total || 0), 0),
+      clientes_simples_nacional: demonstrativos.filter(dem => dem.detalhes_tributacao?.simples_nacional).length,
+      clientes_regime_normal: demonstrativos.filter(dem => !dem.detalhes_tributacao?.simples_nacional).length
+    };
+
+    console.log('Resumo calculado:', resumo);
+
     return new Response(
       JSON.stringify({
         success: true,
         demonstrativos,
-        resumo: {
-          clientes_processados: demonstrativos.length,
-          total_clientes_processados: demonstrativos.length,
-          periodo
-        }
+        resumo
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
