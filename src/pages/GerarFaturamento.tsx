@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { 
   FileText, 
   Send,
@@ -89,6 +90,10 @@ export default function GerarFaturamento() {
   const [enviandoEmails, setEnviandoEmails] = useState(false);
   const [gerandoNFOmie, setGerandoNFOmie] = useState(false);
   const [resetandoNFOmie, setResetandoNFOmie] = useState(false);
+  
+  // Estados para controlar diálogos de confirmação
+  const [showConfirmEmails, setShowConfirmEmails] = useState(false);
+  const [showConfirmNFs, setShowConfirmNFs] = useState(false);
   const [refreshUploadStatus, setRefreshUploadStatus] = useState(0);
   const [isClearing, setIsClearing] = useState(false);
   const [sistemaProntoParagerar, setSistemaProntoParagerar] = useState(true);
@@ -1232,8 +1237,8 @@ export default function GerarFaturamento() {
     }
   };
 
-  // Função para enviar emails
-  const enviarTodosEmails = async () => {
+  // Função para mostrar confirmação de emails
+  const confirmarEnvioEmails = () => {
     if (gerandoRelatorios) {
       toast({
         title: "Aguarde a geração dos relatórios",
@@ -1243,17 +1248,21 @@ export default function GerarFaturamento() {
       return;
     }
     const relatóriosParaEnviar = resultados.filter(r => r.relatorioGerado && !r.emailEnviado); 
-    
     if (relatóriosParaEnviar.length === 0) {
       toast({
         title: "Nenhum relatório para enviar",
-        description: "Todos os relatórios já foram enviados ou ainda não foram gerados",
+        description: "Gere os relatórios primeiro (Etapa 2)",
         variant: "destructive",
       });
       return;
     }
+    setShowConfirmEmails(true);
+  };
 
+  // Função para enviar emails (executada após confirmação)
+  const enviarTodosEmails = async () => {
     setEnviandoEmails(true);
+    const relatóriosParaEnviar = resultados.filter(r => r.relatorioGerado && !r.emailEnviado);
     let enviados = 0;
     let errors = 0;
 
@@ -1329,8 +1338,8 @@ export default function GerarFaturamento() {
     }
   };
 
-  // Função para gerar NF no Omie (LIMITADA PARA TESTE)
-  const gerarNFOmie = async () => {
+  // Função para mostrar confirmação de NFs
+  const confirmarGeracaoNFs = () => {
     if (gerandoNFOmie) return;
     
     // Verificar se há clientes selecionados
@@ -1342,7 +1351,13 @@ export default function GerarFaturamento() {
       });
       return;
     }
+    setShowConfirmNFs(true);
+  };
 
+  // Função para gerar NF no Omie (executada após confirmação)
+  const gerarNFOmie = async () => {
+    setGerandoNFOmie(true);
+    
     // ✅ CLIENTES PERMITIDOS PARA TESTE DE EMISSÃO DE NF
     const clientesPermitidosParaTeste = ['COT', 'CORTREL', 'CORTEL', 'IMDBATATAIS', 'BROOKLIN'];
     
@@ -2275,7 +2290,7 @@ export default function GerarFaturamento() {
                 </h4>
                 <div className="flex flex-col sm:flex-row gap-3 items-center">
                   <Button 
-                    onClick={enviarTodosEmails}
+                    onClick={confirmarEnvioEmails}
                     disabled={gerandoRelatorios || enviandoEmails || resultados.filter(r => r.relatorioGerado && !r.emailEnviado).length === 0}
                     size="lg"
                     className="min-w-[280px] bg-orange-600 hover:bg-orange-700 disabled:opacity-50"
@@ -2342,7 +2357,7 @@ export default function GerarFaturamento() {
                 
                 <div className="flex flex-col sm:flex-row gap-3 mb-4">
                   <Button 
-                    onClick={gerarNFOmie}
+                    onClick={confirmarGeracaoNFs}
                     disabled={gerandoNFOmie || clientesSelecionadosNF.size === 0}
                     size="lg"
                     className="flex-1 bg-purple-600 hover:bg-purple-700"
@@ -2662,6 +2677,57 @@ export default function GerarFaturamento() {
         </TabsContent>
 
           </Tabs>
+          
+          {/* Diálogos de Confirmação */}
+          <AlertDialog open={showConfirmEmails} onOpenChange={setShowConfirmEmails}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Confirmar Envio de E-mails</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Você tem certeza que deseja enviar os emails com os relatórios para os clientes?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setShowConfirmEmails(false)}>
+                  Não
+                </AlertDialogCancel>
+                <AlertDialogAction 
+                  onClick={() => {
+                    setShowConfirmEmails(false);
+                    enviarTodosEmails();
+                  }}
+                  className="bg-orange-600 hover:bg-orange-700"
+                >
+                  Sim
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
+          <AlertDialog open={showConfirmNFs} onOpenChange={setShowConfirmNFs}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Confirmar Geração de NFs</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Você tem certeza que deseja gerar as NF's para os clientes?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setShowConfirmNFs(false)}>
+                  Não
+                </AlertDialogCancel>
+                <AlertDialogAction 
+                  onClick={() => {
+                    setShowConfirmNFs(false);
+                    gerarNFOmie();
+                  }}
+                  className="bg-purple-600 hover:bg-purple-700"
+                >
+                  Sim
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
           
         </div>
       );
