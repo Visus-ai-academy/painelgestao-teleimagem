@@ -765,18 +765,61 @@ export default function DemonstrativoFaturamento() {
               
               // Só incluir cliente se tem preço configurado
               if (temPrecoConfigurado && valorTotalCliente > 0) {
+                // Calcular adicionais (franquia/portal/integração) e impostos para obter o LÍQUIDO
+                let vFranquia = 0, vPortal = 0, vIntegracao = 0;
+                try {
+                  const { data: calc } = await supabase.rpc('calcular_faturamento_completo', {
+                    p_cliente_id: dadosCliente.cliente.id,
+                    p_periodo: periodo,
+                    p_volume_total: dadosCliente.total_exames,
+                  });
+                  if (calc && calc.length > 0) {
+                    vFranquia = Number(calc[0]?.valor_franquia || 0);
+                    vPortal = Number(calc[0]?.valor_portal_laudos || 0);
+                    vIntegracao = Number(calc[0]?.valor_integracao || 0);
+                  }
+                } catch (e) {
+                  console.warn('Falha ao calcular adicionais do cliente', clienteNome, e);
+                }
+
+                const valorBrutoFinal = Number(valorTotalCliente) + vFranquia + vPortal + vIntegracao;
+
+                // Buscar parâmetros para calcular ISS/IRRF
+                let vISS = 0, vIRRF = 0;
+                try {
+                  const { data: params } = await supabase
+                    .from('parametros_faturamento')
+                    .select('percentual_iss, impostos_ab_min, simples, status')
+                    .eq('cliente_id', dadosCliente.cliente.id)
+                    .eq('status', 'A')
+                    .maybeSingle();
+
+                  if (params) {
+                    const perc = Number(params.percentual_iss || 0);
+                    vISS = valorBrutoFinal * (perc / 100);
+                    if (params.simples && params.impostos_ab_min != null) {
+                      vISS = Math.max(vISS, Number(params.impostos_ab_min));
+                    }
+                  }
+                  vIRRF = valorBrutoFinal * 0.015; // 1,5%
+                } catch (e) {
+                  console.warn('Falha ao calcular impostos do cliente', clienteNome, e);
+                }
+
+                const valorLiquidoFinal = valorBrutoFinal - (vISS + vIRRF);
+
                 clientesMap.set(clienteNome, {
                   id: dadosCliente.cliente.id,
                   nome: clienteNome,
                   email: dadosCliente.cliente.email || '',
                   total_exames: dadosCliente.total_exames,
-                  valor_bruto: Number(valorTotalCliente.toFixed(2)),
-                  valor_liquido: Number(valorTotalCliente.toFixed(2)),
+                  valor_bruto: Number(valorBrutoFinal.toFixed(2)),
+                  valor_liquido: Number(valorLiquidoFinal.toFixed(2)),
                   periodo: periodo,
                   status_pagamento: 'pendente' as const,
                   data_vencimento: new Date().toISOString().split('T')[0],
                   tipo_faturamento: dadosCliente.cliente.tipo_faturamento || 'Não definido',
-                  observacoes: `Dados baseados na volumetria com preços calculados`
+                  observacoes: `Exames: ${dadosCliente.total_exames} | Franquia: R$ ${vFranquia.toFixed(2)} | Portal: R$ ${vPortal.toFixed(2)} | Integração: R$ ${vIntegracao.toFixed(2)} | Impostos: R$ ${(vISS + vIRRF).toFixed(2)}`
                 });
               } else {
                 console.warn(`Cliente ${clienteNome} sem preço configurado - pulando`);
@@ -1075,22 +1118,22 @@ export default function DemonstrativoFaturamento() {
             // Verificar se temos demonstrativos válidos e que seja um array
             const demonstrativos = dados?.demonstrativos;
             if (demonstrativos && Array.isArray(demonstrativos)) {
-            resumoReal = {
-              clientes_processados: demonstrativos.length,
-              total_exames_geral: demonstrativos.reduce((sum, dem) => sum + (dem.total_exames || 0), 0),
-              valor_exames_geral: demonstrativos.reduce((sum, dem) => sum + (dem.valor_exames || 0), 0),
-              valor_franquias_geral: demonstrativos.reduce((sum, dem) => sum + (dem.valor_franquia || 0), 0),
-              valor_portal_geral: demonstrativos.reduce((sum, dem) => sum + (dem.valor_portal_laudos || 0), 0),
-              valor_integracao_geral: demonstrativos.reduce((sum, dem) => sum + (dem.valor_integracao || 0), 0),
-              valor_adicionais_geral: demonstrativos.reduce((sum, dem) => sum + ((dem.valor_franquia || 0) + (dem.valor_portal_laudos || 0) + (dem.valor_integracao || 0)), 0),
-              valor_bruto_geral: demonstrativos.reduce((sum, dem) => sum + (dem.valor_bruto || 0), 0),
-              valor_impostos_geral: demonstrativos.reduce((sum, dem) => sum + (dem.valor_impostos || 0), 0),
-              valor_total_geral: demonstrativos.reduce((sum, dem) => sum + (dem.valor_total || 0), 0),
-              clientes_simples_nacional: demonstrativos.filter(dem => dem.detalhes_tributacao?.simples_nacional).length,
-              clientes_regime_normal: demonstrativos.filter(dem => !dem.detalhes_tributacao?.simples_nacional).length
-            };
-            
-              console.log('✅ Resumo calculado dos demonstrativos:', resumoReal);
+              const demonstrativosValidos = demonstrativos.filter((dem: any) => Number(dem.valor_total ?? dem.valor_liquido ?? 0) > 0);
+              resumoReal = {
+                clientes_processados: demonstrativosValidos.length,
+                total_exames_geral: demonstrativosValidos.reduce((sum: number, dem: any) => sum + (dem.total_exames || 0), 0),
+                valor_exames_geral: demonstrativosValidos.reduce((sum: number, dem: any) => sum + (dem.valor_exames || 0), 0),
+                valor_franquias_geral: demonstrativosValidos.reduce((sum: number, dem: any) => sum + (dem.valor_franquia || 0), 0),
+                valor_portal_geral: demonstrativosValidos.reduce((sum: number, dem: any) => sum + (dem.valor_portal_laudos || 0), 0),
+                valor_integracao_geral: demonstrativosValidos.reduce((sum: number, dem: any) => sum + (dem.valor_integracao || 0), 0),
+                valor_adicionais_geral: demonstrativosValidos.reduce((sum: number, dem: any) => sum + ((dem.valor_franquia || 0) + (dem.valor_portal_laudos || 0) + (dem.valor_integracao || 0)), 0),
+                valor_bruto_geral: demonstrativosValidos.reduce((sum: number, dem: any) => sum + (dem.valor_bruto || 0), 0),
+                valor_impostos_geral: demonstrativosValidos.reduce((sum: number, dem: any) => sum + (dem.valor_impostos || 0), 0),
+                valor_total_geral: demonstrativosValidos.reduce((sum: number, dem: any) => sum + (dem.valor_total || dem.valor_liquido || 0), 0),
+                clientes_simples_nacional: demonstrativosValidos.filter((dem: any) => dem.detalhes_tributacao?.simples_nacional).length,
+                clientes_regime_normal: demonstrativosValidos.filter((dem: any) => !dem.detalhes_tributacao?.simples_nacional).length
+              };
+              console.log('✅ Resumo calculado (somente clientes com valor > 0):', resumoReal);
             } else {
               console.log('⚠️ Demonstrativos não encontrados ou formato inválido');
             }

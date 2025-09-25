@@ -148,7 +148,7 @@ serve(async (req) => {
             .from('volumetria_mobilemed')
             .select('EMPRESA, "Cliente_Nome_Fantasia", MODALIDADE, ESPECIALIDADE, CATEGORIA, PRIORIDADE, VALORES, ESTUDO_DESCRICAO, MEDICO, tipo_faturamento')
             .eq('periodo_referencia', periodo)
-            .in('"Cliente_Nome_Fantasia"', fantasiaBusca)
+            .in('Cliente_Nome_Fantasia', fantasiaBusca)
         : { data: [] as any[] } as any;
 
       // Combinar resultados únicos
@@ -213,12 +213,12 @@ serve(async (req) => {
               .from('volumetria_mobilemed')
               .select('*')
               .eq('periodo_referencia', periodo)
-              .like('"EMPRESA"', padrao),
+              .ilike('EMPRESA', padrao),
             supabase
               .from('volumetria_mobilemed')
               .select('*')
               .eq('periodo_referencia', periodo)
-              .like('"Cliente_Nome_Fantasia"', padrao)
+              .ilike('Cliente_Nome_Fantasia', padrao)
           ]);
           
           const combinar = (arr?: any[] | null) => {
