@@ -46,7 +46,6 @@ import { VolumetriaProvider } from "@/contexts/VolumetriaContext";
 import DemonstrativoFaturamento from "@/components/DemonstrativoFaturamento";
 import { DemonstrativoFaturamentoCompleto } from "@/components/DemonstrativoFaturamentoCompleto";
 import { ControleFechamentoFaturamento } from '@/components/ControleFechamentoFaturamento';
-import ListaExamesPeriodo from "@/components/faturamento/ListaExamesPeriodo";
 import { ExamesValoresZerados } from "@/components/ExamesValorezrados";
 import { DiagnosticoPrecosFaturamento } from "@/components/DiagnosticoPrecosFaturamento";
 
@@ -1845,8 +1844,6 @@ export default function GerarFaturamento() {
             </p>
             <DemonstrativoFaturamento />
           </div>
-          <Separator />
-          <ListaExamesPeriodo />
         </TabsContent>
 
         {/* Tab: Relatórios - Simplificada */}
