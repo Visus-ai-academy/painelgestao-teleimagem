@@ -143,11 +143,13 @@ serve(async (req) => {
         gruposExames[key].quantidade += qtd;
       }
 
-      // Calcular preços para cada grupo usando tabela precos_servicos
+      // Calcular preços para cada grupo usando tabela precos_servicos com busca flexível
       for (const [key, grupo] of Object.entries(gruposExames)) {
         try {
-          // Buscar preço na tabela precos_servicos
-          const { data: precoData, error } = await supabase
+          let precoUnitario = 0;
+          
+          // 1. Tentar busca exata primeiro
+          const { data: precoExato } = await supabase
             .from('precos_servicos')
             .select('valor_base, valor_urgencia')
             .eq('cliente_id', cliente.id)
@@ -158,21 +160,57 @@ serve(async (req) => {
             .eq('ativo', true)
             .maybeSingle();
           
-          if (error) {
-            console.error(`Erro ao buscar preço para ${key}:`, error);
-            continue;
-          }
-          
-          let precoUnitario = 0;
-          if (precoData) {
-            // Verificar se é urgência/plantão para usar valor_urgencia
+          if (precoExato) {
             const isUrgencia = grupo.prioridade.toUpperCase().includes('URGÊNCIA') || 
-                             grupo.prioridade.toUpperCase().includes('PLANTAO') ||
-                             grupo.prioridade.toUpperCase().includes('PLANTÃO');
+                              grupo.prioridade.toUpperCase().includes('PLANTAO') ||
+                              grupo.prioridade.toUpperCase().includes('PLANTÃO');
             
-            precoUnitario = isUrgencia && precoData.valor_urgencia ? 
-                           Number(precoData.valor_urgencia) : 
-                           Number(precoData.valor_base || 0);
+            precoUnitario = isUrgencia && precoExato.valor_urgencia ? 
+                           Number(precoExato.valor_urgencia) : 
+                           Number(precoExato.valor_base || 0);
+          } else {
+            // 2. Busca flexível: sem prioridade específica
+            const { data: precoFlexivel } = await supabase
+              .from('precos_servicos')
+              .select('valor_base, valor_urgencia, prioridade')
+              .eq('cliente_id', cliente.id)
+              .eq('modalidade', grupo.modalidade)
+              .eq('especialidade', grupo.especialidade)
+              .eq('categoria', grupo.categoria)
+              .eq('ativo', true)
+              .limit(5);
+            
+            if (precoFlexivel && precoFlexivel.length > 0) {
+              // Preferir preço ROTINA se existir, senão pegar o primeiro
+              const precoRotina = precoFlexivel.find(p => p.prioridade?.toUpperCase() === 'ROTINA');
+              const precoEscolhido = precoRotina || precoFlexivel[0];
+              
+              const isUrgencia = grupo.prioridade.toUpperCase().includes('URGÊNCIA') || 
+                                grupo.prioridade.toUpperCase().includes('PLANTAO') ||
+                                grupo.prioridade.toUpperCase().includes('PLANTÃO');
+              
+              precoUnitario = isUrgencia && precoEscolhido.valor_urgencia ? 
+                             Number(precoEscolhido.valor_urgencia) : 
+                             Number(precoEscolhido.valor_base || 0);
+              
+              console.log(`Preço flexível encontrado para ${key}: R$ ${precoUnitario} (usando ${precoEscolhido.prioridade || 'sem prioridade'})`);
+            } else {
+              // 3. Última tentativa: buscar por modalidade/especialidade apenas
+              const { data: precoBasico } = await supabase
+                .from('precos_servicos')
+                .select('valor_base, valor_urgencia')
+                .eq('cliente_id', cliente.id)
+                .eq('modalidade', grupo.modalidade)
+                .eq('especialidade', grupo.especialidade)
+                .eq('ativo', true)
+                .limit(1)
+                .maybeSingle();
+                
+              if (precoBasico) {
+                precoUnitario = Number(precoBasico.valor_base || 0);
+                console.log(`Preço básico encontrado para ${key}: R$ ${precoUnitario}`);
+              }
+            }
           }
           
           const valorTotal = precoUnitario * grupo.quantidade;

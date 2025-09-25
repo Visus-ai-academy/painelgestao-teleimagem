@@ -48,6 +48,7 @@ import { DemonstrativoFaturamentoCompleto } from "@/components/DemonstrativoFatu
 import { ControleFechamentoFaturamento } from '@/components/ControleFechamentoFaturamento';
 import ListaExamesPeriodo from "@/components/faturamento/ListaExamesPeriodo";
 import { ExamesValoresZerados } from "@/components/ExamesValorezrados";
+import { DiagnosticoPrecosFaturamento } from "@/components/DiagnosticoPrecosFaturamento";
 
 
 import { generatePDF, downloadPDF, type FaturamentoData } from "@/lib/pdfUtils";
@@ -2671,6 +2672,8 @@ export default function GerarFaturamento() {
           </Card>
           
           <ExamesValoresZerados />
+          
+          <DiagnosticoPrecosFaturamento />
         </TabsContent>
 
           </Tabs>

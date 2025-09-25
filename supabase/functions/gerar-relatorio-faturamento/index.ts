@@ -291,27 +291,48 @@ serve(async (req: Request) => {
               console.log(`   Volume agregado: ${volumeParaCalculo}`);
               console.log(`   É plantão: ${isPlantao}`);
               
-              const { data: preco, error } = await supabase.rpc('calcular_preco_exame', {
-                p_cliente_id: cliente_id,
-                p_modalidade: g.modalidade,
-                p_especialidade: g.especialidade,
-                p_prioridade: g.prioridade,
-                p_categoria: g.categoria || 'SC',
-                p_volume_total: volumeParaCalculo,
-                p_is_plantao: isPlantao,
-              });
+              // Buscar preço na tabela precos_servicos diretamente (mais confiável que RPC)
+              const { data: precoData } = await supabase
+                .from('precos_servicos')
+                .select('valor_base, valor_urgencia')
+                .eq('cliente_id', cliente_id)
+                .eq('modalidade', g.modalidade)
+                .eq('especialidade', g.especialidade)
+                .eq('categoria', g.categoria || 'SC')
+                .eq('prioridade', g.prioridade)
+                .eq('ativo', true)
+                .maybeSingle();
               
-              if (error) {
-                console.error('❌ Erro na RPC calcular_preco_exame:', error);
-                precoPorCombo[key] = 0;
-              } else {
-                const precoNum = Number(preco);
-                console.log(`💰 Preço calculado para ${key}: R$ ${precoNum}`);
+              if (precoData) {
+                const isUrgencia = g.prioridade.toUpperCase().includes('URGÊNCIA') || 
+                                  g.prioridade.toUpperCase().includes('PLANTAO') ||
+                                  g.prioridade.toUpperCase().includes('PLANTÃO');
                 
-                if (Number.isFinite(precoNum) && precoNum > 0) {
-                  precoPorCombo[key] = precoNum;
+                const precoCalculado = isUrgencia && precoData.valor_urgencia ? 
+                                     Number(precoData.valor_urgencia) : 
+                                     Number(precoData.valor_base || 0);
+                
+                console.log(`💰 Preço encontrado para ${key}: R$ ${precoCalculado}`);
+                precoPorCombo[key] = precoCalculado;
+              } else {
+                // Tentar busca flexível sem prioridade específica
+                const { data: precoFlexivel } = await supabase
+                  .from('precos_servicos')
+                  .select('valor_base, valor_urgencia, prioridade')
+                  .eq('cliente_id', cliente_id)
+                  .eq('modalidade', g.modalidade)
+                  .eq('especialidade', g.especialidade)
+                  .eq('categoria', g.categoria || 'SC')
+                  .eq('ativo', true)
+                  .limit(1)
+                  .maybeSingle();
+                
+                if (precoFlexivel) {
+                  const precoCalculado = Number(precoFlexivel.valor_base || 0);
+                  console.log(`💰 Preço flexível encontrado para ${key}: R$ ${precoCalculado}`);
+                  precoPorCombo[key] = precoCalculado;
                 } else {
-                  console.warn(`⚠️ Preço inválido retornado: ${preco} (${typeof preco})`);
+                  console.warn(`⚠️ Nenhum preço encontrado para ${key}`);
                   precoPorCombo[key] = 0;
                 }
               }
