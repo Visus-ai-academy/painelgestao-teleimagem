@@ -33,13 +33,12 @@ serve(async (req) => {
     );
 
     const { periodo, clientes: clientesFiltro } = await req.json();
-    console.log('Período recebido:', periodo);
     
     if (!periodo) {
       throw new Error('Período é obrigatório');
     }
 
-    // Buscar clientes ativos (com optional filtro)
+    // Limitar a 20 clientes por vez para evitar timeout
     let clientesQuery = supabase
       .from('clientes')
       .select(`
@@ -47,38 +46,28 @@ serve(async (req) => {
         nome,
         nome_fantasia,
         nome_mobilemed,
-        ativo,
         parametros_faturamento(
-          id,
           aplicar_franquia,
           valor_franquia,
           volume_franquia,
-          frequencia_continua,
-          frequencia_por_volume,
-          valor_acima_franquia,
           valor_integracao,
           portal_laudos,
-          cobrar_integracao,
           impostos_ab_min,
           percentual_iss,
           simples
         ),
         contratos_clientes(
-          tipo_faturamento,
-          numero_contrato
+          tipo_faturamento
         )
       `)
-      .eq('ativo', true);
+      .eq('ativo', true)
+      .limit(20);
 
     if (Array.isArray(clientesFiltro) && clientesFiltro.length > 0) {
       const looksUuid = typeof clientesFiltro[0] === 'string' && /[0-9a-fA-F-]{36}/.test(clientesFiltro[0]);
       if (looksUuid) {
-        // Filtrar por ids
-        // @ts-ignore
         clientesQuery = clientesQuery.in('id', clientesFiltro);
       } else {
-        // Filtrar por nomes
-        // @ts-ignore
         clientesQuery = clientesQuery.in('nome', clientesFiltro);
       }
     }
@@ -86,7 +75,6 @@ serve(async (req) => {
     const { data: clientes, error: clientesError } = await clientesQuery.order('nome');
 
     if (clientesError) {
-      console.error('Erro ao buscar clientes:', clientesError);
       throw clientesError;
     }
 
@@ -94,145 +82,176 @@ serve(async (req) => {
       throw new Error('Nenhum cliente ativo encontrado');
     }
 
-    console.log(`Total de clientes ativos: ${clientes.length}`);
+    // Buscar TODOS os preços de uma vez para os clientes selecionados
+    const clienteIds = clientes.map(c => c.id);
+    const { data: todosPrecos } = await supabase
+      .from('precos_servicos')
+      .select('cliente_id, modalidade, especialidade, categoria, prioridade, valor_base, valor_urgencia, volume_inicial, volume_final, considera_prioridade_plantao')
+      .in('cliente_id', clienteIds)
+      .eq('ativo', true);
+
+    // Indexar preços por cliente para acesso rápido
+    const precosPorCliente: Record<string, any[]> = {};
+    if (todosPrecos) {
+      for (const preco of todosPrecos) {
+        if (!precosPorCliente[preco.cliente_id]) {
+          precosPorCliente[preco.cliente_id] = [];
+        }
+        precosPorCliente[preco.cliente_id].push(preco);
+      }
+    }
+
+    // Buscar volumetria em LOTE para TODOS os clientes
+    const todosNomes = clientes.flatMap(c => [
+      c.nome,
+      c.nome_fantasia || c.nome,
+      c.nome_mobilemed || c.nome
+    ].filter(Boolean));
+
+    const inList = todosNomes.map((n: string) => `"${n}"`).join(',');
+    const orFilter = `"EMPRESA".in.(${inList}),"Cliente_Nome_Fantasia".in.(${inList})`;
+    
+    const { data: todasVolumetrias } = await supabase
+      .from('volumetria_mobilemed')
+      .select('EMPRESA, "Cliente_Nome_Fantasia", MODALIDADE, ESPECIALIDADE, CATEGORIA, PRIORIDADE, VALORES, tipo_faturamento')
+      .eq('periodo_referencia', periodo)
+      .or(orFilter);
 
     const demonstrativos: DemonstrativoCliente[] = [];
+
+    const norm = (s: string) => (s || '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
+
+    // Função otimizada para selecionar preço
+    const selecionarPreco = (precosCliente: any[], modalidade: string, especialidade: string, categoria: string, prioridade: string, volume: number) => {
+      if (!precosCliente || precosCliente.length === 0) {
+        return { unit: 0, faixa: '', det: { motivo: 'sem_precos_cliente' } };
+      }
+
+      const modalidadeN = norm(modalidade);
+      const especialidadeN = norm(especialidade);
+      const categoriaN = norm(categoria || 'SC') || 'SC';
+      const prioridadeN = norm(prioridade || '');
+
+      // Match por MEC
+      let candidatos = precosCliente.filter((p: any) =>
+        norm(p.modalidade) === modalidadeN &&
+        norm(p.especialidade) === especialidadeN &&
+        norm((p.categoria || 'SC')) === categoriaN
+      );
+
+      if (candidatos.length === 0) return { unit: 0, faixa: '', det: { motivo: 'sem_match_mec' } };
+
+      // Priorizar match exato de prioridade
+      const candidatosPrioridade = candidatos.filter((p: any) => norm(p.prioridade) === prioridadeN);
+      if (candidatosPrioridade.length > 0) candidatos = candidatosPrioridade;
+
+      // Filtrar por faixa de volume
+      let dentroFaixa = candidatos.filter((p: any) =>
+        (p.volume_inicial == null || p.volume_inicial <= volume) &&
+        (p.volume_final == null || p.volume_final >= volume)
+      );
+
+      if (dentroFaixa.length === 0) {
+        const abaixo = candidatos.filter((p: any) => p.volume_inicial == null || p.volume_inicial <= volume);
+        if (abaixo.length > 0) {
+          dentroFaixa = [abaixo.reduce((best: any, cur: any) =>
+            ((best.volume_inicial ?? -Infinity) <= (cur.volume_inicial ?? -Infinity) ? cur : best)
+          )];
+        }
+      }
+
+      if (dentroFaixa.length === 0) {
+        return { unit: 0, faixa: '', det: { motivo: 'sem_match_volume' } };
+      }
+
+      const escolhido = dentroFaixa.length > 1
+        ? dentroFaixa.reduce((best: any, cur: any) => ((best.volume_inicial ?? -Infinity) <= (cur.volume_inicial ?? -Infinity) ? cur : best))
+        : dentroFaixa[0];
+
+      const prioridadeUrg = prioridadeN === 'URGENCIA' || prioridadeN === 'URGÊNCIA' || prioridadeN === 'URG' || prioridadeN === 'PLANTAO' || prioridadeN === 'PLANTÃO';
+      const unit = (prioridadeUrg || (escolhido.considera_prioridade_plantao ?? false))
+        ? (escolhido.valor_urgencia ?? escolhido.valor_base ?? 0)
+        : (escolhido.valor_base ?? 0);
+      const faixa = `${escolhido.volume_inicial ?? 0}-${escolhido.volume_final ?? '∞'}`;
+      
+      return { unit, faixa, det: {} };
+    };
 
     for (const cliente of clientes) {
       const parametros = cliente.parametros_faturamento?.[0];
       const contrato = cliente.contratos_clientes?.[0];
       const tipoFaturamento = contrato?.tipo_faturamento || 'CO-FT';
 
-      console.log(`Processando cliente: ${cliente.nome}`);
-
-      // Buscar volumetria para este cliente no período com agrupamento
+      // Buscar volumetria deste cliente na lista carregada
       const nomesBusca = [
         cliente.nome,
         cliente.nome_fantasia || cliente.nome,
         cliente.nome_mobilemed || cliente.nome
       ].filter(Boolean);
 
-      console.log(`Buscando volumetria para ${cliente.nome} com nomes:`, nomesBusca);
+      let volumetria = todasVolumetrias?.filter(vol => {
+        const empresa = vol.EMPRESA || '';
+        const clienteFantasia = vol["Cliente_Nome_Fantasia"] || '';
+        return nomesBusca.some(nome => 
+          empresa.includes(nome) || clienteFantasia.includes(nome) ||
+          nome.includes(empresa) || nome.includes(clienteFantasia)
+        );
+      }) || [];
 
-      // Busca única por nomes (EMPRESA ou Cliente_Nome_Fantasia) com colunas necessárias
-      const inList = nomesBusca.map((n: string) => `"${n}"`).join(',');
-      const orFilter = `"EMPRESA".in.(${inList}),"Cliente_Nome_Fantasia".in.(${inList})`;
-      let { data: volumetria } = await supabase
-        .from('volumetria_mobilemed')
-        .select('EMPRESA, "Cliente_Nome_Fantasia", MODALIDADE, ESPECIALIDADE, CATEGORIA, PRIORIDADE, VALORES, ESTUDO_DESCRICAO, MEDICO, tipo_faturamento')
-        .eq('periodo_referencia', periodo)
-        .or(orFilter);
-
-      // Estratégia 3: Para clientes específicos, fazer busca por padrão (agrupamento)
-      const nomeFantasia = cliente.nome_fantasia || cliente.nome;
-      
-      if ((!volumetria || volumetria.length === 0)) {
-        console.log(`Verificando se ${nomeFantasia} precisa de agrupamento...`);
-        
+      // Aplicar agrupamentos específicos se necessário
+      if (volumetria.length === 0) {
+        const nomeFantasia = cliente.nome_fantasia || cliente.nome;
         let padroesBusca: string[] = [];
         
-        // Agrupamento específico por padrão
         if (nomeFantasia === 'PRN') {
-          padroesBusca = ['PRN%'];
+          padroesBusca = ['PRN'];
         } else if (['CEDIDIAG', 'CEDI-RJ', 'CEDI-RO', 'CEDI_RJ', 'CEDI_RO', 'CEDI_RX'].includes(nomeFantasia)) {
-          padroesBusca = ['CEDI%'];
-        }
-        // Agrupamentos por sufixos comuns  
-        else if (nomeFantasia === 'CDI_HCMINEIROS') {
-          padroesBusca = ['CDI_HCMINEIROS%'];
-        } else if (nomeFantasia === 'CDMINEIROS') {
-          padroesBusca = ['CDMINEIROS%'];
-        } else if (nomeFantasia === 'GDI') {
-          padroesBusca = ['GDI%'];
-        } else if (nomeFantasia === 'RADIOCOR') {
-          padroesBusca = ['RADIOCOR%', 'NL_RADIOCOR%'];
-        } else if (nomeFantasia === 'NL_RADIOCOR') {
-          padroesBusca = ['NL_RADIOCOR%'];
-        } else if (nomeFantasia === 'INTERCOR') {
-          padroesBusca = ['INTERCOR%'];
-        } else if (nomeFantasia === 'RMPADUA') {
-          padroesBusca = ['PADUA%'];
-        } else if (nomeFantasia === 'VIVERCLIN') {
-          padroesBusca = ['VIVERCLIN%'];
+          padroesBusca = ['CEDI'];
         } else if (nomeFantasia === 'C.BITTENCOURT') {
-          padroesBusca = ['C.BITTENCOURT%', 'C_BITTENCOURT%', 'C-BITTENCOURT%', 'CBITTENCOURT%'];
+          padroesBusca = ['C.BITTENCOURT', 'C_BITTENCOURT', 'C-BITTENCOURT', 'CBITTENCOURT'];
         } else if (nomeFantasia === 'CBU') {
-          padroesBusca = ['CBU%', 'C_BU%', 'C-BU%'];
+          padroesBusca = ['CBU', 'C_BU', 'C-BU'];
         } else if (nomeFantasia === 'CDATUCURUI' || nomeFantasia === 'CDA TUCURUI') {
-          padroesBusca = ['CDATUCURUI%', 'CDA_TUCURUI%', 'CDA-TUCURUI%', 'CDA TUCURUI%'];
-        }
-        // Agrupamento genérico: se nome_fantasia é diferente do nome, buscar variações
-        else if (cliente.nome_fantasia && cliente.nome_fantasia !== cliente.nome) {
-          // Tentar buscar variações do nome fantasia
-          padroesBusca = [
-            `${nomeFantasia}%`, 
-            `${nomeFantasia}_%`, 
-            `${nomeFantasia}-%`
-          ];
+          padroesBusca = ['CDATUCURUI', 'CDA_TUCURUI', 'CDA-TUCURUI', 'CDA TUCURUI'];
         }
         
         if (padroesBusca.length > 0) {
-          console.log(`Aplicando agrupamento para ${nomeFantasia} com padrões:`, padroesBusca);
-          
-          for (const padrao of padroesBusca) {
-            const { data: volumetriaAgrupada } = await supabase
-              .from('volumetria_mobilemed')
-              .select('*')
-              .eq('periodo_referencia', periodo)
-              .like('"EMPRESA"', padrao);
-            
-            if (volumetriaAgrupada && volumetriaAgrupada.length > 0) {
-              volumetria = (volumetria || []).concat(volumetriaAgrupada);
-              console.log(`Encontrados ${volumetriaAgrupada.length} registros com padrão ${padrao}`);
-            }
-          }
+          volumetria = todasVolumetrias?.filter(vol => {
+            const empresa = vol.EMPRESA || '';
+            return padroesBusca.some(padrao => empresa.includes(padrao));
+          }) || [];
         }
       }
 
-      // REGRA ESPECÍFICA CEDIDIAG: apenas Medicina Interna, excluindo médico específico
-      if (nomeFantasia === 'CEDIDIAG' && volumetria && volumetria.length > 0) {
-        console.log(`Aplicando filtro específico CEDIDIAG: apenas Medicina Interna`);
+      // Filtro específico CEDIDIAG
+      if ((cliente.nome_fantasia || cliente.nome) === 'CEDIDIAG') {
         volumetria = volumetria.filter(vol => {
           const especialidade = (vol.ESPECIALIDADE || '').toString().toUpperCase();
           const medico = (vol.MEDICO || '').toString();
-          
-          // Apenas Medicina Interna
-          const isMedicinaInterna = especialidade.includes('MEDICINA INTERNA') || especialidade.includes('MEDICINA_INTERNA');
-          
-          // Excluir Dr. Rodrigo Vaz Lima (verificar variações do nome)
-          const isExcludedDoctor = medico.includes('Rodrigo Vaz') || medico.includes('Rodrigo Lima') || 
-                                  medico.includes('RODRIGO VAZ') || medico.includes('RODRIGO LIMA');
-          
+          const isMedicinaInterna = especialidade.includes('MEDICINA INTERNA');
+          const isExcludedDoctor = medico.includes('Rodrigo Vaz') || medico.includes('Rodrigo Lima');
           return isMedicinaInterna && !isExcludedDoctor;
         });
-        console.log(`CEDIDIAG: Após filtro específico: ${volumetria.length} registros`);
       }
 
-      console.log(`Encontrada volumetria: ${volumetria.length} registros`);
-
-      // Contar exames totais (apenas registros faturáveis)
+      // Contar exames excluindo NC-NF
       let totalExames = 0;
       for (const vol of volumetria) {
-        // APLICAR FILTRO NC-NF: Excluir registros que não devem ser faturados
-        if (vol.tipo_faturamento === 'NC-NF') {
-          continue; // Pular este registro do total
+        if (vol.tipo_faturamento !== 'NC-NF') {
+          totalExames += vol.VALORES || 0;
         }
-        totalExames += vol.VALORES || 0;
       }
 
-      // Calcular valores dos exames usando preços do banco
+      // Calcular valores dos exames
       let valorExamesCalculado = 0;
       const detalhesExames = [];
+      const precosCliente = precosPorCliente[cliente.id] || [];
 
-      // Agrupar volumetria por modalidade/especialidade/categoria/prioridade
+      // Agrupar volumetria
       const gruposExames: Record<string, { modalidade: string; especialidade: string; categoria: string; prioridade: string; quantidade: number }> = {};
       
       for (const vol of volumetria) {
-        // APLICAR FILTRO NC-NF: Excluir registros que não devem ser faturados
-        if (vol.tipo_faturamento === 'NC-NF') {
-          console.log(`Excluindo registro NC-NF: ${vol.ESTUDO_DESCRICAO || 'N/A'} do cliente ${vol.EMPRESA || vol.Cliente_Nome_Fantasia}`);
-          continue; // Pular este registro
-        }
+        if (vol.tipo_faturamento === 'NC-NF') continue;
         
         const modalidade = (vol.MODALIDADE || '').toString();
         const especialidade = (vol.ESPECIALIDADE || '').toString();
@@ -247,101 +266,25 @@ serve(async (req) => {
         gruposExames[key].quantidade += qtd;
       }
 
-      // Preparar preços do cliente (busca única)
-      const { data: precosCliente, error: errPrecos } = await supabase
-        .from('precos_servicos')
-        .select('modalidade, especialidade, categoria, prioridade, valor_base, valor_urgencia, volume_inicial, volume_final, considera_prioridade_plantao, ativo')
-        .eq('cliente_id', cliente.id)
-        .eq('ativo', true);
-
-      if (errPrecos) {
-        console.error('Erro buscando precos_servicos:', errPrecos);
-      }
-
-      const norm = (s: string) => (s || '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
-
-      const selecionarPreco = (grupo: { modalidade: string; especialidade: string; categoria: string; prioridade: string; quantidade: number }) => {
-        if (!precosCliente || precosCliente.length === 0) {
-          return { unit: 0, faixa: '', det: { motivo: 'sem_precos_cliente' } };
-        }
-
-        const modalidadeN = norm(grupo.modalidade);
-        const especialidadeN = norm(grupo.especialidade);
-        const categoriaN = norm(grupo.categoria || 'SC') || 'SC';
-        const prioridadeN = norm(grupo.prioridade || '');
-        const volume = grupo.quantidade || 0;
-
-        // Candidatos por MEC (modalidade, especialidade, categoria)
-        let candidatos = precosCliente.filter((p: any) =>
-          norm(p.modalidade) === modalidadeN &&
-          norm(p.especialidade) === especialidadeN &&
-          norm((p.categoria || 'SC')) === categoriaN
-        );
-
-        // Priorizar match exato de prioridade
-        const candidatosPrioridade = candidatos.filter((p: any) => norm(p.prioridade) === prioridadeN);
-        if (candidatosPrioridade.length > 0) candidatos = candidatosPrioridade;
-
-        // Filtrar por faixa de volume (limites nulos permitem faixa aberta)
-        let dentroFaixa = candidatos.filter((p: any) =>
-          (p.volume_inicial == null || p.volume_inicial <= volume) &&
-          (p.volume_final == null || p.volume_final >= volume)
-        );
-
-        // Se nenhuma faixa encaixa, pegar a de maior volume_inicial abaixo do volume
-        if (dentroFaixa.length === 0 && candidatos.length > 0) {
-          const abaixo = candidatos.filter((p: any) => p.volume_inicial == null || p.volume_inicial <= volume);
-          if (abaixo.length > 0) {
-            dentroFaixa = [abaixo.reduce((best: any, cur: any) =>
-              ((best.volume_inicial ?? -Infinity) <= (cur.volume_inicial ?? -Infinity) ? cur : best)
-            )];
-          }
-        }
-
-        if (dentroFaixa.length === 0) {
-          return { unit: 0, faixa: '', det: { motivo: 'sem_match', prioridadeN } };
-        }
-
-        // Em empate, escolher a maior volume_inicial
-        const escolhido = dentroFaixa.length > 1
-          ? dentroFaixa.reduce((best: any, cur: any) => ((best.volume_inicial ?? -Infinity) <= (cur.volume_inicial ?? -Infinity) ? cur : best))
-          : dentroFaixa[0];
-
-        const prioridadeUrg = prioridadeN === 'URGENCIA' || prioridadeN === 'URGÊNCIA' || prioridadeN === 'URG' || prioridadeN === 'PLANTAO' || prioridadeN === 'PLANTÃO';
-        const unit = (prioridadeUrg || (escolhido.considera_prioridade_plantao ?? false))
-          ? (escolhido.valor_urgencia ?? escolhido.valor_base ?? 0)
-          : (escolhido.valor_base ?? 0);
-        const faixa = `${escolhido.volume_inicial ?? 0}-${escolhido.volume_final ?? '∞'}`;
-        const det = { prioridadeN, considera_prioridade_plantao: !!escolhido.considera_prioridade_plantao };
-        return { unit, faixa, det };
-      };
-
-      // Calcular preços para cada grupo usando precificação local (sem RPC por grupo)
+      // Calcular preços para cada grupo
       for (const [key, grupo] of Object.entries(gruposExames)) {
-        try {
-          const { unit, faixa, det } = selecionarPreco(grupo as any);
-          const valorTotalGrupo = unit * (grupo as any).quantidade;
-          valorExamesCalculado += valorTotalGrupo;
+        const { unit } = selecionarPreco(precosCliente, grupo.modalidade, grupo.especialidade, grupo.categoria, grupo.prioridade, grupo.quantidade);
+        const valorTotalGrupo = unit * grupo.quantidade;
+        valorExamesCalculado += valorTotalGrupo;
 
-          detalhesExames.push({
-            modalidade: (grupo as any).modalidade,
-            especialidade: (grupo as any).especialidade,
-            categoria: (grupo as any).categoria,
-            prioridade: (grupo as any).prioridade,
-            quantidade: (grupo as any).quantidade,
-            valor_unitario: unit,
-            valor_total: valorTotalGrupo,
-            faixa_volume: faixa,
-            detalhes_calculo: det,
-            status: unit > 0 ? 'com_preco' : 'sem_preco'
-          });
-
-        } catch (error) {
-          console.error(`Erro no cálculo de preço de ${key}:`, error);
-        }
+        detalhesExames.push({
+          modalidade: grupo.modalidade,
+          especialidade: grupo.especialidade,
+          categoria: grupo.categoria,
+          prioridade: grupo.prioridade,
+          quantidade: grupo.quantidade,
+          valor_unitario: unit,
+          valor_total: valorTotalGrupo,
+          status: unit > 0 ? 'com_preco' : 'sem_preco'
+        });
       }
 
-      // Calcular faturamento completo usando função do banco
+      // Calcular faturamento completo
       const { data: calculoCompleto } = await supabase.rpc('calcular_faturamento_completo', {
         p_cliente_id: cliente.id,
         p_periodo: periodo,
@@ -361,7 +304,7 @@ serve(async (req) => {
         detalhesFranquia = calculo.detalhes_franquia || {};
       }
 
-      // Calcular impostos baseado no contrato
+      // Calcular impostos
       const valorBruto = valorExamesCalculado + valorFranquia + valorPortalLaudos + valorIntegracao;
       let valorISS = 0;
       let valorIRRF = 0;
@@ -372,54 +315,45 @@ serve(async (req) => {
         } else if (parametros.percentual_iss) {
           valorISS = valorBruto * (parametros.percentual_iss / 100);
         }
-        
-        valorIRRF = valorBruto * 0.015; // 1,5% padrão
+        valorIRRF = valorBruto * 0.015;
       }
 
       const valorTotal = valorBruto + valorISS + valorIRRF;
 
-      const demonstrativo: DemonstrativoCliente = {
-        cliente_id: cliente.id,
-        cliente_nome: cliente.nome_fantasia || cliente.nome,
-        periodo,
-        total_exames: totalExames,
-        valor_exames: valorExamesCalculado,
-        valor_franquia: valorFranquia,
-        valor_portal_laudos: valorPortalLaudos,
-        valor_integracao: valorIntegracao,
-        valor_bruto: valorBruto,
-        valor_impostos: valorISS + valorIRRF,
-        valor_total: valorTotal,
-        detalhes_franquia: detalhesFranquia,
-        detalhes_exames: detalhesExames,
-        detalhes_tributacao: {
-          simples_nacional: parametros?.simples || false,
-          percentual_iss: parametros?.percentual_iss,
-          valor_iss: valorISS,
-          base_calculo: valorBruto,
-          impostos_ab_min: parametros?.impostos_ab_min || 0,
-          irrf: valorBruto * 0.015
-        },
-        tipo_faturamento: tipoFaturamento
-      };
-
-      // Incluir no demonstrativo se houver volumetria (exames) OU valor total > 0
+      // Incluir demonstrativo se houver volumetria ou valor > 0
       if (totalExames > 0 || valorTotal > 0) {
-        demonstrativos.push(demonstrativo);
-        console.log(`Demonstrativo criado para ${cliente.nome}: ${totalExames} exames, R$ ${valorTotal.toFixed(2)}`);
-      } else {
-        console.log(`Cliente ${cliente.nome} excluído - sem volumetria e sem valores: ${totalExames} exames, R$ ${valorTotal.toFixed(2)}`);
+        demonstrativos.push({
+          cliente_id: cliente.id,
+          cliente_nome: cliente.nome_fantasia || cliente.nome,
+          periodo,
+          total_exames: totalExames,
+          valor_exames: valorExamesCalculado,
+          valor_franquia: valorFranquia,
+          valor_portal_laudos: valorPortalLaudos,
+          valor_integracao: valorIntegracao,
+          valor_bruto: valorBruto,
+          valor_impostos: valorISS + valorIRRF,
+          valor_total: valorTotal,
+          detalhes_franquia: detalhesFranquia,
+          detalhes_exames: detalhesExames,
+          detalhes_tributacao: {
+            simples_nacional: parametros?.simples || false,
+            percentual_iss: parametros?.percentual_iss,
+            valor_iss: valorISS,
+            base_calculo: valorBruto,
+            impostos_ab_min: parametros?.impostos_ab_min || 0,
+            irrf: valorIRRF
+          },
+          tipo_faturamento: tipoFaturamento
+        });
       }
     }
 
-    console.log(`Total de demonstrativos gerados: ${demonstrativos.length}`);
-
-    // Calcular resumo completo dos demonstrativos
+    // Calcular resumo
     const resumo = {
       clientes_processados: demonstrativos.length,
       total_clientes_processados: demonstrativos.length,
       periodo,
-      // Calcular totais agregados
       total_exames_geral: demonstrativos.reduce((acc, dem) => acc + (dem.total_exames || 0), 0),
       valor_exames_geral: demonstrativos.reduce((acc, dem) => acc + (dem.valor_exames || 0), 0),
       valor_franquias_geral: demonstrativos.reduce((acc, dem) => acc + (dem.valor_franquia || 0), 0),
@@ -431,8 +365,6 @@ serve(async (req) => {
       clientes_simples_nacional: demonstrativos.filter(dem => dem.detalhes_tributacao?.simples_nacional).length,
       clientes_regime_normal: demonstrativos.filter(dem => !dem.detalhes_tributacao?.simples_nacional).length
     };
-
-    console.log('Resumo calculado:', resumo);
 
     return new Response(
       JSON.stringify({
@@ -447,8 +379,6 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Erro na geração de demonstrativos:', error);
-    
     return new Response(
       JSON.stringify({
         success: false,
