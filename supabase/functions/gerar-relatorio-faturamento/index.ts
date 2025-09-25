@@ -336,8 +336,21 @@ serve(async (req: Request) => {
     const impostos = demonstrativoData ? (demonstrativoData.valor_impostos || 0) : totalImpostos;
     const liquido = demonstrativoData ? (demonstrativoData.valor_total || 0) : valorAPagar;
     const laudos = demonstrativoData ? (demonstrativoData.total_exames || 0) : totalLaudos;
+    const valorExames = demonstrativoData ? (demonstrativoData.valor_exames || 0) : 0;
+    const valorFranquia = demonstrativoData ? (demonstrativoData.valor_franquia || 0) : 0;
+    const valorPortal = demonstrativoData ? (demonstrativoData.valor_portal_laudos || 0) : 0;
+    const valorIntegracao = demonstrativoData ? (demonstrativoData.valor_integracao || 0) : 0;
 
+    pdf.setFont('helvetica', 'normal');
     pdf.text(`Total de Laudos: ${laudos}`, rightX, q1RightY); q1RightY += 6;
+
+    if (demonstrativoData) {
+      pdf.text(`Valor Exames: R$ ${valorExames.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, rightX, q1RightY); q1RightY += 6;
+      pdf.text(`Franquia: R$ ${valorFranquia.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, rightX, q1RightY); q1RightY += 6;
+      if (valorPortal > 0) { pdf.text(`Portal Laudos: R$ ${valorPortal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, rightX, q1RightY); q1RightY += 6; }
+      if (valorIntegracao > 0) { pdf.text(`Integração: R$ ${valorIntegracao.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, rightX, q1RightY); q1RightY += 6; }
+    }
+
     pdf.text(`Valor Bruto: R$ ${bruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, rightX, q1RightY); q1RightY += 6;
     if (impostos > 0) {
       pdf.text(`Impostos: R$ ${impostos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, rightX, q1RightY); q1RightY += 6;
