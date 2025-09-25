@@ -96,29 +96,61 @@ serve(async (req) => {
       const tipoFaturamento = contrato?.tipo_faturamento || 'CO-FT';
 
       // Buscar volumetria para este cliente no período
-      const nomesBusca = [
+      // Montar conjunto robusto de aliases para encontrar EMPRESA corretamente (inclui agregados por nome_fantasia)
+      const aliasSet = new Set<string>([
         cliente.nome,
         cliente.nome_fantasia || cliente.nome,
         cliente.nome_mobilemed || cliente.nome
-      ].filter(Boolean);
+      ].filter(Boolean));
 
-      // Busca única por nomes com múltiplas estratégias
+      // Incluir todos os clientes que compartilham o mesmo nome_fantasia (ex.: PRN)
+      if (cliente.nome_fantasia) {
+        const { data: siblings } = await supabase
+          .from('clientes')
+          .select('nome, nome_mobilemed')
+          .eq('nome_fantasia', cliente.nome_fantasia)
+          .eq('ativo', true);
+        (siblings || []).forEach((s: any) => {
+          if (s?.nome) aliasSet.add(s.nome);
+          if (s?.nome_mobilemed) aliasSet.add(s.nome_mobilemed);
+        });
+      }
+
+      // Adicionar variações comuns removendo sufixos
+      const addVariants = (n: string) => {
+        if (!n) return;
+        const v = n.trim();
+        const variants = [
+          v.replace(/[-_ ]TELE$/i, ''),
+          v.replace(/[-_ ]CT$/i, ''),
+          v.replace(/[-_ ]MR$/i, ''),
+          v.replace(/_PLANT[ÃA]O$/i, ''),
+          v.replace(/_RMX$/i, ''),
+        ];
+        variants.forEach(x => { if (x && x !== v) aliasSet.add(x); });
+      };
+      Array.from(aliasSet).forEach(addVariants);
+
+      const nomesBusca = Array.from(aliasSet);
+
+      // Busca por EMPRESA usando todos os aliases
       let volumetria: any[] = [];
-      
-      // Estratégia 1: Busca por EMPRESA
       const { data: volumetriaEmpresa } = await supabase
         .from('volumetria_mobilemed')
         .select('EMPRESA, "Cliente_Nome_Fantasia", MODALIDADE, ESPECIALIDADE, CATEGORIA, PRIORIDADE, VALORES, ESTUDO_DESCRICAO, MEDICO, tipo_faturamento')
         .eq('periodo_referencia', periodo)
         .in('EMPRESA', nomesBusca);
-      
-      // Estratégia 2: Busca por Cliente_Nome_Fantasia
-      const { data: volumetriaFantasia } = await supabase
-        .from('volumetria_mobilemed')
-        .select('EMPRESA, "Cliente_Nome_Fantasia", MODALIDADE, ESPECIALIDADE, CATEGORIA, PRIORIDADE, VALORES, ESTUDO_DESCRICAO, MEDICO, tipo_faturamento')
-        .eq('periodo_referencia', periodo)
-        .in('"Cliente_Nome_Fantasia"', nomesBusca);
-      
+
+      // Busca por Cliente_Nome_Fantasia (quando existir)
+      const fantasiaBusca = cliente.nome_fantasia ? [cliente.nome_fantasia] : [];
+      const { data: volumetriaFantasia } = fantasiaBusca.length > 0
+        ? await supabase
+            .from('volumetria_mobilemed')
+            .select('EMPRESA, "Cliente_Nome_Fantasia", MODALIDADE, ESPECIALIDADE, CATEGORIA, PRIORIDADE, VALORES, ESTUDO_DESCRICAO, MEDICO, tipo_faturamento')
+            .eq('periodo_referencia', periodo)
+            .in('"Cliente_Nome_Fantasia"', fantasiaBusca)
+        : { data: [] as any[] } as any;
+
       // Combinar resultados únicos
       const volumetriaMap = new Map();
       [...(volumetriaEmpresa || []), ...(volumetriaFantasia || [])].forEach(item => {
