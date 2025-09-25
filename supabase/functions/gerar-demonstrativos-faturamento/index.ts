@@ -103,7 +103,7 @@ serve(async (req) => {
       ].filter(Boolean);
 
       // Busca única por nomes com múltiplas estratégias
-      let { data: volumetria } = null;
+let volumetria: any[] = [];
       
       // Estratégia 1: Busca por EMPRESA
       const { data: volumetriaEmpresa } = await supabase
