@@ -241,113 +241,98 @@ serve(async (req) => {
         gruposExames[key].quantidade += qtd;
       }
 
-      // Calcular preços para cada grupo usando função calcular_preco_exame que aplica volumes
+      // Preparar preços do cliente (busca única)
+      const { data: precosCliente, error: errPrecos } = await supabase
+        .from('precos_servicos')
+        .select('modalidade, especialidade, categoria, prioridade, valor_base, valor_urgencia, volume_inicial, volume_final, considera_prioridade_plantao, ativo')
+        .eq('cliente_id', cliente.id)
+        .eq('ativo', true);
+
+      if (errPrecos) {
+        console.error('Erro buscando precos_servicos:', errPrecos);
+      }
+
+      const norm = (s: string) => (s || '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
+
+      const selecionarPreco = (grupo: { modalidade: string; especialidade: string; categoria: string; prioridade: string; quantidade: number }) => {
+        if (!precosCliente || precosCliente.length === 0) {
+          return { unit: 0, faixa: '', det: { motivo: 'sem_precos_cliente' } };
+        }
+
+        const modalidadeN = norm(grupo.modalidade);
+        const especialidadeN = norm(grupo.especialidade);
+        const categoriaN = norm(grupo.categoria || 'SC') || 'SC';
+        const prioridadeN = norm(grupo.prioridade || '');
+        const volume = grupo.quantidade || 0;
+
+        // Candidatos por MEC (modalidade, especialidade, categoria)
+        let candidatos = precosCliente.filter((p: any) =>
+          norm(p.modalidade) === modalidadeN &&
+          norm(p.especialidade) === especialidadeN &&
+          norm((p.categoria || 'SC')) === categoriaN
+        );
+
+        // Priorizar match exato de prioridade
+        const candidatosPrioridade = candidatos.filter((p: any) => norm(p.prioridade) === prioridadeN);
+        if (candidatosPrioridade.length > 0) candidatos = candidatosPrioridade;
+
+        // Filtrar por faixa de volume (limites nulos permitem faixa aberta)
+        let dentroFaixa = candidatos.filter((p: any) =>
+          (p.volume_inicial == null || p.volume_inicial <= volume) &&
+          (p.volume_final == null || p.volume_final >= volume)
+        );
+
+        // Se nenhuma faixa encaixa, pegar a de maior volume_inicial abaixo do volume
+        if (dentroFaixa.length === 0 && candidatos.length > 0) {
+          const abaixo = candidatos.filter((p: any) => p.volume_inicial == null || p.volume_inicial <= volume);
+          if (abaixo.length > 0) {
+            dentroFaixa = [abaixo.reduce((best: any, cur: any) =>
+              ((best.volume_inicial ?? -Infinity) <= (cur.volume_inicial ?? -Infinity) ? cur : best)
+            )];
+          }
+        }
+
+        if (dentroFaixa.length === 0) {
+          return { unit: 0, faixa: '', det: { motivo: 'sem_match', prioridadeN } };
+        }
+
+        // Em empate, escolher a maior volume_inicial
+        const escolhido = dentroFaixa.length > 1
+          ? dentroFaixa.reduce((best: any, cur: any) => ((best.volume_inicial ?? -Infinity) <= (cur.volume_inicial ?? -Infinity) ? cur : best))
+          : dentroFaixa[0];
+
+        const prioridadeUrg = prioridadeN === 'URGENCIA' || prioridadeN === 'URGÊNCIA' || prioridadeN === 'URG' || prioridadeN === 'PLANTAO' || prioridadeN === 'PLANTÃO';
+        const unit = (prioridadeUrg || (escolhido.considera_prioridade_plantao ?? false))
+          ? (escolhido.valor_urgencia ?? escolhido.valor_base ?? 0)
+          : (escolhido.valor_base ?? 0);
+        const faixa = `${escolhido.volume_inicial ?? 0}-${escolhido.volume_final ?? '∞'}`;
+        const det = { prioridadeN, considera_prioridade_plantao: !!escolhido.considera_prioridade_plantao };
+        return { unit, faixa, det };
+      };
+
+      // Calcular preços para cada grupo usando precificação local (sem RPC por grupo)
       for (const [key, grupo] of Object.entries(gruposExames)) {
         try {
-          let precoUnitario = 0;
-          let faixaVolume = '';
-          let detalhesCalculo: any = {};
-          
-          // Usar função calcular_preco_exame que implementa corretamente Vol. Inicial/Final
-          const normalize = (s: string) => (s || '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
-          const modalidadeN = normalize(grupo.modalidade);
-          const especialidadeN = normalize(grupo.especialidade);
-          const prioridadeN = normalize(grupo.prioridade);
-          const categoriaN = normalize(grupo.categoria || 'SC') || 'SC';
-          
-          const tryCalcular = async (opts: { modalidade: string; especialidade: string; categoria: string; prioridade: string; isPlantao: boolean; }) => {
-            const { data, error } = await supabase.rpc('calcular_preco_exame', {
-              p_cliente_id: cliente.id,
-              p_modalidade: opts.modalidade,
-              p_especialidade: opts.especialidade,
-              p_categoria: opts.categoria,
-              p_prioridade: opts.prioridade,
-              p_volume_total: grupo.quantidade,
-              p_is_plantao: opts.isPlantao
-            });
-            return { data, error };
-          };
-          
-          // Tentativa 1: valores originais
-          let tentativa = 1;
-          let calc = await tryCalcular({
-            modalidade: grupo.modalidade,
-            especialidade: grupo.especialidade,
-            categoria: grupo.categoria,
-            prioridade: grupo.prioridade,
-            isPlantao: prioridadeN === 'PLANTAO'
-          });
-          
-          if (calc.error) {
-            console.error(`Erro ao calcular preço (t${tentativa}) para ${key}:`, calc.error);
-          }
-          
-          // Tentativa 2: valores normalizados (sem acento/maiusc.)
-          if (!calc.data || calc.data.length === 0 || Number(calc.data[0]?.valor_unitario || 0) === 0) {
-            tentativa = 2;
-            calc = await tryCalcular({
-              modalidade: modalidadeN,
-              especialidade: especialidadeN,
-              categoria: categoriaN,
-              prioridade: prioridadeN,
-              isPlantao: prioridadeN === 'PLANTAO'
-            });
-            if (calc.error) console.error(`Erro ao calcular preço (t${tentativa}) para ${key}:`, calc.error);
-          }
-          
-          // Tentativa 3: forçar categoria SC
-          if (!calc.data || calc.data.length === 0 || Number(calc.data[0]?.valor_unitario || 0) === 0) {
-            tentativa = 3;
-            calc = await tryCalcular({
-              modalidade: modalidadeN,
-              especialidade: especialidadeN,
-              categoria: 'SC',
-              prioridade: prioridadeN,
-              isPlantao: prioridadeN === 'PLANTAO'
-            });
-            if (calc.error) console.error(`Erro ao calcular preço (t${tentativa}) para ${key}:`, calc.error);
-          }
-          
-          // Tentativa 4: prioridade padrão ROTINA
-          if (!calc.data || calc.data.length === 0 || Number(calc.data[0]?.valor_unitario || 0) === 0) {
-            tentativa = 4;
-            calc = await tryCalcular({
-              modalidade: modalidadeN,
-              especialidade: especialidadeN,
-              categoria: 'SC',
-              prioridade: 'ROTINA',
-              isPlantao: false
-            });
-            if (calc.error) console.error(`Erro ao calcular preço (t${tentativa}) para ${key}:`, calc.error);
-          }
-          
-          if (calc && calc.data && calc.data.length > 0) {
-            const resultado = calc.data[0];
-            precoUnitario = Number(resultado.valor_unitario || 0);
-            faixaVolume = resultado.faixa_volume || '';
-            detalhesCalculo = resultado.detalhes_calculo || {};
-            console.log(`Preço calculado (t${tentativa}) para ${key}: R$ ${precoUnitario} (faixa: ${faixaVolume})`);
-          } else {
-            console.log(`Nenhum preço encontrado para ${key} após tentativas - verificar tabela de preços`);
-          }
-          
-          const valorTotal = precoUnitario * grupo.quantidade;
-          valorExamesCalculado += valorTotal;
-          
+          const { unit, faixa, det } = selecionarPreco(grupo as any);
+          const valorTotalGrupo = unit * (grupo as any).quantidade;
+          valorExamesCalculado += valorTotalGrupo;
+
           detalhesExames.push({
-            modalidade: grupo.modalidade,
-            especialidade: grupo.especialidade,
-            categoria: grupo.categoria,
-            prioridade: grupo.prioridade,
-            quantidade: grupo.quantidade,
-            valor_unitario: precoUnitario,
-            valor_total: valorTotal,
-            faixa_volume: faixaVolume,
-            detalhes_calculo: detalhesCalculo,
-            status: precoUnitario > 0 ? 'com_preco' : 'sem_preco'
+            modalidade: (grupo as any).modalidade,
+            especialidade: (grupo as any).especialidade,
+            categoria: (grupo as any).categoria,
+            prioridade: (grupo as any).prioridade,
+            quantidade: (grupo as any).quantidade,
+            valor_unitario: unit,
+            valor_total: valorTotalGrupo,
+            faixa_volume: faixa,
+            detalhes_calculo: det,
+            status: unit > 0 ? 'com_preco' : 'sem_preco'
           });
-          
-          console.log(`Calculado para ${key}: ${grupo.quantidade} x R$ ${precoUnitario} = R$ ${valorTotal}`);
+
+          if (unit === 0) {
+            console.log(`Nenhum preço encontrado para ${key} - verificar tabela de preços`);
+          }
         } catch (error) {
           console.error(`Erro no cálculo de preço de ${key}:`, error);
         }
