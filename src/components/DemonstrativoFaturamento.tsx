@@ -1186,12 +1186,12 @@ export default function DemonstrativoFaturamento() {
                   </div>
                   <div className="text-sm text-muted-foreground">Clientes</div>
                 </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-gray-800">
-                    {resumoCalculado.total_exames_geral.toLocaleString()}
-                  </div>
-                  <div className="text-sm text-muted-foreground">Total Exames</div>
-                </div>
+                 <div className="text-center">
+                   <div className="text-2xl font-bold text-gray-800">
+                     {(resumoCalculado.total_exames_geral || 0).toLocaleString()}
+                   </div>
+                   <div className="text-sm text-muted-foreground">Total Exames</div>
+                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-green-600">
                     {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(resumoCalculado.valor_exames_geral)}
@@ -1266,9 +1266,9 @@ export default function DemonstrativoFaturamento() {
                                 {detalhe.categoria === 'TC' && <span className="text-red-600 ml-1">⚠️</span>}
                               </td>
                               <td className="py-1 px-3 border-b">{detalhe.prioridade}</td>
-                              <td className="py-1 px-3 text-right border-b">
-                                {detalhe.quantidade.toLocaleString('pt-BR')}
-                              </td>
+                               <td className="py-1 px-3 text-right border-b">
+                                 {(detalhe.quantidade || 0).toLocaleString('pt-BR')}
+                               </td>
                               <td className="py-1 px-3 text-right font-medium border-b">
                                 {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(detalhe.valor_total)}
                               </td>
@@ -1375,9 +1375,9 @@ export default function DemonstrativoFaturamento() {
                             {cliente.tipo_faturamento || 'Não definido'}
                           </Badge>
                         </td>
-                        <td className="py-3 px-4 text-right">{cliente.total_exames.toLocaleString()}</td>
-                        <td className="py-3 px-4 text-right">R$ {cliente.valor_bruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                        <td className="py-3 px-4 text-right font-medium">R$ {cliente.valor_liquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                         <td className="py-3 px-4 text-right">{(cliente.total_exames || 0).toLocaleString()}</td>
+                         <td className="py-3 px-4 text-right">R$ {(cliente.valor_bruto || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                         <td className="py-3 px-4 text-right font-medium">R$ {(cliente.valor_liquido || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
                         <td className="py-3 px-4 text-center">
                           <Badge 
                             variant={
