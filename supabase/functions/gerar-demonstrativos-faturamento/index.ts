@@ -151,7 +151,7 @@ serve(async (req) => {
         try {
           let precoUnitario = 0;
           let faixaVolume = '';
-          let detalhesCalculo = {};
+          let detalhesCalculo: any = {};
           
           // Usar função calcular_preco_exame que implementa corretamente Vol. Inicial/Final
           const { data: precoCalculado, error: precoError } = await supabase.rpc('calcular_preco_exame', {
