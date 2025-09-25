@@ -172,9 +172,9 @@ serve(async (req) => {
             faixaVolume = resultado.faixa_volume || '';
             detalhesCalculo = resultado.detalhes_calculo || {};
             
-            console.log(`Preço calculado para ${key}: R$ ${precoUnitario} (faixa: ${faixaVolume})`);
+            console.log(`Preço calculado para ${key}: R$ ${precoUnitario} (faixa: ${faixaVolume}) - VOLUMES IMPLEMENTADOS`);
           } else {
-            console.log(`Nenhum preço encontrado para ${key}`);
+            console.log(`Nenhum preço encontrado para ${key} - Verificar tabela de preços`);
           }
           
           const valorTotal = precoUnitario * grupo.quantidade;
