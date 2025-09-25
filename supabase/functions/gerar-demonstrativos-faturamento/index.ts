@@ -64,7 +64,10 @@ serve(async (req) => {
         ),
         contratos_clientes(
           tipo_faturamento,
-          numero_contrato
+          numero_contrato,
+          percentual_iss,
+          impostos_ab_min,
+          simples
         )
       `)
       .eq('ativo', true);
@@ -137,24 +140,24 @@ serve(async (req) => {
       let volumetria: any[] = [];
       const { data: volumetriaEmpresa } = await supabase
         .from('volumetria_mobilemed')
-        .select('EMPRESA, "Cliente_Nome_Fantasia", MODALIDADE, ESPECIALIDADE, CATEGORIA, PRIORIDADE, VALORES, ESTUDO_DESCRICAO, MEDICO, tipo_faturamento')
-        .eq('periodo_referencia', periodo)
-        .in('EMPRESA', nomesBusca);
+          .select('id, EMPRESA, "Cliente_Nome_Fantasia", MODALIDADE, ESPECIALIDADE, CATEGORIA, PRIORIDADE, VALORES, ESTUDO_DESCRICAO, MEDICO, tipo_faturamento')
+          .eq('periodo_referencia', periodo)
+          .in('EMPRESA', nomesBusca);
 
       // Busca por Cliente_Nome_Fantasia (quando existir)
       const fantasiaBusca = cliente.nome_fantasia ? [cliente.nome_fantasia] : [];
       const { data: volumetriaFantasia } = fantasiaBusca.length > 0
         ? await supabase
             .from('volumetria_mobilemed')
-            .select('EMPRESA, "Cliente_Nome_Fantasia", MODALIDADE, ESPECIALIDADE, CATEGORIA, PRIORIDADE, VALORES, ESTUDO_DESCRICAO, MEDICO, tipo_faturamento')
-            .eq('periodo_referencia', periodo)
-            .in('Cliente_Nome_Fantasia', fantasiaBusca)
-        : { data: [] as any[] } as any;
+              .select('id, EMPRESA, "Cliente_Nome_Fantasia", MODALIDADE, ESPECIALIDADE, CATEGORIA, PRIORIDADE, VALORES, ESTUDO_DESCRICAO, MEDICO, tipo_faturamento')
+              .eq('periodo_referencia', periodo)
+              .in('Cliente_Nome_Fantasia', fantasiaBusca)
+          : { data: [] as any[] } as any;
 
       // Combinar resultados únicos
       const volumetriaMap = new Map();
       [...(volumetriaEmpresa || []), ...(volumetriaFantasia || [])].forEach(item => {
-        const key = `${item.EMPRESA}_${item.ESTUDO_DESCRICAO || ''}_${item.VALORES}_${item.MEDICO || ''}`;
+        const key = item.id || `${item.EMPRESA}_${item.ESTUDO_DESCRICAO || ''}_${item.VALORES}_${item.MEDICO || ''}`;
         volumetriaMap.set(key, item);
       });
       volumetria = Array.from(volumetriaMap.values());
@@ -223,7 +226,7 @@ serve(async (req) => {
           
           const combinar = (arr?: any[] | null) => {
             (arr || []).forEach(item => {
-              const key = `${item.EMPRESA}_${item.ESTUDO_DESCRICAO || ''}_${item.VALORES}_${item.MEDICO || ''}`;
+              const key = item.id || `${item.EMPRESA}_${item.ESTUDO_DESCRICAO || ''}_${item.VALORES}_${item.MEDICO || ''}`;
               volumetriaMap.set(key, item);
             });
           };
@@ -253,6 +256,18 @@ serve(async (req) => {
           return isMedicinaInterna && !isExcludedDoctor;
         });
       }
+
+      // Filtrar volumetria para o cliente atual, evitando capturas indevidas por padrões
+      const nomeFantasiaAtual = (cliente.nome_fantasia || cliente.nome || '').toString().toUpperCase();
+      const nomesBuscaSet = new Set(nomesBusca.map((n) => (n || '').toString().toUpperCase()));
+      volumetria = (volumetria || []).filter((vol: any) => {
+        const emp = (vol.EMPRESA || '').toString().toUpperCase();
+        const fant = (vol["Cliente_Nome_Fantasia"] || vol.Cliente_Nome_Fantasia || '').toString().toUpperCase();
+        const matchEmpresa = nomesBuscaSet.has(emp);
+        const matchFantasiaExata = fant === nomeFantasiaAtual;
+        const matchFantasiaFamilia = fant.startsWith(nomeFantasiaAtual) && nomeFantasiaAtual.length >= 2;
+        return matchEmpresa || matchFantasiaExata || matchFantasiaFamilia || (!fant && matchEmpresa);
+      });
 
       // Contar exames totais (apenas registros faturáveis) - APLICANDO TODOS OS FILTROS DE EXCLUSÃO
       let totalExames = 0;
@@ -447,15 +462,19 @@ serve(async (req) => {
       let valorISS = 0;
       let valorIRRF = 0;
 
-      if (parametros) {
-        if (parametros.simples && parametros.impostos_ab_min) {
-          valorISS = Math.max(valorBruto * (parametros.percentual_iss / 100 || 0), parametros.impostos_ab_min);
-        } else if (parametros.percentual_iss) {
-          valorISS = valorBruto * (parametros.percentual_iss / 100);
-        }
-        
-        valorIRRF = valorBruto * 0.015; // 1,5% padrão
+      // Cálculo de impostos usando parâmetros ou contrato como fallback
+      const simplesFlag = Boolean(parametros?.simples ?? contrato?.simples ?? false);
+      const percISS = Number(parametros?.percentual_iss ?? contrato?.percentual_iss ?? 0) || 0;
+      const abMin = Number(parametros?.impostos_ab_min ?? contrato?.impostos_ab_min ?? 0) || 0;
+
+      if (percISS > 0) {
+        valorISS = valorBruto * (percISS / 100);
       }
+      if (simplesFlag && abMin > 0) {
+        valorISS = Math.max(valorISS, abMin);
+      }
+      // IRRF: só em regime normal
+      valorIRRF = simplesFlag ? 0 : (valorBruto * 0.015);
 
       const totalImpostos = valorISS + valorIRRF;
       const valorLiquido = valorBruto - totalImpostos; // VALOR LÍQUIDO = BRUTO - IMPOSTOS
