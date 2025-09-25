@@ -319,7 +319,7 @@ export default function DemonstrativoFaturamento() {
                    email: emailCliente,
                    total_exames: demo.total_exames || 0,
                    valor_bruto: Number(demo.valor_bruto ?? demo.valor_exames ?? 0),
-                   valor_liquido: Number(demo.valor_total ?? demo.valor_liquido ?? 0),
+                   valor_liquido: Number((demo.valor_total ?? demo.valor_liquido ?? ((demo.valor_bruto ?? demo.valor_exames ?? 0) - (demo.valor_impostos ?? 0)))),
                    periodo: periodo,
                    status_pagamento: 'pendente' as const,
                    data_vencimento: new Date().toISOString().split('T')[0],
