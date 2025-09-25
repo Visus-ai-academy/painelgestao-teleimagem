@@ -854,33 +854,35 @@ serve(async (req: Request) => {
         console.log('Aviso: não foi possível verificar/criar bucket:', bErr?.message || bErr);
       }
 
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('relatorios-faturamento')
-        .upload(fileName, new Uint8Array(pdfBuffer), {
-          contentType: 'application/pdf',
-          cacheControl: '3600',
-          upsert: true
-        });
-
-      if (uploadError) {
-        console.error('Erro no upload do PDF:', uploadError);
-      } else {
-        const { data: { publicUrl } } = supabase.storage
+      // Upload do PDF
+      try {
+        const { data: uploadData, error: uploadError } = await supabase.storage
           .from('relatorios-faturamento')
-          .getPublicUrl(fileName);
-        
-        pdfUrl = publicUrl;
-        console.log('Relatório PDF gerado com sucesso:', pdfUrl);
-      }
+          .upload(fileName, new Uint8Array(pdfBuffer), {
+            contentType: 'application/pdf',
+            cacheControl: '3600',
+            upsert: true
+          });
+
+        if (uploadError) {
+          console.error('Erro no upload do PDF:', uploadError);
+        } else {
+          const { data: { publicUrl } } = supabase.storage
+            .from('relatorios-faturamento')
+            .getPublicUrl(fileName);
+          
+          pdfUrl = publicUrl;
+          console.log('Relatório PDF gerado com sucesso:', pdfUrl);
+        }
       } catch (pdfError) {
         console.error('Erro na geração do relatório:', pdfError);
       }
 
     // Sempre retornar sucesso, mesmo sem dados
-      const response = {
-        success: true,
-        message: "Relatório gerado com sucesso",
-        cliente: cliente.nome_fantasia || cliente.nome,
+    const response = {
+      success: true,
+      message: "Relatório gerado com sucesso",
+      cliente: cliente.nome_fantasia || cliente.nome,
       periodo: periodo,
       totalRegistros: finalData.length,
       dadosEncontrados: finalData.length > 0,
@@ -894,6 +896,7 @@ serve(async (req: Request) => {
       },
       timestamp: new Date().toISOString()
     };
+    
     return new Response(JSON.stringify(response), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -910,7 +913,7 @@ serve(async (req: Request) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
-  }; // Fim da função processRequest
+  };
 
   // Executar com timeout
   try {
@@ -926,4 +929,4 @@ serve(async (req: Request) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
-});
+}); // End serve function
