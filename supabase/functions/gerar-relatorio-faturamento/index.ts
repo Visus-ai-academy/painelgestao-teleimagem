@@ -290,69 +290,157 @@ serve(async (req: Request) => {
     pdf.setTextColor(0, 0, 0); // Preto
     
     pdf.text(`Cliente: ${dadosRelatorio.cliente_nome || cliente.nome}`, margin, yPos);
-    yPos += 10;
-    
+    yPos += 8;
     pdf.text(`CNPJ: ${formatarCNPJ(dadosRelatorio.cliente_cnpj || cliente.cnpj || 'Não informado')}`, margin, yPos);
-    yPos += 10;
-    
+    yPos += 8;
     pdf.setFontSize(14);
-    pdf.text(`Período: ${periodo}`, margin, yPos);
-    yPos += 20;
+    pdf.text(`Período de referência: ${periodo}`, margin, yPos);
+    yPos += 12;
 
-    // === TABELA DE DETALHAMENTO CONFORME TEMPLATE ORIGINAL ===
+    // ================= QUADRO 1 - RESUMO =================
+    // Barra de título do quadro
+    pdf.setFillColor(0, 124, 186);
+    pdf.setTextColor(255, 255, 255);
+    pdf.rect(margin, yPos, pageWidth - margin * 2, 10, 'F');
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(14);
+    const q1Title = 'QUADRO 1 - RESUMO';
+    const q1TitleW = pdf.getTextWidth(q1Title);
+    pdf.text(q1Title, margin + (pageWidth - margin * 2) / 2 - q1TitleW / 2, yPos + 7);
+    yPos += 12;
+
+    // Moldura do quadro
+    const q1Height = 40;
+    pdf.setDrawColor(0, 124, 186);
+    pdf.rect(margin, yPos, pageWidth - margin * 2, q1Height, 'S');
+
+    // Conteúdo do resumo (distribuído em duas colunas)
+    pdf.setFont('helvetica', 'normal');
+    pdf.setTextColor(0, 0, 0);
+    pdf.setFontSize(10);
+    const colGap = 8;
+    const colW = (pageWidth - margin * 2 - colGap) / 2;
+    let q1Y = yPos + 8;
+
+    // Coluna esquerda
+    pdf.text(`Cliente: ${dadosRelatorio.cliente_nome || cliente.nome}`, margin + 6, q1Y);
+    q1Y += 6;
+    pdf.text(`CNPJ: ${formatarCNPJ(dadosRelatorio.cliente_cnpj || cliente.cnpj || 'Não informado')}`, margin + 6, q1Y);
+    q1Y += 6;
+    pdf.text(`Período: ${periodo}`, margin + 6, q1Y);
+
+    // Coluna direita (resumo financeiro)
+    let q1RightY = yPos + 8;
+    const rightX = margin + colW + colGap + 6;
+    const bruto = demonstrativoData ? (demonstrativoData.valor_bruto || 0) : valorBrutoTotal;
+    const impostos = demonstrativoData ? (demonstrativoData.valor_impostos || 0) : totalImpostos;
+    const liquido = demonstrativoData ? (demonstrativoData.valor_total || 0) : valorAPagar;
+    const laudos = demonstrativoData ? (demonstrativoData.total_exames || 0) : totalLaudos;
+
+    pdf.text(`Total de Laudos: ${laudos}`, rightX, q1RightY); q1RightY += 6;
+    pdf.text(`Valor Bruto: R$ ${bruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, rightX, q1RightY); q1RightY += 6;
+    if (impostos > 0) {
+      pdf.text(`Impostos: R$ ${impostos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, rightX, q1RightY); q1RightY += 6;
+    }
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(`TOTAL A PAGAR: R$ ${liquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, rightX, q1RightY);
+    pdf.setFont('helvetica', 'normal');
+
+    yPos += q1Height + 10;
+
+    // ================= QUADRO 2 - DETALHAMENTO =================
+    // Barra de título do quadro
+    pdf.setFillColor(0, 124, 186);
+    pdf.setTextColor(255, 255, 255);
+    pdf.rect(margin, yPos, pageWidth - margin * 2, 10, 'F');
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(14);
+    const q2Title = 'QUADRO 2 - DETALHAMENTO';
+    const q2TitleW = pdf.getTextWidth(q2Title);
+    pdf.text(q2Title, margin + (pageWidth - margin * 2) / 2 - q2TitleW / 2, yPos + 7);
+    yPos += 12;
+
+    // Delimitar área do quadro 2 (iremos ajustar a altura após renderizar as linhas)
+    const q2StartY = yPos;
+
+    // Cabeçalho da tabela
     if (finalData.length > 0) {
-      // Cabeçalho da tabela
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(10);
       pdf.setTextColor(0, 0, 0);
-      
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(9);
+
       const tableHeaders = ['Modalidade', 'Especialidade', 'Categoria', 'Prioridade', 'Qtd', 'Valor Unit.', 'Valor Total'];
-      const colWidths = [30, 50, 25, 25, 15, 25, 30]; // Larguras das colunas para paisagem
+      const colWidths = [30, 50, 25, 25, 15, 25, 30];
       let xPos = margin;
-      
-      // Desenhar cabeçalho da tabela
+
+      pdf.setFillColor(240, 240, 240);
       for (let i = 0; i < tableHeaders.length; i++) {
-        pdf.setFillColor(240, 240, 240); // Fundo cinza claro
         pdf.rect(xPos, yPos, colWidths[i], 8, 'FD');
         pdf.text(tableHeaders[i], xPos + 2, yPos + 5);
         xPos += colWidths[i];
       }
       yPos += 8;
-      
-      // Dados da tabela
+
+      // Dados
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(8);
-      
       for (let i = 0; i < finalData.length; i++) {
         const item = finalData[i];
         xPos = margin;
-        
-        // Verificar se precisa de nova página
-        if (yPos > pageHeight - 30) {
+
+        // Nova página se necessário (reinserir barra de título do quadro 2 na nova página)
+        if (yPos > pageHeight - 20) {
           pdf.addPage();
           yPos = margin;
+          pdf.setFillColor(0, 124, 186);
+          pdf.setTextColor(255, 255, 255);
+          pdf.rect(margin, yPos, pageWidth - margin * 2, 10, 'F');
+          pdf.setFont('helvetica', 'bold');
+          pdf.setFontSize(14);
+          const q2t = 'QUADRO 2 - DETALHAMENTO';
+          const q2tw = pdf.getTextWidth(q2t);
+          pdf.text(q2t, margin + (pageWidth - margin * 2) / 2 - q2tw / 2, yPos + 7);
+          yPos += 12;
+
+          // Cabeçalho novamente
+          pdf.setTextColor(0, 0, 0);
+          pdf.setFont('helvetica', 'bold');
+          pdf.setFontSize(9);
+          let xh = margin;
+          pdf.setFillColor(240, 240, 240);
+          for (let j = 0; j < tableHeaders.length; j++) {
+            pdf.rect(xh, yPos, colWidths[j], 8, 'FD');
+            pdf.text(tableHeaders[j], xh + 2, yPos + 5);
+            xh += colWidths[j];
+          }
+          yPos += 8;
+          pdf.setFont('helvetica', 'normal');
+          pdf.setFontSize(8);
         }
-        
+
+        const quantidadeStr = (demonstrativoData ? (item.quantidade ?? 1) : (item.VALORES ?? 1)).toString();
+        const valorUnitStr = (demonstrativoData
+          ? (item.valor_unitario ? `R$ ${item.valor_unitario.toFixed(2)}` : '')
+          : (item.valor ? `R$ ${(item.valor / (Number(item.VALORES) || 1)).toFixed(2)}` : ''));
+        const valorTotalStr = (demonstrativoData
+          ? (item.valor_total ? `R$ ${item.valor_total.toFixed(2)}` : '')
+          : (item.valor ? `R$ ${Number(item.valor).toFixed(2)}` : ''));
+
         const rowData = [
           item.modalidade || item.MODALIDADE || '',
           item.especialidade || item.ESPECIALIDADE || '',
           item.categoria || item.CATEGORIA || 'SC',
           item.prioridade || item.PRIORIDADE || '',
-          demonstrativoData ? (item.quantidade?.toString() || '1') : (item.VALORES?.toString() || '1'),
-          demonstrativoData ? 
-            (item.valor_unitario ? `R$ ${item.valor_unitario.toFixed(2)}` : '') :
-            (item.valor ? `R$ ${(item.valor / (Number(item.VALORES) || 1)).toFixed(2)}` : ''),
-          demonstrativoData ?
-            (item.valor_total ? `R$ ${item.valor_total.toFixed(2)}` : '') :
-            (item.valor ? `R$ ${Number(item.valor).toFixed(2)}` : '')
+          quantidadeStr,
+          valorUnitStr,
+          valorTotalStr
         ];
-        
+
         for (let j = 0; j < rowData.length; j++) {
           pdf.rect(xPos, yPos, colWidths[j], 6, 'S');
-          const text = rowData[j].toString();
-          const textWidth = pdf.getTextWidth(text);
+          const text = rowData[j]?.toString() ?? '';
           const maxWidth = colWidths[j] - 4;
-          
+          const textWidth = pdf.getTextWidth(text);
           if (textWidth > maxWidth && text.length > 10) {
             pdf.text(text.substring(0, 8) + '...', xPos + 2, yPos + 4);
           } else {
@@ -362,41 +450,12 @@ serve(async (req: Request) => {
         }
         yPos += 6;
       }
-      
-      yPos += 10;
     }
-    
-    // === RESUMO DE TOTAIS NO CANTO DIREITO INFERIOR ===
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(12);
-    pdf.setTextColor(0, 0, 0);
-    
-    const resumoX = pageWidth - 120;
-    yPos = Math.max(yPos, pageHeight - 60); // Posicionar próximo ao final da página
-    
-    if (demonstrativoData) {
-      pdf.text(`Total de Laudos: ${demonstrativoData.total_exames || 0}`, resumoX, yPos);
-      yPos += 7;
-      pdf.text(`Valor Bruto: R$ ${(demonstrativoData.valor_bruto || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, resumoX, yPos);
-      yPos += 7;
-      if (demonstrativoData.valor_impostos > 0) {
-        pdf.text(`Impostos: R$ ${demonstrativoData.valor_impostos.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, resumoX, yPos);
-        yPos += 7;
-      }
-      pdf.setFontSize(14);
-      pdf.setTextColor(200, 0, 0); // Vermelho para destaque
-      pdf.text(`TOTAL: R$ ${(demonstrativoData.valor_total || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, resumoX, yPos);
-    } else {
-      pdf.text(`Total de Laudos: ${totalLaudos}`, resumoX, yPos);
-      yPos += 7;
-      pdf.text(`Valor Bruto: R$ ${valorBrutoTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, resumoX, yPos);
-      yPos += 7;
-      pdf.text(`Impostos: R$ ${totalImpostos.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, resumoX, yPos);
-      yPos += 7;
-      pdf.setFontSize(14);
-      pdf.setTextColor(200, 0, 0); // Vermelho
-      pdf.text(`TOTAL: R$ ${valorAPagar.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, resumoX, yPos);
-    }
+
+    // Desenhar moldura do Quadro 2
+    const q2EndY = yPos;
+    pdf.setDrawColor(0, 124, 186);
+    pdf.rect(margin, q2StartY - 2, pageWidth - margin * 2, Math.max(20, q2EndY - q2StartY + 4), 'S');
     
     // === RODAPÉ ===
     pdf.setFont('helvetica', 'normal');
