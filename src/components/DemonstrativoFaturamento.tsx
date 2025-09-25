@@ -1082,6 +1082,7 @@ export default function DemonstrativoFaturamento() {
               valor_franquias_geral: demonstrativos.reduce((sum, dem) => sum + (dem.valor_franquia || 0), 0),
               valor_portal_geral: demonstrativos.reduce((sum, dem) => sum + (dem.valor_portal_laudos || 0), 0),
               valor_integracao_geral: demonstrativos.reduce((sum, dem) => sum + (dem.valor_integracao || 0), 0),
+              valor_adicionais_geral: demonstrativos.reduce((sum, dem) => sum + ((dem.valor_franquia || 0) + (dem.valor_portal_laudos || 0) + (dem.valor_integracao || 0)), 0),
               valor_bruto_geral: demonstrativos.reduce((sum, dem) => sum + (dem.valor_bruto || 0), 0),
               valor_impostos_geral: demonstrativos.reduce((sum, dem) => sum + (dem.valor_impostos || 0), 0),
               valor_total_geral: demonstrativos.reduce((sum, dem) => sum + (dem.valor_total || 0), 0),
@@ -1182,13 +1183,13 @@ export default function DemonstrativoFaturamento() {
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-purple-600">
-                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format((resumoCalculado.valor_franquias_geral || 0) + (resumoCalculado.valor_portal_geral || 0) + (resumoCalculado.valor_integracao_geral || 0))}
+                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(resumoCalculado.valor_adicionais_geral || 0)}
                   </div>
                   <div className="text-sm text-muted-foreground">Adicionais</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-orange-600">
-                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(resumoCalculado.valor_exames_geral + ((resumoCalculado.valor_franquias_geral || 0) + (resumoCalculado.valor_portal_geral || 0) + (resumoCalculado.valor_integracao_geral || 0)))}
+                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(resumoCalculado.valor_bruto_geral || 0)}
                   </div>
                   <div className="text-sm text-muted-foreground">Valor Bruto</div>
                 </div>

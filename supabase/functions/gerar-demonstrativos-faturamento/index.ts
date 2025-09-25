@@ -159,65 +159,73 @@ serve(async (req) => {
       });
       volumetria = Array.from(volumetriaMap.values());
 
-      // Estratégia 3: Para clientes específicos, fazer busca por padrão (agrupamento)
+      // Estratégia 3: SEMPRE fazer busca por padrão para agrupamentos (independente se já encontrou dados)
       const nomeFantasia = cliente.nome_fantasia || cliente.nome;
+      let padroesBusca: string[] = [];
       
-      if ((!volumetria || volumetria.length === 0)) {
-        let padroesBusca: string[] = [];
-        
-        // Agrupamento específico por padrão - TODAS as regras mantidas
-        if (nomeFantasia === 'PRN') {
-          padroesBusca = ['PRN%'];
-        } else if (['CEDIDIAG', 'CEDI-RJ', 'CEDI-RO', 'CEDI_RJ', 'CEDI_RO', 'CEDI_RX'].includes(nomeFantasia)) {
-          padroesBusca = ['CEDI%'];
-        }
-        // Agrupamentos por sufixos comuns  
-        else if (nomeFantasia === 'CDI_HCMINEIROS') {
-          padroesBusca = ['CDI_HCMINEIROS%'];
-        } else if (nomeFantasia === 'CDMINEIROS') {
-          padroesBusca = ['CDMINEIROS%'];
-        } else if (nomeFantasia === 'GDI') {
-          padroesBusca = ['GDI%'];
-        } else if (nomeFantasia === 'RADIOCOR') {
-          padroesBusca = ['RADIOCOR%', 'NL_RADIOCOR%'];
-        } else if (nomeFantasia === 'NL_RADIOCOR') {
-          padroesBusca = ['NL_RADIOCOR%'];
-        } else if (nomeFantasia === 'INTERCOR') {
-          padroesBusca = ['INTERCOR%'];
-        } else if (nomeFantasia === 'RMPADUA') {
-          padroesBusca = ['PADUA%'];
-        } else if (nomeFantasia === 'VIVERCLIN') {
-          padroesBusca = ['VIVERCLIN%'];
-        } else if (nomeFantasia === 'C.BITTENCOURT') {
-          padroesBusca = ['C.BITTENCOURT%', 'C_BITTENCOURT%', 'C-BITTENCOURT%', 'CBITTENCOURT%'];
-        } else if (nomeFantasia === 'CBU') {
-          padroesBusca = ['CBU%', 'C_BU%', 'C-BU%'];
-        } else if (nomeFantasia === 'CDATUCURUI' || nomeFantasia === 'CDA TUCURUI') {
-          padroesBusca = ['CDATUCURUI%', 'CDA_TUCURUI%', 'CDA-TUCURUI%', 'CDA TUCURUI%'];
-        }
-        // Agrupamento genérico: se nome_fantasia é diferente do nome, buscar variações
-        else if (cliente.nome_fantasia && cliente.nome_fantasia !== cliente.nome) {
-          // Tentar buscar variações do nome fantasia
-          padroesBusca = [
-            `${nomeFantasia}%`, 
-            `${nomeFantasia}_%`, 
-            `${nomeFantasia}-%`
-          ];
-        }
-        
-        if (padroesBusca.length > 0) {
-          for (const padrao of padroesBusca) {
-            const { data: volumetriaAgrupada } = await supabase
-              .from('volumetria_mobilemed')
-              .select('*')
-              .eq('periodo_referencia', periodo)
-              .like('"EMPRESA"', padrao);
-            
-            if (volumetriaAgrupada && volumetriaAgrupada.length > 0) {
-              volumetria = (volumetria || []).concat(volumetriaAgrupada);
-            }
+      // Agrupamento específico por padrão - TODAS as regras mantidas
+      if (nomeFantasia === 'PRN') {
+        padroesBusca = ['PRN%'];
+      } else if (['CEDIDIAG', 'CEDI-RJ', 'CEDI-RO', 'CEDI_RJ', 'CEDI_RO', 'CEDI_RX'].includes(nomeFantasia)) {
+        padroesBusca = ['CEDI%'];
+      }
+      // Agrupamentos por sufixos comuns  
+      else if (nomeFantasia === 'CDI_HCMINEIROS') {
+        padroesBusca = ['CDI_HCMINEIROS%'];
+      } else if (nomeFantasia === 'CDMINEIROS') {
+        padroesBusca = ['CDMINEIROS%'];
+      } else if (nomeFantasia === 'GDI') {
+        padroesBusca = ['GDI%'];
+      } else if (nomeFantasia === 'RADIOCOR') {
+        padroesBusca = ['RADIOCOR%', 'NL_RADIOCOR%'];
+      } else if (nomeFantasia === 'NL_RADIOCOR') {
+        padroesBusca = ['NL_RADIOCOR%'];
+      } else if (nomeFantasia === 'INTERCOR') {
+        padroesBusca = ['INTERCOR%'];
+      } else if (nomeFantasia === 'RMPADUA') {
+        padroesBusca = ['PADUA%'];
+      } else if (nomeFantasia === 'VIVERCLIN') {
+        padroesBusca = ['VIVERCLIN%'];
+      } else if (nomeFantasia === 'C.BITTENCOURT') {
+        padroesBusca = ['C.BITTENCOURT%', 'C_BITTENCOURT%', 'C-BITTENCOURT%', 'CBITTENCOURT%'];
+      } else if (nomeFantasia === 'CBU') {
+        padroesBusca = ['CBU%', 'C_BU%', 'C-BU%'];
+      } else if (nomeFantasia === 'CDATUCURUI' || nomeFantasia === 'CDA TUCURUI') {
+        padroesBusca = ['CDATUCURUI%', 'CDA_TUCURUI%', 'CDA-TUCURUI%', 'CDA TUCURUI%'];
+      } else if (nomeFantasia.includes('AKCPALMAS') || nomeFantasia.includes('AKC')) {
+        padroesBusca = ['AKC%', 'AKCPALMAS%'];
+      }
+      // Agrupamento genérico: se nome_fantasia é diferente do nome, buscar variações
+      else if (cliente.nome_fantasia && cliente.nome_fantasia !== cliente.nome) {
+        // Tentar buscar variações do nome fantasia
+        padroesBusca = [
+          `${nomeFantasia}%`, 
+          `${nomeFantasia}_%`, 
+          `${nomeFantasia}-%`
+        ];
+      }
+      
+      // SEMPRE executar busca por padrão se houver padrões definidos
+      if (padroesBusca.length > 0) {
+        for (const padrao of padroesBusca) {
+          const { data: volumetriaAgrupada } = await supabase
+            .from('volumetria_mobilemed')
+            .select('*')
+            .eq('periodo_referencia', periodo)
+            .like('"EMPRESA"', padrao);
+          
+          if (volumetriaAgrupada && volumetriaAgrupada.length > 0) {
+            // Adicionar ao conjunto usando Map para evitar duplicatas
+            volumetriaAgrupada.forEach(item => {
+              const key = `${item.EMPRESA}_${item.ESTUDO_DESCRICAO || ''}_${item.VALORES}_${item.MEDICO || ''}`;
+              volumetriaMap.set(key, item);
+            });
           }
         }
+        
+        // Recriar array a partir do Map atualizado
+        volumetria = Array.from(volumetriaMap.values());
+        console.log(`📊 Volume após busca por padrão para ${nomeFantasia}: ${volumetria.length} registros`);
       }
 
       // REGRA ESPECÍFICA CEDIDIAG: apenas Medicina Interna, excluindo médico específico
