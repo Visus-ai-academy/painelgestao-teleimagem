@@ -415,12 +415,12 @@ serve(async (req) => {
         tipo_faturamento: tipoFaturamento
       };
 
-      // Só incluir no demonstrativo se houver valor total > 0
-      if (valorTotal > 0) {
+      // Incluir no demonstrativo se houver volumetria (exames) OU valor total > 0
+      if (totalExames > 0 || valorTotal > 0) {
         demonstrativos.push(demonstrativo);
         console.log(`Demonstrativo criado para ${cliente.nome}: ${totalExames} exames, R$ ${valorTotal.toFixed(2)}`);
       } else {
-        console.log(`Cliente ${cliente.nome} excluído do demonstrativo - valor total zero`);
+        console.log(`Cliente ${cliente.nome} excluído - sem volumetria e sem valores: ${totalExames} exames, R$ ${valorTotal.toFixed(2)}`);
       }
       console.log(`Demonstrativo criado para ${cliente.nome}: ${totalExames} exames, R$ ${valorTotal.toFixed(2)}`);
     }
