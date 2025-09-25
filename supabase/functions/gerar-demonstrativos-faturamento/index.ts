@@ -77,7 +77,10 @@ serve(async (req) => {
       console.log(`Processando cliente: ${cliente.nome_fantasia || cliente.nome}`);
 
       // Buscar parâmetros ativos
-      const parametroAtivo = cliente.parametros_faturamento?.find((p: any) => p.status === 'A');
+      const paramList = Array.isArray(cliente.parametros_faturamento)
+        ? cliente.parametros_faturamento
+        : (cliente.parametros_faturamento ? [cliente.parametros_faturamento] : []);
+      const parametroAtivo = paramList.find((p: any) => p && p.status === 'A');
       const tipoFaturamento = parametroAtivo?.tipo_faturamento || 'CO-FT';
 
       // Pular clientes NC-NF
@@ -92,15 +95,23 @@ serve(async (req) => {
         .map(n => n?.trim())
         .filter(n => n && n.length > 0);
 
-      const { data: volumetria } = await supabase
+      let { data: volumetria } = await supabase
         .from('volumetria_mobilemed')
         .select('*')
         .eq('periodo_referencia', periodo)
         .in('"EMPRESA"', nomesBusca);
 
       if (!volumetria || volumetria.length === 0) {
-        console.log(`Sem volumetria para ${cliente.nome}`);
-        continue;
+        const { data: volumetriaAlt } = await supabase
+          .from('volumetria_mobilemed')
+          .select('*')
+          .eq('periodo_referencia', periodo)
+          .in('"Cliente_Nome_Fantasia"', nomesBusca);
+        if (!volumetriaAlt || volumetriaAlt.length === 0) {
+          console.log(`Sem volumetria para ${cliente.nome} nas chaves:`, nomesBusca);
+          continue;
+        }
+        volumetria = volumetriaAlt;
       }
 
       console.log(`Encontrada volumetria: ${volumetria.length} registros`);

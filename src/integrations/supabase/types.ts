@@ -1027,6 +1027,110 @@ export type Database = {
         }
         Relationships: []
       }
+      demonstrativos_faturamento_calculados: {
+        Row: {
+          calculado_em: string | null
+          calculado_por: string | null
+          cliente_id: string | null
+          cliente_nome: string
+          condicao_volume: string | null
+          created_at: string | null
+          detalhes_exames: Json | null
+          detalhes_franquia: Json | null
+          erro_detalhes: string | null
+          id: string
+          impostos_ab_min: number | null
+          parametros_utilizados: Json | null
+          percentual_iss: number | null
+          periodo_referencia: string
+          status: string | null
+          total_exames: number | null
+          total_registros: number | null
+          updated_at: string | null
+          valor_bruto_total: number | null
+          valor_exames: number | null
+          valor_franquia: number | null
+          valor_impostos_federais: number | null
+          valor_integracao: number | null
+          valor_iss: number | null
+          valor_liquido: number | null
+          valor_portal_laudos: number | null
+          valor_total_faturamento: number | null
+          valor_total_impostos: number | null
+          volume_referencia: number | null
+        }
+        Insert: {
+          calculado_em?: string | null
+          calculado_por?: string | null
+          cliente_id?: string | null
+          cliente_nome: string
+          condicao_volume?: string | null
+          created_at?: string | null
+          detalhes_exames?: Json | null
+          detalhes_franquia?: Json | null
+          erro_detalhes?: string | null
+          id?: string
+          impostos_ab_min?: number | null
+          parametros_utilizados?: Json | null
+          percentual_iss?: number | null
+          periodo_referencia: string
+          status?: string | null
+          total_exames?: number | null
+          total_registros?: number | null
+          updated_at?: string | null
+          valor_bruto_total?: number | null
+          valor_exames?: number | null
+          valor_franquia?: number | null
+          valor_impostos_federais?: number | null
+          valor_integracao?: number | null
+          valor_iss?: number | null
+          valor_liquido?: number | null
+          valor_portal_laudos?: number | null
+          valor_total_faturamento?: number | null
+          valor_total_impostos?: number | null
+          volume_referencia?: number | null
+        }
+        Update: {
+          calculado_em?: string | null
+          calculado_por?: string | null
+          cliente_id?: string | null
+          cliente_nome?: string
+          condicao_volume?: string | null
+          created_at?: string | null
+          detalhes_exames?: Json | null
+          detalhes_franquia?: Json | null
+          erro_detalhes?: string | null
+          id?: string
+          impostos_ab_min?: number | null
+          parametros_utilizados?: Json | null
+          percentual_iss?: number | null
+          periodo_referencia?: string
+          status?: string | null
+          total_exames?: number | null
+          total_registros?: number | null
+          updated_at?: string | null
+          valor_bruto_total?: number | null
+          valor_exames?: number | null
+          valor_franquia?: number | null
+          valor_impostos_federais?: number | null
+          valor_integracao?: number | null
+          valor_iss?: number | null
+          valor_liquido?: number | null
+          valor_portal_laudos?: number | null
+          valor_total_faturamento?: number | null
+          valor_total_impostos?: number | null
+          volume_referencia?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demonstrativos_faturamento_calculados_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       documentos_clientes: {
         Row: {
           clicksign_document_key: string | null
@@ -4143,22 +4247,31 @@ export type Database = {
         Args:
           | {
               p_categoria: string
-              p_cliente_id: string
-              p_especialidade: string
-              p_is_plantao?: boolean
-              p_modalidade: string
-              p_prioridade: string
-              p_volume_total: number
-            }
-          | {
-              p_categoria: string
-              p_cliente_id: string
+              p_cliente: string
               p_especialidade: string
               p_modalidade: string
               p_periodo: string
               p_prioridade: string
-              p_volume_total: number
             }
+          | {
+              p_categoria?: string
+              p_cliente_id: string
+              p_especialidade: string
+              p_is_plantao?: boolean
+              p_modalidade: string
+              p_prioridade?: string
+              p_volume_total?: number
+            }
+        Returns: number
+      }
+      calcular_volume_total: {
+        Args: {
+          p_categoria?: string
+          p_cliente_id: string
+          p_especialidade?: string
+          p_modalidade: string
+          p_periodo?: string
+        }
         Returns: number
       }
       calculate_custom_metric: {
@@ -4575,6 +4688,10 @@ export type Database = {
           arquivos_processados: string[]
           registros_removidos: number
         }[]
+      }
+      limpar_demonstrativos_periodo: {
+        Args: { p_periodo_referencia: string }
+        Returns: number
       }
       limpar_nome_cliente: {
         Args: { nome_cliente: string }
