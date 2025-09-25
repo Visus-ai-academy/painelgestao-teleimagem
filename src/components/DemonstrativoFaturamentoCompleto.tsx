@@ -51,9 +51,16 @@ interface Resumo {
 interface DemonstrativoFaturamentoCompletoProps {
   periodo: string;
   onDemonstrativosGerados?: (dados: { demonstrativos: DemonstrativoCliente[], resumo: Resumo }) => void;
+  onResetarStatus?: () => void;
+  onStatusChange?: (status: 'pendente' | 'processando' | 'concluido') => void;
 }
 
-export function DemonstrativoFaturamentoCompleto({ periodo, onDemonstrativosGerados }: DemonstrativoFaturamentoCompletoProps) {
+export function DemonstrativoFaturamentoCompleto({ 
+  periodo, 
+  onDemonstrativosGerados, 
+  onResetarStatus,
+  onStatusChange 
+}: DemonstrativoFaturamentoCompletoProps) {
   const [loading, setLoading] = useState(false);
   const [demonstrativos, setDemonstrativos] = useState<DemonstrativoCliente[]>([]);
   const [resumo, setResumo] = useState<Resumo | null>(null);
@@ -106,6 +113,16 @@ export function DemonstrativoFaturamentoCompleto({ periodo, onDemonstrativosGera
       return;
     }
 
+    // Reset todos os status para "Pendente"
+    if (onResetarStatus) {
+      onResetarStatus();
+    }
+
+    // Marcar como processando
+    if (onStatusChange) {
+      onStatusChange('processando');
+    }
+
     setLoading(true);
     try {
       console.log('🔄 Chamando edge function gerar-demonstrativos-faturamento para período:', periodo);
@@ -155,6 +172,11 @@ export function DemonstrativoFaturamentoCompleto({ periodo, onDemonstrativosGera
           console.warn('Não foi possível salvar demonstrativos completos no localStorage:', e);
         }
         
+        // Marcar como concluído
+        if (onStatusChange) {
+          onStatusChange('concluido');
+        }
+
         // Chamar callback se fornecido
         if (onDemonstrativosGerados) {
           console.log('📤 Chamando callback onDemonstrativosGerados');
@@ -185,6 +207,12 @@ export function DemonstrativoFaturamentoCompleto({ periodo, onDemonstrativosGera
       }
     } catch (error: any) {
       console.error('❌ Erro completo:', error);
+      
+      // Em caso de erro, marcar como pendente novamente
+      if (onStatusChange) {
+        onStatusChange('pendente');
+      }
+      
       toast({
         title: "Erro ao gerar demonstrativos",
         description: `${error.message || 'Erro desconhecido'}. Verifique o console para mais detalhes.`,

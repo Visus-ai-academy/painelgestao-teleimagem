@@ -344,6 +344,64 @@ export default function GerarFaturamento() {
     }
   }, [periodoSelecionado]);
 
+  // Função para resetar todos os status
+  const resetarTodosStatus = useCallback(() => {
+    // Reset status demonstrativo
+    setDemonstrativosGeradosPorCliente(new Set());
+    setClientesProcessandoDemonstrativo(new Set());
+    localStorage.removeItem(`demonstrativosGerados_${periodoSelecionado}`);
+
+    // Reset status de relatórios, emails e NFs
+    const resultadosResetados = resultados.map(resultado => ({
+      ...resultado,
+      relatorioGerado: false,
+      emailEnviado: false,
+      omieNFGerada: false,
+      linkRelatorio: undefined,
+      erro: undefined,
+      erroEmail: undefined,
+      dataProcessamento: undefined,
+      omieCodigoPedido: undefined,
+      omieNumeroPedido: undefined,
+      dataGeracaoNFOmie: undefined
+    }));
+
+    setResultados(resultadosResetados);
+    setRelatoriosGerados(0);
+    setEmailsEnviados(0);
+    setNfsGeradas(0);
+    
+    // Persistir reset no localStorage
+    localStorage.setItem('relatoriosGerados', '0');
+    localStorage.setItem('emailsEnviados', '0');
+    localStorage.setItem('nfsGeradas', '0');
+
+    // Salvar no banco de dados
+    salvarResultadosDB(resultadosResetados);
+  }, [periodoSelecionado, resultados, salvarResultadosDB]);
+
+  // Função para controlar status dos demonstrativos
+  const handleStatusDemonstrativo = useCallback((status: 'pendente' | 'processando' | 'concluido') => {
+    const nomes = resultados.map(r => r.clienteNome);
+    
+    switch (status) {
+      case 'pendente':
+        setDemonstrativosGeradosPorCliente(new Set());
+        setClientesProcessandoDemonstrativo(new Set());
+        break;
+      case 'processando':
+        setClientesProcessandoDemonstrativo(new Set(nomes));
+        setDemonstrativosGeradosPorCliente(new Set());
+        break;
+      case 'concluido':
+        setClientesProcessandoDemonstrativo(new Set());
+        setDemonstrativosGeradosPorCliente(new Set(nomes));
+        // Salvar no localStorage
+        localStorage.setItem(`demonstrativosGerados_${periodoSelecionado}`, JSON.stringify(nomes));
+        break;
+    }
+  }, [resultados, periodoSelecionado]);
+
   // Função para carregar resultados do banco de dados
   const carregarResultadosDB = useCallback(async () => {
     try {
@@ -2135,6 +2193,8 @@ export default function GerarFaturamento() {
                 {/* Componente de geração de demonstrativos */}
                 <DemonstrativoFaturamentoCompleto 
                   periodo={periodoSelecionado} 
+                  onResetarStatus={resetarTodosStatus}
+                  onStatusChange={handleStatusDemonstrativo}
                   onDemonstrativosGerados={(dados) => {
                     console.log('🔄 Callback onDemonstrativosGerados recebido:');
                     console.log('📊 Dados completos:', dados);
