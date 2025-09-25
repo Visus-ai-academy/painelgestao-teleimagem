@@ -1064,15 +1064,17 @@ export default function DemonstrativoFaturamento() {
       {/* ✅ RESUMO GERAL - Agora na aba correta */}
       {clientes.length > 0 && (() => {
         // ✅ EXTRAIR VALORES REAIS DOS DEMONSTRATIVOS SALVOS
-        const demonstrativosCompletos = localStorage.getItem(`demonstrativos_${periodo}`);
+        const demonstrativosCompletos = localStorage.getItem(`demonstrativos_completos_${periodo}`);
         let resumoReal = null;
         
         if (demonstrativosCompletos) {
           try {
-            const demonstrativos = JSON.parse(demonstrativosCompletos);
-            console.log('✅ Demonstrativos carregados:', demonstrativos);
+            const dados = JSON.parse(demonstrativosCompletos);
+            console.log('✅ Dados carregados do localStorage:', dados);
             
-            // Calcular resumo dos demonstrativos salvos
+            // Verificar se temos demonstrativos válidos e que seja um array
+            const demonstrativos = dados?.demonstrativos;
+            if (demonstrativos && Array.isArray(demonstrativos)) {
             resumoReal = {
               clientes_processados: demonstrativos.length,
               total_exames_geral: demonstrativos.reduce((sum, dem) => sum + (dem.total_exames || 0), 0),
@@ -1087,7 +1089,10 @@ export default function DemonstrativoFaturamento() {
               clientes_regime_normal: demonstrativos.filter(dem => !dem.detalhes_tributacao?.simples_nacional).length
             };
             
-            console.log('✅ Resumo calculado dos demonstrativos:', resumoReal);
+              console.log('✅ Resumo calculado dos demonstrativos:', resumoReal);
+            } else {
+              console.log('⚠️ Demonstrativos não encontrados ou formato inválido');
+            }
           } catch (error) {
             console.error('❌ Erro ao processar demonstrativos do localStorage:', error);
           }
