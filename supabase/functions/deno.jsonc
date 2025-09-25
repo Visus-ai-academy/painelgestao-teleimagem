@@ -1,8 +1,9 @@
 {
   "compilerOptions": {
     "allowJs": true,
-    "lib": ["deno.window", "deno.ns"],
-    "strict": false
+    "lib": ["deno.window", "deno.ns", "dom"],
+    "strict": false,
+    "useUnknownInCatchVariables": false
   },
   "importMap": "./import_map.json"
 }
