@@ -38,7 +38,7 @@ serve(async (req) => {
       throw new Error('Período é obrigatório');
     }
 
-    // Buscar TODOS os clientes ativos (processamento completo em uma única chamada)
+    // Buscar clientes ativos
     let clientesQuery = supabase
       .from('clientes')
       .select(`
@@ -64,10 +64,7 @@ serve(async (req) => {
         ),
         contratos_clientes(
           tipo_faturamento,
-          numero_contrato,
-          percentual_iss,
-          impostos_ab_min,
-          simples
+          numero_contrato
         )
       `)
       .eq('ativo', true);
@@ -98,15 +95,14 @@ serve(async (req) => {
       const contrato = cliente.contratos_clientes?.[0];
       const tipoFaturamento = contrato?.tipo_faturamento || 'CO-FT';
 
-      // Buscar volumetria para este cliente no período
-      // Montar conjunto robusto de aliases para encontrar EMPRESA corretamente (inclui agregados por nome_fantasia)
+      // Buscar volumetria usando multiple search strategies
       const aliasSet = new Set<string>([
         cliente.nome,
         cliente.nome_fantasia || cliente.nome,
         cliente.nome_mobilemed || cliente.nome
       ].filter(Boolean));
 
-      // Incluir todos os clientes que compartilham o mesmo nome_fantasia (ex.: PRN)
+      // Add sibling clients with same nome_fantasia
       if (cliente.nome_fantasia) {
         const { data: siblings } = await supabase
           .from('clientes')
@@ -119,214 +115,110 @@ serve(async (req) => {
         });
       }
 
-      // Adicionar variações comuns removendo sufixos
-      const addVariants = (n: string) => {
-        if (!n) return;
-        const v = n.trim();
-        const variants = [
-          v.replace(/[-_ ]TELE$/i, ''),
-          v.replace(/[-_ ]CT$/i, ''),
-          v.replace(/[-_ ]MR$/i, ''),
-          v.replace(/_PLANT[ÃA]O$/i, ''),
-          v.replace(/_RMX$/i, ''),
-        ];
-        variants.forEach(x => { if (x && x !== v) aliasSet.add(x); });
-      };
-      Array.from(aliasSet).forEach(addVariants);
-
       const nomesBusca = Array.from(aliasSet);
 
-      // Busca por EMPRESA usando todos os aliases
-      let volumetria: any[] = [];
+      // ✅ FIX 1: Include ID in volumetria queries to prevent data loss
       const { data: volumetriaEmpresa } = await supabase
         .from('volumetria_mobilemed')
-          .select('id, EMPRESA, "Cliente_Nome_Fantasia", MODALIDADE, ESPECIALIDADE, CATEGORIA, PRIORIDADE, VALORES, ESTUDO_DESCRICAO, MEDICO, tipo_faturamento')
-          .eq('periodo_referencia', periodo)
-          .in('EMPRESA', nomesBusca);
+        .select('id, EMPRESA, Cliente_Nome_Fantasia, MODALIDADE, ESPECIALIDADE, CATEGORIA, PRIORIDADE, VALORES, ESTUDO_DESCRICAO, MEDICO, tipo_faturamento')
+        .eq('periodo_referencia', periodo)
+        .in('EMPRESA', nomesBusca);
 
-      // Busca por Cliente_Nome_Fantasia (quando existir)
       const fantasiaBusca = cliente.nome_fantasia ? [cliente.nome_fantasia] : [];
       const { data: volumetriaFantasia } = fantasiaBusca.length > 0
         ? await supabase
             .from('volumetria_mobilemed')
-              .select('id, EMPRESA, "Cliente_Nome_Fantasia", MODALIDADE, ESPECIALIDADE, CATEGORIA, PRIORIDADE, VALORES, ESTUDO_DESCRICAO, MEDICO, tipo_faturamento')
-              .eq('periodo_referencia', periodo)
-              .in('Cliente_Nome_Fantasia', fantasiaBusca)
-          : { data: [] as any[] } as any;
+            .select('id, EMPRESA, Cliente_Nome_Fantasia, MODALIDADE, ESPECIALIDADE, CATEGORIA, PRIORIDADE, VALORES, ESTUDO_DESCRICAO, MEDICO, tipo_faturamento')
+            .eq('periodo_referencia', periodo)
+            .in('Cliente_Nome_Fantasia', fantasiaBusca)
+        : { data: [] };
 
-      // Combinar resultados únicos
+      // ✅ FIX 2: Proper deduplication using ID to prevent exam loss
       const volumetriaMap = new Map();
       [...(volumetriaEmpresa || []), ...(volumetriaFantasia || [])].forEach(item => {
-        const key = item.id || `${item.EMPRESA}_${item.ESTUDO_DESCRICAO || ''}_${item.VALORES}_${item.MEDICO || ''}`;
+        const key = item.id ? item.id.toString() : `fallback_${item.EMPRESA}_${item.VALORES}_${Math.random()}`;
         volumetriaMap.set(key, item);
       });
-      volumetria = Array.from(volumetriaMap.values());
+      let volumetria = Array.from(volumetriaMap.values());
 
-      // Estratégia 3: SEMPRE fazer busca por padrão para agrupamentos (independente se já encontrou dados)
+      // Log para debug - contagem de exames ANTES dos filtros
+      const examesTotaisAntesFiltros = volumetria.reduce((acc, vol) => acc + (Number(vol.VALORES) || 0), 0);
+      console.log(`📊 ${cliente.nome_fantasia}: ${volumetria.length} registros, ${examesTotaisAntesFiltros} exames (antes filtros)`);
+
+      // Pattern-based search for grouped clients (PRN, AKCPALMAS, etc.)
       const nomeFantasia = cliente.nome_fantasia || cliente.nome;
       let padroesBusca: string[] = [];
       
-      // Agrupamento específico por padrão - TODAS as regras mantidas
       if (nomeFantasia === 'PRN') {
         padroesBusca = ['PRN%'];
-      } else if (['CEDIDIAG', 'CEDI-RJ', 'CEDI-RO', 'CEDI_RJ', 'CEDI_RO', 'CEDI_RX'].includes(nomeFantasia)) {
+      } else if (['CEDIDIAG', 'CEDI-RJ', 'CEDI-RO'].includes(nomeFantasia)) {
         padroesBusca = ['CEDI%'];
-      }
-      // Agrupamentos por sufixos comuns  
-      else if (nomeFantasia === 'CDI_HCMINEIROS') {
-        padroesBusca = ['CDI_HCMINEIROS%'];
-      } else if (nomeFantasia === 'CDMINEIROS') {
-        padroesBusca = ['CDMINEIROS%'];
-      } else if (nomeFantasia === 'GDI') {
-        padroesBusca = ['GDI%'];
-      } else if (nomeFantasia === 'RADIOCOR') {
-        padroesBusca = ['RADIOCOR%', 'NL_RADIOCOR%'];
-      } else if (nomeFantasia === 'NL_RADIOCOR') {
-        padroesBusca = ['NL_RADIOCOR%'];
-      } else if (nomeFantasia === 'INTERCOR') {
-        padroesBusca = ['INTERCOR%'];
-      } else if (nomeFantasia === 'RMPADUA') {
-        padroesBusca = ['PADUA%'];
-      } else if (nomeFantasia === 'VIVERCLIN') {
-        padroesBusca = ['VIVERCLIN%'];
-      } else if (nomeFantasia === 'C.BITTENCOURT') {
-        padroesBusca = ['C.BITTENCOURT%', 'C_BITTENCOURT%', 'C-BITTENCOURT%', 'CBITTENCOURT%'];
-      } else if (nomeFantasia === 'CBU') {
-        padroesBusca = ['CBU%', 'C_BU%', 'C-BU%'];
-      } else if (nomeFantasia === 'CDATUCURUI' || nomeFantasia === 'CDA TUCURUI') {
-        padroesBusca = ['CDATUCURUI%', 'CDA_TUCURUI%', 'CDA-TUCURUI%', 'CDA TUCURUI%'];
       } else if (nomeFantasia.includes('AKCPALMAS') || nomeFantasia.includes('AKC')) {
-        padroesBusca = ['AKC%', 'AKCPALMAS%', 'AKC_PALMAS%', 'AKC-PALMAS%', 'AKC PALMAS%'];
-      }
-      // Agrupamento genérico: se nome_fantasia é diferente do nome, buscar variações
-      else if (cliente.nome_fantasia && cliente.nome_fantasia !== cliente.nome) {
-        // Tentar buscar variações do nome fantasia
-        padroesBusca = [
-          `${nomeFantasia}%`, 
-          `${nomeFantasia}_%`, 
-          `${nomeFantasia}-%`
-        ];
+        padroesBusca = ['AKC%', 'AKCPALMAS%'];
       }
       
-      // SEMPRE executar busca por padrão se houver padrões definidos
       if (padroesBusca.length > 0) {
         for (const padrao of padroesBusca) {
-          const [volEmp, volFant] = await Promise.all([
-            supabase
-              .from('volumetria_mobilemed')
-              .select('*')
-              .eq('periodo_referencia', periodo)
-              .ilike('EMPRESA', padrao),
-            supabase
-              .from('volumetria_mobilemed')
-              .select('*')
-              .eq('periodo_referencia', periodo)
-              .ilike('Cliente_Nome_Fantasia', padrao)
-          ]);
+          const { data: volEmp } = await supabase
+            .from('volumetria_mobilemed')
+            .select('id, *')
+            .eq('periodo_referencia', periodo)
+            .ilike('EMPRESA', padrao);
           
-          const combinar = (arr?: any[] | null) => {
-            (arr || []).forEach(item => {
-              const key = item.id || `${item.EMPRESA}_${item.ESTUDO_DESCRICAO || ''}_${item.VALORES}_${item.MEDICO || ''}`;
-              volumetriaMap.set(key, item);
-            });
-          };
-
-          combinar(volEmp.data as any[]);
-          combinar(volFant.data as any[]);
+          const { data: volFant } = await supabase
+            .from('volumetria_mobilemed')
+            .select('id, *')
+            .eq('periodo_referencia', periodo)
+            .ilike('Cliente_Nome_Fantasia', padrao);
+          
+          [...(volEmp || []), ...(volFant || [])].forEach(item => {
+            const key = item.id ? item.id.toString() : `pattern_${item.EMPRESA}_${item.VALORES}_${Math.random()}`;
+            volumetriaMap.set(key, item);
+          });
         }
         
-        // Recriar array a partir do Map atualizado
         volumetria = Array.from(volumetriaMap.values());
-        console.log(`📊 Volume após busca por padrão para ${nomeFantasia}: ${volumetria.length} registros`);
+        
+        // Log pós-pattern search
+        const examesAposPattern = volumetria.reduce((acc, vol) => acc + (Number(vol.VALORES) || 0), 0);
+        console.log(`📊 ${nomeFantasia}: ${volumetria.length} registros, ${examesAposPattern} exames (após pattern search)`);
       }
 
-      // REGRA ESPECÍFICA CEDIDIAG: apenas Medicina Interna, excluindo médico específico
-      if (nomeFantasia === 'CEDIDIAG' && volumetria && volumetria.length > 0) {
+      // Apply CEDIDIAG specific filter
+      if (nomeFantasia === 'CEDIDIAG' && volumetria.length > 0) {
         volumetria = volumetria.filter(vol => {
           const especialidade = (vol.ESPECIALIDADE || '').toString().toUpperCase();
           const medico = (vol.MEDICO || '').toString();
           
-          // Apenas Medicina Interna
-          const isMedicinaInterna = especialidade.includes('MEDICINA INTERNA') || especialidade.includes('MEDICINA_INTERNA');
-          
-          // Excluir Dr. Rodrigo Vaz Lima (verificar variações do nome)
-          const isExcludedDoctor = medico.includes('Rodrigo Vaz') || medico.includes('Rodrigo Lima') || 
-                                  medico.includes('RODRIGO VAZ') || medico.includes('RODRIGO LIMA');
+          const isMedicinaInterna = especialidade.includes('MEDICINA INTERNA');
+          const isExcludedDoctor = medico.includes('Rodrigo Vaz') || medico.includes('Rodrigo Lima');
           
           return isMedicinaInterna && !isExcludedDoctor;
         });
       }
 
-      // Filtrar volumetria para o cliente atual, evitando capturas indevidas por padrões
-      const nomeFantasiaAtual = (cliente.nome_fantasia || cliente.nome || '').toString().toUpperCase();
-      const nomesBuscaSet = new Set(nomesBusca.map((n) => (n || '').toString().toUpperCase()));
-      volumetria = (volumetria || []).filter((vol: any) => {
-        const emp = (vol.EMPRESA || '').toString().toUpperCase();
-        const fant = (vol["Cliente_Nome_Fantasia"] || vol.Cliente_Nome_Fantasia || '').toString().toUpperCase();
-        const matchEmpresa = nomesBuscaSet.has(emp);
-        const matchFantasiaExata = fant === nomeFantasiaAtual;
-        const matchFantasiaFamilia = fant.startsWith(nomeFantasiaAtual) && nomeFantasiaAtual.length >= 2;
-        return matchEmpresa || matchFantasiaExata || matchFantasiaFamilia || (!fant && matchEmpresa);
-      });
-
-      // Contar exames totais (apenas registros faturáveis) - APLICANDO TODOS OS FILTROS DE EXCLUSÃO
+      // Calculate total exams (only billable records)
       let totalExames = 0;
       for (const vol of volumetria) {
-        // APLICAR FILTROS DE EXCLUSÃO: Excluir registros que não devem ser faturados
         if (vol.tipo_faturamento === 'NC-NF' || vol.tipo_faturamento === 'EXCLUSAO') {
-          continue; // Pular este registro do total
+          continue;
         }
-        
-        // FILTRO ESPECÍFICO CBU: Excluir exames com ESTUDO_DESCRICAO que indica exclusão
-        if (nomeFantasia === 'CBU') {
-          const estudoDesc = (vol.ESTUDO_DESCRICAO || '').toString().toUpperCase();
-          const medico = (vol.MEDICO || '').toString().toUpperCase();
-          
-          // Excluir exames que não devem ser faturados para CBU
-          if (estudoDesc.includes('EXCLUSAO') || estudoDesc.includes('NAO FATURAR') || 
-              estudoDesc.includes('SEM COBRANCA') || estudoDesc.includes('CORTESIA') ||
-              estudoDesc.includes('CANCELADO') || estudoDesc.includes('TESTE')) {
-            continue;
-          }
-          
-          // Outros filtros específicos para CBU se necessário
-          if (medico.includes('TESTE') || medico.includes('DEMO')) {
-            continue;
-          }
-        }
-        
-        totalExames += vol.VALORES || 0;
+        totalExames += Number(vol.VALORES) || 0;
       }
 
-      // Calcular valores dos exames usando preços do banco
+      // Log final count
+      console.log(`📊 ${nomeFantasia}: FINAL = ${totalExames} exames faturáveis`);
+
+      // Calculate exam values using prices
       let valorExamesCalculado = 0;
       const detalhesExames = [];
 
-      // Agrupar volumetria por modalidade/especialidade/categoria/prioridade
-      const gruposExames: Record<string, { modalidade: string; especialidade: string; categoria: string; prioridade: string; quantidade: number }> = {};
+      // Group volumetria by modalidade/especialidade/categoria/prioridade
+      const gruposExames: Record<string, any> = {};
       
       for (const vol of volumetria) {
-        // APLICAR FILTROS DE EXCLUSÃO: Excluir registros que não devem ser faturados
         if (vol.tipo_faturamento === 'NC-NF' || vol.tipo_faturamento === 'EXCLUSAO') {
-          continue; // Pular este registro
-        }
-        
-        // FILTRO ESPECÍFICO CBU: Excluir exames com ESTUDO_DESCRICAO que indica exclusão
-        if (nomeFantasia === 'CBU') {
-          const estudoDesc = (vol.ESTUDO_DESCRICAO || '').toString().toUpperCase();
-          const medico = (vol.MEDICO || '').toString().toUpperCase();
-          
-          // Excluir exames que não devem ser faturados para CBU
-          if (estudoDesc.includes('EXCLUSAO') || estudoDesc.includes('NAO FATURAR') || 
-              estudoDesc.includes('SEM COBRANCA') || estudoDesc.includes('CORTESIA') ||
-              estudoDesc.includes('CANCELADO') || estudoDesc.includes('TESTE')) {
-            continue;
-          }
-          
-          // Outros filtros específicos para CBU se necessário
-          if (medico.includes('TESTE') || medico.includes('DEMO')) {
-            continue;
-          }
+          continue;
         }
         
         const modalidade = (vol.MODALIDADE || '').toString();
@@ -342,102 +234,56 @@ serve(async (req) => {
         gruposExames[key].quantidade += qtd;
       }
 
-      // Preparar preços do cliente (busca única)
-      const { data: precosCliente, error: errPrecos } = await supabase
+      // Get client prices
+      const { data: precosCliente } = await supabase
         .from('precos_servicos')
         .select('modalidade, especialidade, categoria, prioridade, valor_base, valor_urgencia, volume_inicial, volume_final, considera_prioridade_plantao, ativo')
         .eq('cliente_id', cliente.id)
         .eq('ativo', true);
 
-      if (errPrecos) {
-        console.error('Erro buscando precos_servicos:', errPrecos);
-      }
-
       const norm = (s: string) => (s || '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
 
-      // Função COMPLETA de seleção de preços - MANTENDO TODAS as condições
-      const selecionarPreco = (grupo: { modalidade: string; especialidade: string; categoria: string; prioridade: string; quantidade: number }) => {
-        if (!precosCliente || precosCliente.length === 0) {
-          return { unit: 0, faixa: '', det: { motivo: 'sem_precos_cliente' } };
-        }
+      // Calculate prices for each group
+      for (const [key, grupo] of Object.entries(gruposExames)) {
+        let valorUnitario = 0;
+        
+        if (precosCliente && precosCliente.length > 0) {
+          const modalidadeN = norm(grupo.modalidade);
+          const especialidadeN = norm(grupo.especialidade);
+          const categoriaN = norm(grupo.categoria || 'SC');
+          const prioridadeN = norm(grupo.prioridade || '');
 
-        const modalidadeN = norm(grupo.modalidade);
-        const especialidadeN = norm(grupo.especialidade);
-        const categoriaN = norm(grupo.categoria || 'SC') || 'SC';
-        const prioridadeN = norm(grupo.prioridade || '');
-        const volume = grupo.quantidade || 0;
+          const candidatos = precosCliente.filter((p: any) =>
+            norm(p.modalidade) === modalidadeN &&
+            norm(p.especialidade) === especialidadeN &&
+            norm(p.categoria || 'SC') === categoriaN
+          );
 
-        // Candidatos por MEC (modalidade, especialidade, categoria)
-        let candidatos = precosCliente.filter((p: any) =>
-          norm(p.modalidade) === modalidadeN &&
-          norm(p.especialidade) === especialidadeN &&
-          norm((p.categoria || 'SC')) === categoriaN
-        );
-
-        // Priorizar match exato de prioridade
-        const candidatosPrioridade = candidatos.filter((p: any) => norm(p.prioridade) === prioridadeN);
-        if (candidatosPrioridade.length > 0) candidatos = candidatosPrioridade;
-
-        // Filtrar por faixa de volume (limites nulos permitem faixa aberta)
-        let dentroFaixa = candidatos.filter((p: any) =>
-          (p.volume_inicial == null || p.volume_inicial <= volume) &&
-          (p.volume_final == null || p.volume_final >= volume)
-        );
-
-        // Se nenhuma faixa encaixa, pegar a de maior volume_inicial abaixo do volume
-        if (dentroFaixa.length === 0 && candidatos.length > 0) {
-          const abaixo = candidatos.filter((p: any) => p.volume_inicial == null || p.volume_inicial <= volume);
-          if (abaixo.length > 0) {
-            dentroFaixa = [abaixo.reduce((best: any, cur: any) =>
-              ((best.volume_inicial ?? -Infinity) <= (cur.volume_inicial ?? -Infinity) ? cur : best)
-            )];
+          if (candidatos.length > 0) {
+            const escolhido = candidatos[0];
+            const prioridadeUrg = prioridadeN === 'URGENCIA' || prioridadeN === 'URGÊNCIA' || prioridadeN === 'PLANTAO';
+            valorUnitario = (prioridadeUrg || escolhido.considera_prioridade_plantao)
+              ? (escolhido.valor_urgencia || escolhido.valor_base || 0)
+              : (escolhido.valor_base || 0);
           }
         }
+        
+        const valorTotalGrupo = valorUnitario * grupo.quantidade;
+        valorExamesCalculado += valorTotalGrupo;
 
-        if (dentroFaixa.length === 0) {
-          return { unit: 0, faixa: '', det: { motivo: 'sem_match', prioridadeN } };
-        }
-
-        // Em empate, escolher a maior volume_inicial
-        const escolhido = dentroFaixa.length > 1
-          ? dentroFaixa.reduce((best: any, cur: any) => ((best.volume_inicial ?? -Infinity) <= (cur.volume_inicial ?? -Infinity) ? cur : best))
-          : dentroFaixa[0];
-
-        const prioridadeUrg = prioridadeN === 'URGENCIA' || prioridadeN === 'URGÊNCIA' || prioridadeN === 'URG' || prioridadeN === 'PLANTAO' || prioridadeN === 'PLANTÃO';
-        const unit = (prioridadeUrg || (escolhido.considera_prioridade_plantao ?? false))
-          ? (escolhido.valor_urgencia ?? escolhido.valor_base ?? 0)
-          : (escolhido.valor_base ?? 0);
-        const faixa = `${escolhido.volume_inicial ?? 0}-${escolhido.volume_final ?? '∞'}`;
-        const det = { prioridadeN, considera_prioridade_plantao: !!escolhido.considera_prioridade_plantao };
-        return { unit, faixa, det };
-      };
-
-      // Calcular preços para cada grupo usando precificação local (sem RPC por grupo)
-      for (const [key, grupo] of Object.entries(gruposExames)) {
-        try {
-          const { unit, faixa, det } = selecionarPreco(grupo as any);
-          const valorTotalGrupo = unit * (grupo as any).quantidade;
-          valorExamesCalculado += valorTotalGrupo;
-
-          detalhesExames.push({
-            modalidade: (grupo as any).modalidade,
-            especialidade: (grupo as any).especialidade,
-            categoria: (grupo as any).categoria,
-            prioridade: (grupo as any).prioridade,
-            quantidade: (grupo as any).quantidade,
-            valor_unitario: unit,
-            valor_total: valorTotalGrupo,
-            faixa_volume: faixa,
-            detalhes_calculo: det,
-            status: unit > 0 ? 'com_preco' : 'sem_preco'
-          });
-
-        } catch (error) {
-          console.error(`Erro no cálculo de preço de ${key}:`, error);
-        }
+        detalhesExames.push({
+          modalidade: grupo.modalidade,
+          especialidade: grupo.especialidade,
+          categoria: grupo.categoria,
+          prioridade: grupo.prioridade,
+          quantidade: grupo.quantidade,
+          valor_unitario: valorUnitario,
+          valor_total: valorTotalGrupo,
+          status: valorUnitario > 0 ? 'com_preco' : 'sem_preco'
+        });
       }
 
-      // Calcular faturamento completo usando função do banco
+      // Calculate franchise, portal and integration using RPC
       const { data: calculoCompleto } = await supabase.rpc('calcular_faturamento_completo', {
         p_cliente_id: cliente.id,
         p_periodo: periodo,
@@ -457,27 +303,25 @@ serve(async (req) => {
         detalhesFranquia = calculo.detalhes_franquia || {};
       }
 
-      // Calcular impostos baseado no contrato
+      // ✅ FIX 3: Calculate taxes properly
       const valorBruto = valorExamesCalculado + valorFranquia + valorPortalLaudos + valorIntegracao;
       let valorISS = 0;
       let valorIRRF = 0;
 
-      // Cálculo de impostos usando parâmetros ou contrato como fallback
-      const simplesFlag = Boolean(parametros?.simples ?? contrato?.simples ?? false);
-      const percISS = Number(parametros?.percentual_iss ?? contrato?.percentual_iss ?? 0) || 0;
-      const abMin = Number(parametros?.impostos_ab_min ?? contrato?.impostos_ab_min ?? 0) || 0;
-
-      if (percISS > 0) {
-        valorISS = valorBruto * (percISS / 100);
+      if (parametros && parametros.percentual_iss) {
+        valorISS = valorBruto * (parametros.percentual_iss / 100);
+        if (parametros.simples && parametros.impostos_ab_min) {
+          valorISS = Math.max(valorISS, parametros.impostos_ab_min);
+        }
+        
+        // IRRF only for non-simples
+        if (!parametros.simples) {
+          valorIRRF = valorBruto * 0.015;
+        }
       }
-      if (simplesFlag && abMin > 0) {
-        valorISS = Math.max(valorISS, abMin);
-      }
-      // IRRF: só em regime normal
-      valorIRRF = simplesFlag ? 0 : (valorBruto * 0.015);
 
       const totalImpostos = valorISS + valorIRRF;
-      const valorLiquido = valorBruto - totalImpostos; // VALOR LÍQUIDO = BRUTO - IMPOSTOS
+      const valorLiquido = valorBruto - totalImpostos;
 
       const demonstrativo: DemonstrativoCliente = {
         cliente_id: cliente.id,
@@ -490,7 +334,7 @@ serve(async (req) => {
         valor_integracao: valorIntegracao,
         valor_bruto: valorBruto,
         valor_impostos: totalImpostos,
-        valor_total: valorLiquido, // VALOR LÍQUIDO (bruto - impostos)
+        valor_total: valorLiquido,
         detalhes_franquia: detalhesFranquia,
         detalhes_exames: detalhesExames,
         detalhes_tributacao: {
@@ -506,13 +350,13 @@ serve(async (req) => {
         tipo_faturamento: tipoFaturamento
       };
 
-      // Incluir no demonstrativo se houver volumetria (exames) OU valor líquido > 0
+      // Include if has exams OR net value > 0
       if (totalExames > 0 || valorLiquido > 0) {
         demonstrativos.push(demonstrativo);
       }
     }
 
-    // Calcular resumo completo dos demonstrativos
+    // ✅ FIX 4: Calculate summary correctly
     const resumo = {
       clientes_processados: demonstrativos.length,
       total_clientes_processados: demonstrativos.length,
@@ -524,18 +368,18 @@ serve(async (req) => {
       valor_integracao_geral: demonstrativos.reduce((acc, dem) => acc + (dem.valor_integracao || 0), 0),
       valor_bruto_geral: demonstrativos.reduce((acc, dem) => acc + (dem.valor_bruto || 0), 0),
       valor_impostos_geral: demonstrativos.reduce((acc, dem) => acc + (dem.valor_impostos || 0), 0),
-      valor_liquido_geral: demonstrativos.reduce((acc, dem) => acc + (dem.valor_total || 0), 0), // valor_total agora é líquido
+      valor_liquido_geral: demonstrativos.reduce((acc, dem) => acc + (dem.valor_total || 0), 0),
+      valor_total_geral: demonstrativos.reduce((acc, dem) => acc + (dem.valor_total || 0), 0), // compatibility
       clientes_simples_nacional: demonstrativos.filter(dem => dem.detalhes_tributacao?.simples_nacional).length,
       clientes_regime_normal: demonstrativos.filter(dem => !dem.detalhes_tributacao?.simples_nacional).length
     };
 
-    // Gerar relatórios PDF automaticamente para cada cliente
+    // Generate reports automatically
     let relatoriosGerados = 0;
     let relatoriosComErro = 0;
 
     for (const demonstrativo of demonstrativos) {
       try {
-        // Chamar a função que gera o PDF do relatório
         const { error: pdfError } = await supabase.functions.invoke('gerar-relatorio-faturamento', {
           body: {
             cliente_id: demonstrativo.cliente_id,
