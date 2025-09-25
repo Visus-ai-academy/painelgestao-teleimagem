@@ -128,7 +128,7 @@ serve(async (req) => {
         // Agrupamento específico por padrão
         if (nomeFantasia === 'PRN') {
           padroesBusca = ['PRN%'];
-        } else if (['CEDIDIAG', 'CEDI-RJ', 'CEDI-RO', 'CEDI_RJ', 'CEDI_RO'].includes(nomeFantasia)) {
+        } else if (['CEDIDIAG', 'CEDI-RJ', 'CEDI-RO', 'CEDI_RJ', 'CEDI_RO', 'CEDI_RX'].includes(nomeFantasia)) {
           padroesBusca = ['CEDI%'];
         }
         // Agrupamentos por sufixos comuns  
