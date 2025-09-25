@@ -283,24 +283,109 @@ serve(async (req) => {
         });
       }
 
-      // Calculate franchise, portal and integration using RPC
-      const { data: calculoCompleto } = await supabase.rpc('calcular_faturamento_completo', {
-        p_cliente_id: cliente.id,
-        p_periodo: periodo,
-        p_volume_total: totalExames
-      });
-
+      // Calculate franchise, portal and integration directly (without RPC)
       let valorFranquia = 0;
       let valorPortalLaudos = 0;
       let valorIntegracao = 0;
       let detalhesFranquia = {};
 
-      if (calculoCompleto && calculoCompleto.length > 0) {
-        const calculo = calculoCompleto[0];
-        valorFranquia = Number(calculo.valor_franquia || 0);
-        valorPortalLaudos = Number(calculo.valor_portal_laudos || 0);
-        valorIntegracao = Number(calculo.valor_integracao || 0);
-        detalhesFranquia = calculo.detalhes_franquia || {};
+      console.log(`📋 Calculando franquia para ${nomeFantasia} - Volume: ${totalExames}`);
+      console.log('📋 Parâmetros encontrados:', parametros);
+
+      // Calcular franquia baseado nos parâmetros do cliente
+      if (parametros) {
+        // Portal de Laudos
+        if (parametros.portal_laudos && parametros.valor_integracao > 0) {
+          valorPortalLaudos = Number(parametros.valor_integracao);
+        }
+
+        // Integração
+        if (parametros.cobrar_integracao && parametros.valor_integracao > 0) {
+          valorIntegracao = Number(parametros.valor_integracao);
+        }
+
+        // Franquia
+        if (parametros.aplicar_franquia) {
+          console.log(`📋 ${nomeFantasia}: Aplica franquia = ${parametros.aplicar_franquia}`);
+          console.log(`📋 ${nomeFantasia}: Freq contínua = ${parametros.frequencia_continua}`);
+          console.log(`📋 ${nomeFantasia}: Freq por volume = ${parametros.frequencia_por_volume}`);
+          console.log(`📋 ${nomeFantasia}: Volume franquia = ${parametros.volume_franquia}`);
+          console.log(`📋 ${nomeFantasia}: Valor franquia = ${parametros.valor_franquia}`);
+          console.log(`📋 ${nomeFantasia}: Valor acima franquia = ${parametros.valor_acima_franquia}`);
+          
+          // Se frequência contínua = SIM, sempre cobra franquia
+          if (parametros.frequencia_continua) {
+            if (parametros.frequencia_por_volume && totalExames > (parametros.volume_franquia || 0)) {
+              // Volume acima da franquia
+              valorFranquia = Number(parametros.valor_acima_franquia || parametros.valor_franquia || 0);
+              detalhesFranquia = {
+                tipo: 'continua_com_volume',
+                volume_base: parametros.volume_franquia,
+                volume_atual: totalExames,
+                valor_aplicado: valorFranquia,
+                motivo: 'Frequência contínua + volume acima da franquia'
+              };
+            } else {
+              // Volume dentro da franquia ou não aplica por volume
+              valorFranquia = Number(parametros.valor_franquia || 0);
+              detalhesFranquia = {
+                tipo: 'continua_normal',
+                volume_atual: totalExames,
+                valor_aplicado: valorFranquia,
+                motivo: 'Frequência contínua - valor base'
+              };
+            }
+          } else {
+            // Frequência contínua = NÃO, só cobra se houver volume
+            if (totalExames > 0) {
+              if (parametros.frequencia_por_volume && totalExames > (parametros.volume_franquia || 0)) {
+                // Volume acima da franquia
+                valorFranquia = Number(parametros.valor_acima_franquia || parametros.valor_franquia || 0);
+                detalhesFranquia = {
+                  tipo: 'volume_acima',
+                  volume_base: parametros.volume_franquia,
+                  volume_atual: totalExames,
+                  valor_aplicado: valorFranquia,
+                  motivo: 'Volume acima da franquia'
+                };
+              } else {
+                // Volume dentro da franquia
+                valorFranquia = Number(parametros.valor_franquia || 0);
+                detalhesFranquia = {
+                  tipo: 'volume_normal',
+                  volume_atual: totalExames,
+                  valor_aplicado: valorFranquia,
+                  motivo: 'Volume dentro da franquia'
+                };
+              }
+            } else {
+              // Sem volume, não cobra franquia
+              valorFranquia = 0;
+              detalhesFranquia = {
+                tipo: 'sem_volume',
+                volume_atual: 0,
+                valor_aplicado: 0,
+                motivo: 'Sem volume de exames - franquia não aplicada'
+              };
+            }
+          }
+          
+          console.log(`📋 ${nomeFantasia}: Franquia calculada = R$ ${valorFranquia.toFixed(2)}`);
+        } else {
+          detalhesFranquia = {
+            tipo: 'nao_aplica',
+            valor_aplicado: 0,
+            motivo: 'Cliente não possui franquia configurada'
+          };
+          console.log(`📋 ${nomeFantasia}: Não aplica franquia`);
+        }
+      } else {
+        console.log(`📋 ${nomeFantasia}: Sem parâmetros de faturamento encontrados`);
+        detalhesFranquia = {
+          tipo: 'nao_aplica',
+          valor_aplicado: 0,
+          motivo: 'Cliente não possui parâmetros de faturamento configurados'
+        };
       }
 
       // ✅ FIX 3: Calculate taxes properly
