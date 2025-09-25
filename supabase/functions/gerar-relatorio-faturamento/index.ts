@@ -52,18 +52,17 @@ serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Buscar dados do cliente (prioritizar o que tem preços se houver duplicatas)
+    // Buscar dados do cliente
     let { data: cliente, error: clienteError } = await supabase
       .from('clientes')
       .select('nome, nome_fantasia, cnpj')
       .eq('id', cliente_id)
       .maybeSingle();
 
-    // Se não encontrou ou se não tem preços, tentar buscar versão com preços
-    if (!cliente || clienteError) {
-      console.log('❗ Cliente não encontrado pelo ID, buscando versão com preços...');
+    if (clienteError || !cliente) {
+      console.log('❗ Cliente não encontrado pelo ID');
       
-      // Buscar cliente com mesmo nome que tenha preços ativos
+      // Buscar cliente com preços ativos como fallback
       const { data: clienteComPrecos } = await supabase
         .from('clientes')
         .select('id, nome, nome_fantasia, cnpj')
@@ -71,27 +70,9 @@ serve(async (req: Request) => {
         .limit(10);
       
       if (clienteComPrecos && clienteComPrecos.length > 0) {
-        // Se há apenas um, usar esse
-        if (clienteComPrecos.length === 1) {
-          cliente = clienteComPrecos[0];
-          console.log(`✅ Substituído para cliente com preços: ${cliente.nome} (ID: ${clienteComPrecos[0].id})`);
-        } else {
-          // Se há vários, usar o primeiro (pode melhorar a lógica aqui se necessário)
-          cliente = clienteComPrecos[0];
-          console.log(`⚠️ Múltiplos clientes com preços encontrados, usando: ${cliente.nome}`);
-        }
+        cliente = clienteComPrecos[0];
+        console.log(`✅ Substituído para cliente com preços: ${cliente.nome} (ID: ${clienteComPrecos[0].id})`);
       }
-    }
-
-    if (clienteError) {
-      console.error('Erro ao buscar cliente:', clienteError);
-      return new Response(JSON.stringify({
-        success: false,
-        error: "Erro ao buscar dados do cliente: " + clienteError.message
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
     }
 
     if (!cliente) {
@@ -115,25 +96,25 @@ serve(async (req: Request) => {
 
     console.log(`🔍 Buscando dados para: Cliente=${cliente.nome} | NomeFantasia=${cliente.nome_fantasia} | Período=${dataInicio} a ${dataFim}`);
     
-    // Buscar dados de faturamento usando NOME FANTASIA do cliente prioritariamente
+    // Buscar dados de faturamento
     console.log('📊 Buscando dados de faturamento pelo nome fantasia...');
     
     let { data: dataFaturamento, error: errorFaturamento } = await supabase
       .from('faturamento')
       .select('*, accession_number, cliente_nome_original')
-      .eq('cliente_nome', cliente.nome_fantasia || cliente.nome) // Usar nome_fantasia prioritariamente
+      .eq('cliente_nome', cliente.nome_fantasia || cliente.nome)
       .eq('periodo_referencia', periodo)
-      .gt('valor', 0); // Filtrar apenas registros com valor > 0
+      .gt('valor', 0);
 
     console.log(`📊 Faturamento encontrado: ${dataFaturamento?.length || 0} registros`);
     
     if (!dataFaturamento || dataFaturamento.length === 0) {
-      // Buscar dados de volumetria como fallback (cliente_nome_fantasia) COM AGRUPAMENTO
+      // Buscar dados de volumetria como fallback
       console.log('⚠️ Nenhum dado de faturamento encontrado, tentando volumetria...');
       
       let dataVolumetria = null;
       
-      // Estratégia 1: Busca por Cliente_Nome_Fantasia
+      // Busca por Cliente_Nome_Fantasia
       const { data: dataVolumetriaFantasia } = await supabase
         .from('volumetria_mobilemed')
         .select('*')
@@ -146,7 +127,7 @@ serve(async (req: Request) => {
       if (dataVolumetriaFantasia && dataVolumetriaFantasia.length > 0) {
         dataVolumetria = dataVolumetriaFantasia;
       } else {
-        // Estratégia 2: Busca por EMPRESA com múltiplos candidatos
+        // Busca por EMPRESA
         const candidatos = [cliente.nome_fantasia, cliente.nome].filter(Boolean);
         const { data: dataVolumetriaEmpresa } = await supabase
           .from('volumetria_mobilemed')
@@ -164,7 +145,7 @@ serve(async (req: Request) => {
       if (dataVolumetria && dataVolumetria.length > 0) {
         dataFaturamento = dataVolumetria;
         
-        // REGRA ESPECÍFICA CEDIDIAG: apenas Medicina Interna, excluindo médico específico
+        // REGRA ESPECÍFICA CEDIDIAG: apenas Medicina Interna
         const nomeFantasia = cliente.nome_fantasia || cliente.nome;
         if (nomeFantasia === 'CEDIDIAG') {
           console.log(`📊 Aplicando filtro específico CEDIDIAG: apenas Medicina Interna`);
@@ -172,10 +153,7 @@ serve(async (req: Request) => {
             const especialidade = (vol.ESPECIALIDADE || '').toString().toUpperCase();
             const medico = (vol.MEDICO || '').toString();
             
-            // Apenas Medicina Interna
             const isMedicinaInterna = especialidade.includes('MEDICINA INTERNA') || especialidade.includes('MEDICINA_INTERNA');
-            
-            // Excluir Dr. Rodrigo Vaz Lima (verificar variações do nome)
             const isExcludedDoctor = medico.includes('Rodrigo Vaz') || medico.includes('Rodrigo Lima') || 
                                     medico.includes('RODRIGO VAZ') || medico.includes('RODRIGO LIMA');
             
@@ -243,11 +221,10 @@ serve(async (req: Request) => {
       detalhes_exames: finalData
     };
 
-    // Gerar PDF usando o demonstrativoData se fornecido
+    // Gerar PDF usando template original
     let pdfUrl = null;
 
-    // PDF generation logic
-    // Buscar logomarca da tabela logomarca
+    // Buscar logomarca
     const { data: logomarcaData } = await supabase
       .from('logomarca')
       .select('nome_arquivo')
@@ -274,281 +251,167 @@ serve(async (req: Request) => {
       }
     }
 
-    // Configurar PDF com modelo profissional
-    const pdf = new jsPDF('p', 'mm', 'a4');
+    // ============= GERAÇÃO DO PDF NO FORMATO ORIGINAL =============
+    const pdf = new jsPDF('l', 'mm', 'a4'); // Paisagem (landscape)
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
-    const margin = 15;
-    const contentWidth = pageWidth - (margin * 2);
+    const margin = 20;
     let yPos = margin;
 
-    // === CABEÇALHO PRINCIPAL ===
-    // Adicionar logomarca se disponível
+    // === CABEÇALHO CONFORME TEMPLATE ORIGINAL ===
+    // Logomarca centralizada no topo
     if (logoDataUrl) {
       try {
-        pdf.addImage(logoDataUrl, 'JPEG', margin, yPos, 50, 20);
+        const logoWidth = 40;
+        const logoHeight = 25;
+        const logoX = (pageWidth - logoWidth) / 2;
+        pdf.addImage(logoDataUrl, 'JPEG', logoX, yPos, logoWidth, logoHeight);
+        yPos += logoHeight + 5;
       } catch (e) {
         console.log('Erro ao adicionar logo ao PDF:', e);
+        yPos += 30;
       }
-    }
-    
-    // Título principal (lado direito)
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(18);
-    pdf.setTextColor(44, 62, 80); // Azul escuro
-    pdf.text('DEMONSTRATIVO DE FATURAMENTO', pageWidth - margin, yPos + 10, { align: 'right' });
-    
-    yPos += 35;
-    
-    // Linha separadora
-    pdf.setDrawColor(52, 152, 219); // Azul
-    pdf.setLineWidth(1);
-    pdf.line(margin, yPos, pageWidth - margin, yPos);
-    yPos += 10;
-
-    // === INFORMAÇÕES DO CLIENTE ===
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(14);
-    pdf.setTextColor(52, 73, 94); 
-    pdf.text('DADOS DO CLIENTE', margin, yPos);
-    yPos += 8;
-    
-    // Caixa de informações do cliente
-    pdf.setFillColor(245, 245, 245);
-    pdf.rect(margin, yPos - 3, contentWidth, 25, 'F');
-    pdf.setDrawColor(189, 195, 199);
-    pdf.rect(margin, yPos - 3, contentWidth, 25);
-    
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(11);
-    pdf.setTextColor(44, 62, 80);
-    
-    pdf.text(`CLIENTE: ${dadosRelatorio.cliente_nome || cliente.nome}`, margin + 5, yPos + 5);
-    pdf.text(`CNPJ: ${formatarCNPJ(dadosRelatorio.cliente_cnpj || cliente.cnpj || 'Não informado')}`, margin + 5, yPos + 12);
-    pdf.text(`PERÍODO DE REFERÊNCIA: ${periodo}`, margin + 5, yPos + 19);
-    
-    yPos += 35;
-
-    // === RESUMO EXECUTIVO ===
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(14);
-    pdf.setTextColor(52, 73, 94);
-    pdf.text('RESUMO EXECUTIVO', margin, yPos);
-    yPos += 8;
-    
-    // Caixa do resumo executivo
-    pdf.setFillColor(236, 240, 241);
-    const resumoHeight = 40;
-    pdf.rect(margin, yPos - 3, contentWidth, resumoHeight, 'F');
-    pdf.setDrawColor(189, 195, 199);
-    pdf.rect(margin, yPos - 3, contentWidth, resumoHeight);
-    
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(11);
-    pdf.setTextColor(44, 62, 80);
-    
-    let resumoY = yPos + 5;
-    
-    if (demonstrativoData) {
-      // Linha 1: Exames e Valor dos Exames
-      pdf.text(`Total de Exames Realizados: ${demonstrativoData.total_exames || 0}`, margin + 5, resumoY);
-      pdf.text(`Valor dos Exames: R$ ${(demonstrativoData.valor_exames || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, margin + contentWidth/2, resumoY);
-      resumoY += 7;
-      
-      // Linha 2: Franquia e Portal (se aplicável)
-      if (demonstrativoData.valor_franquia > 0 || demonstrativoData.valor_portal_laudos > 0) {
-        if (demonstrativoData.valor_franquia > 0) {
-          pdf.text(`Franquia: R$ ${demonstrativoData.valor_franquia.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, margin + 5, resumoY);
-        }
-        if (demonstrativoData.valor_portal_laudos > 0) {
-          pdf.text(`Portal de Laudos: R$ ${demonstrativoData.valor_portal_laudos.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, margin + contentWidth/2, resumoY);
-        }
-        resumoY += 7;
-      }
-      
-      // Linha 3: Integração (se aplicável)
-      if (demonstrativoData.valor_integracao > 0) {
-        pdf.text(`Integração: R$ ${demonstrativoData.valor_integracao.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, margin + 5, resumoY);
-        resumoY += 7;
-      }
-      
-      // Linha separadora
-      pdf.setDrawColor(127, 140, 141);
-      pdf.line(margin + 5, resumoY, pageWidth - margin - 5, resumoY);
-      resumoY += 5;
-      
-      // Valores finais
-      pdf.text(`Valor Bruto Total: R$ ${(demonstrativoData.valor_bruto || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, margin + 5, resumoY);
-      pdf.text(`Total de Impostos: R$ ${(demonstrativoData.valor_impostos || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, margin + contentWidth/2, resumoY);
-      resumoY += 7;
-      
-      // Valor líquido destacado
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(12);
-      pdf.setTextColor(231, 76, 60); // Vermelho para destaque
-      pdf.text(`VALOR LÍQUIDO A FATURAR: R$ ${(demonstrativoData.valor_total || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, margin + 5, resumoY);
-      
     } else {
-      // Fallback para dados básicos
-      pdf.text(`Total de Exames: ${totalLaudos}`, margin + 5, resumoY);
-      resumoY += 7;
-      pdf.text(`Valor Bruto: R$ ${valorBrutoTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, margin + 5, resumoY);
-      resumoY += 7;
-      pdf.text(`Impostos: R$ ${totalImpostos.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, margin + 5, resumoY);
-      resumoY += 7;
-      pdf.setFont('helvetica', 'bold');
-      pdf.text(`VALOR A PAGAR: R$ ${valorAPagar.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, margin + 5, resumoY);
+      yPos += 30;
     }
     
-    yPos += resumoHeight + 15;
+    // Título principal: RELATÓRIO DE FATURAMENTO (azul)
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(22);
+    pdf.setTextColor(0, 124, 186); // Azul conforme template original
+    const titleText = 'RELATÓRIO DE FATURAMENTO';
+    const titleWidth = pdf.getTextWidth(titleText);
+    pdf.text(titleText, (pageWidth - titleWidth) / 2, yPos);
+    yPos += 15;
+    
+    // === INFORMAÇÕES DO CLIENTE (Layout Original) ===
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(16);
+    pdf.setTextColor(0, 0, 0); // Preto
+    
+    pdf.text(`Cliente: ${dadosRelatorio.cliente_nome || cliente.nome}`, margin, yPos);
+    yPos += 10;
+    
+    pdf.text(`CNPJ: ${formatarCNPJ(dadosRelatorio.cliente_cnpj || cliente.cnpj || 'Não informado')}`, margin, yPos);
+    yPos += 10;
+    
+    pdf.setFontSize(14);
+    pdf.text(`Período: ${periodo}`, margin, yPos);
+    yPos += 20;
 
-    // === INFORMAÇÕES TRIBUTÁRIAS ===
-    if (demonstrativoData?.detalhes_tributacao) {
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(12);
-      pdf.setTextColor(52, 73, 94);
-      pdf.text('INFORMAÇÕES TRIBUTÁRIAS', margin, yPos);
-      yPos += 8;
-      
-      const trib = demonstrativoData.detalhes_tributacao;
-      
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(10);
-      pdf.setTextColor(44, 62, 80);
-      
-      pdf.text(`• Regime Tributário: ${trib.simples_nacional ? 'Simples Nacional' : 'Regime Normal'}`, margin + 5, yPos);
-      yPos += 6;
-      
-      if (trib.percentual_iss) {
-        pdf.text(`• ISS (${trib.percentual_iss}%): R$ ${(trib.valor_iss || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, margin + 5, yPos);
-        yPos += 6;
-      }
-      
-      if (trib.valor_irrf && trib.valor_irrf > 0) {
-        pdf.text(`• IRRF (1,5%): R$ ${trib.valor_irrf.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, margin + 5, yPos);
-        yPos += 6;
-      }
-      
-      if (trib.impostos_ab_min && trib.impostos_ab_min > 0) {
-        pdf.text(`• Imposto Mínimo Aplicado: R$ ${trib.impostos_ab_min.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, margin + 5, yPos);
-        yPos += 6;
-      }
-      
-      yPos += 10;
-    }
-
-    // === DETALHAMENTO DOS SERVIÇOS ===
+    // === TABELA DE DETALHAMENTO CONFORME TEMPLATE ORIGINAL ===
     if (finalData.length > 0) {
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(12);
-      pdf.setTextColor(52, 73, 94);
-      pdf.text('DETALHAMENTO DOS SERVIÇOS', margin, yPos);
-      yPos += 10;
-      
       // Cabeçalho da tabela
-      const headerHeight = 8;
-      const rowHeight = 7;
-      const colWidths = [25, 45, 25, 15, 25, 25]; // Modalidade, Especialidade, Categoria, Qtd, V.Unit, V.Total
-      const headers = ['Modalidade', 'Especialidade', 'Categoria', 'Qtd', 'Valor Unit.', 'Valor Total'];
-      
-      // Fundo do cabeçalho
-      pdf.setFillColor(52, 152, 219); // Azul
-      pdf.rect(margin, yPos - 2, contentWidth, headerHeight, 'F');
-      
-      // Texto do cabeçalho
       pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(9);
-      pdf.setTextColor(255, 255, 255); // Branco
+      pdf.setFontSize(10);
+      pdf.setTextColor(0, 0, 0);
       
-      let xPos = margin + 2;
-      headers.forEach((header, i) => {
-        pdf.text(header, xPos, yPos + 4);
+      const tableHeaders = ['Modalidade', 'Especialidade', 'Categoria', 'Prioridade', 'Qtd', 'Valor Unit.', 'Valor Total'];
+      const colWidths = [30, 50, 25, 25, 15, 25, 30]; // Larguras das colunas para paisagem
+      let xPos = margin;
+      
+      // Desenhar cabeçalho da tabela
+      for (let i = 0; i < tableHeaders.length; i++) {
+        pdf.setFillColor(240, 240, 240); // Fundo cinza claro
+        pdf.rect(xPos, yPos, colWidths[i], 8, 'FD');
+        pdf.text(tableHeaders[i], xPos + 2, yPos + 5);
         xPos += colWidths[i];
-      });
-      
-      yPos += headerHeight + 2;
+      }
+      yPos += 8;
       
       // Dados da tabela
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(8);
-      pdf.setTextColor(44, 62, 80);
       
-      let alternateRow = false;
-      finalData.forEach((item, index) => {
-        if (yPos > pageHeight - 20) {
-          // Nova página se necessário
+      for (let i = 0; i < finalData.length; i++) {
+        const item = finalData[i];
+        xPos = margin;
+        
+        // Verificar se precisa de nova página
+        if (yPos > pageHeight - 30) {
           pdf.addPage();
           yPos = margin;
         }
         
-        // Fundo alternado para linhas
-        if (alternateRow) {
-          pdf.setFillColor(248, 249, 250);
-          pdf.rect(margin, yPos - 1, contentWidth, rowHeight, 'F');
+        const rowData = [
+          item.modalidade || item.MODALIDADE || '',
+          item.especialidade || item.ESPECIALIDADE || '',
+          item.categoria || item.CATEGORIA || 'SC',
+          item.prioridade || item.PRIORIDADE || '',
+          demonstrativoData ? (item.quantidade?.toString() || '1') : (item.VALORES?.toString() || '1'),
+          demonstrativoData ? 
+            (item.valor_unitario ? `R$ ${item.valor_unitario.toFixed(2)}` : '') :
+            (item.valor ? `R$ ${(item.valor / (Number(item.VALORES) || 1)).toFixed(2)}` : ''),
+          demonstrativoData ?
+            (item.valor_total ? `R$ ${item.valor_total.toFixed(2)}` : '') :
+            (item.valor ? `R$ ${Number(item.valor).toFixed(2)}` : '')
+        ];
+        
+        for (let j = 0; j < rowData.length; j++) {
+          pdf.rect(xPos, yPos, colWidths[j], 6, 'S');
+          const text = rowData[j].toString();
+          const textWidth = pdf.getTextWidth(text);
+          const maxWidth = colWidths[j] - 4;
+          
+          if (textWidth > maxWidth && text.length > 10) {
+            pdf.text(text.substring(0, 8) + '...', xPos + 2, yPos + 4);
+          } else {
+            pdf.text(text, xPos + 2, yPos + 4);
+          }
+          xPos += colWidths[j];
         }
-        
-        xPos = margin + 2;
-        const modalidade = demonstrativoData ? item.modalidade : (item.MODALIDADE || item.modalidade || '');
-        const especialidade = demonstrativoData ? item.especialidade : (item.ESPECIALIDADE || item.especialidade || '');
-        const categoria = demonstrativoData ? item.categoria : (item.CATEGORIA || item.categoria || 'SC');
-        const quantidade = demonstrativoData ? item.quantidade : (item.VALORES || item.quantidade || 0);
-        const valorUnit = demonstrativoData ? item.valor_unitario : (item.valor_unitario || 0);
-        const valorTotal = demonstrativoData ? item.valor_total : (item.valor_total || item.valor || 0);
-        
-        // Truncar textos longos
-        pdf.text(modalidade.toString().substring(0, 10), xPos, yPos + 3);
-        xPos += colWidths[0];
-        pdf.text(especialidade.toString().substring(0, 18), xPos, yPos + 3);
-        xPos += colWidths[1];
-        pdf.text(categoria.toString().substring(0, 10), xPos, yPos + 3);
-        xPos += colWidths[2];
-        pdf.text(quantidade.toString(), xPos, yPos + 3);
-        xPos += colWidths[3];
-        pdf.text(`R$ ${Number(valorUnit).toFixed(2)}`, xPos, yPos + 3);
-        xPos += colWidths[4];
-        pdf.text(`R$ ${Number(valorTotal).toFixed(2)}`, xPos, yPos + 3);
-        
-        yPos += rowHeight;
-        alternateRow = !alternateRow;
-      });
+        yPos += 6;
+      }
       
       yPos += 10;
     }
-
-    // === RODAPÉ ===
-    yPos = pageHeight - 40;
     
-    // Linha separadora
-    pdf.setDrawColor(52, 152, 219);
-    pdf.setLineWidth(0.5);
-    pdf.line(margin, yPos, pageWidth - margin, yPos);
-    yPos += 8;
+    // === RESUMO DE TOTAIS NO CANTO DIREITO INFERIOR ===
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(12);
+    pdf.setTextColor(0, 0, 0);
     
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(9);
-    pdf.setTextColor(127, 140, 141);
-    pdf.text(`Relatório gerado em: ${new Date().toLocaleString('pt-BR')}`, margin, yPos);
-    pdf.text('Sistema de Gestão Teleimagem', pageWidth - margin, yPos, { align: 'right' });
-    yPos += 6;
-    pdf.text('Este documento é válido apenas para o período especificado', margin, yPos);
+    const resumoX = pageWidth - 120;
+    yPos = Math.max(yPos, pageHeight - 60); // Posicionar próximo ao final da página
     
-    // Numeração de páginas
-    const totalPages = pdf.internal.pages.length - 1;
-    if (totalPages > 1) {
-      for (let i = 1; i <= totalPages; i++) {
-        pdf.setPage(i);
-        pdf.setFont('helvetica', 'normal');
-        pdf.setFontSize(8);
-        pdf.setTextColor(127, 140, 141);
-        pdf.text(`Página ${i} de ${totalPages}`, pageWidth - margin, pageHeight - 10, { align: 'right' });
+    if (demonstrativoData) {
+      pdf.text(`Total de Laudos: ${demonstrativoData.total_exames || 0}`, resumoX, yPos);
+      yPos += 7;
+      pdf.text(`Valor Bruto: R$ ${(demonstrativoData.valor_bruto || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, resumoX, yPos);
+      yPos += 7;
+      if (demonstrativoData.valor_impostos > 0) {
+        pdf.text(`Impostos: R$ ${demonstrativoData.valor_impostos.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, resumoX, yPos);
+        yPos += 7;
       }
+      pdf.setFontSize(14);
+      pdf.setTextColor(200, 0, 0); // Vermelho para destaque
+      pdf.text(`TOTAL: R$ ${(demonstrativoData.valor_total || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, resumoX, yPos);
+    } else {
+      pdf.text(`Total de Laudos: ${totalLaudos}`, resumoX, yPos);
+      yPos += 7;
+      pdf.text(`Valor Bruto: R$ ${valorBrutoTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, resumoX, yPos);
+      yPos += 7;
+      pdf.text(`Impostos: R$ ${totalImpostos.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, resumoX, yPos);
+      yPos += 7;
+      pdf.setFontSize(14);
+      pdf.setTextColor(200, 0, 0); // Vermelho
+      pdf.text(`TOTAL: R$ ${valorAPagar.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, resumoX, yPos);
     }
-
-    // Salvar PDF no storage
-    const pdfBytes = pdf.output('arraybuffer');
-    const fileName = `relatorio_${cliente.nome.replace(/[^a-zA-Z0-9]/g, '_')}_${periodo}.pdf`;
     
-    // Upload para storage
+    // === RODAPÉ ===
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(8);
+    pdf.setTextColor(100, 100, 100);
+    const footerY = pageHeight - 10;
+    pdf.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, margin, footerY);
+    pdf.text(`Página 1`, pageWidth - margin - 20, footerY);
+
+    // Gerar bytes do PDF
+    const pdfBytes = pdf.output('arraybuffer');
+
+    // Upload para Supabase Storage
+    const fileName = `relatorio_${(cliente.nome_fantasia || cliente.nome).replace(/[^a-zA-Z0-9]/g, '_').toUpperCase()}_${periodo}.pdf`;
+    
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('relatorios-faturamento')
       .upload(fileName, pdfBytes, {
@@ -568,7 +431,7 @@ serve(async (req: Request) => {
       console.log(`Relatório PDF gerado com sucesso: ${pdfUrl}`);
     }
 
-    // Sempre retornar sucesso, mesmo sem dados
+    // Resposta final
     const response = {
       success: true,
       message: "Relatório gerado com sucesso",
