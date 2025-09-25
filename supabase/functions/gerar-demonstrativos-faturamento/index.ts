@@ -198,9 +198,13 @@ serve(async (req) => {
 
       console.log(`Encontrada volumetria: ${volumetria.length} registros`);
 
-      // Contar exames totais
+      // Contar exames totais (apenas registros faturáveis)
       let totalExames = 0;
       for (const vol of volumetria) {
+        // APLICAR FILTRO NC-NF: Excluir registros que não devem ser faturados
+        if (vol.tipo_faturamento === 'NC-NF') {
+          continue; // Pular este registro do total
+        }
         totalExames += vol.VALORES || 0;
       }
 
@@ -212,6 +216,12 @@ serve(async (req) => {
       const gruposExames: Record<string, { modalidade: string; especialidade: string; categoria: string; prioridade: string; quantidade: number }> = {};
       
       for (const vol of volumetria) {
+        // APLICAR FILTRO NC-NF: Excluir registros que não devem ser faturados
+        if (vol.tipo_faturamento === 'NC-NF') {
+          console.log(`Excluindo registro NC-NF: ${vol.ESTUDO_DESCRICAO || 'N/A'} do cliente ${vol.EMPRESA || vol.Cliente_Nome_Fantasia}`);
+          continue; // Pular este registro
+        }
+        
         const modalidade = (vol.MODALIDADE || '').toString();
         const especialidade = (vol.ESPECIALIDADE || '').toString();
         const categoria = (vol.CATEGORIA || 'SC').toString();

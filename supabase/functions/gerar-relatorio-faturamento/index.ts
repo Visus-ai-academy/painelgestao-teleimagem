@@ -492,14 +492,26 @@ serve(async (req: Request) => {
         valorBrutoTotal = finalData.reduce((sum, item) => sum + (parseFloat(item.valor) || 0), 0);
         totalLaudos = finalData.reduce((sum, item) => sum + (parseInt(item.quantidade) || 0), 0);
       } else {
-        // Dados de volumetria - usar VALORES como quantidade
+        // Dados de volumetria - usar VALORES como quantidade, excluir NC-NF
         valorBrutoTotal = (finalData as any[]).reduce((sum, item) => {
+          // APLICAR FILTRO NC-NF: Excluir registros que não devem ser faturados
+          if (item.tipo_faturamento === 'NC-NF') {
+            return sum; // Não somar valor para registros NC-NF
+          }
+          
           const key = `${(item.MODALIDADE || '')}|${(item.ESPECIALIDADE || '')}|${(item.CATEGORIA || 'SC')}|${(item.PRIORIDADE || '')}`;
           const unit = precoPorCombo[key] ?? 0;
           const qtd = Number(item.VALORES || 0) || 0;
           return sum + unit * qtd;
         }, 0);
-        totalLaudos = finalData.reduce((sum, item) => sum + (parseInt(item.VALORES) || 0), 0);
+        
+        totalLaudos = finalData.reduce((sum, item) => {
+          // APLICAR FILTRO NC-NF: Excluir registros que não devem ser faturados
+          if ((item as any).tipo_faturamento === 'NC-NF') {
+            return sum; // Não contar exames NC-NF
+          }
+          return sum + (parseInt((item as any).VALORES) || 0);
+        }, 0);
       }
       // Impostos padrão (calculados para exibição)
       valorPIS = parseFloat((valorBrutoTotal * (percentualPIS / 100)).toFixed(2));
