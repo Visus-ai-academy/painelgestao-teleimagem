@@ -148,6 +148,12 @@ serve(async (req) => {
           padroesBusca = ['PADUA%'];
         } else if (nomeFantasia === 'VIVERCLIN') {
           padroesBusca = ['VIVERCLIN%'];
+        } else if (nomeFantasia === 'C.BITTENCOURT') {
+          padroesBusca = ['C.BITTENCOURT%', 'C_BITTENCOURT%', 'C-BITTENCOURT%', 'CBITTENCOURT%'];
+        } else if (nomeFantasia === 'CBU') {
+          padroesBusca = ['CBU%', 'C_BU%', 'C-BU%'];
+        } else if (nomeFantasia === 'CDATUCURUI' || nomeFantasia === 'CDA TUCURUI') {
+          padroesBusca = ['CDATUCURUI%', 'CDA_TUCURUI%', 'CDA-TUCURUI%', 'CDA TUCURUI%'];
         }
         // Agrupamento genérico: se nome_fantasia é diferente do nome, buscar variações
         else if (cliente.nome_fantasia && cliente.nome_fantasia !== cliente.nome) {
@@ -243,28 +249,86 @@ serve(async (req) => {
           let detalhesCalculo: any = {};
           
           // Usar função calcular_preco_exame que implementa corretamente Vol. Inicial/Final
-          const isPlantao = grupo.prioridade === 'PLANTÃO';
-          const { data: precoCalculado, error: precoError } = await supabase.rpc('calcular_preco_exame', {
-            p_cliente_id: cliente.id,
-            p_modalidade: grupo.modalidade,
-            p_especialidade: grupo.especialidade,
-            p_categoria: grupo.categoria,
-            p_prioridade: grupo.prioridade,
-            p_volume_total: grupo.quantidade,
-            p_is_plantao: isPlantao
+          const normalize = (s: string) => (s || '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
+          const modalidadeN = normalize(grupo.modalidade);
+          const especialidadeN = normalize(grupo.especialidade);
+          const prioridadeN = normalize(grupo.prioridade);
+          const categoriaN = normalize(grupo.categoria || 'SC') || 'SC';
+          
+          const tryCalcular = async (opts: { modalidade: string; especialidade: string; categoria: string; prioridade: string; isPlantao: boolean; }) => {
+            const { data, error } = await supabase.rpc('calcular_preco_exame', {
+              p_cliente_id: cliente.id,
+              p_modalidade: opts.modalidade,
+              p_especialidade: opts.especialidade,
+              p_categoria: opts.categoria,
+              p_prioridade: opts.prioridade,
+              p_volume_total: grupo.quantidade,
+              p_is_plantao: opts.isPlantao
+            });
+            return { data, error };
+          };
+          
+          // Tentativa 1: valores originais
+          let tentativa = 1;
+          let calc = await tryCalcular({
+            modalidade: grupo.modalidade,
+            especialidade: grupo.especialidade,
+            categoria: grupo.categoria,
+            prioridade: grupo.prioridade,
+            isPlantao: prioridadeN === 'PLANTAO'
           });
           
-          if (precoError) {
-            console.error(`Erro ao calcular preço para ${key}:`, precoError);
-          } else if (precoCalculado && precoCalculado.length > 0) {
-            const resultado = precoCalculado[0];
+          if (calc.error) {
+            console.error(`Erro ao calcular preço (t${tentativa}) para ${key}:`, calc.error);
+          }
+          
+          // Tentativa 2: valores normalizados (sem acento/maiusc.)
+          if (!calc.data || calc.data.length === 0 || Number(calc.data[0]?.valor_unitario || 0) === 0) {
+            tentativa = 2;
+            calc = await tryCalcular({
+              modalidade: modalidadeN,
+              especialidade: especialidadeN,
+              categoria: categoriaN,
+              prioridade: prioridadeN,
+              isPlantao: prioridadeN === 'PLANTAO'
+            });
+            if (calc.error) console.error(`Erro ao calcular preço (t${tentativa}) para ${key}:`, calc.error);
+          }
+          
+          // Tentativa 3: forçar categoria SC
+          if (!calc.data || calc.data.length === 0 || Number(calc.data[0]?.valor_unitario || 0) === 0) {
+            tentativa = 3;
+            calc = await tryCalcular({
+              modalidade: modalidadeN,
+              especialidade: especialidadeN,
+              categoria: 'SC',
+              prioridade: prioridadeN,
+              isPlantao: prioridadeN === 'PLANTAO'
+            });
+            if (calc.error) console.error(`Erro ao calcular preço (t${tentativa}) para ${key}:`, calc.error);
+          }
+          
+          // Tentativa 4: prioridade padrão ROTINA
+          if (!calc.data || calc.data.length === 0 || Number(calc.data[0]?.valor_unitario || 0) === 0) {
+            tentativa = 4;
+            calc = await tryCalcular({
+              modalidade: modalidadeN,
+              especialidade: especialidadeN,
+              categoria: 'SC',
+              prioridade: 'ROTINA',
+              isPlantao: false
+            });
+            if (calc.error) console.error(`Erro ao calcular preço (t${tentativa}) para ${key}:`, calc.error);
+          }
+          
+          if (calc && calc.data && calc.data.length > 0) {
+            const resultado = calc.data[0];
             precoUnitario = Number(resultado.valor_unitario || 0);
             faixaVolume = resultado.faixa_volume || '';
             detalhesCalculo = resultado.detalhes_calculo || {};
-            
-            console.log(`Preço calculado para ${key}: R$ ${precoUnitario} (faixa: ${faixaVolume}) - VOLUMES IMPLEMENTADOS`);
+            console.log(`Preço calculado (t${tentativa}) para ${key}: R$ ${precoUnitario} (faixa: ${faixaVolume})`);
           } else {
-            console.log(`Nenhum preço encontrado para ${key} - Verificar tabela de preços`);
+            console.log(`Nenhum preço encontrado para ${key} após tentativas - verificar tabela de preços`);
           }
           
           const valorTotal = precoUnitario * grupo.quantidade;
