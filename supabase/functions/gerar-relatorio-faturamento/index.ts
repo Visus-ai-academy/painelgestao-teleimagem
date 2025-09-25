@@ -592,7 +592,7 @@ serve(async (req: Request) => {
       // Valor a Pagar destacado (movido para baixo para não sobrepor)
       doc.setFontSize(16);
       doc.setTextColor(0, 0, 0); // Cor preta em vez de verde
-      doc.text(`VALOR A PAGAR: R$ ${valorAPagar.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 148, yQuadro1 + 62, { align: 'center' });
+      doc.text(`VALOR A PAGAR: R$ ${valorAPagar.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 148, yQuadro1 + 62, { align: 'center' });
       
       // === NOVA PÁGINA PARA QUADRO 2 ===
       doc.addPage('landscape');
