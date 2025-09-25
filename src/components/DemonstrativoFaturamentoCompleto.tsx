@@ -127,7 +127,7 @@ export function DemonstrativoFaturamentoCompleto({
     try {
       console.log('🔄 Chamando edge function gerar-demonstrativos-faturamento para período:', periodo);
       
-      const { data, error } = await supabase.functions.invoke('gerar-demonstrativos-faturamento', {
+      const { data, error } = await supabase.functions.invoke('gerar-demonstrativos-faturamento-v2', {
         body: { periodo }
       });
 

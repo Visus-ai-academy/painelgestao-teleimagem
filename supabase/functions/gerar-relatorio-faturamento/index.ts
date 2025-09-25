@@ -1,4 +1,3 @@
-
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.51.0";
@@ -9,17 +8,12 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const handler = async (req: Request) => {
+serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Adicionar timeout de 25 segundos (limite do Supabase é 30s)
-  const timeoutPromise = new Promise((_, reject) => {
-    setTimeout(() => reject(new Error('Timeout: Processamento excedeu 25 segundos')), 25000);
-  });
-
-  const processRequest = async () => {
+  try {
     // Função para formatar CNPJ
     const formatarCNPJ = (cnpj: string): string => {
       if (!cnpj) return '';
@@ -34,8 +28,7 @@ const handler = async (req: Request) => {
       return somenteNumeros.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
     };
 
-    try {
-      console.log('Função iniciada');
+    console.log('Função iniciada');
     
     const body = await req.json();
     const demonstrativoData = body?.demonstrativo_data || null;
@@ -165,64 +158,6 @@ const handler = async (req: Request) => {
         
         if (dataVolumetriaEmpresa && dataVolumetriaEmpresa.length > 0) {
           dataVolumetria = dataVolumetriaEmpresa;
-        } else {
-          // Estratégia 3: Para clientes específicos, fazer busca por padrão (agrupamento)
-          const nomeFantasia = cliente.nome_fantasia || cliente.nome;
-          
-          console.log(`📊 Verificando agrupamento para ${nomeFantasia}...`);
-          
-          let padroesBusca: string[] = [];
-          
-          // Agrupamento específico por padrão
-          if (nomeFantasia === 'PRN') {
-            padroesBusca = ['PRN%'];
-          } else if (['CEDIDIAG', 'CEDI-RJ', 'CEDI-RO', 'CEDI_RJ', 'CEDI_RO'].includes(nomeFantasia)) {
-            padroesBusca = ['CEDI%'];
-          }
-          // Agrupamentos por sufixos comuns  
-          else if (nomeFantasia === 'CDI_HCMINEIROS') {
-            padroesBusca = ['CDI_HCMINEIROS%'];
-          } else if (nomeFantasia === 'CDMINEIROS') {
-            padroesBusca = ['CDMINEIROS%'];
-          } else if (nomeFantasia === 'GDI') {
-            padroesBusca = ['GDI%'];
-          } else if (nomeFantasia === 'RADIOCOR') {
-            padroesBusca = ['RADIOCOR%', 'NL_RADIOCOR%'];
-          } else if (nomeFantasia === 'NL_RADIOCOR') {
-            padroesBusca = ['NL_RADIOCOR%'];
-          } else if (nomeFantasia === 'INTERCOR') {
-            padroesBusca = ['INTERCOR%'];
-          } else if (nomeFantasia === 'RMPADUA') {
-            padroesBusca = ['PADUA%'];
-          } else if (nomeFantasia === 'VIVERCLIN') {
-            padroesBusca = ['VIVERCLIN%'];
-          }
-          // Agrupamento genérico: se nome_fantasia é diferente do nome, buscar variações
-          else if (cliente.nome_fantasia && cliente.nome_fantasia !== cliente.nome) {
-            padroesBusca = [
-              `${nomeFantasia}%`, 
-              `${nomeFantasia}_%`, 
-              `${nomeFantasia}-%`
-            ];
-          }
-          
-          if (padroesBusca.length > 0) {
-            console.log(`📊 Aplicando agrupamento para ${nomeFantasia} com padrões:`, padroesBusca);
-            
-            for (const padrao of padroesBusca) {
-              const { data: dataVolumetriaAgrupada } = await supabase
-                .from('volumetria_mobilemed')
-                .select('*')
-                .eq('periodo_referencia', periodo)
-                .like('"EMPRESA"', padrao)
-                .neq('tipo_faturamento', 'NC-NF');
-              
-              if (dataVolumetriaAgrupada && dataVolumetriaAgrupada.length > 0) {
-                dataVolumetria = (dataVolumetria || []).concat(dataVolumetriaAgrupada);
-                console.log(`📊 Encontrados ${dataVolumetriaAgrupada.length} registros com padrão ${padrao}`);
-              }
-            }
-          }
         }
       }
       
@@ -253,630 +188,263 @@ const handler = async (req: Request) => {
 
     let finalData = dataFaturamento || [];
     
-    // Preparar mapa de preços por combinação para volumetria (modalidade|especialidade|categoria|prioridade)
-    const isFaturamentoDataLocalPrimario = finalData.length > 0 && Object.prototype.hasOwnProperty.call(finalData[0], 'valor');
-    let precoPorCombo: Record<string, number> = {};
-
-    if (!isFaturamentoDataLocalPrimario) {
-      // Agrupar volumetria para obter volume por combinação (usado na faixa de preço)
-      const grupos: Record<string, { modalidade: string; especialidade: string; categoria: string; prioridade: string; quantidade: number }>
-        = {};
-      for (const item of finalData as any[]) {
-        const modalidade = (item.MODALIDADE || '').toString();
-        const especialidade = (item.ESPECIALIDADE || '').toString();
-        const categoria = (item.CATEGORIA || 'SC').toString();
-        const prioridade = (item.PRIORIDADE || '').toString();
-        const key = `${modalidade}|${especialidade}|${categoria}|${prioridade}`;
-        const qtd = Number(item.VALORES || 0) || 0;
-        if (!grupos[key]) {
-          grupos[key] = { modalidade, especialidade, categoria, prioridade, quantidade: 0 };
-        }
-        grupos[key].quantidade += qtd;
-      }
-
-      // Buscar condição de volume do contrato
-      const { data: contrato } = await supabase
-        .from('contratos_clientes')
-        .select('cond_volume')
-        .eq('cliente_id', cliente_id)
-        .eq('status', 'ativo')
-        .single();
+    // DADOS PARA PDF: Se demonstrativoData foi fornecido, usar seus detalhes
+    if (demonstrativoData && demonstrativoData.detalhes_exames) {
+      // Usar dados do demonstrativo já processado
+      console.log('📋 Usando dados do demonstrativo pré-processado');
       
-      const condVolume = contrato?.cond_volume || 'MOD/ESP/CAT';
-      console.log(`📊 Condição de Volume: ${condVolume}`);
-
-      // Consultar preço unitário via RPC uma única vez por combinação
-      const combos = Object.entries(grupos);
-      if (combos.length > 0) {
-        // Calcular volumes agregados conforme cond_volume
-        const volumesAgregados = new Map<string, number>();
-        
-        for (const [key, g] of combos) {
-          const isPlantao = g.prioridade.includes('PLANTAO') || g.prioridade.includes('PLANTÃO');
-          
-          // Definir chave de agregação conforme cond_volume
-          let chaveAgregacao = '';
-          switch (condVolume) {
-            case 'MOD/ESP/CAT':
-              chaveAgregacao = `${g.modalidade}|${g.especialidade}|${g.categoria || 'SC'}`;
-              break;
-            case 'MOD/ESP':
-              chaveAgregacao = `${g.modalidade}|${g.especialidade}`;
-              break;
-            case 'MOD':
-              chaveAgregacao = g.modalidade;
-              break;
-            default:
-              chaveAgregacao = `${g.modalidade}|${g.especialidade}|${g.categoria || 'SC'}`;
-          }
-
-          // Para exames de plantão, verificar se deve considerar no volume agregado
-          if (isPlantao) {
-            // Verificar se preço considera plantão no volume agregado
-            const { data: precoPlantao } = await supabase
-              .from('precos_servicos')
-              .select('considera_prioridade_plantao')
-              .eq('cliente_id', cliente_id)
-              .eq('modalidade', g.modalidade)
-              .eq('especialidade', g.especialidade)
-              .eq('categoria', g.categoria || 'SC')
-              .eq('prioridade', g.prioridade)
-              .eq('ativo', true)
-              .maybeSingle();
-
-            // Só adiciona ao volume agregado se considera plantão
-            if (precoPlantao?.considera_prioridade_plantao) {
-              volumesAgregados.set(
-                chaveAgregacao, 
-                (volumesAgregados.get(chaveAgregacao) || 0) + g.quantidade
-              );
-            }
-          } else {
-            // Exames não-plantão sempre entram no volume agregado
-            volumesAgregados.set(
-              chaveAgregacao, 
-              (volumesAgregados.get(chaveAgregacao) || 0) + g.quantidade
-            );
-          }
-        }
-
-        console.log('📈 Volumes agregados por condição:', Object.fromEntries(volumesAgregados));
-
-        // Calcular preços por combo usando volume agregado correto
-        await Promise.all(
-          combos.map(async ([key, g]) => {
-            const isPlantao = g.prioridade.includes('PLANTAO') || g.prioridade.includes('PLANTÃO');
-            
-            // Definir chave de agregação para buscar volume
-            let chaveAgregacao = '';
-            switch (condVolume) {
-              case 'MOD/ESP/CAT':
-                chaveAgregacao = `${g.modalidade}|${g.especialidade}|${g.categoria || 'SC'}`;
-                break;
-              case 'MOD/ESP':
-                chaveAgregacao = `${g.modalidade}|${g.especialidade}`;
-                break;
-              case 'MOD':
-                chaveAgregacao = g.modalidade;
-                break;
-              default:
-                chaveAgregacao = `${g.modalidade}|${g.especialidade}|${g.categoria || 'SC'}`;
-            }
-            
-            // Para exames de plantão, usar o volume próprio (não agregado)
-            const volumeParaCalculo = isPlantao 
-              ? g.quantidade 
-              : (volumesAgregados.get(chaveAgregacao) || g.quantidade);
-            
-            try {
-              console.log(`🔍 Calculando preço para: ${key}`);
-              console.log(`   Cliente: ${cliente_id}`);
-              console.log(`   Modalidade: ${g.modalidade}`);
-              console.log(`   Especialidade: ${g.especialidade}`);
-              console.log(`   Categoria: ${g.categoria || 'SC'}`);
-              console.log(`   Prioridade: ${g.prioridade}`);
-              console.log(`   Volume próprio: ${g.quantidade}`);
-              console.log(`   Volume agregado: ${volumeParaCalculo}`);
-              console.log(`   É plantão: ${isPlantao}`);
-              
-              // Usar função calcular_preco_exame que implementa corretamente Vol. Inicial/Final
-              const { data: precoCalculado, error: precoError } = await supabase.rpc('calcular_preco_exame', {
-                p_cliente_id: cliente_id,
-                p_modalidade: g.modalidade,
-                p_especialidade: g.especialidade,
-                p_categoria: g.categoria || 'SC',
-                p_prioridade: g.prioridade,
-                p_volume_total: volumeParaCalculo,
-                p_is_plantao: isPlantao
-              });
-              
-              if (precoError) {
-                console.error(`❌ Erro ao calcular preço para ${key}:`, precoError);
-                precoPorCombo[key] = 0;
-              } else if (precoCalculado && precoCalculado.length > 0) {
-                const resultado = precoCalculado[0];
-                const precoFinal = Number(resultado.valor_unitario || 0);
-                const faixaVolume = resultado.faixa_volume || '';
-                
-                console.log(`💰 Preço calculado para ${key}: R$ ${precoFinal} (faixa: ${faixaVolume})`);
-                precoPorCombo[key] = precoFinal;
-              } else {
-                console.warn(`⚠️ Nenhum preço encontrado para ${key}`);
-                precoPorCombo[key] = 0;
-              }
-            } catch (e) {
-              console.error('❌ Falha ao calcular preço para combo', key, e?.message || e);
-              precoPorCombo[key] = 0;
-            }
-          })
-        );
-      }
+      // Converter detalhes_exames para formato esperado pelo PDF
+      finalData = demonstrativoData.detalhes_exames.map((detalhe: any) => ({
+        modalidade: detalhe.modalidade,
+        especialidade: detalhe.especialidade,
+        categoria: detalhe.categoria,
+        prioridade: detalhe.prioridade,
+        quantidade: detalhe.quantidade,
+        valor_unitario: detalhe.valor_unitario,
+        valor_total: detalhe.valor_total,
+        VALORES: detalhe.quantidade,
+        valor: detalhe.valor_total
+      }));
     }
-    
-    // Se não há dados, não gerar PDF
-    if (finalData.length === 0) {
-      console.log('❌ DADOS NÃO ENCONTRADOS - Cliente precisa de verificação no cadastro');
-      console.log(`🔍 Tentando buscar por nome fantasia: ${cliente.nome_fantasia || cliente.nome}`);
+
+    // Calcular totais
+    let totalLaudos = 0;
+    let valorBrutoTotal = 0;
+
+    for (const item of finalData) {
+      const quantidade = demonstrativoData ? 
+        (item.quantidade || 0) : 
+        (Number(item.VALORES) || Number(item.quantidade) || 0);
       
-      return new Response(JSON.stringify({
-        success: true,
-        message: "Nenhum dado encontrado para o cliente no período",
-        cliente: cliente.nome,
-        periodo: periodo,
-        totalRegistros: 0,
-        dadosEncontrados: false,
-        dados: [],
-        arquivos: [],
-        resumo: {
-          total_laudos: 0,
-          valor_bruto_total: 0,
-          valor_a_pagar: 0,
-          total_impostos: 0
-        },
-        timestamp: new Date().toISOString()
-      }), {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      const valor = demonstrativoData ?
+        (Number(item.valor_total) || 0) :
+        (Number(item.valor) || 0);
+
+      totalLaudos += quantidade;
+      valorBrutoTotal += valor;
     }
 
-    console.log('Total de dados únicos encontrados:', finalData.length);
+    // Calcular impostos (exemplo: ISS 5%)
+    const percentualImpostos = 0.05;
+    const totalImpostos = valorBrutoTotal * percentualImpostos;
+    const valorAPagar = valorBrutoTotal - totalImpostos;
 
-    // Calcular resumo usando dados de faturamento ou volumetria
-    const isFaturamentoData = finalData.length > 0 && finalData[0].hasOwnProperty('valor');
-    console.log('🔍 ANÁLISE DOS DADOS FINAIS:');
-    console.log('Total de registros finalData:', finalData.length);
-    console.log('É dados de faturamento?', isFaturamentoData);
-    if (finalData.length > 0) {
-      console.log('Primeiros 3 registros (resumo):', JSON.stringify(finalData.slice(0, 3).map(item => ({
-        // Mostrar campos principais apenas para debug mais limpo
-        tipo: isFaturamentoData ? 'faturamento' : 'volumetria',
-        paciente: isFaturamentoData ? item.paciente : item.NOME_PACIENTE,
-        exame: isFaturamentoData ? item.nome_exame : item.ESTUDO_DESCRICAO,
-        valor: isFaturamentoData ? item.valor : item.VALORES,
-        quantidade: isFaturamentoData ? item.quantidade : 1
-      })), null, 2));
-      console.log('Total de registros únicos por paciente:', new Set(finalData.map(item => 
-        isFaturamentoData ? item.paciente : item.NOME_PACIENTE
-      )).size);
-    }
-    
-    let valorBrutoTotal: number, totalLaudos: number;
-    let valorFranquia = 0;
-    let valorPortal = 0;
-    let valorIntegracao = 0;
-    let totalImpostos = 0;
-    let valorAPagar = 0;
-    
-    // Percentuais fixos para exibição dos tributos
-    const percentualPIS = 0.65; // 0.65%
-    const percentualCOFINS = 3.0; // 3%
-    const percentualCSLL = 1.0; // 1.0%
-    const percentualIRRF = 1.5; // 1.5%
+    console.log(`💰 Totais calculados - Laudos: ${totalLaudos} | Bruto: ${valorBrutoTotal} | Líquido: ${valorAPagar}`);
 
-    let valorPIS = 0, valorCOFINS = 0, valorCSLL = 0, valorIRRF = 0;
-    
-    if (demonstrativoData) {
-      // Usar exatamente os valores do demonstrativo unificado
-      totalLaudos = Number(demonstrativoData.total_exames || 0);
-      valorBrutoTotal = Number(demonstrativoData.valor_bruto ?? demonstrativoData.valor_exames ?? 0);
-      valorFranquia = Number(demonstrativoData.valor_franquia || 0);
-      valorPortal = Number(demonstrativoData.valor_portal_laudos || 0);
-      valorIntegracao = Number(demonstrativoData.valor_integracao || 0);
-      totalImpostos = Number(demonstrativoData.valor_impostos || 0);
-      valorAPagar = Number(demonstrativoData.valor_total || (valorBrutoTotal - totalImpostos));
-    } else {
-      // Calcular resumo usando dados de faturamento ou volumetria
-      const isFaturamentoDataLocal = finalData.length > 0 && finalData[0].hasOwnProperty('valor');
-      if (isFaturamentoDataLocal) {
-        // Dados de faturamento - usar campos corretos
-        valorBrutoTotal = finalData.reduce((sum, item) => sum + (parseFloat(item.valor) || 0), 0);
-        totalLaudos = finalData.reduce((sum, item) => sum + (parseInt(item.quantidade) || 0), 0);
-      } else {
-        // Dados de volumetria - usar VALORES como quantidade, excluir NC-NF
-        valorBrutoTotal = (finalData as any[]).reduce((sum, item) => {
-          // APLICAR FILTRO NC-NF: Excluir registros que não devem ser faturados
-          if (item.tipo_faturamento === 'NC-NF') {
-            return sum; // Não somar valor para registros NC-NF
-          }
-          
-          const key = `${(item.MODALIDADE || '')}|${(item.ESPECIALIDADE || '')}|${(item.CATEGORIA || 'SC')}|${(item.PRIORIDADE || '')}`;
-          const unit = precoPorCombo[key] ?? 0;
-          const qtd = Number(item.VALORES || 0) || 0;
-          return sum + unit * qtd;
-        }, 0);
-        
-        totalLaudos = finalData.reduce((sum, item) => {
-          // APLICAR FILTRO NC-NF: Excluir registros que não devem ser faturados
-          if ((item as any).tipo_faturamento === 'NC-NF') {
-            return sum; // Não contar exames NC-NF
-          }
-          return sum + (parseInt((item as any).VALORES) || 0);
-        }, 0);
-      }
-      // Impostos padrão (calculados para exibição)
-      valorPIS = parseFloat((valorBrutoTotal * (percentualPIS / 100)).toFixed(2));
-      valorCOFINS = parseFloat((valorBrutoTotal * (percentualCOFINS / 100)).toFixed(2));
-      valorCSLL = parseFloat((valorBrutoTotal * (percentualCSLL / 100)).toFixed(2));
-      valorIRRF = parseFloat((valorBrutoTotal * (percentualIRRF / 100)).toFixed(2));
-      totalImpostos = valorPIS + valorCOFINS + valorCSLL + valorIRRF;
-      valorAPagar = valorBrutoTotal - totalImpostos;
-    }
+    // Dados do relatório PDF usando demonstrativoData se disponível
+    const dadosRelatorio = demonstrativoData || {
+      cliente_nome: cliente.nome_fantasia || cliente.nome,
+      cliente_cnpj: cliente.cnpj,
+      periodo: periodo,
+      total_exames: totalLaudos,
+      valor_bruto: valorBrutoTotal,
+      valor_impostos: totalImpostos,
+      valor_total: valorAPagar,
+      detalhes_exames: finalData
+    };
 
-    // Mesmo quando vem do demonstrativo, calcular valores individuais para exibição
-    if (demonstrativoData) {
-      valorPIS = parseFloat((valorBrutoTotal * (percentualPIS / 100)).toFixed(2));
-      valorCOFINS = parseFloat((valorBrutoTotal * (percentualCOFINS / 100)).toFixed(2));
-      valorCSLL = parseFloat((valorBrutoTotal * (percentualCSLL / 100)).toFixed(2));
-      valorIRRF = parseFloat((valorBrutoTotal * (percentualIRRF / 100)).toFixed(2));
-    }
-
-    // Gerar PDF apenas se houver dados
+    // Gerar PDF usando o demonstrativoData se fornecido
     let pdfUrl = null;
-    try {
-      console.log('Gerando relatório PDF...');
-      
-      // Criar novo documento PDF em formato paisagem
-      const doc = new jsPDF('landscape', 'mm', 'a4');
-      
-      // Configurar fonte
-      doc.setFont('helvetica');
-      
-      // === LOGOMARCA ===
+
+    // PDF generation logic
+    // Buscar logomarca da tabela logomarca
+    const { data: logomarcaData } = await supabase
+      .from('logomarca')
+      .select('nome_arquivo')
+      .eq('ativo', true)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    let logoDataUrl = '';
+    if (logomarcaData?.nome_arquivo) {
       try {
-        // Tentar carregar diferentes extensões de logomarca
-        const extensions = ['png', 'jpg', 'jpeg'];
-        let logoAdded = false;
+        const { data: logoFile } = await supabase.storage
+          .from('logomarca')
+          .download(logomarcaData.nome_arquivo);
 
-        for (const ext of extensions) {
-          const fileName = `logomarca.${ext}`;
-          const { data: logoData, error: logoError } = await supabase.storage
-            .from('logomarcas')
-            .download(fileName);
-
-          if (!logoError && logoData) {
-            // Converter blob para array buffer e depois para base64
-            const arrayBuffer = await logoData.arrayBuffer();
-            const uint8Array = new Uint8Array(arrayBuffer);
-            
-            // Converter para base64
-            let binary = '';
-            for (let i = 0; i < uint8Array.byteLength; i++) {
-              binary += String.fromCharCode(uint8Array[i]);
-            }
-            const base64String = btoa(binary);
-            const imageFormat = ext.toUpperCase() === 'JPG' ? 'JPEG' : ext.toUpperCase();
-            
-            // Adicionar imagem ao PDF com dimensões adequadas e posição mais alta
-            doc.addImage(`data:image/${ext};base64,${base64String}`, imageFormat, 130, 5, 40, 25);
-            logoAdded = true;
-            console.log(`Logomarca ${fileName} carregada com sucesso no PDF`);
-            break;
-          }
-        }
-
-        if (!logoAdded) {
-          // Se não encontrou logomarca, mostrar placeholder
-          doc.setDrawColor(200, 200, 200);
-          doc.setLineWidth(0.5);
-          doc.rect(130, 5, 40, 25);
-          doc.setFontSize(8);
-          doc.setTextColor(128, 128, 128);
-          doc.text('LOGOMARCA', 150, 19, { align: 'center' });
-          console.log('Nenhuma logomarca encontrada, usando placeholder');
+        if (logoFile) {
+          const logoBytes = await logoFile.arrayBuffer();
+          const logoBase64 = btoa(String.fromCharCode(...new Uint8Array(logoBytes)));
+          logoDataUrl = `data:${logoFile.type};base64,${logoBase64}`;
+          console.log(`Logomarca ${logomarcaData.nome_arquivo} carregada com sucesso no PDF`);
         }
       } catch (logoError) {
         console.error('Erro ao carregar logomarca:', logoError);
-        // Mostrar placeholder em caso de erro
-        doc.setDrawColor(200, 200, 200);
-        doc.setLineWidth(0.5);
-        doc.rect(130, 5, 40, 25);
-        doc.setFontSize(8);
-        doc.setTextColor(128, 128, 128);
-        doc.text('LOGOMARCA', 150, 19, { align: 'center' });
       }
-      
-      // === CABEÇALHO ===
-      doc.setFontSize(22);
-      doc.setTextColor(0, 124, 186); // #007cba
-      doc.text('RELATÓRIO DE FATURAMENTO', 148, 35, { align: 'center' });
-      
-      // Informações do cliente
-      doc.setFontSize(16);
-      doc.setTextColor(0, 0, 0);
-      doc.text(`Cliente: ${cliente.nome}`, 20, 50);
-      if (cliente.cnpj) {
-        doc.setFontSize(16); // Mesma fonte do campo Cliente
-        doc.setTextColor(0, 0, 0); // Mesma cor do campo Cliente
-        doc.text(`CNPJ: ${formatarCNPJ(cliente.cnpj)}`, 20, 60);
-      }
-      
-      doc.setFontSize(14);
-      doc.setTextColor(0, 0, 0);
-      doc.text(`Período: ${periodo}`, 20, cliente.cnpj ? 70 : 60);
-      doc.text(`Data: ${new Date().toLocaleDateString('pt-BR')}`, 220, 50);
-      
-      // Linha separadora
-      doc.setDrawColor(0, 124, 186);
-      doc.setLineWidth(1);
-      doc.line(20, cliente.cnpj ? 75 : 65, 277, cliente.cnpj ? 75 : 65);
-      
-      // === QUADRO 1 - RESUMO DO CLIENTE ===
-      const yQuadro1 = cliente.cnpj ? 85 : 75;
-      doc.setFontSize(16);
-      doc.setTextColor(0, 124, 186);
-      doc.text('QUADRO 1 - RESUMO', 20, yQuadro1);
-      
-      // Caixa do resumo (mais alta para acomodar melhor os textos)
-      doc.setDrawColor(0, 124, 186);
-      doc.setLineWidth(0.5);
-      doc.rect(20, yQuadro1 + 5, 257, 80);
-      
-      doc.setFontSize(12);
-      doc.setTextColor(0, 0, 0);
-      
-      // Layout em linhas conforme solicitado
-      let yLine = yQuadro1 + 15;
-      doc.text(`Total de Laudos: ${totalLaudos.toLocaleString('pt-BR')}`, 25, yLine);
-      
-      yLine += 8;
-      doc.text(`Valor Bruto: R$ ${valorBrutoTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 25, yLine);
-      
-      yLine += 8;
-      doc.text(`Franquia: R$ ${valorFranquia.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 25, yLine);
-      
-      yLine += 8;
-      doc.text(`Portal de Laudos: R$ ${valorPortal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 25, yLine);
-      
-      yLine += 8;
-      doc.text(`Integração: R$ ${valorIntegracao.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 25, yLine);
-      
-      // Impostos na coluna da direita
-      yLine = yQuadro1 + 15;
-      doc.text(`PIS (${percentualPIS}%): R$ ${valorPIS.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 150, yLine);
-      
-      yLine += 8;
-      doc.text(`COFINS (${percentualCOFINS}%): R$ ${valorCOFINS.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 150, yLine);
-      
-      yLine += 8;
-      doc.text(`CSLL (${percentualCSLL}%): R$ ${valorCSLL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 150, yLine);
-      
-      yLine += 8;
-      doc.text(`IRRF (${percentualIRRF}%): R$ ${valorIRRF.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 150, yLine);
-      
-      // Linha separadora antes do Valor a Pagar (movida para baixo)
-      doc.setDrawColor(0, 124, 186);
-      doc.setLineWidth(1);
-      doc.line(25, yQuadro1 + 50, 270, yQuadro1 + 50);
-      
-      // Valor a Pagar destacado (movido para baixo para não sobrepor)
-      doc.setFontSize(16);
-      doc.setTextColor(0, 0, 0); // Cor preta em vez de verde
-      doc.text(`VALOR A PAGAR: R$ ${valorAPagar.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 148, yQuadro1 + 62, { align: 'center' });
-      
-      // === NOVA PÁGINA PARA QUADRO 2 ===
-      doc.addPage('landscape');
-      
-      // === QUADRO 2 - DETALHAMENTO ===
-      let yPosition = 30; // Começa do topo da nova página
-      doc.setFontSize(16);
-      doc.setTextColor(0, 124, 186);
-      doc.text('QUADRO 2 - DETALHAMENTO', 20, yPosition);
-      
-      yPosition += 10;
-      
-      if (finalData.length > 0) {
-        // Cabeçalho da tabela detalhada (mais larga para paisagem)
-        doc.setFontSize(8);
-        doc.setTextColor(255, 255, 255);
-        doc.setFillColor(0, 124, 186);
-        doc.rect(10, yPosition, 267, 8, 'F');
-        
-        if (isFaturamentoData) {
-          // Headers para dados de faturamento - incluindo novos campos
-          doc.text('Data', 15, yPosition + 5);
-          doc.text('Paciente', 35, yPosition + 5);
-          doc.text('Médico', 65, yPosition + 5);
-          doc.text('Exame', 95, yPosition + 5);
-          doc.text('Modal.', 125, yPosition + 5);
-          doc.text('Espec.', 140, yPosition + 5);
-          doc.text('Categ.', 160, yPosition + 5);
-          doc.text('Prior.', 180, yPosition + 5);
-          doc.text('Accession', 200, yPosition + 5);
-          doc.text('Origem', 220, yPosition + 5);
-          doc.text('Qtd', 245, yPosition + 5);
-          doc.text('Valor', 260, yPosition + 5);
-        } else {
-          // Headers para dados de volumetria - incluindo novos campos
-          doc.text('Data', 15, yPosition + 5);
-          doc.text('Paciente', 35, yPosition + 5);
-          doc.text('Médico', 65, yPosition + 5);
-          doc.text('Exame', 95, yPosition + 5);
-          doc.text('Modal.', 125, yPosition + 5);
-          doc.text('Espec.', 140, yPosition + 5);
-          doc.text('Categ.', 160, yPosition + 5);
-          doc.text('Prior.', 180, yPosition + 5);
-          doc.text('Accession', 200, yPosition + 5);
-          doc.text('Origem', 220, yPosition + 5);
-          doc.text('Qtd', 245, yPosition + 5);
-          doc.text('Valor Total', 260, yPosition + 5);
-        }
-        
-        yPosition += 12;
-        doc.setTextColor(0, 0, 0);
-        
-        // Dados da tabela detalhada
-        for (let i = 0; i < finalData.length; i++) {
-          const item = finalData[i];
-          
-          if (yPosition > 190) { // Nova página se necessário (formato paisagem tem menos altura)
-            doc.addPage('landscape');
-            yPosition = 30;
-            
-            // Repetir cabeçalho na nova página
-            doc.setFontSize(8);
-            doc.setTextColor(255, 255, 255);
-            doc.setFillColor(0, 124, 186);
-            doc.rect(10, yPosition, 267, 8, 'F');
-            
-            if (isFaturamentoData) {
-              // Headers para dados de faturamento
-              doc.text('Data', 22, yPosition + 5);
-              doc.text('Paciente', 40, yPosition + 5);
-              doc.text('Médico', 80, yPosition + 5);
-              doc.text('Exame', 120, yPosition + 5);
-              doc.text('Modal.', 160, yPosition + 5);
-              doc.text('Espec.', 180, yPosition + 5);
-              doc.text('Categ.', 205, yPosition + 5);
-              doc.text('Prior.', 230, yPosition + 5);
-              doc.text('Qtd', 250, yPosition + 5);
-              doc.text('Valor Total', 260, yPosition + 5);
-            } else {
-              // Headers para dados de volumetria
-              doc.text('Data', 22, yPosition + 5);
-              doc.text('Paciente', 40, yPosition + 5);
-              doc.text('Médico', 80, yPosition + 5);
-              doc.text('Exame', 120, yPosition + 5);
-              doc.text('Modal.', 160, yPosition + 5);
-              doc.text('Espec.', 180, yPosition + 5);
-              doc.text('Categ.', 205, yPosition + 5);
-              doc.text('Prior.', 230, yPosition + 5);
-              doc.text('Qtd', 250, yPosition + 5);
-              doc.text('Valor Total', 260, yPosition + 5);
-            }
-            
-            yPosition += 12;
-            doc.setTextColor(0, 0, 0);
-          }
-          
-          // Alternar cores das linhas
-          if (i % 2 === 1) {
-            doc.setFillColor(240, 240, 240);
-            doc.rect(10, yPosition - 2, 267, 6, 'F');
-          }
-          
-          doc.setFontSize(7);
-          
-          if (isFaturamentoData) {
-            // Dados de faturamento - usar campos corretos incluindo novos campos
-            const dataFormatada = item.data_exame ? 
-              item.data_exame.split('T')[0].split('-').reverse().join('/') : '-';
-            doc.text(dataFormatada, 15, yPosition + 2);
-            doc.text((item.paciente || '-').substring(0, 15), 35, yPosition + 2);
-            doc.text((item.medico || '-').substring(0, 15), 65, yPosition + 2);
-            doc.text((item.nome_exame || '-').substring(0, 15), 95, yPosition + 2);
-            doc.text((item.modalidade || '-').substring(0, 8), 125, yPosition + 2);
-            doc.text((item.especialidade || '-').substring(0, 10), 140, yPosition + 2);
-            doc.text((item.categoria || '-').substring(0, 8), 160, yPosition + 2);
-            doc.text((item.prioridade || '-').substring(0, 10), 180, yPosition + 2);
-            doc.text((item.accession_number || '-').substring(0, 10), 200, yPosition + 2);
-            doc.text((item.cliente_nome_original || '-').substring(0, 12), 220, yPosition + 2);
-            doc.text((item.quantidade || '0').toString(), 245, yPosition + 2);
-            doc.text(`R$ ${parseFloat(item.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 260, yPosition + 2);
-          } else {
-            // Dados de volumetria - usar campos da volumetria incluindo novos campos
-            const dataFormatada = item.DATA_REALIZACAO ? 
-              item.DATA_REALIZACAO.split('T')[0].split('-').reverse().join('/') : '-';
-            doc.text(dataFormatada, 15, yPosition + 2);
-            doc.text((item.NOME_PACIENTE || '-').substring(0, 15), 35, yPosition + 2);
-            doc.text((item.MEDICO || '-').substring(0, 15), 65, yPosition + 2);
-            doc.text((item.ESTUDO_DESCRICAO || '-').substring(0, 15), 95, yPosition + 2);
-            doc.text((item.MODALIDADE || '-').substring(0, 8), 125, yPosition + 2);
-            doc.text((item.ESPECIALIDADE || '-').substring(0, 10), 140, yPosition + 2);
-            doc.text((item.CATEGORIA || '-').substring(0, 8), 160, yPosition + 2);
-            doc.text((item.PRIORIDADE || '-').substring(0, 10), 180, yPosition + 2);
-            doc.text((item.ACCESSION_NUMBER || '-').substring(0, 10), 200, yPosition + 2);
-            doc.text((item.EMPRESA || '-').substring(0, 12), 220, yPosition + 2);
-            doc.text((item.VALORES || '0').toString(), 245, yPosition + 2);
-            // Calcular valor para volumetria usando o preço obtido via RPC
-            const key = `${(item.MODALIDADE || '')}|${(item.ESPECIALIDADE || '')}|${(item.CATEGORIA || 'SC')}|${(item.PRIORIDADE || '')}`;
-            const precoUnitario = precoPorCombo[key] ?? 0;
-            const qtd = Number(item.VALORES || 0) || 0;
-            const valorTotal = precoUnitario * qtd;
-            
-            doc.text(`R$ ${valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 260, yPosition + 2);
-          }
-          
-          yPosition += 6;
-        }
-      } else {
-        // Mensagem de nenhum dado encontrado
-        doc.setFontSize(14);
-        doc.setTextColor(128, 128, 128);
-        doc.text('Nenhum dado encontrado para o período selecionado', 148, yPosition + 30, { align: 'center' });
-      }
-      
-      // Rodapé
-      const pageCount = doc.internal.getNumberOfPages();
-      for (let i = 1; i <= pageCount; i++) {
-        doc.setPage(i);
-        doc.setFontSize(8);
-        doc.setTextColor(128, 128, 128);
-        doc.text('Relatório gerado automaticamente pelo sistema visus.a.i. © 2025 - Todos os direitos reservados', 148, 200, { align: 'center' });
-        doc.text(`Página ${i} de ${pageCount}`, 270, 200, { align: 'right' });
-      }
-      
-      // Converter PDF para buffer
-      const pdfBuffer = doc.output('arraybuffer');
-      
-      // Salvar PDF no storage
-      const fileName = `relatorio_${cliente.nome.replace(/[^a-zA-Z0-9]/g, '_')}_${periodo}.pdf`;
+    }
 
-      // Garantir que o bucket exista e seja público
+    // Configurar PDF
+    const pdf = new jsPDF();
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 20;
+
+    // Adicionar logomarca se disponível
+    if (logoDataUrl) {
       try {
-        const bucketName = 'relatorios-faturamento';
-        const { data: existingBucket } = await supabase.storage.getBucket(bucketName);
-        if (!existingBucket) {
-          await supabase.storage.createBucket(bucketName, { public: true });
-          console.log(`Bucket ${bucketName} criado`);
-        }
-      } catch (bErr) {
-        console.log('Aviso: não foi possível verificar/criar bucket:', bErr?.message || bErr);
+        pdf.addImage(logoDataUrl, 'JPEG', margin, 10, 40, 20);
+      } catch (e) {
+        console.log('Erro ao adicionar logo ao PDF:', e);
       }
+    }
 
-      // Upload do PDF
-      try {
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('relatorios-faturamento')
-          .upload(fileName, new Uint8Array(pdfBuffer), {
-            contentType: 'application/pdf',
-            cacheControl: '3600',
-            upsert: true
-          });
+    // Cabeçalho
+    pdf.setFontSize(16);
+    pdf.text('RELATÓRIO DE FATURAMENTO', pageWidth - margin, 20, { align: 'right' });
 
-        if (uploadError) {
-          console.error('Erro no upload do PDF:', uploadError);
-        } else {
-          const { data: { publicUrl } } = supabase.storage
-            .from('relatorios-faturamento')
-            .getPublicUrl(fileName);
-          
-          pdfUrl = publicUrl;
-          console.log('Relatório PDF gerado com sucesso:', pdfUrl);
-        }
-      } catch (pdfError) {
-        console.error('Erro na geração do relatório:', pdfError);
+    // Informações do cliente
+    pdf.setFontSize(12);
+    pdf.text(`Cliente: ${dadosRelatorio.cliente_nome || cliente.nome}`, margin, 40);
+    pdf.text(`CNPJ: ${formatarCNPJ(dadosRelatorio.cliente_cnpj || cliente.cnpj || '')}`, margin, 50);
+    pdf.text(`Período: ${periodo}`, margin, 60);
+
+    // Resumo financeiro
+    pdf.setFontSize(14);
+    pdf.text('RESUMO FINANCEIRO', margin, 80);
+    
+    pdf.setFontSize(10);
+    let yPos = 90;
+    
+    // Usar dados do demonstrativo se disponível
+    if (demonstrativoData) {
+      pdf.text(`Total de Exames: ${demonstrativoData.total_exames}`, margin, yPos);
+      yPos += 10;
+      pdf.text(`Valor dos Exames: R$ ${demonstrativoData.valor_exames?.toFixed(2) || '0,00'}`, margin, yPos);
+      yPos += 10;
+      
+      if (demonstrativoData.valor_franquia > 0) {
+        pdf.text(`Valor da Franquia: R$ ${demonstrativoData.valor_franquia.toFixed(2)}`, margin, yPos);
+        yPos += 10;
       }
+      
+      if (demonstrativoData.valor_portal_laudos > 0) {
+        pdf.text(`Portal de Laudos: R$ ${demonstrativoData.valor_portal_laudos.toFixed(2)}`, margin, yPos);
+        yPos += 10;
+      }
+      
+      if (demonstrativoData.valor_integracao > 0) {
+        pdf.text(`Integração: R$ ${demonstrativoData.valor_integracao.toFixed(2)}`, margin, yPos);
+        yPos += 10;
+      }
+      
+      pdf.text(`Valor Bruto: R$ ${demonstrativoData.valor_bruto?.toFixed(2) || '0,00'}`, margin, yPos);
+      yPos += 10;
+      
+      if (demonstrativoData.valor_impostos > 0) {
+        pdf.text(`Impostos: R$ ${demonstrativoData.valor_impostos.toFixed(2)}`, margin, yPos);
+        yPos += 10;
+      }
+      
+      pdf.setFontSize(12);
+      pdf.text(`VALOR LÍQUIDO: R$ ${demonstrativoData.valor_total?.toFixed(2) || '0,00'}`, margin, yPos);
+      yPos += 15;
+      
+      // Detalhes de tributação se disponível
+      if (demonstrativoData.detalhes_tributacao) {
+        pdf.setFontSize(10);
+        const trib = demonstrativoData.detalhes_tributacao;
+        pdf.text(`Regime: ${trib.simples_nacional ? 'Simples Nacional' : 'Regime Normal'}`, margin, yPos);
+        yPos += 10;
+        
+        if (trib.percentual_iss) {
+          pdf.text(`ISS: ${trib.percentual_iss}% - R$ ${trib.valor_iss?.toFixed(2) || '0,00'}`, margin, yPos);
+          yPos += 10;
+        }
+        
+        if (trib.valor_irrf) {
+          pdf.text(`IRRF: 1,5% - R$ ${trib.valor_irrf.toFixed(2)}`, margin, yPos);
+          yPos += 10;
+        }
+        
+        yPos += 10;
+      }
+    } else {
+      // Fallback para dados básicos
+      pdf.text(`Total de Exames: ${totalLaudos}`, margin, yPos);
+      yPos += 10;
+      pdf.text(`Valor Bruto: R$ ${valorBrutoTotal.toFixed(2)}`, margin, yPos);
+      yPos += 10;
+      pdf.text(`Impostos: R$ ${totalImpostos.toFixed(2)}`, margin, yPos);
+      yPos += 10;
+      pdf.setFontSize(12);
+      pdf.text(`VALOR A PAGAR: R$ ${valorAPagar.toFixed(2)}`, margin, yPos);
+      yPos += 15;
+    }
+
+    // Tabela de detalhes (se há dados)
+    if (finalData.length > 0) {
+      pdf.setFontSize(10);
+      pdf.text('DETALHES POR ESPECIALIDADE/MODALIDADE:', margin, yPos);
+      yPos += 10;
+      
+      // Cabeçalho da tabela
+      const headers = ['Modalidade', 'Especialidade', 'Categoria', 'Qtd', 'Valor Unit.', 'Valor Total'];
+      const colWidths = [30, 40, 25, 20, 25, 30];
+      let xPos = margin;
+      
+      headers.forEach((header, i) => {
+        pdf.text(header, xPos, yPos);
+        xPos += colWidths[i];
+      });
+      
+      yPos += 5;
+      pdf.line(margin, yPos, pageWidth - margin, yPos);
+      yPos += 5;
+      
+      // Dados da tabela (primeiros 20 para não estourar página)
+      const dadosTabela = finalData.slice(0, 20);
+      
+      dadosTabela.forEach((item) => {
+        if (yPos > pageHeight - 30) return; // Evitar sair da página
+        
+        xPos = margin;
+        const modalidade = demonstrativoData ? item.modalidade : (item.MODALIDADE || item.modalidade || '');
+        const especialidade = demonstrativoData ? item.especialidade : (item.ESPECIALIDADE || item.especialidade || '');
+        const categoria = demonstrativoData ? item.categoria : (item.CATEGORIA || item.categoria || 'SC');
+        const quantidade = demonstrativoData ? item.quantidade : (item.VALORES || item.quantidade || 0);
+        const valorUnit = demonstrativoData ? item.valor_unitario : (item.valor_unitario || 0);
+        const valorTotal = demonstrativoData ? item.valor_total : (item.valor_total || item.valor || 0);
+        
+        pdf.text(modalidade.substring(0, 15), xPos, yPos);
+        xPos += colWidths[0];
+        pdf.text(especialidade.substring(0, 20), xPos, yPos);
+        xPos += colWidths[1];
+        pdf.text(categoria.substring(0, 12), xPos, yPos);
+        xPos += colWidths[2];
+        pdf.text(quantidade.toString(), xPos, yPos);
+        xPos += colWidths[3];
+        pdf.text(`R$ ${Number(valorUnit).toFixed(2)}`, xPos, yPos);
+        xPos += colWidths[4];
+        pdf.text(`R$ ${Number(valorTotal).toFixed(2)}`, xPos, yPos);
+        
+        yPos += 8;
+      });
+    }
+
+    // Salvar PDF no storage
+    const pdfBytes = pdf.output('arraybuffer');
+    const fileName = `relatorio_${cliente.nome.replace(/[^a-zA-Z0-9]/g, '_')}_${periodo}.pdf`;
+    
+    // Upload para storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('relatorios-faturamento')
+      .upload(fileName, pdfBytes, {
+        contentType: 'application/pdf',
+        upsert: true
+      });
+
+    if (uploadError) {
+      console.error('Erro no upload do PDF:', uploadError);
+    } else {
+      // Gerar URL pública
+      const { data: urlData } = supabase.storage
+        .from('relatorios-faturamento')
+        .getPublicUrl(fileName);
+      
+      pdfUrl = urlData.publicUrl;
+      console.log(`Relatório PDF gerado com sucesso: ${pdfUrl}`);
+    }
 
     // Sempre retornar sucesso, mesmo sem dados
     const response = {
@@ -913,22 +481,4 @@ const handler = async (req: Request) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
-  } // End processRequest function
-
-  // Executar com timeout
-  try {
-    return await Promise.race([processRequest(), timeoutPromise]);
-  } catch (error) {
-    console.error('Erro com timeout:', error);
-    return new Response(JSON.stringify({ 
-      success: false, 
-      error: error.message || 'Timeout ou erro interno',
-      timeout: error.message.includes('Timeout')
-    }), {
-      status: error.message.includes('Timeout') ? 408 : 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
-  }
-};
-
-serve(handler);
+});
