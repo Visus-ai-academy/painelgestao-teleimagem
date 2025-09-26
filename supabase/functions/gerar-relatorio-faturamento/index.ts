@@ -140,48 +140,22 @@ serve(async (req: Request) => {
       valorBrutoTotal += valor;
     }
 
-    // Calcular impostos (ISS 5%)
-    const percentualImpostos = 0.05;
-    const totalImpostos = valorBrutoTotal * percentualImpostos;
-    const valorAPagar = valorBrutoTotal - totalImpostos;
-
-    // Dados do relatório PDF
-    const dadosRelatorio = demonstrativoData || {
-      cliente_nome: cliente.nome_fantasia || cliente.nome,
-      cliente_cnpj: cliente.cnpj,
-      periodo: periodo,
-      total_exames: totalLaudos,
-      valor_bruto: valorBrutoTotal,
-      valor_impostos: totalImpostos,
-      valor_total: valorAPagar,
-      detalhes_exames: finalData
-    };
-
-    // Buscar logomarca
-    const { data: logomarcaData } = await supabase
-      .from('logomarca')
-      .select('nome_arquivo')
-      .eq('ativo', true)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    let logoDataUrl = '';
-    if (logomarcaData?.nome_arquivo) {
-      try {
-        const { data: logoFile } = await supabase.storage
-          .from('logomarca')
-          .download(logomarcaData.nome_arquivo);
-
-        if (logoFile) {
-          const logoBytes = await logoFile.arrayBuffer();
-          const logoBase64 = btoa(String.fromCharCode(...new Uint8Array(logoBytes)));
-          logoDataUrl = `data:${logoFile.type};base64,${logoBase64}`;
-        }
-      } catch (logoError) {
-        console.error('Erro ao carregar logomarca:', logoError);
-      }
-    }
+    // Calcular valores
+    const valorExames = demonstrativoData ? (demonstrativoData.valor_bruto || 0) : valorBrutoTotal;
+    const valorFranquia = demonstrativoData ? (demonstrativoData.valor_franquia || 0) : 0;
+    const valorPortal = demonstrativoData ? (demonstrativoData.valor_portal_laudos || 0) : 0;
+    const valorIntegracao = demonstrativoData ? (demonstrativoData.valor_integracao || 0) : 0;
+    
+    // Base de cálculo para impostos
+    const baseCalculo = valorExames + valorFranquia + valorPortal + valorIntegracao;
+    
+    // Impostos conforme o modelo original
+    const pis = baseCalculo * 0.0065;      // 0.65%
+    const cofins = baseCalculo * 0.03;     // 3%
+    const csll = baseCalculo * 0.01;       // 1%
+    const irrf = baseCalculo * 0.015;      // 1.5%
+    
+    const valorLiquido = baseCalculo - pis - cofins - csll - irrf;
 
     // ============= GERAÇÃO DO PDF - TEMPLATE ORIGINAL RESTAURADO =============
     
@@ -251,23 +225,6 @@ serve(async (req: Request) => {
     // QUADRO 1 - RESUMO
     addText('QUADRO 1 - RESUMO', 20, currentY, { fontSize: 12, isBold: true });
     currentY += 10;
-    
-    // Calcular valores
-    const valorExames = demonstrativoData ? (demonstrativoData.valor_bruto || 0) : valorBrutoTotal;
-    const valorFranquia = demonstrativoData ? (demonstrativoData.valor_franquia || 0) : 0;
-    const valorPortal = demonstrativoData ? (demonstrativoData.valor_portal_laudos || 0) : 0;
-    const valorIntegracao = demonstrativoData ? (demonstrativoData.valor_integracao || 0) : 0;
-    
-    // Base de cálculo para impostos
-    const baseCalculo = valorExames + valorFranquia + valorPortal + valorIntegracao;
-    
-    // Impostos conforme o modelo original
-    const pis = baseCalculo * 0.0065;      // 0.65%
-    const cofins = baseCalculo * 0.03;     // 3%
-    const csll = baseCalculo * 0.01;       // 1%
-    const irrf = baseCalculo * 0.015;      // 1.5%
-    
-    const valorLiquido = baseCalculo - pis - cofins - csll - irrf;
     
     // Função para formatar valores
     const formatarValor = (valor: number) => `R$ ${valor.toLocaleString('pt-BR', { 
@@ -419,13 +376,6 @@ serve(async (req: Request) => {
       align: 'right'
     });
 
-    // Gerar PDF e fazer upload
-    const pdfBytes = pdf.output('arraybuffer');
-    const fileName = `relatorio_${(cliente.nome_fantasia || cliente.nome).replace(/[^a-zA-Z0-9]/g, '_').toUpperCase()}_${periodo}.pdf`;
-    
-    let pdfUrl = null;
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('relatorios-faturamento')
     // Gerar PDF e fazer upload
     const pdfBytes = pdf.output('arraybuffer');
     const fileName = `relatorio_${(cliente.nome_fantasia || cliente.nome).replace(/[^a-zA-Z0-9]/g, '_').toUpperCase()}_${periodo}.pdf`;
