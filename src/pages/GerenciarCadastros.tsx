@@ -19,7 +19,8 @@ import { useValoresReferencia } from '@/hooks/useValoresReferencia';
 import { ClientValidationStatus } from '@/components/ClientValidationStatus';
 import { PrecosSemClienteAnalise } from '@/components/PrecosSemClienteAnalise';
 import { ParametrosFaturamentoList } from '@/components/ParametrosFaturamentoList';
-import { LimparPrecosCompleto } from '@/temp-limpar-precos-completo';
+import { LimparPrecos } from '@/components/LimparPrecos';
+
 
 
 import { 
@@ -669,7 +670,7 @@ export default function GerenciarCadastros() {
             <PrecosSemClienteAnalise />
             
             {/* Limpeza Completa de Preços */}
-            <LimparPrecosCompleto />
+            <LimparPrecos />
 
             {/* Upload Preço Clientes */}
             <Card>

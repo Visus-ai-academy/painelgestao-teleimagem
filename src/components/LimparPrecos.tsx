@@ -41,6 +41,48 @@ export function LimparPrecos() {
     }
   };
 
+  const handleLimparRPC = async () => {
+    setLoading(true);
+    setResultado(null);
+
+    try {
+      const { error } = await supabase.rpc('limpar_todos_precos');
+      
+      if (error) {
+        throw error;
+      }
+
+      // Verificar limpeza
+      const { count } = await supabase
+        .from('precos_servicos')
+        .select('id', { count: 'exact', head: true });
+        
+      setResultado({
+        sucesso: true,
+        metodo: 'RPC direta',
+        registros_restantes: count || 0,
+        limpeza_completa: (count === 0),
+        timestamp: new Date().toISOString()
+      });
+
+      toast({
+        title: "Sucesso",
+        description: "Limpeza RPC concluída com sucesso!",
+        variant: "default",
+      });
+
+    } catch (error: any) {
+      console.error('Erro na RPC:', error);
+      toast({
+        title: "Erro",
+        description: "Erro na limpeza RPC: " + error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <Card>
@@ -60,24 +102,45 @@ export function LimparPrecos() {
             </AlertDescription>
           </Alert>
 
-          <Button 
-            onClick={handleLimparPrecos}
-            disabled={loading}
-            variant="destructive"
-            className="w-full"
-          >
-            {loading ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                Limpando...
-              </>
-            ) : (
-              <>
-                <Trash2 className="h-4 w-4 mr-2" />
-                Limpar Todos os Preços
-              </>
-            )}
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              onClick={handleLimparPrecos}
+              disabled={loading}
+              variant="destructive"
+              className="flex-1"
+            >
+              {loading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Limpando...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Limpar via Edge Function
+                </>
+              )}
+            </Button>
+
+            <Button 
+              onClick={handleLimparRPC}
+              disabled={loading}
+              variant="outline"
+              className="flex-1"
+            >
+              {loading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
+                  Limpando...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Limpar via RPC Direta
+                </>
+              )}
+            </Button>
+          </div>
 
           {resultado && (
             <Alert>
