@@ -157,224 +157,199 @@ serve(async (req: Request) => {
     
     const valorLiquido = baseCalculo - pis - cofins - csll - irrf;
 
-    // ============= GERAÇÃO DO PDF - TEMPLATE ORIGINAL RESTAURADO =============
-    
-    // Criar PDF em PAISAGEM
-    const pdf = new jsPDF('l', 'mm', 'a4'); 
-    const pageWidth = pdf.internal.pageSize.getWidth(); 
-    const pageHeight = pdf.internal.pageSize.getHeight(); 
-    const margin = 15;
-    
+    // ============= GERAÇÃO DO PDF - TEMPLATE PADRÃO (pré 24/09/2025) =============
+    // Este template replica o layout usado no frontend (src/lib/pdfUtils.ts)
+    const pdf = new jsPDF('l', 'mm', 'a4');
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 10;
+    const contentWidth = pageWidth - (margin * 2);
+
     let currentY = margin;
-    
-    // Função para adicionar texto
+
     const addText = (text: string, x: number, y: number, options: any = {}) => {
-      const { fontSize = 10, align = 'left', isBold = false, maxWidth } = options;
-      
-      if (isBold) {
-        pdf.setFont('helvetica', 'bold');
-      } else {
-        pdf.setFont('helvetica', 'normal');  
-      }
-      
+      const fontSize = options.fontSize || 10;
+      const maxWidth = options.maxWidth || contentWidth;
+      const align = options.align || 'left';
+      const isBold = options.bold || false;
+
       pdf.setFontSize(fontSize);
-      
-      if (maxWidth && pdf.getTextWidth(text) > maxWidth) {
-        const lines = pdf.splitTextToSize(text, maxWidth);
-        pdf.text(lines, x, y, { align });
-        return y + (lines.length * fontSize * 0.35);
-      } else {
-        pdf.text(text, x, y, { align });
-        return y + (fontSize * 0.35);
+      pdf.setFont('helvetica', isBold ? 'bold' : 'normal');
+
+      const lines = pdf.splitTextToSize(text, maxWidth);
+      for (let i = 0; i < lines.length; i++) {
+        let textX = x;
+        if (align === 'center') textX = x + (maxWidth / 2) - (pdf.getTextWidth(lines[i]) / 2);
+        if (align === 'right') textX = x + maxWidth - pdf.getTextWidth(lines[i]);
+        pdf.text(lines[i], textX, y + (i * (fontSize * 0.4)));
       }
+      return y + (lines.length * (fontSize * 0.4));
     };
-    
-    // Função para verificar quebra de página
-    const checkNewPage = (currentY: number, spaceNeeded: number = 20): number => {
-      if (currentY + spaceNeeded > 190) {
+
+    const checkNewPage = (requiredSpace: number) => {
+      if (currentY + requiredSpace > pageHeight - margin) {
         pdf.addPage();
-        return 20;
+        currentY = margin;
       }
-      return currentY;
     };
-    
-    // Header do relatório
-    addText('TELEiMAGEM', 20, currentY, { fontSize: 16, isBold: true });
-    currentY += 8;
-    addText('EXCELENCIA EM TELERRADIOLOGIA', 20, currentY, { fontSize: 12 });
-    currentY += 15;
-    
-    // Título do relatório
-    addText('RELATÓRIO DE FATURAMENTO', 20, currentY, { fontSize: 14, isBold: true });
-    currentY += 15;
-    
-    // Informações do cliente
-    const clienteData = {
-      nome: cliente.nome_fantasia || cliente.nome,
-      cnpj: cliente.cnpj || 'N/A'
-    };
-    
-    addText(`Cliente: ${clienteData.nome}`, 20, currentY, { fontSize: 11 });
-    addText(`Data: ${new Date().toLocaleDateString('pt-BR')}`, 200, currentY, { fontSize: 11 });
-    currentY += 8;
-    
-    addText(`CNPJ: ${clienteData.cnpj}`, 20, currentY, { fontSize: 11 });
-    addText(`Período: ${periodo}`, 200, currentY, { fontSize: 11 });
-    currentY += 15;
-    
-    // QUADRO 1 - RESUMO
-    addText('QUADRO 1 - RESUMO', 20, currentY, { fontSize: 12, isBold: true });
-    currentY += 10;
-    
-    // Função para formatar valores
-    const formatarValor = (valor: number) => `R$ ${valor.toLocaleString('pt-BR', { 
-      minimumFractionDigits: 2, 
-      maximumFractionDigits: 2 
-    })}`;
-    
-    // Resumo em formato tabular (igual ao original)
-    addText('Total de Laudos:', 25, currentY, { fontSize: 10 }); 
-    addText(totalLaudos.toString(), 100, currentY, { fontSize: 10 });
-    currentY += 6;
-    
-    addText('Valor Bruto:', 25, currentY, { fontSize: 10 });
-    addText(formatarValor(valorExames), 100, currentY, { fontSize: 10 });
-    currentY += 6;
-    
-    addText('Franquia:', 25, currentY, { fontSize: 10 });
-    addText(formatarValor(valorFranquia), 100, currentY, { fontSize: 10 });
-    currentY += 6;
-    
-    addText('Portal de Laudos:', 25, currentY, { fontSize: 10 });
-    addText(formatarValor(valorPortal), 100, currentY, { fontSize: 10 });
-    currentY += 6;
-    
-    addText('Integração:', 25, currentY, { fontSize: 10 });
-    addText(formatarValor(valorIntegracao), 100, currentY, { fontSize: 10 });
-    currentY += 6;
-    
-    addText('PIS (0.65%):', 25, currentY, { fontSize: 10 });
-    addText(formatarValor(pis), 100, currentY, { fontSize: 10 });
-    currentY += 6;
-    
-    addText('COFINS (3%):', 25, currentY, { fontSize: 10 });
-    addText(formatarValor(cofins), 100, currentY, { fontSize: 10 });
-    currentY += 6;
-    
-    addText('CSLL (1%):', 25, currentY, { fontSize: 10 });
-    addText(formatarValor(csll), 100, currentY, { fontSize: 10 });
-    currentY += 6;
-    
-    addText('IRRF (1.5%):', 25, currentY, { fontSize: 10 });
-    addText(formatarValor(irrf), 100, currentY, { fontSize: 10 });
-    currentY += 10;
-    
-    addText('VALOR A PAGAR:', 25, currentY, { fontSize: 11, isBold: true });
-    addText(formatarValor(valorLiquido), 100, currentY, { fontSize: 11, isBold: true });
+
+    // Cabeçalho
+    currentY = addText('RELATÓRIO DE FATURAMENTO', margin, currentY + 15, {
+      fontSize: 20,
+      bold: true,
+      align: 'center',
+      maxWidth: contentWidth
+    });
+
+    currentY = addText(`Período: ${periodo}`, margin, currentY + 10, {
+      fontSize: 12,
+      align: 'center',
+      maxWidth: contentWidth
+    });
+
     currentY += 20;
-    
-    // QUADRO 2 - DETALHAMENTO
+
+    // Box de informações do cliente + resumo financeiro
+    checkNewPage(80);
+    pdf.setDrawColor(200, 200, 200);
+    pdf.setFillColor(248, 249, 250);
+    pdf.rect(margin, currentY, contentWidth, 60, 'FD');
+
+    const clienteNome = cliente.nome_fantasia || cliente.nome;
+    currentY = addText(`Cliente: ${clienteNome}`, margin + 5, currentY + 12, {
+      fontSize: 16,
+      bold: true,
+      align: 'center',
+      maxWidth: contentWidth - 10
+    });
+
+    currentY += 15;
+
+    const leftColumnX = margin + 10;
+    const rightColumnX = margin + (contentWidth / 2) + 10;
+    let leftY = currentY;
+
+    leftY = addText(`Período: ${periodo}`, leftColumnX, leftY, { fontSize: 11 });
+    leftY = addText(`Total de Exames: ${totalLaudos}`, leftColumnX, leftY + 6, { fontSize: 11 });
+    leftY = addText(`Data do Relatório: ${new Date().toLocaleDateString('pt-BR')}`, leftColumnX, leftY + 6, { fontSize: 11 });
+
+    // Impostos detalhados conforme template original do frontend
+    const irpj = baseCalculo * 0.015; // 1,5%
+    const impostosDetalhados = {
+      irpj,
+      pis,
+      cofins,
+      csll
+    };
+
+    const formatarValor = (valor: number) => `R$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+
+    const resumoData = [
+      ['Valor Bruto', formatarValor(valorExames)],
+      ['(-) Franquia', formatarValor(valorFranquia)],
+      ['(-) Integração', formatarValor(valorIntegracao)],
+      ['(-) Portal Laudos', formatarValor(valorPortal)],
+      ['(-) IRPJ (1,5%)', formatarValor(impostosDetalhados.irpj)],
+      ['(-) PIS (0,65%)', formatarValor(impostosDetalhados.pis)],
+      ['(-) COFINS (3%)', formatarValor(impostosDetalhados.cofins)],
+      ['(-) CSLL (1%)', formatarValor(impostosDetalhados.csll)],
+      ['VALOR LÍQUIDO', formatarValor(valorLiquido)]
+    ];
+
+    let rightY = currentY;
+    const colWidth = (contentWidth / 2) - 20;
+
+    resumoData.forEach((row, index) => {
+      const isTotal = index === resumoData.length - 1;
+      if (isTotal) {
+        pdf.setDrawColor(33, 150, 243);
+        pdf.setFillColor(227, 242, 253);
+        pdf.rect(rightColumnX, rightY - 2, colWidth, 8, 'FD');
+      }
+      rightY = addText(row[0], rightColumnX + 2, rightY, { fontSize: isTotal ? 12 : 10, bold: isTotal });
+      addText(row[1], rightColumnX + 2, rightY - (isTotal ? 4.8 : 4), { fontSize: isTotal ? 12 : 10, bold: isTotal, align: 'right', maxWidth: colWidth - 4 });
+      rightY += isTotal ? 10 : 6;
+    });
+
+    currentY = Math.max(leftY, rightY) + 10;
+
+    // Tabela de exames
     if (finalData && finalData.length > 0) {
-      currentY = checkNewPage(currentY, 30);
-      
-      addText('QUADRO 2 - DETALHAMENTO', 20, currentY, { fontSize: 12, isBold: true });
+      checkNewPage(50);
+      currentY = addText('Detalhamento dos Exames', margin, currentY + 10, { fontSize: 14, bold: true });
       currentY += 15;
-      
-      // Cabeçalho da tabela (conforme o modelo original)
-      const headers = ['Data', 'Paciente', 'Médico', 'Exame', 'Modal.', 'Espec.', 'Categ.', 'Prior.', 'Accession', 'Origem', 'Qtd', 'Valor Total'];
-      const colWidths = [18, 25, 25, 25, 12, 18, 12, 15, 20, 15, 8, 18];
-      
-      // Posição inicial da tabela
-      const tableStartX = 15;
-      let headerX = tableStartX;
-      
-      // Desenhar cabeçalho
-      pdf.setFillColor(240, 240, 240);
-      pdf.rect(tableStartX, currentY - 2, 211, 6, 'F');
-      
+
+      const headers = ['Unidade', 'Paciente', 'Accession', 'Exame', 'Médico', 'Prior.', 'Modal.', 'Espec.', 'Categ.', 'Qtd', 'Valor'];
+      const colWidths = [20, 30, 18, 35, 25, 15, 15, 20, 15, 12, 20]; // total 225mm
+      let tableX = margin + ((contentWidth - 225) / 2);
+
+      // Cabeçalho azul
+      pdf.setFillColor(37, 99, 235);
+      pdf.setTextColor(255, 255, 255);
+      pdf.rect(tableX, currentY, 225, 8, 'F');
+
+      let headerX = tableX;
       headers.forEach((header, index) => {
-        addText(header, headerX + 1, currentY + 2, {
-          fontSize: 8,
-          isBold: true,
-          maxWidth: colWidths[index] - 2
-        });
+        addText(header, headerX + 1, currentY + 6, { fontSize: 8, bold: true, maxWidth: colWidths[index] - 2 });
         headerX += colWidths[index];
       });
-      
+
       currentY += 8;
-      
-      // Linhas de dados
+      pdf.setTextColor(0, 0, 0);
+
+      // Linhas
       finalData.forEach((item: any, index: number) => {
-        currentY = checkNewPage(currentY, 6);
-        
-        // Alternar cor de fundo
-        if (index % 2 === 0) {
-          pdf.setFillColor(248, 248, 248);
-          pdf.rect(tableStartX, currentY - 2, 211, 6, 'F');
-        }
-        
-        const quantidade = demonstrativoData ? (item.quantidade || 1) : (item.VALORES || 1);
-        const valorTotal = demonstrativoData ? (item.valor_total || 0) : (item.valor || 0);
-        
+        checkNewPage(6);
+        if (index % 2 === 0) { pdf.setFillColor(248, 249, 250); pdf.rect(tableX, currentY, 225, 6, 'F'); }
+
+        const unidade = (item.unidade_origem || item.cliente || item.cliente_nome_original || clienteNome || '').toString().substring(0,12);
+        const paciente = (item.paciente || item.NOME_PACIENTE || '').toString().substring(0,18);
+        const accession = (item.accession_number || item.ACCESSION_NUMBER || '-').toString().substring(0,12);
+        const exame = (item.nome_exame || item.ESTUDO_DESCRICAO || '').toString().substring(0,22);
+        const medico = (item.laudado_por || item.medico || item.MEDICO || '').toString().substring(0,15);
+        const prioridade = (item.prioridade || item.PRIORIDADE || 'ROTINA').toString().substring(0,8);
+        const modalidade = (item.modalidade || item.MODALIDADE || 'N/A').toString().substring(0,8);
+        const especialidade = (item.especialidade || item.ESPECIALIDADE || 'N/A').toString().substring(0,12);
+        const categoria = (item.categoria || item.CATEGORIA || 'SC').toString().substring(0,8);
+        const qtd = (demonstrativoData ? (item.quantidade || 0) : (item.VALORES || item.quantidade || 0));
+        const valorTot = (demonstrativoData ? (item.valor_total || 0) : (item.valor || 0));
+
         const cells = [
-          new Date().toLocaleDateString('pt-BR').substring(0, 10), // Data (placeholder)
-          (item.NOME_PACIENTE || 'Paciente').toString().substring(0, 15), // Paciente
-          (item.MEDICO || 'Médico').toString().substring(0, 15), // Médico
-          (item.ESTUDO_DESCRICAO || item.modalidade || 'Exame').toString().substring(0, 15), // Exame
-          (item.modalidade || item.MODALIDADE || 'N/A').toString().substring(0, 6), // Modal.
-          (item.especialidade || item.ESPECIALIDADE || 'N/A').toString().substring(0, 10), // Espec.
-          (item.categoria || item.CATEGORIA || 'SC').toString().substring(0, 6), // Categ.
-          (item.prioridade || item.PRIORIDADE || 'ROTINA').toString().substring(0, 8), // Prior.
-          (item.ACCESSION_NUMBER || item.accession_number || '-').toString().substring(0, 12), // Accession
-          clienteData.nome.substring(0, 8), // Origem
-          quantidade.toString(), // Qtd
-          formatarValor(valorTotal) // Valor Total
+          unidade,
+          paciente,
+          accession,
+          exame,
+          medico,
+          prioridade,
+          modalidade,
+          especialidade,
+          categoria,
+          qtd.toString(),
+          formatarValor(valorTot)
         ];
-        
-        let cellX = tableStartX;
+
+        let cellX = tableX;
         cells.forEach((cell, cellIndex) => {
-          const align = cellIndex === 10 ? 'center' : (cellIndex === 11 ? 'right' : 'left');
-          addText(cell, cellX + 1, currentY + 2, {
-            fontSize: 7,
-            maxWidth: colWidths[cellIndex] - 2,
-            align: align
-          });
+          const align = cellIndex === 9 ? 'center' : (cellIndex === 10 ? 'right' : 'left');
+          addText(cell, cellX + 1, currentY + 4, { fontSize: 7, maxWidth: colWidths[cellIndex] - 2, align });
           cellX += colWidths[cellIndex];
         });
-        
         currentY += 6;
       });
-      
-      // Bordas da tabela
+
+      // Bordas
       pdf.setDrawColor(0, 0, 0);
       pdf.setLineWidth(0.1);
-      
       const startTableY = currentY - (finalData.length * 6) - 8;
-      pdf.rect(tableStartX, startTableY, 211, currentY - startTableY);
-      
-      // Linhas verticais
-      let lineX = tableStartX;
-      colWidths.forEach(width => {
-        lineX += width;
-        if (lineX < tableStartX + 211) {
-          pdf.line(lineX, startTableY, lineX, currentY);
-        }
-      });
+      pdf.rect(tableX, startTableY, 225, currentY - startTableY);
+      let lineX = tableX;
+      colWidths.forEach(width => { lineX += width; if (lineX < tableX + 225) { pdf.line(lineX, startTableY, lineX, currentY); } });
     }
-    
-    // RODAPÉ (conforme o original)
-    currentY += 15;
-    currentY = checkNewPage(currentY, 15);
-    
-    addText('Relatório gerado automaticamente pelo sistema visus.a.i. © 2025 - Todos os direitos reservados', 20, currentY, {
-      fontSize: 9,
-      align: 'left'
-    });
-    
-    addText('Página 1 de 1', pageWidth - 30, currentY, {
-      fontSize: 9,
-      align: 'right'
-    });
+
+    // Rodapé
+    currentY += 20;
+    checkNewPage(20);
+    currentY = addText(`Relatório gerado automaticamente em ${new Date().toLocaleString('pt-BR')}`, margin, currentY, { fontSize: 10, align: 'center', maxWidth: contentWidth });
 
     // Gerar PDF e fazer upload
     const pdfBytes = pdf.output('arraybuffer');
