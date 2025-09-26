@@ -1,6 +1,9 @@
 {
   "compilerOptions": {
-    "allowJs": true
+    "allowJs": true,
+    "checkJs": false,
+    "skipLibCheck": true,
+    "strict": false
   },
   "importMap": "./import_map.json"
 }
