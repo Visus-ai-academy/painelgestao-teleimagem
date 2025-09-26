@@ -313,20 +313,29 @@ export default function DemonstrativoFaturamento() {
                 const emailCliente = demo.cliente_email || demo.email_cliente || 
                   `${nomeCliente.toLowerCase().replace(/[^a-z0-9]/g, '')}@cliente.com`;
                 
+                 // Calcular valor_bruto incluindo adicionais
+                 const valorExames = Number(demo.valor_exames ?? 0);
+                 const valorFranquia = Number(demo.valor_franquia ?? 0);
+                 const valorPortal = Number(demo.valor_portal_laudos ?? 0);
+                 const valorIntegracao = Number(demo.valor_integracao ?? 0);
+                 const valorImpostos = Number(demo.valor_impostos ?? 0);
+                 
+                 const valorBrutoCompleto = valorExames + valorFranquia + valorPortal + valorIntegracao;
+                 const valorLiquidoCompleto = valorBrutoCompleto - valorImpostos;
+                 
                  return {
                    id: demo.cliente_id || `temp-${nomeCliente}`,
                    nome: nomeCliente,
                    email: emailCliente,
                    total_exames: demo.total_exames || 0,
-                   valor_bruto: Number(demo.valor_bruto ?? demo.valor_exames ?? 0),
-                   valor_liquido: Number((demo.valor_total ?? demo.valor_liquido ?? ((demo.valor_bruto ?? demo.valor_exames ?? 0) - (demo.valor_impostos ?? 0)))),
+                   valor_bruto: valorBrutoCompleto,
+                   valor_liquido: valorLiquidoCompleto,
                    periodo: periodo,
                    status_pagamento: 'pendente' as const,
                    data_vencimento: new Date().toISOString().split('T')[0],
-                   // Não assumir CO-FT por padrão; vamos enriquecer com dados do banco abaixo
                    tipo_faturamento: demo.tipo_faturamento || undefined,
                    alertas: demo.alertas || [],
-                   observacoes: `Exames: ${demo.total_exames || 0} | Franquia: R$ ${(demo.valor_franquia || 0).toFixed(2)} | Portal: R$ ${(demo.valor_portal_laudos || 0).toFixed(2)} | Integração: R$ ${(demo.valor_integracao || 0).toFixed(2)} | Impostos: R$ ${(demo.valor_impostos || 0).toFixed(2)}`,
+                   observacoes: `Exames: ${demo.total_exames || 0} | Franquia: R$ ${valorFranquia.toFixed(2)} | Portal: R$ ${valorPortal.toFixed(2)} | Integração: R$ ${valorIntegracao.toFixed(2)} | Impostos: R$ ${valorImpostos.toFixed(2)}`,
                    detalhes_exames: demo.detalhes_exames || []
                  };
                });
@@ -1127,7 +1136,7 @@ export default function DemonstrativoFaturamento() {
                 valor_portal_geral: demonstrativosValidos.reduce((sum: number, dem: any) => sum + (dem.valor_portal_laudos || 0), 0),
                 valor_integracao_geral: demonstrativosValidos.reduce((sum: number, dem: any) => sum + (dem.valor_integracao || 0), 0),
                 valor_adicionais_geral: demonstrativosValidos.reduce((sum: number, dem: any) => sum + ((dem.valor_franquia || 0) + (dem.valor_portal_laudos || 0) + (dem.valor_integracao || 0)), 0),
-                valor_bruto_geral: demonstrativosValidos.reduce((sum: number, dem: any) => sum + (dem.valor_bruto || 0), 0),
+                valor_bruto_geral: demonstrativosValidos.reduce((sum: number, dem: any) => sum + ((dem.valor_exames || 0) + (dem.valor_franquia || 0) + (dem.valor_portal_laudos || 0) + (dem.valor_integracao || 0)), 0),
                 valor_impostos_geral: demonstrativosValidos.reduce((sum: number, dem: any) => sum + (dem.valor_impostos || 0), 0),
                 valor_total_geral: demonstrativosValidos.reduce((sum: number, dem: any) => sum + (dem.valor_total || dem.valor_liquido || 0), 0),
                 clientes_simples_nacional: demonstrativosValidos.filter((dem: any) => dem.detalhes_tributacao?.simples_nacional).length,
@@ -1173,27 +1182,31 @@ export default function DemonstrativoFaturamento() {
           });
           
           const valorExamesGeral = clientes.reduce((sum, c) => sum + (c.valor_bruto || 0), 0);
-          const valorTotalGeral = valorExamesGeral + valorFranquiasTotal + valorPortalTotal + valorIntegracaoTotal;
+          const valorBrutoGeral = valorExamesGeral; // valor_bruto já inclui adicionais após nossa correção
+          const valorLiquidoGeral = valorBrutoGeral - valorImpostosTotal;
           
           console.log('🧮 Resumo calculado via fallback:', {
             totalExamesGeral,
-            valorExamesGeral,
+            valorExamesGeral: valorExamesGeral - valorFranquiasTotal - valorPortalTotal - valorIntegracaoTotal, // apenas exames
             valorFranquiasTotal,
             valorPortalTotal, 
             valorIntegracaoTotal,
             valorImpostosTotal,
-            valorTotalGeral
+            valorBrutoGeral,
+            valorLiquidoGeral
           });
           
           return {
             clientes_processados: clientes.length,
             total_exames_geral: totalExamesGeral,
-            valor_exames_geral: valorExamesGeral,
+            valor_exames_geral: valorExamesGeral - valorFranquiasTotal - valorPortalTotal - valorIntegracaoTotal, // apenas exames
             valor_franquias_geral: valorFranquiasTotal,
             valor_portal_geral: valorPortalTotal,     
             valor_integracao_geral: valorIntegracaoTotal, 
+            valor_adicionais_geral: valorFranquiasTotal + valorPortalTotal + valorIntegracaoTotal,
+            valor_bruto_geral: valorBrutoGeral,
             valor_impostos_geral: valorImpostosTotal,   
-            valor_total_geral: valorTotalGeral,
+            valor_total_geral: valorLiquidoGeral,
             clientes_simples_nacional: 0,
             clientes_regime_normal: clientes.length
           };
@@ -1205,7 +1218,7 @@ export default function DemonstrativoFaturamento() {
               <CardTitle>Resumo Geral - {periodo}</CardTitle>
             </CardHeader>
             <CardContent>
-               <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+               <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
                 <div className="text-center">
                   <div className="text-2xl font-bold text-blue-600">
                     {resumoCalculado.clientes_processados}
@@ -1232,9 +1245,15 @@ export default function DemonstrativoFaturamento() {
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-orange-600">
-                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(resumoCalculado.valor_bruto_geral || 0)}
+                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format((resumoCalculado.valor_exames_geral || 0) + (resumoCalculado.valor_adicionais_geral || 0))}
                   </div>
                   <div className="text-sm text-muted-foreground">Valor Bruto</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-red-600">
+                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(resumoCalculado.valor_total_geral || 0)}
+                  </div>
+                  <div className="text-sm text-muted-foreground">Valor Líquido</div>
                 </div>
               </div>
 
