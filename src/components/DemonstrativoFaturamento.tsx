@@ -415,25 +415,69 @@ export default function DemonstrativoFaturamento() {
                      tipo_faturamento: c.tipo_faturamento || mapContratoTipos.get(c.nome)
                    }));
                  }
-                 setClientes(enriquecidos);
-                setClientesFiltrados(enriquecidos);
-              } catch (e) {
-                console.warn('Não foi possível enriquecer tipo_faturamento dos demonstrativos locais:', e);
-                setClientes(clientesConvertidos);
-                setClientesFiltrados(clientesConvertidos);
-              }
-              setCarregando(false);
-              
-              if (!hasShownInitialToast.current) {
-                toast({
-                  title: "Demonstrativos carregados",
-                  description: `${clientesConvertidos.length} demonstrativos completos encontrados para ${periodo}`,
-                  variant: "default",
-                });
-                hasShownInitialToast.current = true;
-              }
-              
-              return;
+                  // ✅ Após enriquecer, ajustar valores com adicionais e impostos (6,15% quando NÃO simples)
+                  const isUUID = (id?: string) => !!id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+                  const ajustados: ClienteFaturamento[] = [];
+                  for (const c of enriquecidos) {
+                    let vFranquia = 0, vPortal = 0, vIntegracao = 0;
+                    if (isUUID(c.id)) {
+                      try {
+                        const { data: calc } = await supabase.rpc('calcular_faturamento_completo', {
+                          p_cliente_id: c.id,
+                          p_periodo: periodo,
+                          p_volume_total: c.total_exames,
+                        });
+                        if (calc && calc.length > 0) {
+                          vFranquia = Number(calc[0]?.valor_franquia || 0);
+                          vPortal = Number(calc[0]?.valor_portal_laudos || 0);
+                          vIntegracao = Number(calc[0]?.valor_integracao || 0);
+                        }
+                      } catch (e) {
+                        console.warn('Falha ao calcular adicionais do cliente (via demonstrativo local):', c.nome, e);
+                      }
+                    }
+                    const valorBrutoFinal = Number(c.valor_bruto || 0) + vFranquia + vPortal + vIntegracao;
+                    let simples = false;
+                    try {
+                      if (isUUID(c.id)) {
+                        const { data: params } = await supabase
+                          .from('parametros_faturamento')
+                          .select('simples')
+                          .eq('cliente_id', c.id)
+                          .eq('status', 'A')
+                          .maybeSingle();
+                        simples = !!params?.simples;
+                      }
+                    } catch (e) {
+                      console.warn('Falha ao buscar regime tributário do cliente (demonstrativo local):', c.nome, e);
+                    }
+                    const impostos = simples ? 0 : Number((valorBrutoFinal * 0.0615).toFixed(2));
+                    ajustados.push({
+                      ...c,
+                      valor_bruto: Number(valorBrutoFinal.toFixed(2)),
+                      valor_liquido: Number((valorBrutoFinal - impostos).toFixed(2)),
+                      observacoes: `Exames: ${c.total_exames || 0} | Franquia: R$ ${vFranquia.toFixed(2)} | Portal: R$ ${vPortal.toFixed(2)} | Integração: R$ ${vIntegracao.toFixed(2)} | Impostos: R$ ${impostos.toFixed(2)}`,
+                    });
+                  }
+                  setClientes(ajustados);
+                  setClientesFiltrados(ajustados);
+               } catch (e) {
+                 console.warn('Não foi possível enriquecer tipo_faturamento dos demonstrativos locais:', e);
+                 setClientes(clientesConvertidos);
+                 setClientesFiltrados(clientesConvertidos);
+               }
+               setCarregando(false);
+               
+               if (!hasShownInitialToast.current) {
+                 toast({
+                   title: "Demonstrativos carregados",
+                   description: `${clientesConvertidos.length} demonstrativos completos encontrados para ${periodo}`,
+                   variant: "default",
+                 });
+                 hasShownInitialToast.current = true;
+               }
+               
+               return;
             }
           }
         } catch (error) {
@@ -1194,7 +1238,8 @@ export default function DemonstrativoFaturamento() {
           console.warn('⚠️ Não há demonstrativos no localStorage para período:', periodo);
         }
         
-        const resumoCalculado = resumoReal || (() => {
+        const usarResumoLocal = resumoReal && (((resumoReal as any).valor_adicionais_geral ?? 0) > 0 || ((resumoReal as any).valor_impostos_geral ?? 0) > 0);
+        const resumoCalculado = usarResumoLocal ? (resumoReal as any) : (() => {
           // 🔧 CALCULAR VALORES COMPLETOS a partir das observações dos clientes
           console.log('⚠️ FALLBACK: Calculando resumo a partir dos dados dos clientes');
           
