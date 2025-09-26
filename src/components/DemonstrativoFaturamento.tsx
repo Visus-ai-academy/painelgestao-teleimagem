@@ -949,7 +949,7 @@ export default function DemonstrativoFaturamento() {
           }
           
           clientesMap.set(clienteNome, {
-            id: clienteNome,
+            id: (item as any).cliente_id || clienteNome,
             nome: item.cliente_nome || 'Cliente não identificado',
             email: item.cliente_email || '',
             total_exames: item.quantidade || 1, // Usar quantidade real do faturamento
@@ -975,6 +975,47 @@ export default function DemonstrativoFaturamento() {
             cliente.tipo_faturamento = 'Não definido'; // fallback
           }
         }
+      }
+      
+      // Ajustar valores com adicionais (franquia/portal/integração) e impostos (6,15% quando aplicável)
+      for (const c of clientesArray) {
+        let vFranquia = 0, vPortal = 0, vIntegracao = 0;
+        if (c.id) {
+          try {
+            const { data: calc } = await supabase.rpc('calcular_faturamento_completo', {
+              p_cliente_id: c.id,
+              p_periodo: periodo,
+              p_volume_total: c.total_exames,
+            });
+            if (calc && calc.length > 0) {
+              vFranquia = Number(calc[0]?.valor_franquia || 0);
+              vPortal = Number(calc[0]?.valor_portal_laudos || 0);
+              vIntegracao = Number(calc[0]?.valor_integracao || 0);
+            }
+          } catch (e) {
+            console.warn('Falha ao calcular adicionais do cliente (via faturamento):', c.nome, e);
+          }
+        }
+        const valorBrutoFinal = Number(c.valor_bruto || 0) + vFranquia + vPortal + vIntegracao;
+        // Determinar regime e aplicar 6,15% quando NÃO simples
+        let simples = false;
+        try {
+          if (c.id) {
+            const { data: params } = await supabase
+              .from('parametros_faturamento')
+              .select('simples')
+              .eq('cliente_id', c.id)
+              .eq('status', 'A')
+              .maybeSingle();
+            simples = !!params?.simples;
+          }
+        } catch (e) {
+          console.warn('Falha ao buscar regime tributário do cliente:', c.nome, e);
+        }
+        const impostos = simples ? 0 : Number((valorBrutoFinal * 0.0615).toFixed(2));
+        c.valor_bruto = Number(valorBrutoFinal.toFixed(2));
+        c.valor_liquido = Number((valorBrutoFinal - impostos).toFixed(2));
+        c.observacoes = `Exames: ${c.total_exames || 0} | Franquia: R$ ${vFranquia.toFixed(2)} | Portal: R$ ${vPortal.toFixed(2)} | Integração: R$ ${vIntegracao.toFixed(2)} | Impostos: R$ ${impostos.toFixed(2)}`;
       }
       
       console.log('📊 Clientes processados finais:', clientesArray.length);
