@@ -183,126 +183,277 @@ serve(async (req: Request) => {
       }
     }
 
-    // ============= GERAÇÃO DO PDF - TEMPLATE ORIGINAL =============
-    const pdf = new jsPDF('portrait', 'mm', 'a4');
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
+    // ============= GERAÇÃO DO PDF - TEMPLATE ORIGINAL RESTAURADO =============
     
-    const margin = 20;
-    let yPosition = margin;
+    // Função para formatar valor com verificação de undefined/null
+    const formatarValor = (valor: number | undefined | null): string => {
+      if (valor === undefined || valor === null || isNaN(valor)) {
+        return 'R$ 0,00';
+      }
+      return `R$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+    };
+
+    // Calcular impostos detalhados (6.15% total)
+    const calcularImpostosDetalhados = (valorBruto: number) => {
+      const irpj = valorBruto * 0.015; // 1.5%
+      const pis = valorBruto * 0.0065; // 0.65%
+      const cofins = valorBruto * 0.03; // 3%
+      const csll = valorBruto * 0.01; // 1%
+      
+      return {
+        irpj,
+        pis,
+        cofins,
+        csll,
+        total: irpj + pis + cofins + csll
+      };
+    };
+
+    // Criar PDF em PAISAGEM
+    const pdf = new jsPDF('l', 'mm', 'a4'); // 'l' = landscape (paisagem)
+    const pageWidth = pdf.internal.pageSize.getWidth(); // ~297mm
+    const pageHeight = pdf.internal.pageSize.getHeight(); // ~210mm
+    const margin = 10;
+    const contentWidth = pageWidth - (margin * 2);
     
-    // Logomarca
+    let currentY = margin;
+    
+    // Função para adicionar texto com quebra de linha automática
+    const addText = (text: string, x: number, y: number, options: any = {}) => {
+      const fontSize = options.fontSize || 10;
+      const maxWidth = options.maxWidth || contentWidth;
+      const align = options.align || 'left';
+      
+      pdf.setFontSize(fontSize);
+      if (options.bold) pdf.setFont('helvetica', 'bold');
+      else pdf.setFont('helvetica', 'normal');
+      
+      const lines = pdf.splitTextToSize(text, maxWidth);
+      
+      for (let i = 0; i < lines.length; i++) {
+        let textX = x;
+        if (align === 'center') {
+          textX = x + (maxWidth / 2) - (pdf.getTextWidth(lines[i]) / 2);
+        } else if (align === 'right') {
+          textX = x + maxWidth - pdf.getTextWidth(lines[i]);
+        }
+        
+        pdf.text(lines[i], textX, y + (i * (fontSize * 0.4)));
+      }
+      
+      return y + (lines.length * (fontSize * 0.4));
+    };
+    
+    // Função para adicionar nova página se necessário
+    const checkNewPage = (requiredSpace: number) => {
+      if (currentY + requiredSpace > pageHeight - margin) {
+        pdf.addPage();
+        currentY = margin;
+      }
+    };
+
+    // CABEÇALHO com logomarca
     if (logoDataUrl) {
       try {
-        pdf.addImage(logoDataUrl, 'JPEG', margin, yPosition, 50, 20);
+        pdf.addImage(logoDataUrl, 'JPEG', margin, currentY, 40, 15);
       } catch (e) {
         console.log('Erro ao adicionar logo:', e);
       }
     }
-    yPosition += 30;
-
-    // Título
-    pdf.setFontSize(16);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('RELATÓRIO DE FATURAMENTO', pageWidth / 2, yPosition, { align: 'center' });
-    yPosition += 10;
-
-    // Cliente e Período
-    pdf.setFontSize(12);
-    pdf.setFont('helvetica', 'normal');
-    pdf.text(`Cliente: ${dadosRelatorio.cliente_nome || cliente.nome}`, margin, yPosition);
-    yPosition += 8;
-    pdf.text(`Período: ${periodo}`, margin, yPosition);
-    yPosition += 8;
-    pdf.text(`CNPJ: ${cliente.cnpj || 'N/A'}`, margin, yPosition);
-    yPosition += 15;
-
-    // Resumo Financeiro
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('RESUMO FINANCEIRO', margin, yPosition);
-    yPosition += 10;
-
+    currentY += 20;
+    
+    currentY = addText('RELATÓRIO DE FATURAMENTO', margin, currentY + 15, {
+      fontSize: 20,
+      bold: true,
+      align: 'center',
+      maxWidth: contentWidth
+    });
+    
+    currentY = addText(`Período: ${periodo}`, margin, currentY + 10, {
+      fontSize: 12,
+      align: 'center',
+      maxWidth: contentWidth
+    });
+    
+    currentY += 20;
+    
+    // INFORMAÇÕES DO CLIENTE
+    checkNewPage(80);
+    
+    // Retângulo para informações do cliente
+    pdf.setDrawColor(200, 200, 200);
+    pdf.setFillColor(248, 249, 250);
+    pdf.rect(margin, currentY, contentWidth, 60, 'FD');
+    
+    currentY = addText(`Cliente: ${dadosRelatorio.cliente_nome || cliente.nome}`, margin + 5, currentY + 12, {
+      fontSize: 16,
+      bold: true,
+      align: 'center',
+      maxWidth: contentWidth - 10
+    });
+    
+    currentY += 15;
+    
+    // Informações básicas (lado esquerdo)
+    const leftColumnX = margin + 10;
+    const rightColumnX = margin + (contentWidth / 2) + 10;
+    let leftY = currentY;
+    
+    leftY = addText(`Período: ${periodo}`, leftColumnX, leftY, { fontSize: 11 });
+    leftY = addText(`Total de Exames: ${totalLaudos}`, leftColumnX, leftY + 6, { fontSize: 11 });
+    leftY = addText(`CNPJ: ${cliente.cnpj || 'N/A'}`, leftColumnX, leftY + 6, { fontSize: 11 });
+    leftY = addText(`Data do Relatório: ${new Date().toLocaleDateString('pt-BR')}`, leftColumnX, leftY + 6, { fontSize: 11 });
+    
+    // Resumo financeiro (lado direito)
     const valorExames = demonstrativoData ? (demonstrativoData.valor_bruto || 0) : valorBrutoTotal;
     const valorFranquia = demonstrativoData ? (demonstrativoData.valor_franquia || 0) : 0;
     const valorIntegracao = demonstrativoData ? (demonstrativoData.valor_integracao || 0) : 0;
     const valorPortal = demonstrativoData ? (demonstrativoData.valor_portal_laudos || 0) : 0;
-    const valorLiquido = demonstrativoData ? (demonstrativoData.valor_total || 0) : valorAPagar;
-
-    // Função para formatar moeda
-    const formatMoney = (value: number) => `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-
-    pdf.setFont('helvetica', 'normal');
-    pdf.text(`Valor dos Exames: ${formatMoney(valorExames)}`, margin, yPosition);
-    yPosition += 6;
-    pdf.text(`Franquia: ${formatMoney(valorFranquia)}`, margin, yPosition);
-    yPosition += 6;
-    pdf.text(`Integração: ${formatMoney(valorIntegracao)}`, margin, yPosition);
-    yPosition += 6;
-    pdf.text(`Portal de Laudos: ${formatMoney(valorPortal)}`, margin, yPosition);
-    yPosition += 6;
-    pdf.text(`Impostos (5%): ${formatMoney(totalImpostos)}`, margin, yPosition);
-    yPosition += 10;
+    const valorLiquido = demonstrativoData ? (demonstrativoData.valor_total || 0) : (valorBrutoTotal - totalImpostos);
     
-    pdf.setFont('helvetica', 'bold');
-    pdf.text(`VALOR LÍQUIDO: ${formatMoney(valorLiquido)}`, margin, yPosition);
-    yPosition += 20;
-
-    // Detalhamento dos Exames
-    if (finalData && finalData.length > 0) {
-      pdf.setFont('helvetica', 'bold');
-      pdf.text('DETALHAMENTO DOS EXAMES', margin, yPosition);
-      yPosition += 10;
-
-      // Cabeçalho da tabela
-      const headers = ['Modalidade', 'Especialidade', 'Qtd', 'Valor Unit.', 'Valor Total'];
-      const colWidths = [30, 50, 20, 25, 25];
-      let xPos = margin;
-
-      pdf.setFontSize(10);
-      pdf.setFont('helvetica', 'bold');
+    const impostosDetalhados = calcularImpostosDetalhados(valorExames);
+    
+    const resumoData = [
+      ['Valor dos Exames', formatarValor(valorExames)],
+      ['(-) Franquia', formatarValor(valorFranquia)],
+      ['(-) Integração', formatarValor(valorIntegracao)],
+      ['(-) Portal Laudos', formatarValor(valorPortal)],
+      ['(-) IRPJ (1,5%)', formatarValor(impostosDetalhados.irpj)],
+      ['(-) PIS (0,65%)', formatarValor(impostosDetalhados.pis)],
+      ['(-) COFINS (3%)', formatarValor(impostosDetalhados.cofins)],
+      ['(-) CSLL (1%)', formatarValor(impostosDetalhados.csll)],
+      ['VALOR LÍQUIDO', formatarValor(valorLiquido)]
+    ];
+    
+    let rightY = currentY;
+    const colWidth = (contentWidth / 2) - 20;
+    
+    resumoData.forEach((row, index) => {
+      const isTotal = index === resumoData.length - 1;
       
-      for (let i = 0; i < headers.length; i++) {
-        pdf.text(headers[i], xPos, yPosition);
-        xPos += colWidths[i];
+      if (isTotal) {
+        pdf.setDrawColor(33, 150, 243);
+        pdf.setFillColor(227, 242, 253);
+        pdf.rect(rightColumnX, rightY - 2, colWidth, 8, 'FD');
       }
-      yPosition += 8;
-
-      // Linha dos dados
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(9);
       
-      finalData.forEach((item: any) => {
-        if (yPosition > pageHeight - 40) {
-          pdf.addPage();
-          yPosition = margin;
+      rightY = addText(row[0], rightColumnX + 2, rightY, { 
+        fontSize: isTotal ? 12 : 10, 
+        bold: isTotal 
+      });
+      
+      addText(row[1], rightColumnX + 2, rightY - (isTotal ? 4.8 : 4), { 
+        fontSize: isTotal ? 12 : 10, 
+        bold: isTotal,
+        align: 'right',
+        maxWidth: colWidth - 4
+      });
+      
+      rightY += isTotal ? 10 : 6;
+    });
+    
+    currentY = Math.max(leftY, rightY) + 10;
+    
+    // TABELA DE EXAMES DETALHADA
+    if (finalData && finalData.length > 0) {
+      checkNewPage(50);
+      
+      currentY = addText('Detalhamento dos Exames', margin, currentY + 10, {
+        fontSize: 14,
+        bold: true
+      });
+      
+      currentY += 15;
+      
+      // Cabeçalho da tabela
+      const headers = ['Modalidade', 'Especialidade', 'Categoria', 'Prioridade', 'Qtd', 'Valor Unit.', 'Valor Total'];
+      const colWidths = [25, 40, 25, 25, 15, 25, 25]; // Total: 180mm
+      
+      let tableX = margin + ((contentWidth - 180) / 2); // Centralizar tabela
+      
+      // Desenhar cabeçalho
+      pdf.setFillColor(37, 99, 235);
+      pdf.setTextColor(255, 255, 255);
+      pdf.rect(tableX, currentY, 180, 8, 'F');
+      
+      let headerX = tableX;
+      headers.forEach((header, index) => {
+        addText(header, headerX + 1, currentY + 6, {
+          fontSize: 8,
+          bold: true,
+          maxWidth: colWidths[index] - 2
+        });
+        headerX += colWidths[index];
+      });
+      
+      currentY += 8;
+      pdf.setTextColor(0, 0, 0);
+      
+      // Desenhar linhas da tabela
+      finalData.forEach((item: any, index: number) => {
+        checkNewPage(6);
+        
+        // Alternar cor de fundo
+        if (index % 2 === 0) {
+          pdf.setFillColor(248, 249, 250);
+          pdf.rect(tableX, currentY, 180, 6, 'F');
         }
-
-        xPos = margin;
+        
         const quantidade = demonstrativoData ? (item.quantidade || 0) : (item.VALORES || 0);
         const valorTotal = demonstrativoData ? (item.valor_total || 0) : (item.valor || 0);
         const valorUnitario = quantidade > 0 ? valorTotal / quantidade : 0;
-
-        const rowData = [
-          (item.modalidade || item.MODALIDADE || 'N/A').toString().substring(0, 8),
-          (item.especialidade || item.ESPECIALIDADE || 'N/A').toString().substring(0, 15),
+        
+        const cells = [
+          (item.modalidade || item.MODALIDADE || 'N/A').toString().substring(0, 10),
+          (item.especialidade || item.ESPECIALIDADE || 'N/A').toString().substring(0, 20),
+          (item.categoria || item.CATEGORIA || 'SC').toString().substring(0, 10),
+          (item.prioridade || item.PRIORIDADE || 'ROTINA').toString().substring(0, 10),
           quantidade.toString(),
-          formatMoney(valorUnitario),
-          formatMoney(valorTotal)
+          formatarValor(valorUnitario),
+          formatarValor(valorTotal)
         ];
-
-        for (let i = 0; i < rowData.length; i++) {
-          pdf.text(rowData[i], xPos, yPosition);
-          xPos += colWidths[i];
+        
+        let cellX = tableX;
+        cells.forEach((cell, cellIndex) => {
+          const align = cellIndex === 4 ? 'center' : (cellIndex >= 5 ? 'right' : 'left');
+          addText(cell, cellX + 1, currentY + 4, {
+            fontSize: 7,
+            maxWidth: colWidths[cellIndex] - 2,
+            align: align
+          });
+          cellX += colWidths[cellIndex];
+        });
+        
+        currentY += 6;
+      });
+      
+      // Desenhar bordas da tabela
+      pdf.setDrawColor(0, 0, 0);
+      pdf.setLineWidth(0.1);
+      
+      // Bordas externas
+      const startTableY = currentY - (finalData.length * 6) - 8;
+      pdf.rect(tableX, startTableY, 180, currentY - startTableY);
+      
+      // Linhas verticais
+      let lineX = tableX;
+      colWidths.forEach(width => {
+        lineX += width;
+        if (lineX < tableX + 180) {
+          pdf.line(lineX, startTableY, lineX, currentY);
         }
-        yPosition += 6;
       });
     }
-
-    // Rodapé
-    yPosition = pageHeight - 30;
-    pdf.setFontSize(8);
-    pdf.text(`Relatório gerado em: ${new Date().toLocaleString('pt-BR')}`, margin, yPosition);
-    pdf.text(`Total de Exames: ${totalLaudos}`, margin, yPosition + 5);
+    
+    // RODAPÉ
+    currentY += 20;
+    checkNewPage(20);
+    
+    currentY = addText(`Relatório gerado automaticamente em ${new Date().toLocaleString('pt-BR')}`, margin, currentY, {
+      fontSize: 10,
+      align: 'center',
+      maxWidth: contentWidth
+    });
 
     // Gerar PDF e fazer upload
     const pdfBytes = pdf.output('arraybuffer');
