@@ -671,7 +671,7 @@ export default function Colaboradores() {
                 <DialogTrigger asChild>
                   <Button variant="outline" className="flex items-center gap-2">
                     <Upload className="h-4 w-4" />
-                    Upload CSV
+                    Upload Médicos
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-2xl">
