@@ -115,8 +115,12 @@ serve(async (req) => {
             .eq('id', existente.id);
 
           if (updateError) {
-            console.error('Erro ao atualizar médico:', updateError);
-            errosDetalhados.push(`Linha ${processados}: ${updateError.message}`);
+            console.error('Erro ao atualizar médico:', {
+              crm: medicoData.crm,
+              nome: medicoData.nome,
+              erro: updateError
+            });
+            errosDetalhados.push(`Linha ${processados} (${medicoData.nome}): ${updateError.message}`);
             erros++;
           } else {
             atualizados++;
@@ -128,8 +132,13 @@ serve(async (req) => {
             .insert(medicoData);
 
           if (insertError) {
-            console.error('Erro ao inserir médico:', insertError);
-            errosDetalhados.push(`Linha ${processados}: ${insertError.message}`);
+            console.error('Erro ao inserir médico:', {
+              crm: medicoData.crm,
+              nome: medicoData.nome,
+              dados: medicoData,
+              erro: insertError
+            });
+            errosDetalhados.push(`Linha ${processados} (${medicoData.nome}): ${insertError.message} - Detalhes: ${insertError.details || 'N/A'}`);
             erros++;
           } else {
             inseridos++;
