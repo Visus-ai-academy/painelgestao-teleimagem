@@ -1,5 +1,4 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.51.0";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.51.0';
 import * as XLSX from "https://deno.land/x/sheetjs@v0.18.3/xlsx.mjs";
 
 const corsHeaders = {
@@ -18,7 +17,7 @@ interface MedicoRow {
   ativo?: boolean | string;
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
