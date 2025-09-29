@@ -88,8 +88,8 @@ export default function Colaboradores() {
     loading: loadingMedicoData,
     error: errorMedicoData 
   } = useMedicoData();
-  const [filtroFuncao, setFiltroFuncao] = useState("");
-  const [filtroEspecialidade, setFiltroEspecialidade] = useState("");
+  const [filtroFuncao, setFiltroFuncao] = useState("todas");
+  const [filtroEspecialidade, setFiltroEspecialidade] = useState("todas");
   const [filtroStatusAtivo, setFiltroStatusAtivo] = useState("todos");
   const [filtroSocio, setFiltroSocio] = useState("todos");
   const [busca, setBusca] = useState("");
@@ -448,10 +448,10 @@ export default function Colaboradores() {
                       colaborador.nome.toLowerCase().includes(busca.toLowerCase());
     
     // Filtro por função
-    const matchFuncao = filtroFuncao === "" || colaborador.funcao === filtroFuncao;
+    const matchFuncao = filtroFuncao === "todas" || colaborador.funcao === filtroFuncao;
     
     // Filtro por especialidade
-    const matchEspecialidade = filtroEspecialidade === "" || 
+    const matchEspecialidade = filtroEspecialidade === "todas" || 
                                (colaborador.especialidades && 
                                 colaborador.especialidades.includes(filtroEspecialidade));
     
@@ -608,7 +608,7 @@ export default function Colaboradores() {
                     <SelectValue placeholder="Todas" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todas</SelectItem>
+                    <SelectItem value="todas">Todas</SelectItem>
                     {Array.from(new Set(colaboradores.map(c => c.funcao))).map(funcao => (
                       <SelectItem key={funcao} value={funcao}>{funcao}</SelectItem>
                     ))}
@@ -624,7 +624,7 @@ export default function Colaboradores() {
                     <SelectValue placeholder="Todas" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todas</SelectItem>
+                    <SelectItem value="todas">Todas</SelectItem>
                     {especialidadesDisponiveis.map(esp => (
                       <SelectItem key={esp} value={esp}>{esp}</SelectItem>
                     ))}
