@@ -198,7 +198,25 @@ serve(async (req: Request) => {
 
     // ================ PÁGINA 1 - LOGOMARCA E RESUMO ================
     
-    // Logomarca centralizada (simulada com texto)
+    // Tentar carregar logomarca do storage
+    let logoAdded = false;
+    try {
+      // Verificar logomarca no storage (diferentes extensões)
+      const extensions = ['png', 'jpg', 'jpeg'];
+      for (const ext of extensions) {
+        const fileName = `logomarca.${ext}`;
+        const { data } = supabase.storage
+          .from('logomarcas')
+          .getPublicUrl(fileName);
+        
+        // Para PDF, precisaríamos converter e adicionar a imagem
+        // Por ora, manter texto mas melhorar formatação
+      }
+    } catch (error) {
+      console.log('Logomarca não encontrada, usando texto');
+    }
+    
+    // Logomarca centralizada
     currentY = addText('TELEiMAGEM', margin, currentY + 15, {
       fontSize: 18,
       bold: true,
@@ -246,7 +264,7 @@ serve(async (req: Request) => {
 
     currentY += 15;
 
-    // Criar tabela de resumo conforme modelo original
+    // Criar tabela de resumo sem VALOR A PAGAR (será separado)
     const resumoItems = [
       ['Total de Laudos:', totalLaudos.toString()],
       ['Valor Bruto:', formatarValor(valorExames)],
@@ -279,24 +297,23 @@ serve(async (req: Request) => {
       addText(item[1], resumoTableX + 125, rowY + 5.5, { fontSize: 11, bold: true });
     });
 
-    currentY += (resumoItems.length * rowHeight) + 15;
+    currentY += (resumoItems.length * rowHeight) + 20;
 
-    // VALOR A PAGAR (destacado)
-    pdf.setFillColor(240, 240, 240);
-    pdf.rect(resumoTableX, currentY, resumoTableWidth, 12, 'F');
-    pdf.rect(resumoTableX, currentY, resumoTableWidth, 12);
-    pdf.line(resumoTableX + 120, currentY, resumoTableX + 120, currentY + 12);
+    // VALOR A PAGAR (destacado e separado da tabela, conforme modelo esperado)
+    currentY = addText(`VALOR A PAGAR: ${formatarValor(valorLiquido)}`, margin, currentY + 10, {
+      fontSize: 14,
+      bold: true,
+      maxWidth: contentWidth
+    });
 
-    addText('VALOR A PAGAR:', resumoTableX + 5, currentY + 8, { fontSize: 12, bold: true });
-    addText(formatarValor(valorLiquido), resumoTableX + 125, currentY + 8, { fontSize: 12, bold: true });
+    currentY += 20;
 
-    currentY += 25;
-
-    // Rodapé da página 1
+    // Rodapé da página 1 (conforme modelo esperado)
     addText('Relatório gerado automaticamente pelo sistema visus.a.i. © 2025 - Todos os direitos reservados', 
       margin, pageHeight - 30, { fontSize: 8, align: 'center', maxWidth: contentWidth });
     
-    addText(`Página 1 de ${Math.ceil(finalData.length / 35) + 1}`, 
+    const totalPaginas = Math.ceil(finalData.length / 30) + 1; // 30 linhas por página + página 1
+    addText(`Página 1 de ${totalPaginas}`, 
       margin, pageHeight - 20, { fontSize: 8, align: 'center', maxWidth: contentWidth });
 
     // ================ PÁGINA 2+ - QUADRO 2 - DETALHAMENTO ================
@@ -367,19 +384,20 @@ serve(async (req: Request) => {
 
         pdf.rect(tableX, currentY, 240, 8);
 
-        // Preparar dados da linha
-        const dataExame = item.data_exame || item.DATA_EXAME || '';
+        // Preparar dados da linha com formatação correta
+        const dataExame = item.data_exame || item.DATA_EXAME || item.DATA_REALIZACAO || '';
         const dataFormatada = dataExame ? new Date(dataExame).toLocaleDateString('pt-BR') : '';
         
+        // Melhorar formatação dos nomes (truncar mas manter legível)
         const paciente = (item.paciente || item.NOME_PACIENTE || '').toString().substring(0, 15);
-        const medico = (item.laudado_por || item.medico || item.MEDICO || '').toString().substring(0, 15);
-        const exame = (item.nome_exame || item.ESTUDO_DESCRICAO || '').toString().substring(0, 20);
-        const modalidade = (item.modalidade || item.MODALIDADE || '').toString().substring(0, 8);
-        const especialidade = (item.especialidade || item.ESPECIALIDADE || '').toString().substring(0, 12);
-        const categoria = (item.categoria || item.CATEGORIA || 'SC').toString().substring(0, 8);
-        const prioridade = (item.prioridade || item.PRIORIDADE || 'ROTINA').toString().substring(0, 10);
-        const accession = (item.accession_number || item.ACCESSION_NUMBER || '-').toString().substring(0, 12);
-        const origem = (item.unidade_origem || item.cliente || clienteNome || '').toString().substring(0, 12);
+        const medico = (item.laudado_por || item.medico || item.MEDICO || '').toString().replace(/^(DR\.?\s*|DRA\.?\s*)/i, '').substring(0, 15);
+        const exame = (item.nome_exame || item.ESTUDO_DESCRICAO || '').toString().substring(0, 15);
+        const modalidade = (item.modalidade || item.MODALIDADE || '').toString().substring(0, 6);
+        const especialidade = (item.especialidade || item.ESPECIALIDADE || '').toString().substring(0, 10);
+        const categoria = (item.categoria || item.CATEGORIA || 'SC').toString().substring(0, 6);
+        const prioridade = (item.prioridade || item.PRIORIDADE || 'ROTINA').toString().substring(0, 8);
+        const accession = (item.accession_number || item.ACCESSION_NUMBER || '-').toString().substring(0, 10);
+        const origem = (item.unidade_origem || item.cliente || clienteNome || '').toString().substring(0, 9);
         const qtd = (demonstrativoData ? (item.quantidade || 0) : (item.VALORES || item.quantidade || 0));
         const valorTot = (demonstrativoData ? (item.valor_total || 0) : (item.valor || 0));
 
