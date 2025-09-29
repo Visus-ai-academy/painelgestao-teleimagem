@@ -146,8 +146,9 @@ serve(async (req) => {
     const { error: logError } = await supabase
       .from('processamento_uploads')
       .insert({
-        arquivo_fonte: file.name,
-        tipo_processamento: 'medicos',
+        arquivo_nome: file.name,
+        tipo_arquivo: 'medicos',
+        tipo_dados: 'cadastro',
         status: erros > 0 ? 'concluido_com_erros' : 'concluido',
         registros_processados: processados,
         registros_inseridos: inseridos,
