@@ -121,7 +121,7 @@ export default function Colaboradores() {
   // Lista de colaboradores (médicos) da tabela medicos
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
   const [loadingColaboradores, setLoadingColaboradores] = useState(true);
-  const [distribuicaoFuncoes, setDistribuicaoFuncoes] = useState<{ nome: string; count: number }[]>([]);
+  const [distribuicaoFuncoes, setDistribuicaoFuncoes] = useState<{ nome: string; count: number; especialidade?: string; equipe?: string }[]>([]);
   const [cleaningData, setCleaningData] = useState(false);
 
   // Função para limpar dados fictícios
@@ -226,15 +226,21 @@ export default function Colaboradores() {
 
         setColaboradores(lista);
 
-        // Calcular distribuição por função
-        const funcoesMap = new Map<string, number>();
+        // Calcular distribuição por função + especialidade + equipe
+        const distribuicaoMap = new Map<string, number>();
         lista.forEach(medico => {
           const funcao = medico.funcao || 'Não especificado';
-          funcoesMap.set(funcao, (funcoesMap.get(funcao) || 0) + 1);
+          const especialidade = medico.especialidade_atuacao || medico.especialidades?.[0] || 'Não especificado';
+          const equipe = medico.equipe || 'Não especificado';
+          const chave = `${funcao}|${especialidade}|${equipe}`;
+          distribuicaoMap.set(chave, (distribuicaoMap.get(chave) || 0) + 1);
         });
 
-        const distribuicao = Array.from(funcoesMap.entries())
-          .map(([nome, count]) => ({ nome, count }))
+        const distribuicao = Array.from(distribuicaoMap.entries())
+          .map(([chave, count]) => {
+            const [funcao, especialidade, equipe] = chave.split('|');
+            return { nome: funcao, count, especialidade, equipe };
+          })
           .sort((a, b) => b.count - a.count);
 
         setDistribuicaoFuncoes(distribuicao);
@@ -680,7 +686,7 @@ export default function Colaboradores() {
       {/* Distribuição por Função */}
       <Card>
         <CardHeader>
-          <CardTitle>Distribuição por Função</CardTitle>
+          <CardTitle>Distribuição por Função, Especialidade e Equipe</CardTitle>
         </CardHeader>
         <CardContent>
           {loadingColaboradores ? (
@@ -688,43 +694,39 @@ export default function Colaboradores() {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
           ) : distribuicaoFuncoes.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {distribuicaoFuncoes.map((funcao, index) => {
-                // Buscar colaboradores dessa função
-                const colaboradoresFuncao = colaboradores.filter(c => c.funcao === funcao.nome);
-                // Pegar a especialidade e equipe mais comum
-                const especialidadeMap = new Map<string, number>();
-                const equipeMap = new Map<string, number>();
-                
-                colaboradoresFuncao.forEach(c => {
-                  const esp = c.especialidade_atuacao || c.especialidades?.[0] || 'Não especificado';
-                  const eq = c.equipe || 'Não especificado';
-                  especialidadeMap.set(esp, (especialidadeMap.get(esp) || 0) + 1);
-                  equipeMap.set(eq, (equipeMap.get(eq) || 0) + 1);
-                });
-                
-                const especialidadePrincipal = Array.from(especialidadeMap.entries())
-                  .sort((a, b) => b[1] - a[1])[0]?.[0] || 'Não especificado';
-                const equipePrincipal = Array.from(equipeMap.entries())
-                  .sort((a, b) => b[1] - a[1])[0]?.[0] || 'Não especificado';
-                
-                return (
-                  <div key={index} className="border rounded-lg p-4">
-                    <div className="text-2xl font-bold text-primary mb-2">{funcao.count}</div>
-                    <div className="font-medium text-sm mb-3">{funcao.nome}</div>
-                    <div className="space-y-1 text-xs text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <span className="font-medium">Especialidade:</span>
-                        <span className="truncate">{especialidadePrincipal}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <span className="font-medium">Equipe:</span>
-                        <span className="truncate">{equipePrincipal}</span>
-                      </div>
-                    </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {distribuicaoFuncoes.map((item, index) => (
+                <div key={index} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="text-2xl font-bold text-primary">{item.count}</div>
+                    <Badge variant="secondary" className="text-xs">
+                      {item.count === 1 ? '1 pessoa' : `${item.count} pessoas`}
+                    </Badge>
                   </div>
-                );
-              })}
+                  <div className="space-y-2">
+                    <div>
+                      <div className="text-xs font-medium text-muted-foreground">Função</div>
+                      <div className="font-medium text-sm">{item.nome}</div>
+                    </div>
+                    {item.especialidade && (
+                      <div>
+                        <div className="text-xs font-medium text-muted-foreground">Especialidade</div>
+                        <div className="text-sm truncate" title={item.especialidade}>
+                          {item.especialidade}
+                        </div>
+                      </div>
+                    )}
+                    {item.equipe && (
+                      <div>
+                        <div className="text-xs font-medium text-muted-foreground">Equipe</div>
+                        <div className="text-sm truncate" title={item.equipe}>
+                          {item.equipe}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           ) : (
             <div className="text-center text-muted-foreground py-8">
