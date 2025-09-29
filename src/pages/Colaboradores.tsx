@@ -89,8 +89,10 @@ export default function Colaboradores() {
     loading: loadingMedicoData,
     error: errorMedicoData 
   } = useMedicoData();
-  const [filtroFuncao, setFiltroFuncao] = useState("todas");
-  const [filtroStatus, setFiltroStatus] = useState("todos");
+  const [filtroFuncao, setFiltroFuncao] = useState("");
+  const [filtroEspecialidade, setFiltroEspecialidade] = useState("");
+  const [filtroStatusAtivo, setFiltroStatusAtivo] = useState("todos");
+  const [filtroSocio, setFiltroSocio] = useState("todos");
   const [busca, setBusca] = useState("");
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showNewColaboradorDialog, setShowNewColaboradorDialog] = useState(false);
@@ -115,66 +117,75 @@ export default function Colaboradores() {
     rqe: ""
   });
 
-  // Lista de colaboradores (médicos) derivada da volumetria final
+  // Lista de colaboradores (médicos) da tabela medicos
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
   const [loadingColaboradores, setLoadingColaboradores] = useState(true);
+  const [distribuicaoFuncoes, setDistribuicaoFuncoes] = useState<{ nome: string; count: number }[]>([]);
 
   useEffect(() => {
     const carregar = async () => {
       try {
         setLoadingColaboradores(true);
-        const arquivos = ['volumetria_padrao','volumetria_fora_padrao','volumetria_padrao_retroativo','volumetria_fora_padrao_retroativo','volumetria_onco_padrao'];
+        
+        // Buscar médicos da tabela medicos
         const { data, error } = await supabase
-          .from('volumetria_mobilemed')
-          .select('"MEDICO","MODALIDADE","ESPECIALIDADE","CATEGORIA","PRIORIDADE","arquivo_fonte"')
-          .in('arquivo_fonte', arquivos);
+          .from('medicos')
+          .select('*')
+          .order('nome');
+        
         if (error) throw error;
 
-        const map = new Map<string, { modalidades: Set<string>; especialidades: Set<string>; categorias: Set<string>; prioridades: Set<string>; }>();
-
-        (data || []).forEach((row: any) => {
-          const nome = (row?.MEDICO || '').trim();
-          if (!nome) return;
-          if (!map.has(nome)) {
-            map.set(nome, { modalidades: new Set(), especialidades: new Set(), categorias: new Set(), prioridades: new Set() });
-          }
-          const entry = map.get(nome)!;
-          if (row?.MODALIDADE) entry.modalidades.add(String(row.MODALIDADE));
-          if (row?.ESPECIALIDADE) entry.especialidades.add(String(row.ESPECIALIDADE));
-          if (row?.CATEGORIA) entry.categorias.add(String(row.CATEGORIA));
-          if (row?.PRIORIDADE) entry.prioridades.add(String(row.PRIORIDADE));
-        });
-
-        const lista: Colaborador[] = Array.from(map.entries()).map(([nome, info], idx) => ({
-          id: `${idx + 1}`,
-          nome,
-          email: '',
-          funcao: 'Medico',
+        // Converter dados da tabela medicos para formato Colaborador
+        const lista: Colaborador[] = (data || []).map((medico: any) => ({
+          id: medico.id,
+          nome: medico.nome || '',
+          email: medico.email || '',
+          funcao: medico.funcao || 'Médico',
           departamento: 'Medicina',
           nivel: '',
-          status: 'Ativo',
+          status: medico.ativo ? 'Ativo' : 'Inativo',
           dataAdmissao: '',
-          telefone: '',
-          cpf: '',
+          telefone: medico.telefone || '',
+          cpf: medico.cpf || '',
           permissoes: [],
           gestor: '',
           salario: 0,
-          categoria: Array.from(info.categorias).sort().join(', '),
-          modalidades: Array.from(info.modalidades).sort(),
-          especialidades: Array.from(info.especialidades).sort(),
-          prioridades: Array.from(info.prioridades).sort(),
+          crm: medico.crm || '',
+          categoria: medico.categoria || '',
+          modalidades: medico.modalidades || [],
+          especialidades: medico.especialidades || [],
+          prioridades: [],
           documentos: []
         }));
 
         setColaboradores(lista);
+
+        // Calcular distribuição por função
+        const funcoesMap = new Map<string, number>();
+        lista.forEach(medico => {
+          const funcao = medico.funcao || 'Não especificado';
+          funcoesMap.set(funcao, (funcoesMap.get(funcao) || 0) + 1);
+        });
+
+        const distribuicao = Array.from(funcoesMap.entries())
+          .map(([nome, count]) => ({ nome, count }))
+          .sort((a, b) => b.count - a.count);
+
+        setDistribuicaoFuncoes(distribuicao);
+
       } catch (err) {
-        console.error('Erro ao carregar médicos da volumetria:', err);
+        console.error('Erro ao carregar médicos:', err);
+        toast({
+          title: "Erro ao carregar médicos",
+          description: "Não foi possível carregar a lista de médicos.",
+          variant: "destructive"
+        });
       } finally {
         setLoadingColaboradores(false);
       }
     };
     carregar();
-  }, []);
+  }, [toast]);
 
   const handleFileUpload = async (file: File) => {
     // Simular processamento do arquivo CSV
@@ -433,11 +444,27 @@ export default function Colaboradores() {
   };
 
   const colaboradoresFiltrados = colaboradores.filter(colaborador => {
-    const matchFuncao = filtroFuncao === "todas" || colaborador.funcao === filtroFuncao;
-    const matchStatus = filtroStatus === "todos" || colaborador.status === filtroStatus;
-    const matchBusca = colaborador.nome.toLowerCase().includes(busca.toLowerCase()) ||
-                      colaborador.email.toLowerCase().includes(busca.toLowerCase());
-    return matchFuncao && matchStatus && matchBusca;
+    // Filtro por nome
+    const matchNome = busca === "" || 
+                      colaborador.nome.toLowerCase().includes(busca.toLowerCase());
+    
+    // Filtro por função
+    const matchFuncao = filtroFuncao === "" || colaborador.funcao === filtroFuncao;
+    
+    // Filtro por especialidade
+    const matchEspecialidade = filtroEspecialidade === "" || 
+                               (colaborador.especialidades && 
+                                colaborador.especialidades.includes(filtroEspecialidade));
+    
+    // Filtro por status ativo
+    const matchStatusAtivo = filtroStatusAtivo === "todos" || 
+                             (filtroStatusAtivo === "ativo" && colaborador.status === "Ativo") ||
+                             (filtroStatusAtivo === "inativo" && colaborador.status === "Inativo");
+    
+    // Filtro por sócio (campo ainda não implementado, sempre true por enquanto)
+    const matchSocio = filtroSocio === "todos";
+    
+    return matchNome && matchFuncao && matchEspecialidade && matchStatusAtivo && matchSocio;
   });
 
   const colaboradoresAtivos = colaboradores.filter(c => c.status === "Ativo").length;
@@ -477,7 +504,7 @@ export default function Colaboradores() {
         <p className="text-gray-600 mt-1">Cadastro completo de colaboradores e controle de acesso</p>
       </div>
 
-      <FilterBar />
+      
 
       {/* Métricas */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -536,54 +563,109 @@ export default function Colaboradores() {
           <CardTitle>Distribuição por Função</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {funcoes.map((funcao, index) => (
-              <div key={index} className="border rounded-lg p-4 text-center">
-                <div className="text-2xl font-bold text-blue-600">{funcao.count}</div>
-                <div className="font-medium text-sm">{funcao.nome}</div>
-                <div className="text-xs text-gray-500">{funcao.departamento}</div>
-              </div>
-            ))}
-          </div>
+          {loadingColaboradores ? (
+            <div className="flex justify-center p-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : distribuicaoFuncoes.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {distribuicaoFuncoes.map((funcao, index) => (
+                <div key={index} className="border rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-blue-600">{funcao.count}</div>
+                  <div className="font-medium text-sm">{funcao.nome}</div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center text-muted-foreground py-8">
+              Nenhum médico cadastrado
+            </div>
+          )}
         </CardContent>
       </Card>
 
       {/* Filtros e Busca */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex flex-wrap gap-4 items-center">
-            <div className="flex-1 min-w-64 relative">
+          <div className="space-y-4">
+            {/* Busca por nome */}
+            <div className="relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
               <Input
-                placeholder="Buscar por nome ou email..."
+                placeholder="Buscar por nome do médico..."
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
                 className="pl-10"
               />
             </div>
-            <div className="flex gap-2">
-              <Button
-                variant={filtroFuncao === "todas" ? "default" : "outline"}
-                onClick={() => setFiltroFuncao("todas")}
-                size="sm"
-              >
-                Todas Funções
-              </Button>
-              <Button
-                variant={filtroStatus === "todos" ? "default" : "outline"}
-                onClick={() => setFiltroStatus("todos")}
-                size="sm"
-              >
-                Todos Status
-              </Button>
-              <Button
-                variant={filtroStatus === "Ativo" ? "default" : "outline"}
-                onClick={() => setFiltroStatus("Ativo")}
-                size="sm"
-              >
-                Ativos
-              </Button>
+
+            {/* Linha de filtros */}
+            <div className="flex flex-wrap gap-3">
+              {/* Filtro Função */}
+              <div className="flex-1 min-w-48">
+                <Label className="text-xs text-muted-foreground mb-1">Função</Label>
+                <Select value={filtroFuncao} onValueChange={setFiltroFuncao}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Todas</SelectItem>
+                    {Array.from(new Set(colaboradores.map(c => c.funcao))).map(funcao => (
+                      <SelectItem key={funcao} value={funcao}>{funcao}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Filtro Especialidade */}
+              <div className="flex-1 min-w-48">
+                <Label className="text-xs text-muted-foreground mb-1">Especialidade</Label>
+                <Select value={filtroEspecialidade} onValueChange={setFiltroEspecialidade}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Todas</SelectItem>
+                    {especialidadesDisponiveis.map(esp => (
+                      <SelectItem key={esp} value={esp}>{esp}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Filtro Status Ativo */}
+              <div className="flex-1 min-w-48">
+                <Label className="text-xs text-muted-foreground mb-1">Status</Label>
+                <Select value={filtroStatusAtivo} onValueChange={setFiltroStatusAtivo}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos</SelectItem>
+                    <SelectItem value="ativo">Ativo</SelectItem>
+                    <SelectItem value="inativo">Inativo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Filtro Sócio */}
+              <div className="flex-1 min-w-48">
+                <Label className="text-xs text-muted-foreground mb-1">Sócio</Label>
+                <Select value={filtroSocio} onValueChange={setFiltroSocio}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos</SelectItem>
+                    <SelectItem value="sim">Sim</SelectItem>
+                    <SelectItem value="nao">Não</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
+          </div>
+          
+          <Separator className="my-4" />
             
             <div className="flex gap-2">
               <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
