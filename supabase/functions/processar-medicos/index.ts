@@ -13,6 +13,9 @@ serve(async (req) => {
   }
 
   try {
+    console.log('🔍 Iniciando processamento de médicos');
+    console.log('🔍 SUPABASE_URL:', Deno.env.get('SUPABASE_URL')?.substring(0, 30) + '...');
+    
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -37,14 +40,14 @@ serve(async (req) => {
     const normalize = (s: string) => s
       .toLowerCase()
       .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '') // remover acentos
+      .replace(/[\u0300-\u036f]/g, '')
       .replace(/[^a-z0-9]+/g, '_')
       .replace(/^_|_$/g, '');
 
     const normalizeRow = (r: Record<string, unknown>) => {
       const out: Record<string, unknown> = {};
       for (const k of Object.keys(r)) {
-        out[normalize(k)] = r[k as keyof typeof r];
+        out[normalize(k)] = r[k];
       }
       return out;
     };
@@ -64,8 +67,8 @@ serve(async (req) => {
         processados++;
 
         const row = rowRaw as Record<string, unknown>;
-        const nomeMed = (row['nome_medico'] as string | undefined) ?? (row['nome'] as string | undefined) ?? (row['nomemedico'] as string | undefined);
-        const crmVal = (row['crm'] as string | undefined) ?? (row['c_r_m'] as string | undefined);
+        const nomeMed = String(row['nome_medico'] || row['nome'] || row['nomemedico'] || '').trim();
+        const crmVal = String(row['crm'] || row['c_r_m'] || '').trim();
 
         if (!nomeMed) {
           errosDetalhados.push(`Linha ${processados}: Nome_Médico é obrigatório`);
@@ -73,80 +76,73 @@ serve(async (req) => {
           continue;
         }
 
-        // Mapear Status_Ativo_Médico para boolean (aceita diversas variações)
-        const ativoStr = ((row['status_ativo_medico'] as string | undefined) ?? (row['ativo'] as string | undefined) ?? '').toString().toLowerCase();
-        const isAtivo = ['sim','ativo','true','1','s','y','yes'].includes(ativoStr);
+        // Mapear Status_Ativo_Médico para boolean
+        const ativoStr = String(row['status_ativo_medico'] || row['ativo'] || '').toLowerCase();
+        const isAtivo = ['sim', 'ativo', 'true', '1', 's', 'y', 'yes'].includes(ativoStr);
 
         // Processar adicional de valor
-        const adicionalValorRaw = (row['adicional_de_valor_sem_utilizar_digitador'] ?? row['adicional_valor_sem_digitador'] ?? row['adicional'] ?? 0) as unknown;
-        const adicionalValorNum = typeof adicionalValorRaw === 'number'
-          ? adicionalValorRaw
-          : parseFloat(adicionalValorRaw?.toString().replace(/[^\d.,]/g, '').replace(',', '.') || '0');
+        const adicionalValorRaw = row['adicional_de_valor_sem_utilizar_digitador'] || row['adicional_valor_sem_digitador'] || row['adicional'] || 0;
+        let adicionalValorNum = 0;
+        if (typeof adicionalValorRaw === 'number') {
+          adicionalValorNum = adicionalValorRaw;
+        } else {
+          const valorStr = String(adicionalValorRaw).replace(/[^\d.,]/g, '').replace(',', '.');
+          adicionalValorNum = parseFloat(valorStr) || 0;
+        }
 
         const medicoData = {
-          nome: nomeMed.toString().trim(),
-          crm: crmVal?.toString().trim() || null,
-          cpf: (row['cpf'] as string | undefined)?.toString().trim() || null,
-          email: (row['e_mail'] as string | undefined)?.toString().trim() || null,
-          telefone: (row['telefone'] as string | undefined)?.toString().trim() || null,
-          socio: (row['socio'] as string | undefined)?.toString().trim() || null,
-          funcao: (row['funcao'] as string | undefined)?.toString().trim() || null,
-          especialidade: ((row['especialidade_de_atuacao'] as string | undefined)?.toString().trim()) || 'GERAL',
-          especialidade_atuacao: (row['especialidade_de_atuacao'] as string | undefined)?.toString().trim() || null,
-          equipe: (row['equipe'] as string | undefined)?.toString().trim() || null,
-          acrescimo_sem_digitador: (row['acrescimo_sem_digitador'] as string | undefined)?.toString().trim() || null,
+          nome: nomeMed,
+          crm: crmVal || null,
+          cpf: String(row['cpf'] || '').trim() || null,
+          email: String(row['e_mail'] || '').trim() || null,
+          telefone: String(row['telefone'] || '').trim() || null,
+          socio: String(row['socio'] || '').trim() || null,
+          funcao: String(row['funcao'] || '').trim() || null,
+          especialidade: String(row['especialidade_de_atuacao'] || '').trim() || 'GERAL',
+          especialidade_atuacao: String(row['especialidade_de_atuacao'] || '').trim() || null,
+          equipe: String(row['equipe'] || '').trim() || null,
+          acrescimo_sem_digitador: String(row['acrescimo_sem_digitador'] || '').trim() || null,
           adicional_valor_sem_digitador: adicionalValorNum || null,
-          nome_empresa: (row['nome_empresa'] as string | undefined)?.toString().trim() || null,
-          cnpj: (row['cnpj'] as string | undefined)?.toString().trim() || null,
-          optante_simples: (row['optante_pelo_simples'] as string | undefined)?.toString().trim() || null,
+          nome_empresa: String(row['nome_empresa'] || '').trim() || null,
+          cnpj: String(row['cnpj'] || '').trim() || null,
+          optante_simples: String(row['optante_pelo_simples'] || '').trim() || null,
           ativo: isAtivo,
           modalidades: [],
           especialidades: []
         };
 
-        // Verificar se médico já existe pelo CRM (se fornecido) ou nome
-        let query = supabase.from('medicos').select('id');
+        // Verificar se médico já existe
+        let queryBuilder = supabase.from('medicos').select('id');
         
         if (medicoData.crm) {
-          query = query.eq('crm', medicoData.crm);
+          queryBuilder = queryBuilder.eq('crm', medicoData.crm);
         } else {
-          query = query.eq('nome', medicoData.nome);
+          queryBuilder = queryBuilder.eq('nome', medicoData.nome);
         }
         
-        const { data: existente } = await query.maybeSingle();
+        const { data: existente } = await queryBuilder.maybeSingle();
 
         if (existente) {
-          // Atualizar médico existente
           const { error: updateError } = await supabase
             .from('medicos')
             .update(medicoData)
-            .eq('id', (existente as any).id);
+            .eq('id', existente.id);
 
           if (updateError) {
-            console.error('Erro ao atualizar médico:', {
-              crm: medicoData.crm,
-              nome: medicoData.nome,
-              erro: updateError
-            });
+            console.error('Erro ao atualizar médico:', { crm: medicoData.crm, nome: medicoData.nome, erro: updateError });
             errosDetalhados.push(`Linha ${processados} (${medicoData.nome}): ${updateError.message}`);
             erros++;
           } else {
             atualizados++;
           }
         } else {
-          // Inserir novo médico
           const { error: insertError } = await supabase
             .from('medicos')
             .insert(medicoData);
 
           if (insertError) {
-            console.error('Erro ao inserir médico:', {
-              crm: medicoData.crm,
-              nome: medicoData.nome,
-              dados: medicoData,
-              erro: insertError
-            });
-            errosDetalhados.push(`Linha ${processados} (${medicoData.nome}): ${insertError.message} - Detalhes: ${insertError.details || 'N/A'}`);
+            console.error('Erro ao inserir médico:', { crm: medicoData.crm, nome: medicoData.nome, erro: insertError });
+            errosDetalhados.push(`Linha ${processados} (${medicoData.nome}): ${insertError.message}`);
             erros++;
           } else {
             inseridos++;
@@ -177,12 +173,7 @@ serve(async (req) => {
       console.error('Erro ao gravar log:', logError);
     }
 
-    console.log('✅ Processamento concluído:', {
-      processados,
-      inseridos,
-      atualizados,
-      erros
-    });
+    console.log('✅ Processamento concluído:', { processados, inseridos, atualizados, erros });
 
     return new Response(
       JSON.stringify({
@@ -212,3 +203,4 @@ serve(async (req) => {
     );
   }
 });
+
