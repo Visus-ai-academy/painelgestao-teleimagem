@@ -54,6 +54,8 @@ interface Colaborador {
   especialidades?: string[];
   documentos?: DocumentoColaborador[];
   prioridades?: string[];
+  equipe?: string;
+  especialidade_atuacao?: string;
 }
 
 interface DocumentoColaborador {
@@ -165,7 +167,9 @@ export default function Colaboradores() {
           crm: medico.crm,
           categoria: medico.categoria,
           modalidades: medico.modalidades || [],
-          especialidades: medico.especialidades || []
+          especialidades: medico.especialidades || [],
+          equipe: medico.equipe || '',
+          especialidade_atuacao: medico.especialidade_atuacao || ''
         }));
         setColaboradores(lista);
       }
@@ -215,7 +219,9 @@ export default function Colaboradores() {
           modalidades: medico.modalidades || [],
           especialidades: medico.especialidades || [],
           prioridades: [],
-          documentos: []
+          documentos: [],
+          equipe: medico.equipe || '',
+          especialidade_atuacao: medico.especialidade_atuacao || ''
         }));
 
         setColaboradores(lista);
@@ -295,7 +301,9 @@ export default function Colaboradores() {
           modalidades: medico.modalidades || [],
           especialidades: medico.especialidades || [],
           prioridades: [],
-          documentos: []
+          documentos: [],
+          equipe: medico.equipe || '',
+          especialidade_atuacao: medico.especialidade_atuacao || ''
         }));
         setColaboradores(lista);
       }
@@ -681,12 +689,42 @@ export default function Colaboradores() {
             </div>
           ) : distribuicaoFuncoes.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {distribuicaoFuncoes.map((funcao, index) => (
-                <div key={index} className="border rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-blue-600">{funcao.count}</div>
-                  <div className="font-medium text-sm">{funcao.nome}</div>
-                </div>
-              ))}
+              {distribuicaoFuncoes.map((funcao, index) => {
+                // Buscar colaboradores dessa função
+                const colaboradoresFuncao = colaboradores.filter(c => c.funcao === funcao.nome);
+                // Pegar a especialidade e equipe mais comum
+                const especialidadeMap = new Map<string, number>();
+                const equipeMap = new Map<string, number>();
+                
+                colaboradoresFuncao.forEach(c => {
+                  const esp = c.especialidade_atuacao || c.especialidades?.[0] || 'Não especificado';
+                  const eq = c.equipe || 'Não especificado';
+                  especialidadeMap.set(esp, (especialidadeMap.get(esp) || 0) + 1);
+                  equipeMap.set(eq, (equipeMap.get(eq) || 0) + 1);
+                });
+                
+                const especialidadePrincipal = Array.from(especialidadeMap.entries())
+                  .sort((a, b) => b[1] - a[1])[0]?.[0] || 'Não especificado';
+                const equipePrincipal = Array.from(equipeMap.entries())
+                  .sort((a, b) => b[1] - a[1])[0]?.[0] || 'Não especificado';
+                
+                return (
+                  <div key={index} className="border rounded-lg p-4">
+                    <div className="text-2xl font-bold text-primary mb-2">{funcao.count}</div>
+                    <div className="font-medium text-sm mb-3">{funcao.nome}</div>
+                    <div className="space-y-1 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-1">
+                        <span className="font-medium">Especialidade:</span>
+                        <span className="truncate">{especialidadePrincipal}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="font-medium">Equipe:</span>
+                        <span className="truncate">{equipePrincipal}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <div className="text-center text-muted-foreground py-8">
