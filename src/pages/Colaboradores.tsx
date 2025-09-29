@@ -124,7 +124,7 @@ export default function Colaboradores() {
   // Lista de colaboradores (médicos) da tabela medicos
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
   const [loadingColaboradores, setLoadingColaboradores] = useState(true);
-  const [distribuicaoFuncoes, setDistribuicaoFuncoes] = useState<{ nome: string; count: number; especialidade?: string; equipe?: string }[]>([]);
+  const [distribuicaoFuncoes, setDistribuicaoFuncoes] = useState<{ nome: string; count: number; especialidades: string[]; equipe?: string }[]>([]);
   const [cleaningData, setCleaningData] = useState(false);
 
   // Função para limpar dados fictícios
@@ -229,20 +229,35 @@ export default function Colaboradores() {
 
         setColaboradores(lista);
 
-        // Calcular distribuição por função + especialidade + equipe
-        const distribuicaoMap = new Map<string, number>();
+        // Calcular distribuição por função + equipe (com todas as especialidades)
+        const distribuicaoMap = new Map<string, { count: number; especialidades: Set<string> }>();
+        
         lista.forEach(medico => {
           const funcao = medico.funcao || 'Não especificado';
-          const especialidade = medico.especialidade_atuacao || medico.especialidades?.[0] || 'Não especificado';
           const equipe = medico.equipe || 'Não especificado';
-          const chave = `${funcao}|${especialidade}|${equipe}`;
-          distribuicaoMap.set(chave, (distribuicaoMap.get(chave) || 0) + 1);
+          const chave = `${funcao}|${equipe}`;
+          
+          if (!distribuicaoMap.has(chave)) {
+            distribuicaoMap.set(chave, { count: 0, especialidades: new Set() });
+          }
+          
+          const grupo = distribuicaoMap.get(chave)!;
+          grupo.count++;
+          
+          // Adicionar especialidade ao conjunto
+          const especialidade = medico.especialidade_atuacao || medico.especialidades?.[0] || 'Não especificado';
+          grupo.especialidades.add(especialidade);
         });
 
         const distribuicao = Array.from(distribuicaoMap.entries())
-          .map(([chave, count]) => {
-            const [funcao, especialidade, equipe] = chave.split('|');
-            return { nome: funcao, count, especialidade, equipe };
+          .map(([chave, dados]) => {
+            const [funcao, equipe] = chave.split('|');
+            return { 
+              nome: funcao, 
+              count: dados.count, 
+              especialidades: Array.from(dados.especialidades),
+              equipe 
+            };
           })
           .sort((a, b) => b.count - a.count);
 
@@ -711,11 +726,22 @@ export default function Colaboradores() {
                       <div className="text-xs font-medium text-muted-foreground">Função</div>
                       <div className="font-medium text-sm">{item.nome}</div>
                     </div>
-                    {item.especialidade && (
+                    {item.especialidades && item.especialidades.length > 0 && (
                       <div>
-                        <div className="text-xs font-medium text-muted-foreground">Especialidade</div>
-                        <div className="text-sm truncate" title={item.especialidade}>
-                          {item.especialidade}
+                        <div className="text-xs font-medium text-muted-foreground mb-1">
+                          Especialidade{item.especialidades.length > 1 ? 's' : ''}
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {item.especialidades.map((esp, idx) => (
+                            <Badge 
+                              key={idx} 
+                              variant="outline" 
+                              className="text-xs"
+                              title={esp}
+                            >
+                              {esp.length > 15 ? esp.substring(0, 15) + '...' : esp}
+                            </Badge>
+                          ))}
                         </div>
                       </div>
                     )}
