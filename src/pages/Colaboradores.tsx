@@ -667,36 +667,6 @@ export default function Colaboradores() {
           <Separator className="my-4" />
             
             <div className="flex gap-2">
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={async () => {
-                  try {
-                    const { data, error } = await supabase.rpc('limpar_dados_ficticios');
-                    if (error) throw error;
-                    
-                    toast({
-                      title: "Dados fictícios removidos",
-                      description: "Médicos fictícios foram removidos com sucesso!",
-                    });
-                    
-                    // Recarregar lista
-                    window.location.reload();
-                  } catch (error: any) {
-                    toast({
-                      title: "Erro ao limpar dados",
-                      description: error.message,
-                      variant: "destructive",
-                    });
-                  }
-                }}
-                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Limpar Dados Fictícios
-              </Button>
-              
-              <div className="flex-1" />
               <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
                 <DialogTrigger asChild>
                   <Button variant="outline" className="flex items-center gap-2">
