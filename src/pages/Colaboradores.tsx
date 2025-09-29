@@ -10,7 +10,6 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
-import { FilterBar } from "@/components/FilterBar";
 import { FileUpload } from "@/components/FileUpload";
 import { useToast } from "@/hooks/use-toast";
 import { useMedicoData } from "@/hooks/useMedicoData";
@@ -1027,7 +1026,6 @@ export default function Colaboradores() {
                 </DialogContent>
               </Dialog>
             </div>
-          </div>
         </CardContent>
       </Card>
 
