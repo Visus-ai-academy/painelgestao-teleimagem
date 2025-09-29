@@ -2039,7 +2039,7 @@ export type Database = {
           cnpj: string | null
           cpf: string | null
           created_at: string
-          crm: string
+          crm: string | null
           email: string | null
           equipe: string | null
           especialidade: string
@@ -2064,7 +2064,7 @@ export type Database = {
           cnpj?: string | null
           cpf?: string | null
           created_at?: string
-          crm: string
+          crm?: string | null
           email?: string | null
           equipe?: string | null
           especialidade: string
@@ -2089,7 +2089,7 @@ export type Database = {
           cnpj?: string | null
           cpf?: string | null
           created_at?: string
-          crm?: string
+          crm?: string | null
           email?: string | null
           equipe?: string | null
           especialidade?: string
