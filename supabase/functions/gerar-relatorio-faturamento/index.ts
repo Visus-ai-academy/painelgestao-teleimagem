@@ -128,23 +128,44 @@ serve(async (req: Request) => {
     let valorBrutoTotal = 0;
 
     for (const item of finalData) {
-      const quantidade = demonstrativoData ? 
-        (item.quantidade || 0) : 
-        (Number(item.VALORES) || Number(item.quantidade) || 0);
+      const quantidade = demonstrativoData 
+        ? (item.quantidade || 0) 
+        : (Number(item.VALORES) || Number(item.quantidade) || 0);
       
-      const valor = demonstrativoData ?
-        (Number(item.valor_total) || 0) :
-        (Number(item.valor) || 0);
+      const valor = demonstrativoData
+        ? (Number(item.valor_total) || 0)
+        : (Number(item.valor) || 0);
 
       totalLaudos += quantidade;
       valorBrutoTotal += valor;
     }
 
-    // Calcular valores baseados no demonstrativo quando disponível (fonte da verdade)
-    const valorExames = demonstrativoData ? (Number(demonstrativoData.valor_exames ?? demonstrativoData.valor_bruto) || 0) : valorBrutoTotal;
-    const valorFranquia = demonstrativoData ? (Number(demonstrativoData.valor_franquia) || 0) : 0;
-    const valorPortal = demonstrativoData ? (Number(demonstrativoData.valor_portal_laudos) || 0) : 0;
-    const valorIntegracao = demonstrativoData ? (Number(demonstrativoData.valor_integracao) || 0) : 0;
+    // Tentar buscar demonstrativo calculado (modelo anterior ao 23/09/2025)
+    const { data: demo } = await supabase
+      .from('demonstrativos_faturamento_calculados')
+      .select('*')
+      .eq('cliente_id', cliente_id)
+      .eq('periodo_referencia', periodo)
+      .order('calculado_em', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    // Definir valores base priorizando demonstrativo calculado
+    let valorExames = demonstrativoData 
+      ? (Number(demonstrativoData.valor_exames ?? demonstrativoData.valor_bruto) || 0) 
+      : valorBrutoTotal;
+    let valorFranquia = demonstrativoData ? (Number(demonstrativoData.valor_franquia) || 0) : 0;
+    let valorPortal = demonstrativoData ? (Number(demonstrativoData.valor_portal_laudos) || 0) : 0;
+    let valorIntegracao = demonstrativoData ? (Number(demonstrativoData.valor_integracao) || 0) : 0;
+
+    if (demo) {
+      totalLaudos = Number(demo.total_exames ?? totalLaudos) || totalLaudos;
+      // Valor Bruto (modelo antigo usava valor_bruto_total)
+      valorExames = Number(demo.valor_bruto_total ?? demo.valor_exames ?? valorExames) || 0;
+      valorFranquia = Number(demo.valor_franquia || 0);
+      valorPortal = Number(demo.valor_portal_laudos || 0);
+      valorIntegracao = Number(demo.valor_integracao || 0);
+    }
     
     const baseCalculo = valorExames + valorFranquia + valorPortal + valorIntegracao;
 
@@ -317,17 +338,12 @@ serve(async (req: Request) => {
 
     currentY += 15;
 
-    // Criar tabela de resumo sem VALOR A PAGAR (será separado)
+    // Criar tabela de resumo (modelo anterior a 23/09/2025)
     const resumoItems = [
       ['Total de Laudos:', totalLaudos.toString()],
       ['Valor Bruto:', formatarValor(valorExames)],
       ['Franquia:', formatarValor(valorFranquia)],
-      ['Portal de Laudos:', formatarValor(valorPortal)],
-      ['Integração:', formatarValor(valorIntegracao)],
-      ['PIS (0.65%):', formatarValor(pis)],
-      ['COFINS (3%):', formatarValor(cofins)],
-      ['CSLL (1%):', formatarValor(csll)],
-      ['IRRF (1.5%):', formatarValor(irrf)]
+      ['Portal de Laudos:', formatarValor(valorPortal)]
     ];
 
     // Desenhar tabela de resumo
