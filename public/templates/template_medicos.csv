@@ -1,0 +1,4 @@
+nome,crm,email,telefone,categoria,modalidades,especialidades,ativo
+Dr. João Silva,12345-SP,joao.silva@example.com,(11) 98765-4321,Plantonista,"CT,MR","NEURO,MEDICINA INTERNA",sim
+Dra. Maria Santos,67890-RJ,maria.santos@example.com,(21) 91234-5678,Diarista,"RX,US","MUSCULO ESQUELETICO",sim
+Dr. Pedro Oliveira,11223-MG,pedro.oliveira@example.com,(31) 99876-5432,Especialista,"MR","NEURO",sim

@@ -248,15 +248,67 @@ export default function Colaboradores() {
   }, [toast]);
 
   const handleFileUpload = async (file: File) => {
-    // Simular processamento do arquivo CSV
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    toast({
-      title: "Upload realizado",
-      description: `Arquivo ${file.name} processado com sucesso! 12 colaboradores foram importados.`,
-    });
-    
-    setShowUploadDialog(false);
+    try {
+      console.log('📤 Enviando arquivo de médicos...', file.name);
+      
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const { data, error } = await supabase.functions.invoke('processar-medicos', {
+        body: formData
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      console.log('✅ Resposta do servidor:', data);
+
+      toast({
+        title: "✅ Upload realizado com sucesso!",
+        description: `${data.inseridos} médicos inseridos, ${data.atualizados} atualizados`,
+      });
+
+      // Recarregar lista de médicos
+      const { data: medicosData } = await supabase
+        .from('medicos')
+        .select('*')
+        .order('nome');
+
+      if (medicosData) {
+        const lista: Colaborador[] = medicosData.map(medico => ({
+          id: medico.id,
+          nome: medico.nome || '',
+          email: medico.email || '',
+          funcao: medico.funcao || 'Médico',
+          departamento: 'Medicina',
+          nivel: '',
+          status: (medico.ativo ? 'Ativo' : 'Inativo') as "Ativo" | "Inativo" | "Férias" | "Licença",
+          dataAdmissao: '',
+          telefone: medico.telefone || '',
+          cpf: medico.cpf || '',
+          permissoes: [],
+          gestor: '',
+          salario: 0,
+          crm: medico.crm || '',
+          categoria: medico.categoria || '',
+          modalidades: medico.modalidades || [],
+          especialidades: medico.especialidades || [],
+          prioridades: [],
+          documentos: []
+        }));
+        setColaboradores(lista);
+      }
+
+      setShowUploadDialog(false);
+    } catch (err: any) {
+      console.error('Erro no upload:', err);
+      toast({
+        title: "Erro no upload",
+        description: err.message || "Não foi possível processar o arquivo",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleModalidadeChange = (modalidade: string, checked: boolean) => {
