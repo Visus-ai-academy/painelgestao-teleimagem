@@ -434,14 +434,15 @@ serve(async (req: Request) => {
 
     // Gerar PDF e fazer upload
     const pdfBytes = pdf.output('arraybuffer');
-    const fileName = `relatorio_${(cliente.nome_fantasia || cliente.nome).replace(/[^a-zA-Z0-9]/g, '_').toUpperCase()}_${periodo}.pdf`;
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const fileName = `relatorio_${(cliente.nome_fantasia || cliente.nome).replace(/[^a-zA-Z0-9]/g, '_').toUpperCase()}_${periodo}_${timestamp}.pdf`;
     
     let pdfUrl = null;
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('relatorios-faturamento')
       .upload(fileName, pdfBytes, {
         contentType: 'application/pdf',
-        upsert: true
+        upsert: false
       });
 
     if (uploadError) {
