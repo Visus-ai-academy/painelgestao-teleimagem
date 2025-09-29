@@ -7,24 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface MedicoRow {
-  'Nome_Médico': string;
-  'CRM': string;
-  'CPF'?: string;
-  'Status_Ativo_Médico'?: string;
-  'Sócio?'?: string;
-  'Função'?: string;
-  'Especialidade de Atuação'?: string;
-  'Equipe'?: string;
-  'Acrescimo sem digitador'?: string | number;
-  'Adicional de Valor sem utilizar digitador'?: string | number;
-  'Nome_empresa'?: string;
-  'CNPJ'?: string;
-  'Telefone'?: string;
-  'E-MAIL'?: string;
-  'Optante pelo simples'?: string;
-}
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -85,8 +67,8 @@ serve(async (req) => {
         const nomeMed = (row['nome_medico'] as string | undefined) ?? (row['nome'] as string | undefined) ?? (row['nomemedico'] as string | undefined);
         const crmVal = (row['crm'] as string | undefined) ?? (row['c_r_m'] as string | undefined);
 
-        if (!nomeMed || !crmVal) {
-          errosDetalhados.push(`Linha ${processados}: Nome_Médico e CRM são obrigatórios`);
+        if (!nomeMed) {
+          errosDetalhados.push(`Linha ${processados}: Nome_Médico é obrigatório`);
           erros++;
           continue;
         }
@@ -103,7 +85,7 @@ serve(async (req) => {
 
         const medicoData = {
           nome: nomeMed.toString().trim(),
-          crm: crmVal.toString().trim(),
+          crm: crmVal?.toString().trim() || null,
           cpf: (row['cpf'] as string | undefined)?.toString().trim() || null,
           email: (row['e_mail'] as string | undefined)?.toString().trim() || null,
           telefone: (row['telefone'] as string | undefined)?.toString().trim() || null,
@@ -122,12 +104,16 @@ serve(async (req) => {
           especialidades: []
         };
 
-        // Verificar se médico já existe pelo CRM
-        const { data: existente } = await supabase
-          .from('medicos')
-          .select('id')
-          .eq('crm', medicoData.crm)
-          .maybeSingle();
+        // Verificar se médico já existe pelo CRM (se fornecido) ou nome
+        let query = supabase.from('medicos').select('id');
+        
+        if (medicoData.crm) {
+          query = query.eq('crm', medicoData.crm);
+        } else {
+          query = query.eq('nome', medicoData.nome);
+        }
+        
+        const { data: existente } = await query.maybeSingle();
 
         if (existente) {
           // Atualizar médico existente
@@ -179,7 +165,6 @@ serve(async (req) => {
       .insert({
         arquivo_nome: file.name,
         tipo_arquivo: 'medicos',
-        tipo_dados: 'cadastro',
         status: 'concluido',
         registros_processados: processados,
         registros_inseridos: inseridos,
