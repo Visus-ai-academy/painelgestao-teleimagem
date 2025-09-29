@@ -8,14 +8,21 @@ const corsHeaders = {
 };
 
 interface MedicoRow {
-  nome: string;
-  crm: string;
-  email?: string;
-  telefone?: string;
-  categoria?: string;
-  modalidades?: string;
-  especialidades?: string;
-  ativo?: string;
+  'Nome_Médico': string;
+  'CRM': string;
+  'CPF'?: string;
+  'Status_Ativo_Médico'?: string;
+  'Sócio?'?: string;
+  'Função'?: string;
+  'Especialidade de Atuação'?: string;
+  'Equipe'?: string;
+  'Acrescimo sem digitador'?: string | number;
+  'Adicional de Valor sem utilizar digitador'?: string | number;
+  'Nome_empresa'?: string;
+  'CNPJ'?: string;
+  'Telefone'?: string;
+  'E-MAIL'?: string;
+  'Optante pelo simples'?: string;
 }
 
 serve(async (req) => {
@@ -56,30 +63,41 @@ serve(async (req) => {
       try {
         processados++;
 
-        if (!row.nome || !row.crm) {
-          errosDetalhados.push(`Linha ${processados}: Nome e CRM são obrigatórios`);
+        if (!row['Nome_Médico'] || !row['CRM']) {
+          errosDetalhados.push(`Linha ${processados}: Nome_Médico e CRM são obrigatórios`);
           erros++;
           continue;
         }
 
-        // Parse modalidades e especialidades (podem vir como string separada por vírgula ou ponto-e-vírgula)
-        const modalidades = row.modalidades 
-          ? row.modalidades.split(/[,;]/).map(m => m.trim()).filter(Boolean)
-          : [];
-        
-        const especialidades = row.especialidades
-          ? row.especialidades.split(/[,;]/).map(e => e.trim()).filter(Boolean)
-          : [];
+        // Mapear Status_Ativo_Médico para boolean
+        const ativo = row['Status_Ativo_Médico']?.toString().toLowerCase();
+        const isAtivo = ativo === 'sim' || ativo === 'ativo' || ativo === 'true' || ativo === '1';
+
+        // Processar adicional de valor
+        const adicionalValor = row['Adicional de Valor sem utilizar digitador'];
+        const adicionalValorNum = typeof adicionalValor === 'number' 
+          ? adicionalValor 
+          : parseFloat(adicionalValor?.toString().replace(/[^\d.,]/g, '').replace(',', '.') || '0');
 
         const medicoData = {
-          nome: row.nome.trim(),
-          crm: row.crm.trim(),
-          email: row.email?.trim() || null,
-          telefone: row.telefone?.trim() || null,
-          categoria: row.categoria?.trim() || null,
-          modalidades,
-          especialidades,
-          ativo: row.ativo?.toLowerCase() !== 'false' && row.ativo?.toLowerCase() !== 'não'
+          nome: row['Nome_Médico'].toString().trim(),
+          crm: row['CRM'].toString().trim(),
+          cpf: row['CPF']?.toString().trim() || null,
+          email: row['E-MAIL']?.toString().trim() || null,
+          telefone: row['Telefone']?.toString().trim() || null,
+          socio: row['Sócio?']?.toString().trim() || null,
+          funcao: row['Função']?.toString().trim() || null,
+          especialidade: row['Especialidade de Atuação']?.toString().trim() || 'GERAL',
+          especialidade_atuacao: row['Especialidade de Atuação']?.toString().trim() || null,
+          equipe: row['Equipe']?.toString().trim() || null,
+          acrescimo_sem_digitador: row['Acrescimo sem digitador']?.toString().trim() || null,
+          adicional_valor_sem_digitador: adicionalValorNum || null,
+          nome_empresa: row['Nome_empresa']?.toString().trim() || null,
+          cnpj: row['CNPJ']?.toString().trim() || null,
+          optante_simples: row['Optante pelo simples']?.toString().trim() || null,
+          ativo: isAtivo,
+          modalidades: [],
+          especialidades: []
         };
 
         // Verificar se médico já existe pelo CRM
