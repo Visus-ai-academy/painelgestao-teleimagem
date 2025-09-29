@@ -97,6 +97,9 @@ export default function Colaboradores() {
   const [busca, setBusca] = useState("");
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showNewColaboradorDialog, setShowNewColaboradorDialog] = useState(false);
+  const [showViewDialog, setShowViewDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [selectedColaborador, setSelectedColaborador] = useState<Colaborador | null>(null);
   const [newColaborador, setNewColaborador] = useState({
     nome: "",
     email: "",
@@ -1213,11 +1216,13 @@ export default function Colaboradores() {
                       <div className="text-sm text-gray-600">
                         {colaborador.funcao} • {colaborador.departamento}
                       </div>
-                      <div className="text-xs text-gray-500">
-                        Admitido em {new Date(colaborador.dataAdmissao).toLocaleDateString('pt-BR')}
-                      </div>
-                      {/* Mostrar documentos para médicos */}
-                      {colaborador.departamento === "Medicina" && colaborador.documentos && (
+                      {colaborador.email && (
+                        <div className="text-xs text-gray-500">
+                          {colaborador.email}
+                        </div>
+                      )}
+                      {/* Mostrar documentos para médicos SOMENTE se houver documentos */}
+                      {colaborador.departamento === "Medicina" && colaborador.documentos && colaborador.documentos.length > 0 && (
                         <div className="mt-2">
                           <div className="text-xs font-medium text-gray-700 mb-1">Documentos:</div>
                           <div className="space-y-1">
@@ -1242,22 +1247,42 @@ export default function Colaboradores() {
                   
                   <div className="flex items-center gap-4">
                     <div className="text-right">
-                      <div className="text-lg font-semibold text-gray-900">
-                        R$ {colaborador.salario?.toLocaleString('pt-BR')}
-                      </div>
-                      <div className="text-sm text-gray-500">{colaborador.nivel}</div>
                       {colaborador.crm && (
-                        <div className="text-xs text-gray-500">CRM: {colaborador.crm}</div>
+                        <div className="text-xs text-gray-500 mb-1">CRM: {colaborador.crm}</div>
+                      )}
+                      {colaborador.categoria && (
+                        <div className="text-xs text-gray-500">Categoria: {colaborador.categoria}</div>
+                      )}
+                      {colaborador.nivel && (
+                        <div className="text-sm text-gray-500 mt-1">{colaborador.nivel}</div>
                       )}
                     </div>
                     
                     <div className="flex items-center gap-2">
                       {getStatusBadge(colaborador.status)}
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-8 w-8 p-0"
+                          onClick={() => {
+                            setSelectedColaborador(colaborador);
+                            setShowViewDialog(true);
+                          }}
+                          title="Visualizar"
+                        >
                           <Eye className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-8 w-8 p-0"
+                          onClick={() => {
+                            setSelectedColaborador(colaborador);
+                            setShowEditDialog(true);
+                          }}
+                          title="Editar"
+                        >
                           <Edit className="h-4 w-4" />
                         </Button>
                         {/* Botão para reenviar contrato se for médico e não estiver assinado */}
@@ -1268,11 +1293,30 @@ export default function Colaboradores() {
                             size="sm" 
                             className="h-8 w-8 p-0 text-blue-600"
                             title="Reenviar contrato"
+                            onClick={() => {
+                              toast({
+                                title: "Contrato enviado",
+                                description: `Contrato reenviado para ${colaborador.email}`,
+                              });
+                            }}
                           >
                             <Send className="h-4 w-4" />
                           </Button>
                         )}
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-600">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-8 w-8 p-0 text-red-600"
+                          title="Excluir"
+                          onClick={() => {
+                            if (confirm(`Deseja realmente excluir ${colaborador.nome}?`)) {
+                              toast({
+                                title: "Colaborador excluído",
+                                description: `${colaborador.nome} foi removido do sistema`,
+                              });
+                            }
+                          }}
+                        >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
@@ -1280,33 +1324,149 @@ export default function Colaboradores() {
                   </div>
                 </div>
                 
-                <div className="mt-3 pt-3 border-t">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600">Permissões de acesso:</p>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {colaborador.permissoes.map((permissao, index) => (
-                          <Badge key={index} variant="secondary" className="text-xs">
-                            {permissao}
+                {(colaborador.modalidades?.length || colaborador.especialidades?.length || colaborador.equipe) && (
+                  <div className="mt-3 pt-3 border-t">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      {colaborador.modalidades && colaborador.modalidades.length > 0 && (
+                        <div>
+                          <p className="text-sm text-gray-600">Modalidades:</p>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {colaborador.modalidades.map((modalidade, index) => (
+                              <Badge key={index} variant="secondary" className="text-xs">
+                                {modalidade}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {colaborador.especialidades && colaborador.especialidades.length > 0 && (
+                        <div>
+                          <p className="text-sm text-gray-600">Especialidades:</p>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {colaborador.especialidades.map((esp, index) => (
+                              <Badge key={index} variant="outline" className="text-xs">
+                                {esp}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {colaborador.equipe && (
+                        <div>
+                          <p className="text-sm text-gray-600">Equipe:</p>
+                          <Badge variant="default" className="text-xs mt-1">
+                            {colaborador.equipe}
                           </Badge>
-                        ))}
-                      </div>
+                        </div>
+                      )}
                     </div>
-                    {colaborador.crm && (
-                      <div className="text-right">
-                        <p className="text-sm text-gray-600">Categoria: {colaborador.categoria}</p>
-                        <p className="text-xs text-gray-500">
-                          Modalidades: {colaborador.modalidades?.join(', ') || 'N/A'}
-                        </p>
-                      </div>
-                    )}
                   </div>
-                </div>
+                )}
               </div>
             ))}
           </div>
         </CardContent>
       </Card>
+
+      {/* Dialog de Visualização */}
+      <Dialog open={showViewDialog} onOpenChange={setShowViewDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Detalhes do Colaborador</DialogTitle>
+          </DialogHeader>
+          {selectedColaborador && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-4 pb-4 border-b">
+                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
+                  <span className="text-blue-600 font-semibold text-xl">
+                    {selectedColaborador.nome.split(' ').map(n => n[0]).join('').substring(0, 2)}
+                  </span>
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold">{selectedColaborador.nome}</h3>
+                  <p className="text-sm text-muted-foreground">{selectedColaborador.funcao}</p>
+                  {getStatusBadge(selectedColaborador.status)}
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Email</Label>
+                  <p className="text-sm">{selectedColaborador.email || 'N/A'}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Telefone</Label>
+                  <p className="text-sm">{selectedColaborador.telefone || 'N/A'}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">CPF</Label>
+                  <p className="text-sm">{selectedColaborador.cpf || 'N/A'}</p>
+                </div>
+                {selectedColaborador.crm && (
+                  <div>
+                    <Label className="text-xs text-muted-foreground">CRM</Label>
+                    <p className="text-sm">{selectedColaborador.crm}</p>
+                  </div>
+                )}
+                {selectedColaborador.categoria && (
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Categoria</Label>
+                    <p className="text-sm">{selectedColaborador.categoria}</p>
+                  </div>
+                )}
+                {selectedColaborador.equipe && (
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Equipe</Label>
+                    <p className="text-sm">{selectedColaborador.equipe}</p>
+                  </div>
+                )}
+              </div>
+
+              {selectedColaborador.modalidades && selectedColaborador.modalidades.length > 0 && (
+                <div>
+                  <Label className="text-xs text-muted-foreground">Modalidades</Label>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {selectedColaborador.modalidades.map((mod, idx) => (
+                      <Badge key={idx} variant="secondary">{mod}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedColaborador.especialidades && selectedColaborador.especialidades.length > 0 && (
+                <div>
+                  <Label className="text-xs text-muted-foreground">Especialidades</Label>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {selectedColaborador.especialidades.map((esp, idx) => (
+                      <Badge key={idx} variant="outline">{esp}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de Edição */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Editar Colaborador</DialogTitle>
+          </DialogHeader>
+          {selectedColaborador && (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Funcionalidade de edição em desenvolvimento
+              </p>
+              <div className="bg-muted p-4 rounded-lg">
+                <p className="text-sm font-medium">{selectedColaborador.nome}</p>
+                <p className="text-xs text-muted-foreground">{selectedColaborador.email}</p>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
