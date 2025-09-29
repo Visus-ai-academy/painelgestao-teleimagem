@@ -6,20 +6,24 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Edit, Trash2, User } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Plus, Edit, Trash2, X } from "lucide-react";
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { RoleProtectedRoute } from '@/components/RoleProtectedRoute';
+import { useMedicoData } from '@/hooks/useMedicoData';
 
 interface Medico {
   id: string;
   nome: string;
   crm: string;
-  especialidade: string;
+  modalidades: string[];
+  especialidades: string[];
+  categoria?: string;
   telefone?: string;
   email?: string;
   ativo: boolean;
-  user_id: string;
+  user_id?: string;
 }
 
 export default function GerenciarMedicos() {
@@ -28,11 +32,14 @@ export default function GerenciarMedicos() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingMedico, setEditingMedico] = useState<Medico | null>(null);
   const { toast } = useToast();
+  const { modalidades, especialidades, categoriasMedico, loading: loadingData } = useMedicoData();
 
   const [formData, setFormData] = useState({
     nome: '',
     crm: '',
-    especialidade: '',
+    modalidades: [] as string[],
+    especialidades: [] as string[],
+    categoria: '',
     telefone: '',
     email: '',
     user_id: ''
@@ -73,10 +80,21 @@ export default function GerenciarMedicos() {
     e.preventDefault();
     
     try {
+      const dataToSave = {
+        nome: formData.nome,
+        crm: formData.crm,
+        modalidades: formData.modalidades,
+        especialidades: formData.especialidades,
+        categoria: formData.categoria || null,
+        telefone: formData.telefone || null,
+        email: formData.email || null,
+        user_id: formData.user_id || null
+      };
+
       if (editingMedico) {
         const { error } = await supabase
           .from('medicos')
-          .update(formData)
+          .update(dataToSave)
           .eq('id', editingMedico.id);
 
         if (error) throw error;
@@ -88,7 +106,7 @@ export default function GerenciarMedicos() {
       } else {
         const { error } = await supabase
           .from('medicos')
-          .insert([formData]);
+          .insert([dataToSave]);
 
         if (error) throw error;
 
@@ -100,7 +118,16 @@ export default function GerenciarMedicos() {
 
       setIsDialogOpen(false);
       setEditingMedico(null);
-      setFormData({ nome: '', crm: '', especialidade: '', telefone: '', email: '', user_id: '' });
+      setFormData({ 
+        nome: '', 
+        crm: '', 
+        modalidades: [], 
+        especialidades: [], 
+        categoria: '', 
+        telefone: '', 
+        email: '', 
+        user_id: '' 
+      });
       await fetchMedicos();
     } catch (error: any) {
       console.error('Erro ao salvar médico:', error);
@@ -117,10 +144,12 @@ export default function GerenciarMedicos() {
     setFormData({
       nome: medico.nome,
       crm: medico.crm,
-      especialidade: medico.especialidade,
+      modalidades: medico.modalidades || [],
+      especialidades: medico.especialidades || [],
+      categoria: medico.categoria || '',
       telefone: medico.telefone || '',
       email: medico.email || '',
-      user_id: medico.user_id
+      user_id: medico.user_id || ''
     });
     setIsDialogOpen(true);
   };
@@ -177,6 +206,32 @@ export default function GerenciarMedicos() {
     }
   };
 
+  const addModalidade = (modalidade: string) => {
+    if (modalidade && !formData.modalidades.includes(modalidade)) {
+      setFormData({ ...formData, modalidades: [...formData.modalidades, modalidade] });
+    }
+  };
+
+  const removeModalidade = (modalidade: string) => {
+    setFormData({ 
+      ...formData, 
+      modalidades: formData.modalidades.filter(m => m !== modalidade) 
+    });
+  };
+
+  const addEspecialidade = (especialidade: string) => {
+    if (especialidade && !formData.especialidades.includes(especialidade)) {
+      setFormData({ ...formData, especialidades: [...formData.especialidades, especialidade] });
+    }
+  };
+
+  const removeEspecialidade = (especialidade: string) => {
+    setFormData({ 
+      ...formData, 
+      especialidades: formData.especialidades.filter(e => e !== especialidade) 
+    });
+  };
+
   useEffect(() => {
     fetchMedicos();
   }, []);
@@ -195,13 +250,22 @@ export default function GerenciarMedicos() {
             <DialogTrigger asChild>
               <Button onClick={() => {
                 setEditingMedico(null);
-                setFormData({ nome: '', crm: '', especialidade: '', telefone: '', email: '', user_id: '' });
+                setFormData({ 
+                  nome: '', 
+                  crm: '', 
+                  modalidades: [], 
+                  especialidades: [], 
+                  categoria: '', 
+                  telefone: '', 
+                  email: '', 
+                  user_id: '' 
+                });
               }}>
                 <Plus className="h-4 w-4 mr-2" />
                 Novo Médico
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>
                   {editingMedico ? 'Editar Médico' : 'Novo Médico'}
@@ -231,15 +295,81 @@ export default function GerenciarMedicos() {
                     />
                   </div>
                 </div>
+
                 <div>
-                  <Label htmlFor="especialidade">Especialidade</Label>
-                  <Input
-                    id="especialidade"
-                    value={formData.especialidade}
-                    onChange={(e) => setFormData({ ...formData, especialidade: e.target.value })}
-                    required
-                  />
+                  <Label>Modalidades</Label>
+                  <Select onValueChange={addModalidade} disabled={loadingData}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione modalidades" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {modalidades.map((mod) => (
+                        <SelectItem key={mod.id} value={mod.nome}>
+                          {mod.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {formData.modalidades.map((mod) => (
+                      <Badge key={mod} variant="secondary" className="flex items-center gap-1">
+                        {mod}
+                        <X 
+                          className="h-3 w-3 cursor-pointer" 
+                          onClick={() => removeModalidade(mod)}
+                        />
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
+
+                <div>
+                  <Label>Especialidades</Label>
+                  <Select onValueChange={addEspecialidade} disabled={loadingData}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione especialidades" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {especialidades.map((esp) => (
+                        <SelectItem key={esp.id} value={esp.nome}>
+                          {esp.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {formData.especialidades.map((esp) => (
+                      <Badge key={esp} variant="secondary" className="flex items-center gap-1">
+                        {esp}
+                        <X 
+                          className="h-3 w-3 cursor-pointer" 
+                          onClick={() => removeEspecialidade(esp)}
+                        />
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="categoria">Categoria</Label>
+                  <Select
+                    value={formData.categoria}
+                    onValueChange={(value) => setFormData({ ...formData, categoria: value })}
+                    disabled={loadingData}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione uma categoria" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categoriasMedico.map((cat) => (
+                        <SelectItem key={cat.id} value={cat.nome}>
+                          {cat.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="telefone">Telefone</Label>
@@ -259,16 +389,17 @@ export default function GerenciarMedicos() {
                     />
                   </div>
                 </div>
+
                 <div>
-                  <Label htmlFor="user_id">ID do Usuário</Label>
+                  <Label htmlFor="user_id">ID do Usuário (opcional)</Label>
                   <Input
                     id="user_id"
                     value={formData.user_id}
                     onChange={(e) => setFormData({ ...formData, user_id: e.target.value })}
                     placeholder="UUID do usuário no sistema de autenticação"
-                    required
                   />
                 </div>
+
                 <div className="flex justify-end space-x-2">
                   <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                     Cancelar
@@ -300,9 +431,10 @@ export default function GerenciarMedicos() {
                   <TableRow>
                     <TableHead>Nome</TableHead>
                     <TableHead>CRM</TableHead>
-                    <TableHead>Especialidade</TableHead>
-                    <TableHead>Telefone</TableHead>
-                    <TableHead>E-mail</TableHead>
+                    <TableHead>Modalidades</TableHead>
+                    <TableHead>Especialidades</TableHead>
+                    <TableHead>Categoria</TableHead>
+                    <TableHead>Contato</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Ações</TableHead>
                   </TableRow>
@@ -312,9 +444,32 @@ export default function GerenciarMedicos() {
                     <TableRow key={medico.id}>
                       <TableCell className="font-medium">{medico.nome}</TableCell>
                       <TableCell>{medico.crm}</TableCell>
-                      <TableCell>{medico.especialidade}</TableCell>
-                      <TableCell>{medico.telefone || '-'}</TableCell>
-                      <TableCell>{medico.email || '-'}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {medico.modalidades?.map((mod) => (
+                            <Badge key={mod} variant="outline" className="text-xs">
+                              {mod}
+                            </Badge>
+                          )) || '-'}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {medico.especialidades?.map((esp) => (
+                            <Badge key={esp} variant="outline" className="text-xs">
+                              {esp}
+                            </Badge>
+                          )) || '-'}
+                        </div>
+                      </TableCell>
+                      <TableCell>{medico.categoria || '-'}</TableCell>
+                      <TableCell>
+                        <div className="text-sm">
+                          {medico.telefone && <div>{medico.telefone}</div>}
+                          {medico.email && <div className="text-muted-foreground">{medico.email}</div>}
+                          {!medico.telefone && !medico.email && '-'}
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <Badge 
                           variant={medico.ativo ? "default" : "secondary"}
