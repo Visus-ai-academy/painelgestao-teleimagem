@@ -140,22 +140,56 @@ serve(async (req: Request) => {
       valorBrutoTotal += valor;
     }
 
-    // Calcular valores
-    const valorExames = demonstrativoData ? (demonstrativoData.valor_bruto || 0) : valorBrutoTotal;
-    const valorFranquia = demonstrativoData ? (demonstrativoData.valor_franquia || 0) : 0;
-    const valorPortal = demonstrativoData ? (demonstrativoData.valor_portal_laudos || 0) : 0;
-    const valorIntegracao = demonstrativoData ? (demonstrativoData.valor_integracao || 0) : 0;
+    // Calcular valores baseados no demonstrativo quando disponível (fonte da verdade)
+    const valorExames = demonstrativoData ? (Number(demonstrativoData.valor_exames ?? demonstrativoData.valor_bruto) || 0) : valorBrutoTotal;
+    const valorFranquia = demonstrativoData ? (Number(demonstrativoData.valor_franquia) || 0) : 0;
+    const valorPortal = demonstrativoData ? (Number(demonstrativoData.valor_portal_laudos) || 0) : 0;
+    const valorIntegracao = demonstrativoData ? (Number(demonstrativoData.valor_integracao) || 0) : 0;
     
-    // Base de cálculo para impostos
     const baseCalculo = valorExames + valorFranquia + valorPortal + valorIntegracao;
-    
-    // Impostos conforme o modelo original
-    const pis = baseCalculo * 0.0065;      // 0.65%
-    const cofins = baseCalculo * 0.03;     // 3%
-    const csll = baseCalculo * 0.01;       // 1%
-    const irrf = baseCalculo * 0.015;      // 1.5%
-    
-    const valorLiquido = baseCalculo - pis - cofins - csll - irrf;
+
+    // Impostos - usar exatamente os do demonstrativo, se fornecidos; caso contrário, calcular
+    let pis = 0, cofins = 0, csll = 0, irrf = 0;
+
+    if (demonstrativoData) {
+      const hasBreakdown = ['pis', 'cofins', 'csll', 'irrf'].some((k) => demonstrativoData[k] != null);
+      const totalImpostosFed = Number(demonstrativoData.valor_impostos_federais ?? demonstrativoData.valor_total_impostos ?? 0) || 0;
+
+      if (hasBreakdown) {
+        pis = Number(demonstrativoData.pis || 0);
+        cofins = Number(demonstrativoData.cofins || 0);
+        csll = Number(demonstrativoData.csll || 0);
+        irrf = Number(demonstrativoData.irrf || 0);
+      } else if (totalImpostosFed > 0) {
+        // Alocar proporcionalmente às alíquotas para refletir exatamente o total do demonstrativo
+        const rates = [0.0065, 0.03, 0.01, 0.015];
+        const sumRates = rates.reduce((a,b)=>a+b,0); // 0.0615
+        const alloc = rates.map(r => Number(((totalImpostosFed * r) / sumRates).toFixed(2)));
+        let allocSum = alloc.reduce((a,b)=>a+b,0);
+        const diff = Number((totalImpostosFed - allocSum).toFixed(2));
+        // Ajustar diferença de arredondamento no último imposto (IRRF)
+        alloc[3] = Number((alloc[3] + diff).toFixed(2));
+        ;[pis, cofins, csll, irrf] = alloc as [number, number, number, number];
+      } else {
+        // Fallback: calcular pelas alíquotas padrão
+        pis = baseCalculo * 0.0065;
+        cofins = baseCalculo * 0.03;
+        csll = baseCalculo * 0.01;
+        irrf = baseCalculo * 0.015;
+      }
+    } else {
+      // Sem demonstrativo: calcular normalmente
+      pis = baseCalculo * 0.0065;      // 0.65%
+      cofins = baseCalculo * 0.03;     // 3%
+      csll = baseCalculo * 0.01;       // 1%
+      irrf = baseCalculo * 0.015;      // 1.5%
+    }
+
+    // Valor líquido - priorizar o do demonstrativo, se houver
+    const valorLiquido = demonstrativoData && (demonstrativoData.valor_liquido != null)
+      ? Number(demonstrativoData.valor_liquido)
+      : (baseCalculo - pis - cofins - csll - irrf);
+
 
     // ============= GERAÇÃO DO PDF - TEMPLATE ORIGINAL (pré 23/09/2025) =============
     const pdf = new jsPDF('l', 'mm', 'a4'); // Formato paisagem
