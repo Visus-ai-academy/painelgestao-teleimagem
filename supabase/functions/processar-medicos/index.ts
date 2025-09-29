@@ -111,16 +111,38 @@ serve(async (req) => {
           especialidades: []
         };
 
-        // Verificar se médico já existe
-        let queryBuilder = supabase.from('medicos').select('id');
+        // Verificar se médico já existe (prioridade: CRM > CPF > Nome)
+        let existente = null;
         
+        // 1. Tentar por CRM se existir
         if (medicoData.crm) {
-          queryBuilder = queryBuilder.eq('crm', medicoData.crm);
-        } else {
-          queryBuilder = queryBuilder.eq('nome', medicoData.nome);
+          const { data } = await supabase
+            .from('medicos')
+            .select('id')
+            .eq('crm', medicoData.crm)
+            .maybeSingle();
+          existente = data;
         }
         
-        const { data: existente } = await queryBuilder.maybeSingle();
+        // 2. Se não encontrou por CRM, tentar por CPF
+        if (!existente && medicoData.cpf) {
+          const { data } = await supabase
+            .from('medicos')
+            .select('id')
+            .eq('cpf', medicoData.cpf)
+            .maybeSingle();
+          existente = data;
+        }
+        
+        // 3. Se não encontrou por CRM nem CPF, tentar por nome
+        if (!existente) {
+          const { data } = await supabase
+            .from('medicos')
+            .select('id')
+            .eq('nome', medicoData.nome)
+            .maybeSingle();
+          existente = data;
+        }
 
         if (existente) {
           const { error: updateError } = await supabase
