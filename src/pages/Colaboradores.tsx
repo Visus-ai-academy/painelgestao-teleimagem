@@ -120,6 +120,67 @@ export default function Colaboradores() {
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
   const [loadingColaboradores, setLoadingColaboradores] = useState(true);
   const [distribuicaoFuncoes, setDistribuicaoFuncoes] = useState<{ nome: string; count: number }[]>([]);
+  const [cleaningData, setCleaningData] = useState(false);
+
+  // Função para limpar dados fictícios
+  const limparDadosFicticios = async () => {
+    if (!confirm("⚠️ ATENÇÃO: Esta ação irá remover os 3 colaboradores fictícios. Deseja continuar?")) {
+      return;
+    }
+
+    try {
+      setCleaningData(true);
+      console.log('🧹 Limpando dados fictícios...');
+      
+      const { data, error } = await supabase.functions.invoke('limpar-dados-ficticios');
+      
+      if (error) throw error;
+      
+      toast({
+        title: "✅ Limpeza concluída!",
+        description: `${data.medicos_removidos} médicos fictícios removidos`,
+      });
+      
+      // Recarregar lista
+      const { data: medicosData } = await supabase
+        .from('medicos')
+        .select('*')
+        .order('nome');
+      
+      if (medicosData) {
+        const lista: Colaborador[] = medicosData.map((medico: any) => ({
+          id: medico.id,
+          nome: medico.nome || '',
+          email: medico.email || '',
+          funcao: medico.funcao || 'Médico',
+          departamento: 'Medicina',
+          nivel: '',
+          status: medico.ativo ? 'Ativo' : 'Inativo',
+          dataAdmissao: '',
+          telefone: medico.telefone || '',
+          cpf: medico.cpf || '',
+          permissoes: [],
+          gestor: '',
+          salario: 0,
+          crm: medico.crm,
+          categoria: medico.categoria,
+          modalidades: medico.modalidades || [],
+          especialidades: medico.especialidades || []
+        }));
+        setColaboradores(lista);
+      }
+      
+    } catch (error: any) {
+      console.error('Erro:', error);
+      toast({
+        title: "❌ Erro na limpeza",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setCleaningData(false);
+    }
+  };
 
   useEffect(() => {
     const carregar = async () => {
@@ -667,6 +728,16 @@ export default function Colaboradores() {
           <Separator className="my-4" />
             
             <div className="flex gap-2">
+              <Button 
+                onClick={limparDadosFicticios}
+                disabled={cleaningData}
+                variant="destructive"
+                size="sm"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                {cleaningData ? "Limpando..." : "Limpar Fictícios"}
+              </Button>
+              
               <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
                 <DialogTrigger asChild>
                   <Button variant="outline" className="flex items-center gap-2">

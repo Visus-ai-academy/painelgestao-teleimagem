@@ -85,6 +85,7 @@ export default function GerenciarMedicos() {
         crm: formData.crm,
         modalidades: formData.modalidades,
         especialidades: formData.especialidades,
+        especialidade: formData.especialidades[0] || '', // Campo singular obrigatório (usar primeira especialidade)
         categoria: formData.categoria || null,
         telefone: formData.telefone || null,
         email: formData.email || null,
