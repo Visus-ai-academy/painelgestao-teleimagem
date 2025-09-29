@@ -49,9 +49,27 @@ serve(async (req) => {
     const workbook = XLSX.read(arrayBuffer);
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
-    const jsonData: MedicoRow[] = XLSX.utils.sheet_to_json(worksheet);
+    const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
 
-    console.log(`📊 Total de registros no arquivo: ${jsonData.length}`);
+    // Normalizar cabeçalhos para evitar erros com acentos/variações
+    const normalize = (s: string) => s
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // remover acentos
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_|_$/g, '');
+
+    const normalizeRow = (r: Record<string, unknown>) => {
+      const out: Record<string, unknown> = {};
+      for (const k of Object.keys(r)) {
+        out[normalize(k)] = r[k as keyof typeof r];
+      }
+      return out;
+    };
+
+    const dataNormalized = jsonData.map(normalizeRow);
+
+    console.log(`📊 Total de registros no arquivo: ${dataNormalized.length}`);
 
     let processados = 0;
     let inseridos = 0;
@@ -59,42 +77,46 @@ serve(async (req) => {
     let erros = 0;
     const errosDetalhados: string[] = [];
 
-    for (const row of jsonData) {
+    for (const rowRaw of dataNormalized) {
       try {
         processados++;
 
-        if (!row['Nome_Médico'] || !row['CRM']) {
+        const row = rowRaw as Record<string, unknown>;
+        const nomeMed = (row['nome_medico'] as string | undefined) ?? (row['nome'] as string | undefined) ?? (row['nomemedico'] as string | undefined);
+        const crmVal = (row['crm'] as string | undefined) ?? (row['c_r_m'] as string | undefined);
+
+        if (!nomeMed || !crmVal) {
           errosDetalhados.push(`Linha ${processados}: Nome_Médico e CRM são obrigatórios`);
           erros++;
           continue;
         }
 
-        // Mapear Status_Ativo_Médico para boolean
-        const ativo = row['Status_Ativo_Médico']?.toString().toLowerCase();
-        const isAtivo = ativo === 'sim' || ativo === 'ativo' || ativo === 'true' || ativo === '1';
+        // Mapear Status_Ativo_Médico para boolean (aceita diversas variações)
+        const ativoStr = ((row['status_ativo_medico'] as string | undefined) ?? (row['ativo'] as string | undefined) ?? '').toString().toLowerCase();
+        const isAtivo = ['sim','ativo','true','1','s','y','yes'].includes(ativoStr);
 
         // Processar adicional de valor
-        const adicionalValor = row['Adicional de Valor sem utilizar digitador'];
-        const adicionalValorNum = typeof adicionalValor === 'number' 
-          ? adicionalValor 
-          : parseFloat(adicionalValor?.toString().replace(/[^\d.,]/g, '').replace(',', '.') || '0');
+        const adicionalValorRaw = (row['adicional_de_valor_sem_utilizar_digitador'] ?? row['adicional_valor_sem_digitador'] ?? row['adicional'] ?? 0) as unknown;
+        const adicionalValorNum = typeof adicionalValorRaw === 'number'
+          ? adicionalValorRaw
+          : parseFloat(adicionalValorRaw?.toString().replace(/[^\d.,]/g, '').replace(',', '.') || '0');
 
         const medicoData = {
-          nome: row['Nome_Médico'].toString().trim(),
-          crm: row['CRM'].toString().trim(),
-          cpf: row['CPF']?.toString().trim() || null,
-          email: row['E-MAIL']?.toString().trim() || null,
-          telefone: row['Telefone']?.toString().trim() || null,
-          socio: row['Sócio?']?.toString().trim() || null,
-          funcao: row['Função']?.toString().trim() || null,
-          especialidade: row['Especialidade de Atuação']?.toString().trim() || 'GERAL',
-          especialidade_atuacao: row['Especialidade de Atuação']?.toString().trim() || null,
-          equipe: row['Equipe']?.toString().trim() || null,
-          acrescimo_sem_digitador: row['Acrescimo sem digitador']?.toString().trim() || null,
+          nome: nomeMed.toString().trim(),
+          crm: crmVal.toString().trim(),
+          cpf: (row['cpf'] as string | undefined)?.toString().trim() || null,
+          email: (row['e_mail'] as string | undefined)?.toString().trim() || null,
+          telefone: (row['telefone'] as string | undefined)?.toString().trim() || null,
+          socio: (row['socio'] as string | undefined)?.toString().trim() || null,
+          funcao: (row['funcao'] as string | undefined)?.toString().trim() || null,
+          especialidade: ((row['especialidade_de_atuacao'] as string | undefined)?.toString().trim()) || 'GERAL',
+          especialidade_atuacao: (row['especialidade_de_atuacao'] as string | undefined)?.toString().trim() || null,
+          equipe: (row['equipe'] as string | undefined)?.toString().trim() || null,
+          acrescimo_sem_digitador: (row['acrescimo_sem_digitador'] as string | undefined)?.toString().trim() || null,
           adicional_valor_sem_digitador: adicionalValorNum || null,
-          nome_empresa: row['Nome_empresa']?.toString().trim() || null,
-          cnpj: row['CNPJ']?.toString().trim() || null,
-          optante_simples: row['Optante pelo simples']?.toString().trim() || null,
+          nome_empresa: (row['nome_empresa'] as string | undefined)?.toString().trim() || null,
+          cnpj: (row['cnpj'] as string | undefined)?.toString().trim() || null,
+          optante_simples: (row['optante_pelo_simples'] as string | undefined)?.toString().trim() || null,
           ativo: isAtivo,
           modalidades: [],
           especialidades: []
@@ -112,7 +134,7 @@ serve(async (req) => {
           const { error: updateError } = await supabase
             .from('medicos')
             .update(medicoData)
-            .eq('id', existente.id);
+            .eq('id', (existente as any).id);
 
           if (updateError) {
             console.error('Erro ao atualizar médico:', {
@@ -158,7 +180,7 @@ serve(async (req) => {
         arquivo_nome: file.name,
         tipo_arquivo: 'medicos',
         tipo_dados: 'cadastro',
-        status: erros > 0 ? 'concluido_com_erros' : 'concluido',
+        status: 'concluido',
         registros_processados: processados,
         registros_inseridos: inseridos,
         registros_atualizados: atualizados,
