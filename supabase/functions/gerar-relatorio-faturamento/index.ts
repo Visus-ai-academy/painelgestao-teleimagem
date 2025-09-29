@@ -201,28 +201,47 @@ serve(async (req: Request) => {
     // Tentar carregar logomarca do storage
     let logoAdded = false;
     try {
-      // Verificar logomarca no storage (diferentes extensões)
       const extensions = ['png', 'jpg', 'jpeg'];
       for (const ext of extensions) {
         const fileName = `logomarca.${ext}`;
         const { data } = supabase.storage
           .from('logomarcas')
           .getPublicUrl(fileName);
-        
-        // Para PDF, precisaríamos converter e adicionar a imagem
-        // Por ora, manter texto mas melhorar formatação
+        const publicUrl = data?.publicUrl;
+        if (publicUrl) {
+          const resp = await fetch(publicUrl);
+          if (resp.ok) {
+            const buf = await resp.arrayBuffer();
+            const bytes = new Uint8Array(buf);
+            let binary = '';
+            for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+            const base64 = btoa(binary);
+            const dataUrl = `data:image/${ext};base64,${base64}`;
+            // Inserir logo centralizada no topo
+            const logoWidth = 60; // mm
+            const logoHeight = 20; // mm aprox.
+            const logoX = (pageWidth - logoWidth) / 2;
+            const logoY = margin - 5;
+            pdf.addImage(dataUrl, ext.toUpperCase() === 'PNG' ? 'PNG' : 'JPEG', logoX, logoY, logoWidth, logoHeight);
+            currentY = Math.max(currentY, logoY + logoHeight);
+            logoAdded = true;
+            break;
+          }
+        }
       }
     } catch (error) {
       console.log('Logomarca não encontrada, usando texto');
     }
     
-    // Logomarca centralizada
-    currentY = addText('TELEiMAGEM', margin, currentY + 15, {
-      fontSize: 18,
-      bold: true,
-      align: 'center',
-      maxWidth: contentWidth
-    });
+    // Logomarca/título
+    if (!logoAdded) {
+      currentY = addText('TELEiMAGEM', margin, currentY + 15, {
+        fontSize: 18,
+        bold: true,
+        align: 'center',
+        maxWidth: contentWidth
+      });
+    }
     
     currentY = addText('EXCELÊNCIA EM TELERRADIOLOGIA', margin, currentY + 8, {
       fontSize: 12,
