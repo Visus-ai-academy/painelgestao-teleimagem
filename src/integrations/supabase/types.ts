@@ -2032,46 +2032,76 @@ export type Database = {
       }
       medicos: {
         Row: {
+          acrescimo_sem_digitador: string | null
+          adicional_valor_sem_digitador: number | null
           ativo: boolean
           categoria: string | null
+          cnpj: string | null
+          cpf: string | null
           created_at: string
           crm: string
           email: string | null
+          equipe: string | null
           especialidade: string
+          especialidade_atuacao: string | null
           especialidades: string[] | null
+          funcao: string | null
           id: string
           modalidades: string[] | null
           nome: string
+          nome_empresa: string | null
+          optante_simples: string | null
+          socio: string | null
           telefone: string | null
           updated_at: string
           user_id: string | null
         }
         Insert: {
+          acrescimo_sem_digitador?: string | null
+          adicional_valor_sem_digitador?: number | null
           ativo?: boolean
           categoria?: string | null
+          cnpj?: string | null
+          cpf?: string | null
           created_at?: string
           crm: string
           email?: string | null
+          equipe?: string | null
           especialidade: string
+          especialidade_atuacao?: string | null
           especialidades?: string[] | null
+          funcao?: string | null
           id?: string
           modalidades?: string[] | null
           nome: string
+          nome_empresa?: string | null
+          optante_simples?: string | null
+          socio?: string | null
           telefone?: string | null
           updated_at?: string
           user_id?: string | null
         }
         Update: {
+          acrescimo_sem_digitador?: string | null
+          adicional_valor_sem_digitador?: number | null
           ativo?: boolean
           categoria?: string | null
+          cnpj?: string | null
+          cpf?: string | null
           created_at?: string
           crm?: string
           email?: string | null
+          equipe?: string | null
           especialidade?: string
+          especialidade_atuacao?: string | null
           especialidades?: string[] | null
+          funcao?: string | null
           id?: string
           modalidades?: string[] | null
           nome?: string
+          nome_empresa?: string | null
+          optante_simples?: string | null
+          socio?: string | null
           telefone?: string | null
           updated_at?: string
           user_id?: string | null
