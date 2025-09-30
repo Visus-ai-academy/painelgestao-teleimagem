@@ -24,7 +24,7 @@ const toKey = (s: string) => normalize(s).replace(/[^a-z0-9]+/g, '_');
 
 const KEY_SYNONYMS: Record<string, string> = {
   // medico_nome
-  medico_nome: 'medico_nome', medico, medicoa: 'medico_nome', nome_medico: 'medico_nome', nome_do_medico: 'medico_nome', dr: 'medico_nome', medico__nome: 'medico_nome',
+  medico_nome: 'medico_nome', medico: 'medico_nome', medicoa: 'medico_nome', nome_medico: 'medico_nome', nome_do_medico: 'medico_nome', dr: 'medico_nome', medico__nome: 'medico_nome',
   // medico_crm
   medico_crm: 'medico_crm', crm: 'medico_crm', crm_medico: 'medico_crm', crmm: 'medico_crm',
   // modalidade

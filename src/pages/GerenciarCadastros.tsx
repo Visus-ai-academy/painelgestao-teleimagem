@@ -293,51 +293,62 @@ export default function GerenciarCadastros() {
   const handleUploadRepasse = async (file: File) => {
     console.log('🔄 Iniciando upload de repasse médico (client-parse):', file.name);
 
-    // Ler e parsear no cliente (mais memória disponível que na edge)
-    const buf = await file.arrayBuffer();
-    const wb = XLSX.read(buf, { type: 'array', cellDates: false });
-    const ws = wb.Sheets[wb.SheetNames[0]];
+    try {
+      // Ler e parsear no cliente (mais memória disponível que na edge)
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: 'array', cellDates: false });
+      const ws = wb.Sheets[wb.SheetNames[0]];
 
-    type RepasseRow = {
-      medico_nome?: string;
-      medico_crm?: string;
-      modalidade: string;
-      especialidade: string;
-      categoria?: string;
-      prioridade: string;
-      valor: number;
-      esta_no_escopo?: boolean | string;
-      cliente_nome?: string;
-    };
+      type RepasseRow = {
+        medico_nome?: string;
+        medico_crm?: string;
+        modalidade: string;
+        especialidade: string;
+        categoria?: string;
+        prioridade: string;
+        valor: number;
+        esta_no_escopo?: boolean | string;
+        cliente_nome?: string;
+      };
 
-    const rows = XLSX.utils.sheet_to_json<RepasseRow>(ws, { raw: true, defval: null }) as RepasseRow[];
-    const total = rows.length;
+      const rows = XLSX.utils.sheet_to_json<RepasseRow>(ws, { raw: true, defval: null }) as RepasseRow[];
+      const total = rows.length;
 
-    // Iniciar upload no backend e obter uploadId
-    const startRes = await supabase.functions.invoke('importar-repasse-medico', {
-      body: { action: 'start', fileName: file.name, totalRows: total }
-    });
-    if (startRes.error) throw startRes.error;
-    const uploadId = (startRes.data as any)?.upload_id as string;
-    setRepasseUploadId(uploadId);
-
-    // Enviar em chunks pequenos
-    const CHUNK = 200;
-    for (let i = 0; i < rows.length; i += CHUNK) {
-      const chunk = rows.slice(i, i + CHUNK);
-      const res = await supabase.functions.invoke('importar-repasse-medico', {
-        body: { action: 'chunk', uploadId, rows: chunk }
+      // Iniciar upload no backend e obter uploadId
+      const startRes = await supabase.functions.invoke('importar-repasse-medico', {
+        body: { action: 'start', fileName: file.name, totalRows: total }
       });
-      if (res.error) throw res.error;
+      if (startRes.error) throw startRes.error;
+      const uploadId = (startRes.data as any)?.upload_id as string;
+      if (!uploadId) throw new Error('Falha ao iniciar processamento do repasse.');
+      setRepasseUploadId(uploadId);
+
+      // Enviar em chunks pequenos
+      const CHUNK = 200;
+      for (let i = 0; i < rows.length; i += CHUNK) {
+        const chunk = rows.slice(i, i + CHUNK);
+        const res = await supabase.functions.invoke('importar-repasse-medico', {
+          body: { action: 'chunk', uploadId, rows: chunk }
+        });
+        if (res.error) throw res.error;
+      }
+
+      // Finalizar
+      const fin = await supabase.functions.invoke('importar-repasse-medico', {
+        body: { action: 'finish', uploadId }
+      });
+      if (fin.error) throw fin.error;
+
+      toast({ title: 'Repasse processado!', description: `Total enviado: ${total}` });
+    } catch (err: any) {
+      console.error('❌ Erro no upload de repasse:', err);
+      toast({
+        title: 'Erro no Upload de Repasse',
+        description: err?.message || 'Falha ao processar arquivo de repasse médico',
+        variant: 'destructive'
+      });
+      setRepasseUploadId(null);
     }
-
-    // Finalizar
-    const fin = await supabase.functions.invoke('importar-repasse-medico', {
-      body: { action: 'finish', uploadId }
-    });
-    if (fin.error) throw fin.error;
-
-    toast({ title: 'Repasse processado!', description: `Total enviado: ${total}` });
   };
 
   // Handler para modalidades
