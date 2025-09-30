@@ -249,7 +249,13 @@ export default function Colaboradores() {
         lista.forEach(medico => {
           const equipe = medico.equipe || 'Sem Equipe';
           const funcao = (medico.funcao || '').toUpperCase();
-          const especialidade = medico.especialidade_atuacao || medico.especialidades?.[0] || 'Não especificado';
+          // Usar especialidade_atuacao como prioridade
+          const especialidade = medico.especialidade_atuacao || 'Não especificado';
+          
+          // Debug para verificar dados
+          if (medico.equipe?.includes('EQUIPE')) {
+            console.log('Médico:', medico.nome, 'Especialidade Atuação:', medico.especialidade_atuacao, 'Equipe:', medico.equipe);
+          }
           
           if (!equipesMap.has(equipe)) {
             equipesMap.set(equipe, {
@@ -270,9 +276,11 @@ export default function Colaboradores() {
             equipeData.fellow++;
           }
           
-          // Contar especialidades
-          const countEsp = equipeData.especialidades.get(especialidade) || 0;
-          equipeData.especialidades.set(especialidade, countEsp + 1);
+          // Contar especialidades - só adiciona se tiver especialidade definida
+          if (especialidade && especialidade !== 'Não especificado') {
+            const countEsp = equipeData.especialidades.get(especialidade) || 0;
+            equipeData.especialidades.set(especialidade, countEsp + 1);
+          }
         });
 
         // Converter para array de resumo
