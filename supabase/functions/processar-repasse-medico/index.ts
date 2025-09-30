@@ -85,54 +85,63 @@ serve(async (req) => {
       .update({ detalhes_erro: { total_linhas: totalLinhas } })
       .eq('id', uploadId);
 
-    // Buscar médicos e clientes UMA VEZ
-    const { data: medicos } = await supabase
-      .from('medicos')
-      .select('id, nome, crm')
-      .eq('ativo', true);
-
-    const { data: clientes } = await supabase
-      .from('clientes')
-      .select('id, nome, nome_fantasia')
-      .eq('ativo', true);
-
-    const medicoMapNome = new Map(medicos?.map(m => [m.nome.toLowerCase(), m.id]) || []);
-    const medicoMapCrm = new Map(medicos?.map(m => [m.crm?.toLowerCase(), m.id]) || []);
-    const clienteMap = new Map(clientes?.map(c => [c.nome_fantasia?.toLowerCase() || c.nome.toLowerCase(), c.id]) || []);
-
     let processados = 0;
     let inseridos = 0;
     let atualizados = 0;
     let erros = 0;
     const detalhesErros: any[] = [];
 
-    // Processar em lotes MUITO pequenos (10 registros)
-    const BATCH_SIZE = 10;
+    // Processar em lotes pequenos (5 registros por vez)
+    const BATCH_SIZE = 5;
     
     for (let batchStart = 0; batchStart < totalLinhas; batchStart += BATCH_SIZE) {
       const batchEnd = Math.min(batchStart + BATCH_SIZE, totalLinhas);
       const batch = jsonData.slice(batchStart, batchEnd);
       
-      const batchPromises = batch.map(async (row, idx) => {
+      for (let idx = 0; idx < batch.length; idx++) {
+        const row = batch[idx];
         const lineNum = batchStart + idx + 1;
         
         try {
           if (!row.modalidade || !row.especialidade || !row.prioridade || !row.valor) {
-            throw new Error('Campos obrigatórios faltando');
+            erros++;
+            if (detalhesErros.length < 50) {
+              detalhesErros.push({ linha: lineNum, erro: 'Campos obrigatórios faltando' });
+            }
+            processados++;
+            continue;
           }
 
-          // Buscar médico
+          // Buscar médico SE necessário
           let medico_id = null;
           if (row.medico_crm) {
-            medico_id = medicoMapCrm.get(row.medico_crm.toLowerCase().trim());
+            const { data: medico } = await supabase
+              .from('medicos')
+              .select('id')
+              .eq('crm', row.medico_crm.trim())
+              .eq('ativo', true)
+              .maybeSingle();
+            medico_id = medico?.id;
           } else if (row.medico_nome) {
-            medico_id = medicoMapNome.get(row.medico_nome.toLowerCase().trim());
+            const { data: medico } = await supabase
+              .from('medicos')
+              .select('id')
+              .ilike('nome', row.medico_nome.trim())
+              .eq('ativo', true)
+              .maybeSingle();
+            medico_id = medico?.id;
           }
 
-          // Buscar cliente
+          // Buscar cliente SE necessário
           let cliente_id = null;
           if (row.cliente_nome) {
-            cliente_id = clienteMap.get(row.cliente_nome.toLowerCase().trim());
+            const { data: cliente } = await supabase
+              .from('clientes')
+              .select('id')
+              .or(`nome_fantasia.ilike.${row.cliente_nome.trim()},nome.ilike.${row.cliente_nome.trim()}`)
+              .eq('ativo', true)
+              .maybeSingle();
+            cliente_id = cliente?.id;
           }
 
           // Escopo
@@ -177,51 +186,39 @@ serve(async (req) => {
               .from('medicos_valores_repasse')
               .update({ valor: repasseData.valor, esta_no_escopo })
               .eq('id', existente.id);
-            return { tipo: 'atualizado', linha: lineNum };
+            atualizados++;
           } else {
             await supabase
               .from('medicos_valores_repasse')
               .insert(repasseData);
-            return { tipo: 'inserido', linha: lineNum };
+            inseridos++;
           }
+          
+          processados++;
         } catch (error: any) {
-          return { tipo: 'erro', linha: lineNum, erro: error.message };
-        }
-      });
-
-      // Processar batch
-      const resultados = await Promise.all(batchPromises);
-      
-      resultados.forEach(r => {
-        processados++;
-        if (r.tipo === 'inserido') inseridos++;
-        else if (r.tipo === 'atualizado') atualizados++;
-        else if (r.tipo === 'erro') {
           erros++;
-          if (detalhesErros.length < 50) { // Limitar memória de erros
-            detalhesErros.push({ linha: r.linha, erro: r.erro });
+          if (detalhesErros.length < 50) {
+            detalhesErros.push({ linha: lineNum, erro: error.message });
           }
+          processados++;
         }
-      });
-
-      // Log progresso a cada 100 registros
-      if (batchEnd % 100 === 0 || batchEnd === totalLinhas) {
-        console.log(`Processados ${batchEnd}/${totalLinhas} (${Math.round(batchEnd/totalLinhas*100)}%)`);
-        
-        // Atualizar progresso no banco
-        await supabase
-          .from('processamento_uploads')
-          .update({
-            registros_processados: processados,
-            registros_inseridos: inseridos,
-            registros_atualizados: atualizados,
-            registros_erro: erros
-          })
-          .eq('id', uploadId);
       }
 
-      // Pequena pausa para GC
-      await new Promise(resolve => setTimeout(resolve, 5));
+      // Atualizar progresso a cada batch
+      console.log(`Processados ${batchEnd}/${totalLinhas} (${Math.round(batchEnd/totalLinhas*100)}%)`);
+      
+      await supabase
+        .from('processamento_uploads')
+        .update({
+          registros_processados: processados,
+          registros_inseridos: inseridos,
+          registros_atualizados: atualizados,
+          registros_erro: erros
+        })
+        .eq('id', uploadId);
+
+      // Pausa para GC
+      await new Promise(resolve => setTimeout(resolve, 10));
     }
 
     // Atualizar registro final
