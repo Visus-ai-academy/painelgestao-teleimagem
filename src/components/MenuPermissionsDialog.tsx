@@ -56,7 +56,6 @@ const menuOptions: MenuOption[] = [
   
   // Sub-menus dos Contratos
   { key: 'contratos-clientes', label: 'Contratos Clientes', defaultRoles: ['admin', 'manager'], isSubMenu: true, parentMenu: 'contratos' },
-  { key: 'contratos-fornecedores', label: 'Contratos Fornecedores', defaultRoles: ['admin'], isSubMenu: true, parentMenu: 'contratos' },
   
   // Sub-menus da Configuração
   { key: 'usuarios', label: 'Gerenciar Usuários', defaultRoles: ['admin'], isSubMenu: true, parentMenu: 'configuracao' },

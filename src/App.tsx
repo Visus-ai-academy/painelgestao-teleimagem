@@ -48,7 +48,6 @@ import EstruturaVendas from "./pages/EstruturaVendas";
 import ConfiguracaoImportacao from "./pages/ConfiguracaoImportacao";
 import MapeamentoVisual from "./pages/MapeamentoVisual";
 import Seguranca from "./pages/Seguranca";
-import Pendencias from "./pages/Pendencias";
 import ControleRegras from "./pages/ControleRegras";
 import GerenciarCadastros from "./pages/GerenciarCadastros";
 import MapaDistribuicaoClientes from "./pages/MapaDistribuicaoClientes";
@@ -396,15 +395,6 @@ const App = () => {
               <ProtectedRoute>
                 <Layout>
                   <RelatorioImplementacoes />
-                </Layout>
-              </ProtectedRoute>
-            } />
-            <Route path="/pendencias" element={
-              <ProtectedRoute>
-                <Layout>
-                  <RoleProtectedRoute requiredRoles={['manager', 'admin']}>
-                    <Pendencias />
-                  </RoleProtectedRoute>
                 </Layout>
               </ProtectedRoute>
             } />

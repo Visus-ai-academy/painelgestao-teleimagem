@@ -120,13 +120,7 @@ const menuItems: MenuItem[] = [
     ]
   },
   { 
-    title: "Contratos Fornecedores", 
-    url: "/contratos/fornecedores", 
-    icon: FileText,
-    requiredRoles: ['admin'],
-  },
-  { 
-    title: "Configuração", 
+    title: "Configuração",
     url: "/configuracao", 
     icon: Settings,
     requiredRoles: ['admin'],
@@ -152,13 +146,7 @@ const menuItems: MenuItem[] = [
     requiredRoles: ['admin'],
   },
   { 
-    title: "Pendências", 
-    url: "/pendencias", 
-    icon: AlertTriangle,
-    requiredRoles: ['manager', 'admin'],
-  },
-  { 
-    title: "Cadastros Base", 
+    title: "Cadastros Base",
     url: "/upload-dados", 
     icon: Upload,
     requiredRoles: ['manager', 'admin'],
