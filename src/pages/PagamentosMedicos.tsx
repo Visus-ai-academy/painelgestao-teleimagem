@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { CalendarIcon, Download, Eye, Calculator, Filter, Search, Upload, BarChart3, AlertCircle } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { CalendarIcon, Download, Eye, Calculator, Filter, Search, Upload, BarChart3, AlertCircle, ChevronDown, ChevronRight, DollarSign } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -566,85 +567,111 @@ export default function PagamentosMedicos() {
       <Card>
         <CardHeader>
           <CardTitle>Detalhamento por Médico</CardTitle>
+          <p className="text-sm text-muted-foreground mt-1">
+            Clique em um médico para ver os detalhes
+          </p>
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="text-center py-8">Carregando dados...</div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Médico</TableHead>
-                  <TableHead className="text-right">Exames</TableHead>
-                  <TableHead className="text-right">Valor a Pagar</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {resumosFiltrados.map((resumo) => (
-                  <Fragment key={resumo.medico.id}>
-                    <TableRow 
-                      className="cursor-pointer hover:bg-muted/50"
-                      onClick={() => setMedicoExpandido(medicoExpandido === resumo.medico.id ? null : resumo.medico.id)}
-                    >
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                          <Eye className="h-4 w-4 text-muted-foreground" />
-                          {resumo.medico.nome}
-                          {resumo.exames_sem_valor > 0 && (
-                            <Badge variant="outline" className="ml-2 text-orange-600 border-orange-600">
-                              <AlertCircle className="h-3 w-3 mr-1" />
-                              {resumo.exames_sem_valor} sem valor
-                            </Badge>
-                          )}
+            <div className="space-y-2">
+              {resumosFiltrados.map((resumo) => (
+                <Collapsible key={resumo.medico.id}>
+                  <CollapsibleTrigger 
+                    className="w-full"
+                    onClick={() => setMedicoExpandido(medicoExpandido === resumo.medico.id ? null : resumo.medico.id)}
+                  >
+                    <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50">
+                      <div className="flex items-center gap-3">
+                        {medicoExpandido === resumo.medico.id ? 
+                          <ChevronDown className="h-4 w-4" /> : 
+                          <ChevronRight className="h-4 w-4" />
+                        }
+                        <Eye className="h-4 w-4" />
+                        <span className="font-medium">{resumo.medico.nome}</span>
+                        {resumo.exames_sem_valor > 0 && (
+                          <Badge variant="outline" className="ml-2 text-orange-600 border-orange-600">
+                            <AlertCircle className="h-3 w-3 mr-1" />
+                            {resumo.exames_sem_valor} sem valor
+                          </Badge>
+                        )}
+                      </div>
+                      
+                      <div className="flex items-center gap-6 text-sm">
+                        <div className="text-center">
+                          <div className="font-medium">{resumo.total_exames}</div>
+                          <div className="text-muted-foreground">Exames</div>
                         </div>
-                      </TableCell>
-                      <TableCell className="text-right">{resumo.total_exames}</TableCell>
-                      <TableCell className="text-right font-bold text-green-600">
-                        R$ {resumo.valor_bruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </TableCell>
-                    </TableRow>
-                    
-                    {/* Detalhamento expandido */}
-                    {medicoExpandido === resumo.medico.id && (
-                      <TableRow>
-                        <TableCell colSpan={3} className="bg-muted/30 p-6">
-                          <div className="space-y-4">
-                            <h4 className="font-semibold text-sm">Detalhamento por Arranjo</h4>
-                            <div className="grid gap-2">
-                              {resumo.arranjos.map((arranjo, idx) => (
-                                <div key={idx} className="flex items-center justify-between p-3 bg-background rounded-md border">
-                                  <div className="flex-1">
-                                    <div className="font-medium">
-                                      {arranjo.modalidade} / {arranjo.especialidade} / {arranjo.categoria} / {arranjo.prioridade}
-                                    </div>
-                                    <div className="text-sm text-muted-foreground">
-                                      Quantidade: {arranjo.quantidade} exame(s)
-                                      {arranjo.exames_sem_valor > 0 && (
-                                        <span className="ml-2 text-orange-600">
-                                          ({arranjo.exames_sem_valor} sem valor)
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <div className="text-right">
-                                    <div className="font-medium">
-                                      R$ {arranjo.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                    </div>
-                                    <div className="text-sm text-muted-foreground">
-                                      R$ {arranjo.valor_unitario.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} /un
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
+                        <div className="text-center">
+                          <div className="font-bold text-lg text-green-600">
+                            R$ {resumo.valor_bruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                           </div>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </Fragment>
-                ))}
-              </TableBody>
-            </Table>
+                          <div className="text-muted-foreground">Valor a Pagar</div>
+                        </div>
+                      </div>
+                    </div>
+                  </CollapsibleTrigger>
+                  
+                  <CollapsibleContent>
+                    <div className="p-4 border-l border-r border-b rounded-b-lg bg-muted/25 space-y-4">
+                      {/* Detalhes dos Arranjos */}
+                      <div>
+                        <h4 className="font-semibold mb-3 flex items-center gap-2">
+                          <DollarSign className="h-4 w-4" />
+                          Detalhamento por Arranjo
+                        </h4>
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Modalidade</TableHead>
+                              <TableHead>Especialidade</TableHead>
+                              <TableHead>Categoria</TableHead>
+                              <TableHead>Prioridade</TableHead>
+                              <TableHead className="text-right">Quantidade</TableHead>
+                              <TableHead className="text-right">Valor Unit.</TableHead>
+                              <TableHead className="text-right">Total</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {resumo.arranjos.map((arranjo, idx) => (
+                              <TableRow key={idx}>
+                                <TableCell className="font-medium">{arranjo.modalidade}</TableCell>
+                                <TableCell>{arranjo.especialidade}</TableCell>
+                                <TableCell>{arranjo.categoria}</TableCell>
+                                <TableCell>{arranjo.prioridade}</TableCell>
+                                <TableCell className="text-right">
+                                  {arranjo.quantidade}
+                                  {arranjo.exames_sem_valor > 0 && (
+                                    <Badge variant="outline" className="ml-2 text-xs text-orange-600 border-orange-600">
+                                      {arranjo.exames_sem_valor} s/ valor
+                                    </Badge>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  R$ {arranjo.valor_unitario.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                </TableCell>
+                                <TableCell className="text-right font-medium text-green-600">
+                                  R$ {arranjo.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            <TableRow className="font-bold bg-muted/50">
+                              <TableCell colSpan={4} className="text-right">Total Geral</TableCell>
+                              <TableCell className="text-right">{resumo.total_exames}</TableCell>
+                              <TableCell></TableCell>
+                              <TableCell className="text-right text-green-600">
+                                R$ {resumo.valor_bruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </TableCell>
+                            </TableRow>
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              ))}
+            </div>
           )}
         </CardContent>
       </Card>
