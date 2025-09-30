@@ -27,524 +27,836 @@ const ArquiteturaProjeto = () => {
     {
       id: 'upload-volumetria',
       type: 'default',
-      position: { x: 50, y: 100 },
-      data: { label: '📤 UPLOAD VOLUMETRIA\n(Arquivos 1,2,3,4)' },
-      style: { backgroundColor: '#fef3c7', borderColor: '#f59e0b', width: 160, height: 70 }
+      position: { x: 50, y: 50 },
+      data: { label: '📤 UPLOAD\nVOLUMETRIA\n(4 Arquivos)' },
+      style: { backgroundColor: '#10b981', color: 'white', borderColor: '#059669', width: 140, height: 70 }
     },
     {
-      id: 'mobilemed-futuro',
+      id: 'upload-cadastros',
       type: 'default',
-      position: { x: 250, y: 100 },
-      data: { label: '🔮 MOBILEMED\n(FUTURO - Online)' },
-      style: { backgroundColor: '#e5e7eb', borderColor: '#6b7280', width: 160, height: 70 }
-    },
-
-    // PROCESSAMENTO AUTOMÁTICO
-    {
-      id: 'processamento-volumetria',
-      type: 'default',
-      position: { x: 150, y: 220 },
-      data: { label: '⚙️ PROCESSAMENTO AUTOMÁTICO\nVIA TRIGGERS\n(8 Regras Unificadas)' },
-      style: { backgroundColor: '#10b981', color: 'white', borderColor: '#059669', width: 180, height: 80 }
+      position: { x: 210, y: 50 },
+      data: { label: '📋 UPLOAD\nCADASTROS' },
+      style: { backgroundColor: '#3b82f6', color: 'white', borderColor: '#2563eb', width: 140, height: 70 }
     },
     {
-      id: 'tipo-cliente-faturamento',
+      id: 'upload-faturamento',
       type: 'default',
-      position: { x: 150, y: 320 },
-      data: { label: '🏷️ APLICAR TIPO CLIENTE\n(NC/CO) & FATURAMENTO\n(CO-FT/NC-FT/NC-NF)' },
-      style: { backgroundColor: '#dc2626', color: 'white', borderColor: '#b91c1c', width: 180, height: 80 }
+      position: { x: 370, y: 50 },
+      data: { label: '💰 UPLOAD\nFATURAMENTO' },
+      style: { backgroundColor: '#a855f7', color: 'white', borderColor: '#9333ea', width: 140, height: 70 }
     },
     {
-      id: 'volumetria-periodo',
+      id: 'upload-repasse',
       type: 'default',
-      position: { x: 150, y: 440 },
-      data: { label: '📊 VOLUMETRIA\nDO PERÍODO' },
-      style: { backgroundColor: '#10b981', color: 'white', borderColor: '#059669', width: 180, height: 70 }
+      position: { x: 530, y: 50 },
+      data: { label: '👨‍⚕️ UPLOAD\nREPASSE MÉDICO' },
+      style: { backgroundColor: '#16a34a', color: 'white', borderColor: '#15803d', width: 140, height: 70 }
     },
 
-    // CADASTROS
+    // PROCESSAMENTO AUTOMÁTICO (94 REGRAS)
     {
-      id: 'cadastros',
+      id: 'regras-volumetria',
       type: 'default',
-      position: { x: 450, y: 200 },
-      data: { label: '📋 CADASTROS' },
-      style: { backgroundColor: '#1e40af', color: 'white', borderColor: '#1d4ed8', width: 160, height: 60 }
+      position: { x: 50, y: 160 },
+      data: { label: '⚙️ 27 REGRAS\nVOLUMETRIA\n(Triggers Automáticos)' },
+      style: { backgroundColor: '#059669', color: 'white', borderColor: '#047857', width: 150, height: 80 }
     },
     {
-      id: 'clientes',
+      id: 'regras-faturamento',
       type: 'default',
-      position: { x: 400, y: 300 },
-      data: { label: '🏥 Clientes' },
-      style: { backgroundColor: '#dbeafe', borderColor: '#3b82f6', width: 100, height: 50 }
+      position: { x: 220, y: 160 },
+      data: { label: '🧾 5 REGRAS\nFATURAMENTO' },
+      style: { backgroundColor: '#7c3aed', color: 'white', borderColor: '#6d28d9', width: 150, height: 80 }
     },
     {
-      id: 'contratos',
+      id: 'regras-exclusao',
       type: 'default',
-      position: { x: 520, y: 300 },
-      data: { label: '📄 Contratos' },
-      style: { backgroundColor: '#dbeafe', borderColor: '#3b82f6', width: 100, height: 50 }
-    },
-    {
-      id: 'precos',
-      type: 'default',
-      position: { x: 400, y: 370 },
-      data: { label: '💰 Preços' },
-      style: { backgroundColor: '#dbeafe', borderColor: '#3b82f6', width: 100, height: 50 }
-    },
-    {
-      id: 'medicos',
-      type: 'default',
-      position: { x: 520, y: 370 },
-      data: { label: '👨‍⚕️ Médicos' },
-      style: { backgroundColor: '#dbeafe', borderColor: '#3b82f6', width: 100, height: 50 }
-    },
-    {
-      id: 'parametros',
-      type: 'default',
-      position: { x: 460, y: 440 },
-      data: { label: '⚙️ Parâmetros\nContratos' },
-      style: { backgroundColor: '#dbeafe', borderColor: '#3b82f6', width: 100, height: 50 }
+      position: { x: 390, y: 160 },
+      data: { label: '🔍 62 REGRAS\nEXCLUSÃO & AUDITORIA' },
+      style: { backgroundColor: '#dc2626', color: 'white', borderColor: '#b91c1c', width: 150, height: 80 }
     },
 
-    // PROCESSAMENTO CENTRAL
+    // CADASTROS E PARÂMETROS
     {
-      id: 'geracao-faturamento',
+      id: 'cadastros-clientes',
       type: 'default',
-      position: { x: 750, y: 350 },
-      data: { label: '🧾 GERAÇÃO\nFATURAMENTO' },
-      style: { backgroundColor: '#a855f7', color: 'white', borderColor: '#9333ea', width: 160, height: 70 }
+      position: { x: 700, y: 80 },
+      data: { label: '🏥 CLIENTES\n& CONTRATOS' },
+      style: { backgroundColor: '#1e40af', color: 'white', borderColor: '#1d4ed8', width: 130, height: 70 }
     },
     {
-      id: 'pagamento-medicos',
+      id: 'cadastros-medicos',
       type: 'default',
-      position: { x: 750, y: 500 },
-      data: { label: '💳 PAGAMENTO\nMÉDICOS' },
-      style: { backgroundColor: '#16a34a', color: 'white', borderColor: '#15803d', width: 160, height: 70 }
+      position: { x: 850, y: 80 },
+      data: { label: '👨‍⚕️ MÉDICOS\n& ESPECIALIDADES' },
+      style: { backgroundColor: '#1e40af', color: 'white', borderColor: '#1d4ed8', width: 130, height: 70 }
     },
     {
-      id: 'volumetria-onco',
+      id: 'cadastros-exames',
       type: 'default',
-      position: { x: 550, y: 500 },
-      data: { label: '🎯 VOLUMETRIA\nONCO (Referência)' },
-      style: { backgroundColor: '#f97316', color: 'white', borderColor: '#ea580c', width: 160, height: 70 }
-    },
-
-    // SAÍDAS
-    {
-      id: 'relatorios-email',
-      type: 'default',
-      position: { x: 1000, y: 250 },
-      data: { label: '📧 RELATÓRIOS\nE-MAIL' },
-      style: { backgroundColor: '#f3e8ff', borderColor: '#a855f7', width: 140, height: 60 }
+      position: { x: 1000, y: 80 },
+      data: { label: '🔬 EXAMES\n& CATEGORIAS' },
+      style: { backgroundColor: '#1e40af', color: 'white', borderColor: '#1d4ed8', width: 130, height: 70 }
     },
     {
-      id: 'emissao-nf',
+      id: 'parametros-sistema',
       type: 'default',
-      position: { x: 1000, y: 350 },
-      data: { label: '🧾 EMISSÃO\nNOTA FISCAL' },
-      style: { backgroundColor: '#f3e8ff', borderColor: '#a855f7', width: 140, height: 60 }
-    },
-    {
-      id: 'contas-pagar',
-      type: 'default',
-      position: { x: 1000, y: 500 },
-      data: { label: '💰 CONTAS\nA PAGAR' },
-      style: { backgroundColor: '#dcfce7', borderColor: '#16a34a', width: 140, height: 60 }
+      position: { x: 850, y: 180 },
+      data: { label: '⚙️ PARÂMETROS\nSISTEMA' },
+      style: { backgroundColor: '#0891b2', color: 'white', borderColor: '#0e7490', width: 130, height: 70 }
     },
 
-    // INTEGRAÇÕES
+    // ÁREA DE FATURAMENTO
     {
-      id: 'omie-nf',
+      id: 'demonstrativo',
       type: 'default',
-      position: { x: 1200, y: 350 },
-      data: { label: '🔗 OMIE\n(NF)' },
-      style: { backgroundColor: '#1f2937', color: 'white', borderColor: '#374151', width: 100, height: 60 }
+      position: { x: 50, y: 290 },
+      data: { label: '📊 DEMONSTRATIVO\nFATURAMENTO' },
+      style: { backgroundColor: '#7c3aed', color: 'white', borderColor: '#6d28d9', width: 150, height: 70 }
     },
     {
-      id: 'omie-pagamentos',
+      id: 'geracao-nf',
       type: 'default',
-      position: { x: 1200, y: 500 },
-      data: { label: '🔗 OMIE\n(Pagamentos)' },
-      style: { backgroundColor: '#1f2937', color: 'white', borderColor: '#374151', width: 100, height: 60 }
+      position: { x: 220, y: 290 },
+      data: { label: '🧾 GERAÇÃO\nNOTA FISCAL' },
+      style: { backgroundColor: '#7c3aed', color: 'white', borderColor: '#6d28d9', width: 150, height: 70 }
     },
     {
-      id: 'clicksign',
+      id: 'divergencias',
       type: 'default',
-      position: { x: 1200, y: 250 },
-      data: { label: '🔗 CLICKSIGN\n(Contratos)' },
-      style: { backgroundColor: '#1f2937', color: 'white', borderColor: '#374151', width: 100, height: 60 }
-    },
-
-    // STATUS ATUAL DO PROCESSAMENTO
-    {
-      id: 'status-processamento',
-      type: 'default',
-      position: { x: 350, y: 220 },
-      data: { label: '✅ PROCESSAMENTO\nTOTALMENTE AUTOMÁTICO\n• 3 Triggers Ativos\n• 0 Edge Functions Manuais' },
-      style: { backgroundColor: '#059669', color: 'white', borderColor: '#047857', width: 200, height: 90 }
+      position: { x: 390, y: 290 },
+      data: { label: '⚠️ ANÁLISE\nDIVERGÊNCIAS' },
+      style: { backgroundColor: '#ea580c', color: 'white', borderColor: '#c2410c', width: 150, height: 70 }
     },
 
-    // ÁREAS FUNCIONAIS  
+    // ÁREA OPERACIONAL
     {
-      id: 'gestao-escalas',
+      id: 'escalas-medicas',
       type: 'default',
-      position: { x: 100, y: 600 },
-      data: { label: '📅 GESTÃO\nESCALAS' },
-      style: { backgroundColor: '#fecaca', borderColor: '#ef4444', width: 120, height: 60 }
+      position: { x: 50, y: 400 },
+      data: { label: '📅 ESCALAS\nMÉDICAS' },
+      style: { backgroundColor: '#0891b2', color: 'white', borderColor: '#0e7490', width: 140, height: 70 }
     },
     {
-      id: 'area-people',
+      id: 'presenca-medico',
       type: 'default',
-      position: { x: 250, y: 600 },
-      data: { label: '👥 ÁREA\nPEOPLE' },
-      style: { backgroundColor: '#fecaca', borderColor: '#ef4444', width: 120, height: 60 }
+      position: { x: 210, y: 400 },
+      data: { label: '✅ PRESENÇA\nMÉDICO' },
+      style: { backgroundColor: '#0891b2', color: 'white', borderColor: '#0e7490', width: 140, height: 70 }
     },
     {
-      id: 'area-pcp',
+      id: 'pcp-producao',
       type: 'default',
-      position: { x: 400, y: 600 },
-      data: { label: '📊 ÁREA\nPCP' },
-      style: { backgroundColor: '#fecaca', borderColor: '#ef4444', width: 120, height: 60 }
+      position: { x: 370, y: 400 },
+      data: { label: '📈 PCP\nPRODUÇÃO' },
+      style: { backgroundColor: '#0891b2', color: 'white', borderColor: '#0e7490', width: 140, height: 70 }
+    },
+    {
+      id: 'qualidade',
+      type: 'default',
+      position: { x: 530, y: 400 },
+      data: { label: '⭐ ANÁLISE\nQUALIDADE' },
+      style: { backgroundColor: '#0891b2', color: 'white', borderColor: '#0e7490', width: 140, height: 70 }
+    },
+
+    // ÁREA RH & PEOPLE
+    {
+      id: 'colaboradores',
+      type: 'default',
+      position: { x: 700, y: 290 },
+      data: { label: '👥 COLABORADORES' },
+      style: { backgroundColor: '#db2777', color: 'white', borderColor: '#be185d', width: 140, height: 70 }
+    },
+    {
+      id: 'plano-carreira',
+      type: 'default',
+      position: { x: 860, y: 290 },
+      data: { label: '📊 PLANO\nCARREIRA' },
+      style: { backgroundColor: '#db2777', color: 'white', borderColor: '#be185d', width: 140, height: 70 }
+    },
+    {
+      id: 'treinamento',
+      type: 'default',
+      position: { x: 1020, y: 290 },
+      data: { label: '🎓 TREINAMENTO\nEQUIPE' },
+      style: { backgroundColor: '#db2777', color: 'white', borderColor: '#be185d', width: 140, height: 70 }
+    },
+
+    // ÁREA COMERCIAL
+    {
+      id: 'estrutura-vendas',
+      type: 'default',
+      position: { x: 700, y: 400 },
+      data: { label: '💼 ESTRUTURA\nVENDAS' },
+      style: { backgroundColor: '#f59e0b', color: 'white', borderColor: '#d97706', width: 140, height: 70 }
+    },
+    {
+      id: 'regua-cobranca',
+      type: 'default',
+      position: { x: 860, y: 400 },
+      data: { label: '📧 RÉGUA\nCOBRANÇA' },
+      style: { backgroundColor: '#f59e0b', color: 'white', borderColor: '#d97706', width: 140, height: 70 }
+    },
+    {
+      id: 'mapa-clientes',
+      type: 'default',
+      position: { x: 1020, y: 400 },
+      data: { label: '🗺️ MAPA\nCLIENTES' },
+      style: { backgroundColor: '#f59e0b', color: 'white', borderColor: '#d97706', width: 140, height: 70 }
+    },
+
+    // RELATÓRIOS E ANÁLISES
+    {
+      id: 'relatorios',
+      type: 'default',
+      position: { x: 50, y: 520 },
+      data: { label: '📑 RELATÓRIOS\nGERENCIAIS' },
+      style: { backgroundColor: '#6366f1', color: 'white', borderColor: '#4f46e5', width: 150, height: 70 }
     },
     {
       id: 'dashboards',
       type: 'default',
-      position: { x: 550, y: 600 },
-      data: { label: '📈 DASHBOARDS' },
-      style: { backgroundColor: '#fecaca', borderColor: '#ef4444', width: 120, height: 60 }
+      position: { x: 220, y: 520 },
+      data: { label: '📊 DASHBOARDS\nEXECUTIVOS' },
+      style: { backgroundColor: '#6366f1', color: 'white', borderColor: '#4f46e5', width: 150, height: 70 }
     },
     {
-      id: 'mysuite-futuro',
+      id: 'comparativos',
       type: 'default',
-      position: { x: 700, y: 600 },
-      data: { label: '🔮 MYSUITE\n(FUTURO)' },
-      style: { backgroundColor: '#e5e7eb', borderColor: '#6b7280', width: 120, height: 60 }
+      position: { x: 390, y: 520 },
+      data: { label: '📈 COMPARATIVOS\nPERÍODO' },
+      style: { backgroundColor: '#6366f1', color: 'white', borderColor: '#4f46e5', width: 150, height: 70 }
+    },
+
+    // INTEGRAÇÕES
+    {
+      id: 'omie-integracao',
+      type: 'default',
+      position: { x: 700, y: 520 },
+      data: { label: '🔗 OMIE ERP\n(NF + Pagtos)' },
+      style: { backgroundColor: '#1f2937', color: 'white', borderColor: '#111827', width: 140, height: 70 }
     },
     {
-      id: 'gerador-contratos',
+      id: 'clicksign-integracao',
       type: 'default',
-      position: { x: 850, y: 600 },
-      data: { label: '📝 GERADOR\nCONTRATOS' },
-      style: { backgroundColor: '#fef3c7', borderColor: '#f59e0b', width: 120, height: 60 }
+      position: { x: 860, y: 520 },
+      data: { label: '✍️ CLICKSIGN\n(Contratos)' },
+      style: { backgroundColor: '#1f2937', color: 'white', borderColor: '#111827', width: 140, height: 70 }
+    },
+    {
+      id: 'email-integracao',
+      type: 'default',
+      position: { x: 1020, y: 520 },
+      data: { label: '📧 RESEND\n(E-mails)' },
+      style: { backgroundColor: '#1f2937', color: 'white', borderColor: '#111827', width: 140, height: 70 }
+    },
+
+    // SEGURANÇA
+    {
+      id: 'seguranca',
+      type: 'default',
+      position: { x: 370, y: 640 },
+      data: { label: '🔐 SEGURANÇA\nRLS + 2FA + Audit' },
+      style: { backgroundColor: '#dc2626', color: 'white', borderColor: '#991b1b', width: 170, height: 70 }
+    },
+    {
+      id: 'lgpd',
+      type: 'default',
+      position: { x: 560, y: 640 },
+      data: { label: '⚖️ COMPLIANCE\nLGPD' },
+      style: { backgroundColor: '#dc2626', color: 'white', borderColor: '#991b1b', width: 170, height: 70 }
+    },
+    {
+      id: 'backup',
+      type: 'default',
+      position: { x: 750, y: 640 },
+      data: { label: '💾 BACKUP\n& RECOVERY' },
+      style: { backgroundColor: '#dc2626', color: 'white', borderColor: '#991b1b', width: 170, height: 70 }
+    },
+
+    // ESTATÍSTICAS DO SISTEMA
+    {
+      id: 'stats',
+      type: 'default',
+      position: { x: 1100, y: 140 },
+      data: { label: '📊 SISTEMA\n11 Módulos\n124+ Funcionalidades\n94 Regras\n68 Tabelas\n60+ Edge Functions\n9 Integrações' },
+      style: { 
+        backgroundColor: '#ffffff',
+        borderColor: '#10b981',
+        borderWidth: 3,
+        width: 200,
+        height: 140,
+        fontSize: '11px',
+        fontWeight: 'bold'
+      }
     },
   ], []);
 
   const sistemaEdges: Edge[] = useMemo(() => [
-    // Fluxo principal de dados (AUTOMÁTICO VIA TRIGGERS)
-    { id: 'e1', source: 'upload-volumetria', target: 'processamento-volumetria', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#10b981' } },
-    { id: 'e2', source: 'mobilemed-futuro', target: 'processamento-volumetria', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#6b7280', strokeDasharray: '5,5' } },
-    { id: 'e3', source: 'processamento-volumetria', target: 'tipo-cliente-faturamento', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#dc2626' } },
-    { id: 'e4', source: 'tipo-cliente-faturamento', target: 'volumetria-periodo', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#10b981' } },
+    // Fluxo de Upload → Processamento
+    { id: 'e1', source: 'upload-volumetria', target: 'regras-volumetria', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#10b981' } },
+    { id: 'e2', source: 'upload-cadastros', target: 'cadastros-clientes', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#3b82f6' } },
+    { id: 'e3', source: 'upload-cadastros', target: 'cadastros-medicos', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#3b82f6' } },
+    { id: 'e4', source: 'upload-cadastros', target: 'cadastros-exames', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#3b82f6' } },
+    { id: 'e5', source: 'upload-faturamento', target: 'regras-faturamento', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#a855f7' } },
+    { id: 'e6', source: 'upload-repasse', target: 'cadastros-medicos', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#16a34a' } },
     
-    // Status do processamento
-    { id: 'e_status', source: 'processamento-volumetria', target: 'status-processamento', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#059669' } },
+    // Fluxo de Regras
+    { id: 'e7', source: 'regras-volumetria', target: 'demonstrativo', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#059669' } },
+    { id: 'e8', source: 'regras-volumetria', target: 'regras-exclusao', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#dc2626' } },
+    { id: 'e9', source: 'regras-faturamento', target: 'demonstrativo', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#7c3aed' } },
+    { id: 'e10', source: 'regras-faturamento', target: 'geracao-nf', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#7c3aed' } },
+    { id: 'e11', source: 'regras-exclusao', target: 'divergencias', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#dc2626' } },
     
-    // Conexões com cadastros
-    { id: 'e5', source: 'cadastros', target: 'clientes', type: 'smoothstep', style: { stroke: '#3b82f6' } },
-    { id: 'e6', source: 'cadastros', target: 'contratos', type: 'smoothstep', style: { stroke: '#3b82f6' } },
-    { id: 'e7', source: 'cadastros', target: 'precos', type: 'smoothstep', style: { stroke: '#3b82f6' } },
-    { id: 'e8', source: 'cadastros', target: 'medicos', type: 'smoothstep', style: { stroke: '#3b82f6' } },
-    { id: 'e9', source: 'cadastros', target: 'parametros', type: 'smoothstep', style: { stroke: '#3b82f6' } },
+    // Conexões Cadastros → Parâmetros
+    { id: 'e12', source: 'cadastros-clientes', target: 'parametros-sistema', type: 'smoothstep', style: { stroke: '#1e40af' } },
+    { id: 'e13', source: 'cadastros-medicos', target: 'parametros-sistema', type: 'smoothstep', style: { stroke: '#1e40af' } },
+    { id: 'e14', source: 'cadastros-exames', target: 'parametros-sistema', type: 'smoothstep', style: { stroke: '#1e40af' } },
     
-    // Processamento de faturamento
-    { id: 'e10', source: 'volumetria-periodo', target: 'geracao-faturamento', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#a855f7' } },
-    { id: 'e11', source: 'contratos', target: 'geracao-faturamento', type: 'smoothstep', style: { stroke: '#3b82f6' } },
-    { id: 'e12', source: 'precos', target: 'geracao-faturamento', type: 'smoothstep', style: { stroke: '#3b82f6' } },
-    { id: 'e13', source: 'parametros', target: 'geracao-faturamento', type: 'smoothstep', style: { stroke: '#3b82f6' } },
+    // Parâmetros → Processamento
+    { id: 'e15', source: 'parametros-sistema', target: 'regras-volumetria', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#0891b2' } },
+    { id: 'e16', source: 'parametros-sistema', target: 'regras-faturamento', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#0891b2' } },
     
-    // Processamento de pagamentos médicos
-    { id: 'e14', source: 'volumetria-periodo', target: 'pagamento-medicos', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#16a34a' } },
-    { id: 'e15', source: 'volumetria-onco', target: 'pagamento-medicos', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#f97316' } },
-    { id: 'e16', source: 'medicos', target: 'pagamento-medicos', type: 'smoothstep', style: { stroke: '#3b82f6' } },
+    // Área Operacional
+    { id: 'e17', source: 'cadastros-medicos', target: 'escalas-medicas', type: 'smoothstep', style: { stroke: '#0891b2' } },
+    { id: 'e18', source: 'escalas-medicas', target: 'presenca-medico', type: 'smoothstep', style: { stroke: '#0891b2' } },
+    { id: 'e19', source: 'regras-volumetria', target: 'pcp-producao', type: 'smoothstep', style: { stroke: '#0891b2' } },
+    { id: 'e20', source: 'pcp-producao', target: 'qualidade', type: 'smoothstep', style: { stroke: '#0891b2' } },
     
-    // Saídas do faturamento
-    { id: 'e17', source: 'geracao-faturamento', target: 'relatorios-email', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#a855f7' } },
-    { id: 'e18', source: 'geracao-faturamento', target: 'emissao-nf', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#a855f7' } },
-    { id: 'e19', source: 'pagamento-medicos', target: 'contas-pagar', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#16a34a' } },
+    // Área RH
+    { id: 'e21', source: 'cadastros-medicos', target: 'colaboradores', type: 'smoothstep', style: { stroke: '#db2777' } },
+    { id: 'e22', source: 'colaboradores', target: 'plano-carreira', type: 'smoothstep', style: { stroke: '#db2777' } },
+    { id: 'e23', source: 'colaboradores', target: 'treinamento', type: 'smoothstep', style: { stroke: '#db2777' } },
+    
+    // Área Comercial
+    { id: 'e24', source: 'cadastros-clientes', target: 'estrutura-vendas', type: 'smoothstep', style: { stroke: '#f59e0b' } },
+    { id: 'e25', source: 'estrutura-vendas', target: 'regua-cobranca', type: 'smoothstep', style: { stroke: '#f59e0b' } },
+    { id: 'e26', source: 'cadastros-clientes', target: 'mapa-clientes', type: 'smoothstep', style: { stroke: '#f59e0b' } },
+    
+    // Relatórios
+    { id: 'e27', source: 'demonstrativo', target: 'relatorios', type: 'smoothstep', style: { stroke: '#6366f1' } },
+    { id: 'e28', source: 'pcp-producao', target: 'dashboards', type: 'smoothstep', style: { stroke: '#6366f1' } },
+    { id: 'e29', source: 'demonstrativo', target: 'comparativos', type: 'smoothstep', style: { stroke: '#6366f1' } },
     
     // Integrações
-    { id: 'e20', source: 'emissao-nf', target: 'omie-nf', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#1f2937' } },
-    { id: 'e21', source: 'contas-pagar', target: 'omie-pagamentos', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#1f2937' } },
-    { id: 'e22', source: 'relatorios-email', target: 'clicksign', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#1f2937' } },
-    { id: 'e23', source: 'gerador-contratos', target: 'clicksign', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#f59e0b' } },
+    { id: 'e30', source: 'geracao-nf', target: 'omie-integracao', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#1f2937' } },
+    { id: 'e31', source: 'cadastros-clientes', target: 'clicksign-integracao', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#1f2937' } },
+    { id: 'e32', source: 'relatorios', target: 'email-integracao', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#1f2937' } },
+    { id: 'e33', source: 'regua-cobranca', target: 'email-integracao', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#1f2937' } },
     
-    // Áreas funcionais
-    { id: 'e24', source: 'medicos', target: 'gestao-escalas', type: 'smoothstep', style: { stroke: '#ef4444' } },
-    { id: 'e25', source: 'medicos', target: 'area-people', type: 'smoothstep', style: { stroke: '#ef4444' } },
-    { id: 'e26', source: 'volumetria-periodo', target: 'area-pcp', type: 'smoothstep', style: { stroke: '#ef4444' } },
-    { id: 'e27', source: 'volumetria-periodo', target: 'dashboards', type: 'smoothstep', style: { stroke: '#ef4444' } },
-    { id: 'e28', source: 'dashboards', target: 'mysuite-futuro', type: 'smoothstep', style: { stroke: '#6b7280', strokeDasharray: '5,5' } },
-    { id: 'e29', source: 'contratos', target: 'gerador-contratos', type: 'smoothstep', style: { stroke: '#f59e0b' } },
+    // Segurança
+    { id: 'e34', source: 'parametros-sistema', target: 'seguranca', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#dc2626' } },
+    { id: 'e35', source: 'seguranca', target: 'lgpd', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#dc2626' } },
+    { id: 'e36', source: 'lgpd', target: 'backup', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#dc2626' } },
   ], []);
 
-  // 2. INTEGRAÇÕES - FUTURAS E ATUAIS
+  // 2. INTEGRAÇÕES - IMPLEMENTADAS E FUTURAS
   const integracoesNodes: Node[] = useMemo(() => [
     // SISTEMA CENTRAL
     {
       id: 'sistema-teleimagem',
       type: 'default',
       position: { x: 500, y: 300 },
-      data: { label: '🏗️ SISTEMA\nTELEIMAGEM' },
+      data: { label: '🏗️ SISTEMA\nTELEIMAGEM\n(68 Tabelas)' },
       style: { 
         backgroundColor: '#1e40af', 
         color: 'white', 
         borderColor: '#1d4ed8', 
-        width: 180, 
-        height: 80,
+        width: 200, 
+        height: 90,
         fontSize: '14px',
         fontWeight: 'bold'
       }
     },
 
-    // INTEGRAÇÕES IMPLEMENTADAS
+    // INTEGRAÇÕES IMPLEMENTADAS (✅)
     {
       id: 'supabase',
       type: 'default',
-      position: { x: 200, y: 150 },
-      data: { label: '✅ SUPABASE\nAuth + Database' },
-      style: { backgroundColor: '#10b981', color: 'white', borderColor: '#059669', width: 160, height: 70 }
+      position: { x: 100, y: 100 },
+      data: { label: '✅ SUPABASE\nDatabase + Auth\n+ Storage + Edge' },
+      style: { backgroundColor: '#10b981', color: 'white', borderColor: '#059669', width: 180, height: 80 }
     },
     {
       id: 'omie',
       type: 'default',
-      position: { x: 800, y: 150 },
-      data: { label: '✅ OMIE ERP\nNF + Pagamentos' },
-      style: { backgroundColor: '#10b981', color: 'white', borderColor: '#059669', width: 160, height: 70 }
+      position: { x: 900, y: 100 },
+      data: { label: '✅ OMIE ERP\nNF + Pagamentos\n+ Cadastros' },
+      style: { backgroundColor: '#10b981', color: 'white', borderColor: '#059669', width: 180, height: 80 }
     },
     {
       id: 'clicksign',
       type: 'default',
-      position: { x: 200, y: 450 },
-      data: { label: '✅ CLICKSIGN\nAssinatura Contratos' },
-      style: { backgroundColor: '#10b981', color: 'white', borderColor: '#059669', width: 160, height: 70 }
+      position: { x: 100, y: 220 },
+      data: { label: '✅ CLICKSIGN\nAssinatura Digital\nContratos' },
+      style: { backgroundColor: '#10b981', color: 'white', borderColor: '#059669', width: 180, height: 80 }
     },
     {
       id: 'resend',
       type: 'default',
-      position: { x: 800, y: 450 },
-      data: { label: '✅ RESEND\nEnvio E-mails' },
-      style: { backgroundColor: '#10b981', color: 'white', borderColor: '#059669', width: 160, height: 70 }
+      position: { x: 100, y: 460 },
+      data: { label: '✅ RESEND\nEnvio E-mails\nTransacionais' },
+      style: { backgroundColor: '#10b981', color: 'white', borderColor: '#059669', width: 180, height: 80 }
+    },
+    {
+      id: 'leaflet',
+      type: 'default',
+      position: { x: 900, y: 220 },
+      data: { label: '✅ LEAFLET\nMapas Interativos\nDistribuição Clientes' },
+      style: { backgroundColor: '#10b981', color: 'white', borderColor: '#059669', width: 180, height: 80 }
+    },
+    {
+      id: 'react-flow',
+      type: 'default',
+      position: { x: 900, y: 340 },
+      data: { label: '✅ REACT FLOW\nDiagramas\nArquitetura' },
+      style: { backgroundColor: '#10b981', color: 'white', borderColor: '#059669', width: 180, height: 80 }
+    },
+    {
+      id: 'recharts',
+      type: 'default',
+      position: { x: 900, y: 460 },
+      data: { label: '✅ RECHARTS\nGráficos\nDashboards' },
+      style: { backgroundColor: '#10b981', color: 'white', borderColor: '#059669', width: 180, height: 80 }
+    },
+    {
+      id: 'jspdf',
+      type: 'default',
+      position: { x: 100, y: 580 },
+      data: { label: '✅ JSPDF + DOCX\nGeração PDF/Word\nRelatórios' },
+      style: { backgroundColor: '#10b981', color: 'white', borderColor: '#059669', width: 180, height: 80 }
+    },
+    {
+      id: 'xlsx',
+      type: 'default',
+      position: { x: 300, y: 580 },
+      data: { label: '✅ XLSX\nImport/Export\nExcel' },
+      style: { backgroundColor: '#10b981', color: 'white', borderColor: '#059669', width: 180, height: 80 }
     },
 
-    // INTEGRAÇÕES FUTURAS
+    // INTEGRAÇÕES FUTURAS (🔮)
     {
       id: 'mobilemed',
       type: 'default',
-      position: { x: 350, y: 100 },
-      data: { label: '🔮 MOBILEMED\nDados Online/Diários' },
-      style: { backgroundColor: '#f59e0b', color: 'white', borderColor: '#d97706', width: 160, height: 70 }
+      position: { x: 300, y: 100 },
+      data: { label: '🔮 MOBILEMED\nDados Online\nTempo Real' },
+      style: { backgroundColor: '#f59e0b', color: 'white', borderColor: '#d97706', width: 180, height: 80 }
     },
     {
       id: 'mysuite',
       type: 'default',
-      position: { x: 650, y: 100 },
-      data: { label: '🔮 MYSUITE\nAnálise Qualidade' },
-      style: { backgroundColor: '#f59e0b', color: 'white', borderColor: '#d97706', width: 160, height: 70 }
+      position: { x: 700, y: 100 },
+      data: { label: '🔮 MYSUITE\nQualidade Laudos\nIndicadores' },
+      style: { backgroundColor: '#f59e0b', color: 'white', borderColor: '#d97706', width: 180, height: 80 }
+    },
+    {
+      id: 'whatsapp',
+      type: 'default',
+      position: { x: 300, y: 460 },
+      data: { label: '🔮 WHATSAPP\nNotificações\nComunicação' },
+      style: { backgroundColor: '#f59e0b', color: 'white', borderColor: '#d97706', width: 180, height: 80 }
+    },
+    {
+      id: 'power-bi',
+      type: 'default',
+      position: { x: 700, y: 460 },
+      data: { label: '🔮 POWER BI\nBI Avançado\nAnálises' },
+      style: { backgroundColor: '#f59e0b', color: 'white', borderColor: '#d97706', width: 180, height: 80 }
     },
 
-    // FUNCIONALIDADES ESPECÍFICAS
+    // SERVIÇOS INTERNOS
     {
-      id: 'upload-manual',
+      id: 'edge-functions',
       type: 'default',
-      position: { x: 50, y: 300 },
-      data: { label: '📤 UPLOAD MANUAL\nArquivos 1,2,3,4' },
-      style: { backgroundColor: '#3b82f6', color: 'white', borderColor: '#2563eb', width: 140, height: 70 }
+      position: { x: 300, y: 220 },
+      data: { label: '⚡ EDGE FUNCTIONS\n60+ Funções\nServerless' },
+      style: { backgroundColor: '#3b82f6', color: 'white', borderColor: '#2563eb', width: 180, height: 80 }
     },
     {
-      id: 'gerador-pdf',
+      id: 'triggers',
       type: 'default',
-      position: { x: 950, y: 300 },
-      data: { label: '📄 GERADOR PDF\nRelatórios + Contratos' },
-      style: { backgroundColor: '#3b82f6', color: 'white', borderColor: '#2563eb', width: 140, height: 70 }
+      position: { x: 700, y: 220 },
+      data: { label: '🔄 TRIGGERS\nProcessamento\nAutomático' },
+      style: { backgroundColor: '#3b82f6', color: 'white', borderColor: '#2563eb', width: 180, height: 80 }
     },
     {
-      id: 'seguranca',
+      id: 'rls-security',
       type: 'default',
-      position: { x: 350, y: 500 },
-      data: { label: '🔐 SEGURANÇA\nRLS + Audit + 2FA' },
-      style: { backgroundColor: '#dc2626', color: 'white', borderColor: '#b91c1c', width: 160, height: 70 }
+      position: { x: 500, y: 450 },
+      data: { label: '🔐 RLS + 2FA\nSegurança\nMulticamadas' },
+      style: { backgroundColor: '#dc2626', color: 'white', borderColor: '#b91c1c', width: 180, height: 80 }
     },
+
+    // ESTATÍSTICAS
     {
-      id: 'analytics',
+      id: 'stats-integracoes',
       type: 'default',
-      position: { x: 650, y: 500 },
-      data: { label: '📊 ANALYTICS\nDashboards + Métricas' },
-      style: { backgroundColor: '#a855f7', color: 'white', borderColor: '#9333ea', width: 160, height: 70 }
+      position: { x: 470, y: 580 },
+      data: { label: '📊 TOTAIS\n✅ 9 Implementadas\n🔮 4 Planejadas\n⚡ 60+ Edge Functions' },
+      style: { 
+        backgroundColor: '#ffffff',
+        borderColor: '#10b981',
+        borderWidth: 3,
+        width: 260,
+        height: 100,
+        fontSize: '12px',
+        fontWeight: 'bold'
+      }
     },
   ], []);
 
   const integracoesEdges: Edge[] = useMemo(() => [
-    // Integrações implementadas
-    { id: 'i1', source: 'sistema-teleimagem', target: 'supabase', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#10b981' } },
-    { id: 'i2', source: 'sistema-teleimagem', target: 'omie', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#10b981' } },
-    { id: 'i3', source: 'sistema-teleimagem', target: 'clicksign', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#10b981' } },
-    { id: 'i4', source: 'sistema-teleimagem', target: 'resend', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#10b981' } },
+    // Integrações Implementadas (Verde - Ativas)
+    { id: 'i1', source: 'sistema-teleimagem', target: 'supabase', type: 'smoothstep', style: { strokeWidth: 4, stroke: '#10b981' } },
+    { id: 'i2', source: 'sistema-teleimagem', target: 'omie', type: 'smoothstep', style: { strokeWidth: 4, stroke: '#10b981' } },
+    { id: 'i3', source: 'sistema-teleimagem', target: 'clicksign', type: 'smoothstep', style: { strokeWidth: 4, stroke: '#10b981' } },
+    { id: 'i4', source: 'sistema-teleimagem', target: 'resend', type: 'smoothstep', style: { strokeWidth: 4, stroke: '#10b981' } },
+    { id: 'i5', source: 'sistema-teleimagem', target: 'leaflet', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#10b981' } },
+    { id: 'i6', source: 'sistema-teleimagem', target: 'react-flow', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#10b981' } },
+    { id: 'i7', source: 'sistema-teleimagem', target: 'recharts', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#10b981' } },
+    { id: 'i8', source: 'sistema-teleimagem', target: 'jspdf', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#10b981' } },
+    { id: 'i9', source: 'sistema-teleimagem', target: 'xlsx', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#10b981' } },
     
-    // Integrações futuras
-    { id: 'i5', source: 'sistema-teleimagem', target: 'mobilemed', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#f59e0b', strokeDasharray: '8,8' } },
-    { id: 'i6', source: 'sistema-teleimagem', target: 'mysuite', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#f59e0b', strokeDasharray: '8,8' } },
+    // Integrações Futuras (Laranja - Planejadas)
+    { id: 'i10', source: 'sistema-teleimagem', target: 'mobilemed', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#f59e0b', strokeDasharray: '10,10' } },
+    { id: 'i11', source: 'sistema-teleimagem', target: 'mysuite', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#f59e0b', strokeDasharray: '10,10' } },
+    { id: 'i12', source: 'sistema-teleimagem', target: 'whatsapp', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#f59e0b', strokeDasharray: '10,10' } },
+    { id: 'i13', source: 'sistema-teleimagem', target: 'power-bi', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#f59e0b', strokeDasharray: '10,10' } },
     
-    // Funcionalidades
-    { id: 'i7', source: 'upload-manual', target: 'sistema-teleimagem', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#3b82f6' } },
-    { id: 'i8', source: 'sistema-teleimagem', target: 'gerador-pdf', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#3b82f6' } },
-    { id: 'i9', source: 'sistema-teleimagem', target: 'seguranca', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#dc2626' } },
-    { id: 'i10', source: 'sistema-teleimagem', target: 'analytics', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#a855f7' } },
+    // Serviços Internos (Azul)
+    { id: 'i14', source: 'sistema-teleimagem', target: 'edge-functions', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#3b82f6' } },
+    { id: 'i15', source: 'sistema-teleimagem', target: 'triggers', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#3b82f6' } },
+    { id: 'i16', source: 'supabase', target: 'edge-functions', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#3b82f6' } },
+    { id: 'i17', source: 'supabase', target: 'triggers', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#3b82f6' } },
+    
+    // Segurança (Vermelho)
+    { id: 'i18', source: 'sistema-teleimagem', target: 'rls-security', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#dc2626' } },
+    { id: 'i19', source: 'supabase', target: 'rls-security', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#dc2626' } },
   ], []);
 
-  // 3. ARQUITETURA TÉCNICA
+  // 3. ARQUITETURA TÉCNICA - STACK COMPLETO
   const arquiteturaNodes: Node[] = useMemo(() => [
-    // FRONTEND
+    // CAMADA FRONTEND
     {
       id: 'frontend',
       type: 'default',
-      position: { x: 400, y: 50 },
-      data: { label: '🌐 FRONTEND\nReact + TypeScript' },
-      style: { backgroundColor: '#1e40af', color: 'white', borderColor: '#1d4ed8', width: 180, height: 70 }
+      position: { x: 500, y: 50 },
+      data: { label: '🌐 FRONTEND\nReact 18.3 + TypeScript + Vite' },
+      style: { 
+        backgroundColor: '#1e40af', 
+        color: 'white', 
+        borderColor: '#1d4ed8', 
+        width: 220, 
+        height: 80,
+        fontSize: '13px',
+        fontWeight: 'bold'
+      }
     },
-    {
-      id: 'vite',
-      type: 'default',
-      position: { x: 200, y: 150 },
-      data: { label: '⚡ Vite\nBuild Tool' },
-      style: { backgroundColor: '#dbeafe', borderColor: '#3b82f6', width: 120, height: 60 }
-    },
+    
+    // UI & STYLING
     {
       id: 'tailwind',
       type: 'default',
-      position: { x: 340, y: 150 },
-      data: { label: '🎨 Tailwind CSS\nStyling' },
-      style: { backgroundColor: '#dbeafe', borderColor: '#3b82f6', width: 120, height: 60 }
+      position: { x: 200, y: 160 },
+      data: { label: '🎨 TAILWIND CSS\nStyling System' },
+      style: { backgroundColor: '#3b82f6', color: 'white', borderColor: '#2563eb', width: 150, height: 70 }
     },
     {
       id: 'shadcn',
       type: 'default',
-      position: { x: 480, y: 150 },
-      data: { label: '🧩 Shadcn/ui\nComponents' },
-      style: { backgroundColor: '#dbeafe', borderColor: '#3b82f6', width: 120, height: 60 }
+      position: { x: 370, y: 160 },
+      data: { label: '🧩 SHADCN/UI\nComponents' },
+      style: { backgroundColor: '#3b82f6', color: 'white', borderColor: '#2563eb', width: 150, height: 70 }
     },
     {
-      id: 'router',
+      id: 'radix',
       type: 'default',
-      position: { x: 620, y: 150 },
-      data: { label: '🛣️ React Router\nNavigation' },
-      style: { backgroundColor: '#dbeafe', borderColor: '#3b82f6', width: 120, height: 60 }
+      position: { x: 540, y: 160 },
+      data: { label: '⚙️ RADIX UI\nPrimitives' },
+      style: { backgroundColor: '#3b82f6', color: 'white', borderColor: '#2563eb', width: 150, height: 70 }
+    },
+    {
+      id: 'lucide',
+      type: 'default',
+      position: { x: 710, y: 160 },
+      data: { label: '🎯 LUCIDE\nIcons 460+' },
+      style: { backgroundColor: '#3b82f6', color: 'white', borderColor: '#2563eb', width: 150, height: 70 }
+    },
+    
+    // ROTEAMENTO & STATE
+    {
+      id: 'react-router',
+      type: 'default',
+      position: { x: 200, y: 260 },
+      data: { label: '🛣️ REACT ROUTER\nNavigation v6' },
+      style: { backgroundColor: '#8b5cf6', color: 'white', borderColor: '#7c3aed', width: 150, height: 70 }
+    },
+    {
+      id: 'tanstack-query',
+      type: 'default',
+      position: { x: 370, y: 260 },
+      data: { label: '🔄 TANSTACK QUERY\nData Fetching' },
+      style: { backgroundColor: '#8b5cf6', color: 'white', borderColor: '#7c3aed', width: 150, height: 70 }
+    },
+    {
+      id: 'react-hook-form',
+      type: 'default',
+      position: { x: 540, y: 260 },
+      data: { label: '📝 REACT HOOK FORM\nForm Management' },
+      style: { backgroundColor: '#8b5cf6', color: 'white', borderColor: '#7c3aed', width: 150, height: 70 }
+    },
+    {
+      id: 'zod',
+      type: 'default',
+      position: { x: 710, y: 260 },
+      data: { label: '✅ ZOD\nValidation' },
+      style: { backgroundColor: '#8b5cf6', color: 'white', borderColor: '#7c3aed', width: 150, height: 70 }
     },
 
-    // BACKEND
+    // VISUALIZAÇÃO DE DADOS
+    {
+      id: 'recharts',
+      type: 'default',
+      position: { x: 200, y: 360 },
+      data: { label: '📊 RECHARTS\nCharts Library' },
+      style: { backgroundColor: '#06b6d4', color: 'white', borderColor: '#0891b2', width: 150, height: 70 }
+    },
+    {
+      id: 'react-flow-vis',
+      type: 'default',
+      position: { x: 370, y: 360 },
+      data: { label: '🔀 REACT FLOW\nDiagrams' },
+      style: { backgroundColor: '#06b6d4', color: 'white', borderColor: '#0891b2', width: 150, height: 70 }
+    },
+    {
+      id: 'leaflet-map',
+      type: 'default',
+      position: { x: 540, y: 360 },
+      data: { label: '🗺️ LEAFLET\nMaps' },
+      style: { backgroundColor: '#06b6d4', color: 'white', borderColor: '#0891b2', width: 150, height: 70 }
+    },
+    {
+      id: 'html2canvas',
+      type: 'default',
+      position: { x: 710, y: 360 },
+      data: { label: '📸 HTML2CANVAS\nScreenshots' },
+      style: { backgroundColor: '#06b6d4', color: 'white', borderColor: '#0891b2', width: 150, height: 70 }
+    },
+
+    // CAMADA BACKEND
     {
       id: 'backend',
       type: 'default',
-      position: { x: 400, y: 300 },
-      data: { label: '🚀 BACKEND\nSupabase' },
-      style: { backgroundColor: '#059669', color: 'white', borderColor: '#047857', width: 180, height: 70 }
+      position: { x: 500, y: 480 },
+      data: { label: '🚀 BACKEND\nSupabase Cloud' },
+      style: { 
+        backgroundColor: '#059669', 
+        color: 'white', 
+        borderColor: '#047857', 
+        width: 220, 
+        height: 80,
+        fontSize: '13px',
+        fontWeight: 'bold'
+      }
     },
+
+    // BANCO DE DADOS
     {
       id: 'postgresql',
       type: 'default',
-      position: { x: 150, y: 400 },
-      data: { label: '🐘 PostgreSQL\nDatabase' },
-      style: { backgroundColor: '#dcfce7', borderColor: '#16a34a', width: 120, height: 60 }
-    },
-    {
-      id: 'edge-functions',
-      type: 'default',
-      position: { x: 290, y: 400 },
-      data: { label: '⚡ Edge Functions\nServerless' },
-      style: { backgroundColor: '#dcfce7', borderColor: '#16a34a', width: 120, height: 60 }
+      position: { x: 100, y: 590 },
+      data: { label: '🐘 POSTGRESQL\n68 Tabelas' },
+      style: { backgroundColor: '#10b981', color: 'white', borderColor: '#059669', width: 140, height: 70 }
     },
     {
       id: 'rls',
       type: 'default',
-      position: { x: 430, y: 400 },
-      data: { label: '🔒 RLS\nSecurity' },
-      style: { backgroundColor: '#dcfce7', borderColor: '#16a34a', width: 120, height: 60 }
+      position: { x: 260, y: 590 },
+      data: { label: '🔒 RLS\nRow Level Security' },
+      style: { backgroundColor: '#10b981', color: 'white', borderColor: '#059669', width: 140, height: 70 }
+    },
+    {
+      id: 'triggers-db',
+      type: 'default',
+      position: { x: 420, y: 590 },
+      data: { label: '⚡ TRIGGERS\nAuto Processing' },
+      style: { backgroundColor: '#10b981', color: 'white', borderColor: '#059669', width: 140, height: 70 }
+    },
+    {
+      id: 'functions-db',
+      type: 'default',
+      position: { x: 580, y: 590 },
+      data: { label: '🔧 FUNCTIONS\nDB Logic' },
+      style: { backgroundColor: '#10b981', color: 'white', borderColor: '#059669', width: 140, height: 70 }
     },
     {
       id: 'realtime',
       type: 'default',
-      position: { x: 570, y: 400 },
-      data: { label: '🔄 Realtime\nSubscriptions' },
-      style: { backgroundColor: '#dcfce7', borderColor: '#16a34a', width: 120, height: 60 }
+      position: { x: 740, y: 590 },
+      data: { label: '🔄 REALTIME\nSubscriptions' },
+      style: { backgroundColor: '#10b981', color: 'white', borderColor: '#059669', width: 140, height: 70 }
     },
     {
       id: 'storage',
       type: 'default',
-      position: { x: 710, y: 400 },
-      data: { label: '💾 Storage\nFiles' },
-      style: { backgroundColor: '#dcfce7', borderColor: '#16a34a', width: 120, height: 60 }
+      position: { x: 900, y: 590 },
+      data: { label: '💾 STORAGE\nFile Management' },
+      style: { backgroundColor: '#10b981', color: 'white', borderColor: '#059669', width: 140, height: 70 }
+    },
+
+    // EDGE FUNCTIONS
+    {
+      id: 'edge-functions-arch',
+      type: 'default',
+      position: { x: 100, y: 690 },
+      data: { label: '⚡ EDGE FUNCTIONS\n60+ Serverless' },
+      style: { backgroundColor: '#14b8a6', color: 'white', borderColor: '#0d9488', width: 180, height: 70 }
+    },
+    {
+      id: 'deno-runtime',
+      type: 'default',
+      position: { x: 300, y: 690 },
+      data: { label: '🦕 DENO\nRuntime' },
+      style: { backgroundColor: '#14b8a6', color: 'white', borderColor: '#0d9488', width: 140, height: 70 }
     },
 
     // INTEGRAÇÕES EXTERNAS
     {
-      id: 'external',
+      id: 'integracoes-ext',
       type: 'default',
-      position: { x: 400, y: 550 },
-      data: { label: '🔗 INTEGRAÇÕES\nExternas' },
-      style: { backgroundColor: '#7c2d12', color: 'white', borderColor: '#92400e', width: 180, height: 70 }
+      position: { x: 500, y: 690 },
+      data: { label: '🔗 INTEGRAÇÕES\n9 Ativas' },
+      style: { 
+        backgroundColor: '#f59e0b', 
+        color: 'white', 
+        borderColor: '#d97706', 
+        width: 180, 
+        height: 70,
+        fontSize: '13px',
+        fontWeight: 'bold'
+      }
     },
     {
-      id: 'omie-ext',
+      id: 'omie-arch',
       type: 'default',
-      position: { x: 200, y: 650 },
-      data: { label: '🏢 Omie ERP' },
-      style: { backgroundColor: '#fef3c7', borderColor: '#f59e0b', width: 100, height: 50 }
+      position: { x: 460, y: 790 },
+      data: { label: '🏢 OMIE ERP' },
+      style: { backgroundColor: '#fef3c7', borderColor: '#f59e0b', width: 110, height: 50 }
     },
     {
-      id: 'clicksign-ext',
+      id: 'clicksign-arch',
       type: 'default',
-      position: { x: 320, y: 650 },
-      data: { label: '✍️ ClickSign' },
-      style: { backgroundColor: '#fef3c7', borderColor: '#f59e0b', width: 100, height: 50 }
+      position: { x: 590, y: 790 },
+      data: { label: '✍️ CLICKSIGN' },
+      style: { backgroundColor: '#fef3c7', borderColor: '#f59e0b', width: 110, height: 50 }
     },
     {
-      id: 'resend-ext',
+      id: 'resend-arch',
       type: 'default',
-      position: { x: 440, y: 650 },
-      data: { label: '📧 Resend' },
-      style: { backgroundColor: '#fef3c7', borderColor: '#f59e0b', width: 100, height: 50 }
+      position: { x: 720, y: 790 },
+      data: { label: '📧 RESEND' },
+      style: { backgroundColor: '#fef3c7', borderColor: '#f59e0b', width: 110, height: 50 }
+    },
+
+    // SEGURANÇA & COMPLIANCE
+    {
+      id: 'security-arch',
+      type: 'default',
+      position: { x: 880, y: 480 },
+      data: { label: '🔐 SEGURANÇA\nMulticamadas' },
+      style: { backgroundColor: '#dc2626', color: 'white', borderColor: '#b91c1c', width: 160, height: 80 }
     },
     {
-      id: 'mobilemed-ext',
+      id: 'auth-2fa',
       type: 'default',
-      position: { x: 560, y: 650 },
-      data: { label: '🏥 MobileMed' },
-      style: { backgroundColor: '#e5e7eb', borderColor: '#6b7280', width: 100, height: 50 }
+      position: { x: 870, y: 690 },
+      data: { label: '🔑 AUTH + 2FA\nSupabase Auth' },
+      style: { backgroundColor: '#fca5a5', borderColor: '#dc2626', width: 140, height: 70 }
     },
     {
-      id: 'mysuite-ext',
+      id: 'lgpd-arch',
       type: 'default',
-      position: { x: 680, y: 650 },
-      data: { label: '📊 MySuite' },
-      style: { backgroundColor: '#e5e7eb', borderColor: '#6b7280', width: 100, height: 50 }
+      position: { x: 1030, y: 690 },
+      data: { label: '⚖️ LGPD\nCompliance' },
+      style: { backgroundColor: '#fca5a5', borderColor: '#dc2626', width: 140, height: 70 }
+    },
+
+    // DOCUMENTAÇÃO & GERAÇÃO
+    {
+      id: 'docs-generation',
+      type: 'default',
+      position: { x: 1080, y: 160 },
+      data: { label: '📄 GERAÇÃO DOCS\nPDF + Word + Excel' },
+      style: { backgroundColor: '#a855f7', color: 'white', borderColor: '#9333ea', width: 160, height: 80 }
+    },
+
+    // ESTATÍSTICAS DA ARQUITETURA
+    {
+      id: 'stats-arch',
+      type: 'default',
+      position: { x: 1080, y: 350 },
+      data: { label: '📊 STACK\n• React 18.3\n• TypeScript\n• 68 Tabelas DB\n• 60+ Edge Functions\n• 94 Regras Negócio\n• 9 Integrações' },
+      style: { 
+        backgroundColor: '#ffffff',
+        borderColor: '#1e40af',
+        borderWidth: 3,
+        width: 200,
+        height: 160,
+        fontSize: '11px',
+        fontWeight: 'bold'
+      }
     },
   ], []);
 
   const arquiteturaEdges: Edge[] = useMemo(() => [
-    // Frontend connections
-    { id: 'a1', source: 'frontend', target: 'vite', type: 'smoothstep', style: { stroke: '#3b82f6' } },
-    { id: 'a2', source: 'frontend', target: 'tailwind', type: 'smoothstep', style: { stroke: '#3b82f6' } },
-    { id: 'a3', source: 'frontend', target: 'shadcn', type: 'smoothstep', style: { stroke: '#3b82f6' } },
-    { id: 'a4', source: 'frontend', target: 'router', type: 'smoothstep', style: { stroke: '#3b82f6' } },
+    // Frontend → UI/Styling
+    { id: 'a1', source: 'frontend', target: 'tailwind', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#3b82f6' } },
+    { id: 'a2', source: 'frontend', target: 'shadcn', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#3b82f6' } },
+    { id: 'a3', source: 'frontend', target: 'radix', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#3b82f6' } },
+    { id: 'a4', source: 'frontend', target: 'lucide', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#3b82f6' } },
     
-    // Frontend to Backend
-    { id: 'a5', source: 'frontend', target: 'backend', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#059669' } },
+    // Frontend → State/Routing
+    { id: 'a5', source: 'frontend', target: 'react-router', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#8b5cf6' } },
+    { id: 'a6', source: 'frontend', target: 'tanstack-query', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#8b5cf6' } },
+    { id: 'a7', source: 'frontend', target: 'react-hook-form', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#8b5cf6' } },
+    { id: 'a8', source: 'frontend', target: 'zod', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#8b5cf6' } },
     
-    // Backend connections
-    { id: 'a6', source: 'backend', target: 'postgresql', type: 'smoothstep', style: { stroke: '#16a34a' } },
-    { id: 'a7', source: 'backend', target: 'edge-functions', type: 'smoothstep', style: { stroke: '#16a34a' } },
-    { id: 'a8', source: 'backend', target: 'rls', type: 'smoothstep', style: { stroke: '#16a34a' } },
-    { id: 'a9', source: 'backend', target: 'realtime', type: 'smoothstep', style: { stroke: '#16a34a' } },
-    { id: 'a10', source: 'backend', target: 'storage', type: 'smoothstep', style: { stroke: '#16a34a' } },
+    // Frontend → Visualização
+    { id: 'a9', source: 'frontend', target: 'recharts', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#06b6d4' } },
+    { id: 'a10', source: 'frontend', target: 'react-flow-vis', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#06b6d4' } },
+    { id: 'a11', source: 'frontend', target: 'leaflet-map', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#06b6d4' } },
+    { id: 'a12', source: 'frontend', target: 'html2canvas', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#06b6d4' } },
     
-    // Backend to External
-    { id: 'a11', source: 'backend', target: 'external', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#7c2d12' } },
+    // Frontend → Backend (Principal)
+    { id: 'a13', source: 'frontend', target: 'backend', type: 'smoothstep', style: { strokeWidth: 4, stroke: '#059669' } },
     
-    // External connections
-    { id: 'a12', source: 'external', target: 'omie-ext', type: 'smoothstep', style: { stroke: '#f59e0b' } },
-    { id: 'a13', source: 'external', target: 'clicksign-ext', type: 'smoothstep', style: { stroke: '#f59e0b' } },
-    { id: 'a14', source: 'external', target: 'resend-ext', type: 'smoothstep', style: { stroke: '#f59e0b' } },
-    { id: 'a15', source: 'external', target: 'mobilemed-ext', type: 'smoothstep', style: { stroke: '#6b7280', strokeDasharray: '5,5' } },
-    { id: 'a16', source: 'external', target: 'mysuite-ext', type: 'smoothstep', style: { stroke: '#6b7280', strokeDasharray: '5,5' } },
+    // Backend → Database
+    { id: 'a14', source: 'backend', target: 'postgresql', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#10b981' } },
+    { id: 'a15', source: 'backend', target: 'rls', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#10b981' } },
+    { id: 'a16', source: 'backend', target: 'triggers-db', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#10b981' } },
+    { id: 'a17', source: 'backend', target: 'functions-db', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#10b981' } },
+    { id: 'a18', source: 'backend', target: 'realtime', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#10b981' } },
+    { id: 'a19', source: 'backend', target: 'storage', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#10b981' } },
+    
+    // Backend → Edge Functions
+    { id: 'a20', source: 'backend', target: 'edge-functions-arch', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#14b8a6' } },
+    { id: 'a21', source: 'edge-functions-arch', target: 'deno-runtime', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#14b8a6' } },
+    
+    // Backend → Integrações
+    { id: 'a22', source: 'backend', target: 'integracoes-ext', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#f59e0b' } },
+    { id: 'a23', source: 'integracoes-ext', target: 'omie-arch', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#f59e0b' } },
+    { id: 'a24', source: 'integracoes-ext', target: 'clicksign-arch', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#f59e0b' } },
+    { id: 'a25', source: 'integracoes-ext', target: 'resend-arch', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#f59e0b' } },
+    
+    // Segurança
+    { id: 'a26', source: 'backend', target: 'security-arch', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#dc2626' } },
+    { id: 'a27', source: 'security-arch', target: 'auth-2fa', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#dc2626' } },
+    { id: 'a28', source: 'security-arch', target: 'lgpd-arch', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#dc2626' } },
+    { id: 'a29', source: 'rls', target: 'security-arch', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#dc2626' } },
+    
+    // Geração de Documentos
+    { id: 'a30', source: 'frontend', target: 'docs-generation', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#a855f7' } },
+    { id: 'a31', source: 'edge-functions-arch', target: 'docs-generation', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#a855f7' } },
   ], []);
 
   // Estados para os flows
