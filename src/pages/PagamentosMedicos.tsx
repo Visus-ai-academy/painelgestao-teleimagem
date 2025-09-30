@@ -445,14 +445,8 @@ export default function PagamentosMedicos() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Médico</TableHead>
-                  <TableHead>CRM</TableHead>
-                  <TableHead>Especialidade</TableHead>
-                  <TableHead>Categoria</TableHead>
                   <TableHead className="text-right">Exames</TableHead>
-                  <TableHead className="text-right">Valor Bruto</TableHead>
-                  <TableHead className="text-right">Descontos</TableHead>
-                  <TableHead className="text-right">Valor Líquido</TableHead>
-                  <TableHead className="text-center">Ações</TableHead>
+                  <TableHead className="text-right">Valor a Pagar</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -467,120 +461,9 @@ export default function PagamentosMedicos() {
                         </Badge>
                       )}
                     </TableCell>
-                    <TableCell>{resumo.medico.crm}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{resumo.medico.especialidade}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={
-                        resumo.medico.categoria === 'Expert' ? 'default' :
-                        resumo.medico.categoria === 'Senior' ? 'secondary' :
-                        'outline'
-                      }>
-                        {resumo.medico.categoria}
-                      </Badge>
-                    </TableCell>
                     <TableCell className="text-right">{resumo.total_exames}</TableCell>
-                    <TableCell className="text-right">
-                      R$ {resumo.valor_bruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </TableCell>
-                    <TableCell className="text-right text-red-600">
-                      R$ {resumo.descontos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </TableCell>
                     <TableCell className="text-right font-bold text-green-600">
-                      R$ {resumo.valor_liquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setMedicoDetalhado(resumo)}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-6xl max-h-[80vh] overflow-y-auto">
-                          <DialogHeader>
-                            <DialogTitle>
-                              Detalhes - {resumo.medico.nome}
-                            </DialogTitle>
-                          </DialogHeader>
-                          <div className="space-y-4">
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                              <div>
-                                <p className="text-sm text-muted-foreground">Total de Exames</p>
-                                <p className="font-bold">{resumo.total_exames}</p>
-                              </div>
-                              <div>
-                                <p className="text-sm text-muted-foreground">Valor Bruto</p>
-                                <p className="font-bold">R$ {resumo.valor_bruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                              </div>
-                              <div>
-                                <p className="text-sm text-muted-foreground">Descontos</p>
-                                <p className="font-bold text-red-600">R$ {resumo.descontos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                              </div>
-                              <div>
-                                <p className="text-sm text-muted-foreground">Valor Líquido</p>
-                                <p className="font-bold text-green-600">R$ {resumo.valor_liquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                              </div>
-                            </div>
-                            
-                            <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead>Data</TableHead>
-                                  <TableHead>Paciente</TableHead>
-                                  <TableHead>Cliente</TableHead>
-                                  <TableHead>Modalidade</TableHead>
-                                  <TableHead>Categoria</TableHead>
-                                  <TableHead>Prioridade</TableHead>
-                                  <TableHead className="text-right">Qtd</TableHead>
-                                  <TableHead className="text-right">Valor Unit.</TableHead>
-                                  <TableHead className="text-right">Total</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {resumo.exames.map((exame) => (
-                                  <TableRow key={exame.id} className={exame.sem_valor_configurado ? 'bg-orange-50' : ''}>
-                                    <TableCell>
-                                      {format(new Date(exame.data_exame), 'dd/MM/yyyy', { locale: ptBR })}
-                                    </TableCell>
-                                    <TableCell>{exame.paciente_nome}</TableCell>
-                                    <TableCell>{exame.cliente_nome}</TableCell>
-                                    <TableCell>
-                                      <Badge variant="outline">{exame.modalidade}</Badge>
-                                    </TableCell>
-                                    <TableCell>
-                                      <Badge variant="outline">{exame.categoria}</Badge>
-                                    </TableCell>
-                                    <TableCell>
-                                      <Badge variant={exame.prioridade === 'URGÊNCIA' ? 'destructive' : 'secondary'}>
-                                        {exame.prioridade}
-                                      </Badge>
-                                    </TableCell>
-                                    <TableCell className="text-right">{exame.quantidade}</TableCell>
-                                    <TableCell className="text-right">
-                                      {exame.sem_valor_configurado ? (
-                                        <span className="text-orange-600 flex items-center justify-end gap-1">
-                                          <AlertCircle className="h-3 w-3" />
-                                          Não configurado
-                                        </span>
-                                      ) : (
-                                        `R$ ${exame.valor_unitario.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-                                      )}
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                      R$ {exame.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                    </TableCell>
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
+                      R$ {resumo.valor_bruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </TableCell>
                   </TableRow>
                 ))}
