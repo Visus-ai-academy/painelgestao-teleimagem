@@ -369,6 +369,84 @@ export default function Colaboradores() {
     carregar();
   }, [toast]);
 
+  // Recalcular resumo de equipes sempre que a lista de colaboradores mudar
+  useEffect(() => {
+    const equipesMap = new Map<string, {
+      total: number;
+      staff: number;
+      fellow: number;
+      especialidades: Map<string, number>;
+    }>();
+
+    colaboradores.forEach(medico => {
+      if (medico.status !== 'Ativo') return;
+
+      const equipeNome = (medico.equipe || 'Sem Equipe').replace(/^EQUIPE\s*(\d)$/i, 'Equipe $1');
+      const funcao = (medico.funcao || '').toUpperCase();
+
+      const tokens: string[] = [];
+      const addSplit = (txt?: string | null) => {
+        const v = (txt ?? '').trim();
+        if (!v) return;
+        v.split(/[,/;]+/).forEach((p) => {
+          const t = p.trim();
+          if (t) tokens.push(t);
+        });
+      };
+
+      addSplit(medico.especialidade_atuacao);
+      if (Array.isArray(medico.especialidades) && medico.especialidades.length > 0) {
+        medico.especialidades.forEach((e) => addSplit(e as any));
+      }
+      addSplit((medico as any).especialidade);
+
+      if (!equipesMap.has(equipeNome)) {
+        equipesMap.set(equipeNome, {
+          total: 0,
+          staff: 0,
+          fellow: 0,
+          especialidades: new Map()
+        });
+      }
+
+      const equipeData = equipesMap.get(equipeNome)!;
+      equipeData.total++;
+
+      if (funcao.includes('STAFF')) {
+        equipeData.staff++;
+      } else if (funcao.includes('FELLOW')) {
+        equipeData.fellow++;
+      }
+
+      const uniqueTokens = Array.from(new Set(tokens.map((t) => t.toUpperCase().trim())));
+      uniqueTokens.forEach((up) => {
+        if (!up || up === 'NÃO ESPECIFICADO' || up === 'NAO ESPECIFICADO') return;
+        const current = equipeData.especialidades.get(up) || 0;
+        equipeData.especialidades.set(up, current + 1);
+      });
+    });
+
+    const resumo: ResumoEquipe[] = Array.from(equipesMap.entries())
+      .map(([equipe, dados]) => ({
+        equipe,
+        total: dados.total,
+        staff: dados.staff,
+        fellow: dados.fellow,
+        especialidades: Array.from(dados.especialidades.entries())
+          .map(([nome, count]) => ({ nome, count }))
+          .sort((a, b) => b.count - a.count)
+      }))
+      .sort((a, b) => {
+        if (a.equipe === 'Equipe 1') return -1;
+        if (b.equipe === 'Equipe 1') return 1;
+        if (a.equipe === 'Equipe 2') return -1;
+        if (b.equipe === 'Equipe 2') return 1;
+        return a.equipe.localeCompare(b.equipe);
+      });
+
+    setResumoEquipes(resumo);
+  }, [colaboradores]);
+
   const handleFileUpload = async (file: File) => {
     try {
       console.log('📤 Enviando arquivo de médicos...', file.name);
@@ -1448,13 +1526,15 @@ export default function Colaboradores() {
                     <div>
                       <h3 className="font-semibold">{colaborador.nome}</h3>
                       <div className="text-sm text-gray-600 flex items-center gap-2">
-                        {(colaborador.funcao && colaborador.funcao.trim().toLowerCase() !== 'medicina') && (
-                          <span>{colaborador.funcao}</span>
-                        )}
                         {((colaborador.especialidade_atuacao?.trim() || colaborador.especialidades?.[0] || (colaborador as any).especialidade)?.trim()) && (
                           <>
-                            {(colaborador.funcao && colaborador.funcao.trim().toLowerCase() !== 'medicina') && <span>•</span>}
                             <span>{(colaborador.especialidade_atuacao?.trim() || colaborador.especialidades?.[0] || (colaborador as any).especialidade)?.trim()}</span>
+                            {(((colaborador.funcao || '').toUpperCase().includes('STAFF')) || ((colaborador.funcao || '').toUpperCase().includes('FELLOW'))) && (
+                              <>
+                                <span>•</span>
+                                <span>{(colaborador.funcao || '').toUpperCase().includes('STAFF') ? 'STAFF' : 'FELLOW'}</span>
+                              </>
+                            )}
                           </>
                         )}
                       </div>
@@ -1552,10 +1632,23 @@ export default function Colaboradores() {
                           size="sm" 
                           className="h-8 w-8 p-0 text-red-600"
                           title="Excluir"
-                          onClick={() => {
+                          onClick={async () => {
                             if (confirm(`Deseja realmente excluir ${colaborador.nome}?`)) {
+                              const { error } = await supabase
+                                .from('medicos')
+                                .delete()
+                                .eq('id', colaborador.id);
+                              if (error) {
+                                toast({
+                                  title: 'Erro ao excluir',
+                                  description: error.message,
+                                  variant: 'destructive'
+                                });
+                                return;
+                              }
+                              setColaboradores(prev => prev.filter(c => c.id !== colaborador.id));
                               toast({
-                                title: "Colaborador excluído",
+                                title: 'Colaborador excluído',
                                 description: `${colaborador.nome} foi removido do sistema`,
                               });
                             }
