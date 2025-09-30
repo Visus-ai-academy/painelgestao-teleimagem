@@ -11,7 +11,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { FileUpload } from "@/components/FileUpload";
-import { SimpleFileUpload } from "@/components/SimpleFileUpload";
 import { useToast } from "@/hooks/use-toast";
 import { toast } from "sonner";
 import { useMedicoData } from "@/hooks/useMedicoData";
