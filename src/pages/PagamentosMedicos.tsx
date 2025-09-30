@@ -48,12 +48,6 @@ export default function PagamentosMedicos() {
   const [resumos, setResumos] = useState<ResumoMedico[]>([]);
   const [periodoReferencia, setPeriodoReferencia] = useState(() => {
     const hoje = new Date();
-    const mes = format(hoje, 'MMM', { locale: ptBR }).toLowerCase();
-    const ano = format(hoje, 'yy');
-    return `${mes}/${ano}`;
-  });
-  const [mesAnoSelecionado, setMesAnoSelecionado] = useState(() => {
-    const hoje = new Date();
     return format(hoje, 'yyyy-MM');
   });
   const [loading, setLoading] = useState(false);
@@ -329,18 +323,12 @@ export default function PagamentosMedicos() {
                 <Input
                   type="month"
                   min="2025-06"
-                  value={mesAnoSelecionado}
-                  onChange={(e) => {
-                    setMesAnoSelecionado(e.target.value);
-                    // Converter YYYY-MM para mmm/yy (formato da volumetria)
-                    const date = new Date(e.target.value + '-01');
-                    const formatted = format(date, 'MMM/yy', { locale: ptBR }).toLowerCase();
-                    setPeriodoReferencia(formatted);
-                  }}
+                  value={periodoReferencia}
+                  onChange={(e) => setPeriodoReferencia(e.target.value)}
                   className="w-full"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Formato da volumetria: <span className="font-mono font-semibold">{periodoReferencia}</span>
+                  Formato: YYYY-MM (ex: 2025-06)
                 </p>
               </div>
               <div className="flex items-end">
