@@ -112,13 +112,12 @@ export default function Colaboradores() {
     nome: "",
     email: "",
     funcao: "",
-    departamento: "",
+    departamento: "Médico",
     nivel: "",
     telefone: "",
     cpf: "",
     gestor: "",
-    salario: "",
-    endereco: ""
+    salario: ""
   });
   const [medicoData, setMedicoData] = useState({
     categoria: "",
@@ -151,6 +150,8 @@ export default function Colaboradores() {
   
   const [resumoEquipes, setResumoEquipes] = useState<ResumoEquipe[]>([]);
   const [cleaningData, setCleaningData] = useState(false);
+  // Mapeamento de médicos com repasse (medicos_valores_repasse)
+  const [medicosComRepasse, setMedicosComRepasse] = useState<Set<string>>(new Set());
 
   // Função para limpar dados fictícios
   const limparDadosFicticios = async () => {
@@ -448,6 +449,29 @@ export default function Colaboradores() {
     setResumoEquipes(resumo);
   }, [colaboradores]);
 
+  // Carregar mapeamento de repasse por médico sempre que a lista mudar
+  useEffect(() => {
+    const carregarRepasse = async () => {
+      try {
+        const ativosIds = colaboradores.filter(c => c.status === 'Ativo').map(c => c.id);
+        if (ativosIds.length === 0) {
+          setMedicosComRepasse(new Set());
+          return;
+        }
+        const { data, error } = await supabase
+          .from('medicos_valores_repasse')
+          .select('medico_id')
+          .in('medico_id', ativosIds);
+        if (error) throw error;
+        const ids = Array.from(new Set((data || []).map((r: any) => r.medico_id).filter(Boolean)));
+        setMedicosComRepasse(new Set(ids));
+      } catch (e) {
+        console.error('Erro ao carregar valores de repasse:', e);
+      }
+    };
+    carregarRepasse();
+  }, [colaboradores]);
+
   const handleFileUpload = async (file: File) => {
     try {
       console.log('📤 Enviando arquivo de médicos...', file.name);
@@ -678,13 +702,12 @@ export default function Colaboradores() {
         nome: "",
         email: "",
         funcao: "",
-        departamento: "",
+        departamento: "Médico",
         nivel: "",
         telefone: "",
         cpf: "",
         gestor: "",
-        salario: "",
-        endereco: ""
+        salario: ""
       });
       setMedicoData({
         categoria: "",
@@ -846,6 +869,9 @@ export default function Colaboradores() {
 
   const colaboradoresAtivos = colaboradores.filter(c => c.status === "Ativo").length;
   const totalColaboradores = colaboradores.length;
+  const activeIds = colaboradores.filter(c => c.status === "Ativo").map(c => c.id);
+  const medicosComRepasseCount = activeIds.filter(id => medicosComRepasse.has(id)).length;
+  const medicosSemRepasseCount = Math.max(0, colaboradoresAtivos - medicosComRepasseCount);
 
   // Mostrar loading se ainda estiver carregando dados das listas
   if (loadingMedicoData) {
@@ -897,13 +923,16 @@ export default function Colaboradores() {
             <>
               {/* Total Médicos Ativos */}
               <div className="mb-6 p-4 rounded-lg bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-950/20 dark:to-blue-900/20 border border-blue-200 dark:border-blue-800">
-                <div className="flex items-center">
-                  <Users className="h-8 w-8 text-blue-600 dark:text-blue-400" />
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Total Médicos Ativos</p>
-                    <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{colaboradoresAtivos}</p>
+                  <div className="flex items-center">
+                    <Users className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Total Médicos Ativos</p>
+                      <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{colaboradoresAtivos}</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
+                        Com Repasse: <span className="font-semibold text-green-600 dark:text-green-400">{medicosComRepasseCount}</span> • Sem Repasse: <span className="font-semibold text-red-600 dark:text-red-400">{medicosSemRepasseCount}</span>
+                      </p>
+                    </div>
                   </div>
-                </div>
               </div>
               
               {resumoEquipes.length > 0 ? (
@@ -1156,15 +1185,6 @@ export default function Colaboradores() {
                           />
                         </div>
                         
-                        <div className="col-span-2">
-                          <Label htmlFor="endereco">Endereço</Label>
-                          <Input
-                            id="endereco"
-                            value={newColaborador.endereco}
-                            onChange={(e) => setNewColaborador({...newColaborador, endereco: e.target.value})}
-                            placeholder="Rua, número, bairro, cidade - UF"
-                          />
-                        </div>
                         
                         {newColaborador.departamento === "Médico" && (
                           <>
@@ -1446,50 +1466,6 @@ export default function Colaboradores() {
                             </div>
                           </div>
 
-                          {(medicoData.modalidades.length > 0 && medicoData.especialidades.length > 0) && (
-                            <div className="col-span-2">
-                              <Label>Valores por Combinação (Modalidade + Especialidade + Categoria do Exame + Prioridade) *</Label>
-                              <div className="space-y-4 mt-2 p-4 border rounded-lg max-h-80 overflow-y-auto bg-muted/30">
-                                {medicoData.modalidades.map((modalidade) => (
-                                  <div key={modalidade} className="bg-background p-4 rounded-lg border-l-4 border-primary">
-                                    <h4 className="font-medium text-sm mb-3 text-primary">{modalidade}</h4>
-                                    {medicoData.especialidades.map((especialidade) => (
-                                      <div key={`${modalidade}-${especialidade}`} className="mb-4 last:mb-0">
-                                        <h5 className="text-xs font-medium text-muted-foreground mb-3 bg-muted/50 p-2 rounded">{especialidade}</h5>
-                                        {categoriasExame.map((categoriaExame) => (
-                                          <div key={`${modalidade}-${especialidade}-${categoriaExame}`} className="mb-3 p-2 border border-dashed border-muted-foreground/30 rounded">
-                                            <h6 className="text-xs font-medium text-foreground mb-2 bg-accent/50 p-1 rounded">{categoriaExame}</h6>
-                                            <div className="grid grid-cols-3 gap-2">
-                                              {prioridadesDisponiveis.map((prioridade) => (
-                                                <div key={`${modalidade}-${especialidade}-${categoriaExame}-${prioridade}`} className="space-y-1">
-                                                  <Label className="text-xs font-medium">{prioridade}</Label>
-                                                  <div className="flex items-center gap-1">
-                                                    <span className="text-xs text-muted-foreground">R$</span>
-                                                    <Input
-                                                      type="number"
-                                                      step="0.01"
-                                                      min="0"
-                                                      value={medicoData.valoresCombinacoes[modalidade]?.[especialidade]?.[categoriaExame]?.[prioridade] || ""}
-                                                      onChange={(e) => handleValorCombinacaoChange(modalidade, especialidade, categoriaExame, prioridade, e.target.value)}
-                                                      placeholder="0,00"
-                                                      className="text-xs h-8"
-                                                    />
-                                                  </div>
-                                                </div>
-                                              ))}
-                                            </div>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    ))}
-                                  </div>
-                                ))}
-                              </div>
-                              <p className="text-xs text-muted-foreground mt-2 italic">
-                                * Configure valores específicos para cada combinação de 4 fatores: Modalidade + Especialidade + Categoria do Exame + Prioridade. A remuneração será calculada automaticamente baseada no volume de exames produzidos.
-                              </p>
-                            </div>
-                          )}
                         </div>
                       </div>
                     )}
@@ -1532,7 +1508,12 @@ export default function Colaboradores() {
                       </span>
                     </div>
                     <div>
-                      <h3 className="font-semibold">{colaborador.nome}</h3>
+                      <h3 className="font-semibold">
+                        {colaborador.nome}
+                        {colaborador.status === 'Ativo' && !medicosComRepasse.has(colaborador.id) && (
+                          <span className="ml-2 text-red-600 font-medium">Sem Valor de Repasse</span>
+                        )}
+                      </h3>
                       <div className="text-sm text-gray-600 flex items-center gap-2 flex-wrap">
                         {((colaborador.especialidade_atuacao?.trim() || colaborador.especialidades?.[0] || (colaborador as any).especialidade)?.trim()) && (
                           <>
