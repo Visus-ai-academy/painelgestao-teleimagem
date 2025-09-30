@@ -2120,7 +2120,7 @@ export type Database = {
           especialidade: string
           esta_no_escopo: boolean | null
           id: string
-          medico_id: string
+          medico_id: string | null
           modalidade: string
           prioridade: string
           updated_at: string | null
@@ -2137,7 +2137,7 @@ export type Database = {
           especialidade: string
           esta_no_escopo?: boolean | null
           id?: string
-          medico_id: string
+          medico_id?: string | null
           modalidade: string
           prioridade: string
           updated_at?: string | null
@@ -2154,7 +2154,7 @@ export type Database = {
           especialidade?: string
           esta_no_escopo?: boolean | null
           id?: string
-          medico_id?: string
+          medico_id?: string | null
           modalidade?: string
           prioridade?: string
           updated_at?: string | null
