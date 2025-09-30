@@ -39,13 +39,12 @@ serve(async (req) => {
 
     console.log(`📊 Processando ${file.name} (${Math.round(file.size/1024)}KB)`);
 
-    // Criar registro de upload inicial
+    // Criar registro de upload inicial (sem tipo_dados para evitar constraint)
     const { data: uploadRecord, error: uploadError } = await supabase
       .from('processamento_uploads')
       .insert({
         arquivo_nome: file.name,
         tipo_arquivo: 'repasse_medico',
-        
         status: 'processando',
         registros_processados: 0,
         registros_inseridos: 0,
@@ -59,25 +58,37 @@ serve(async (req) => {
     if (uploadError) throw uploadError;
     const uploadId = uploadRecord.id;
 
-    // Ler Excel com opções mínimas de memória
+    // Ler Excel com baixo uso de memória e processar em CHUNKS
     const arrayBuffer = await file.arrayBuffer();
     const workbook = XLSX.read(arrayBuffer, {
       type: 'array',
       cellDates: true,
       cellStyles: false,
       sheetStubs: false,
-      dense: true // Usa array denso (menos memória)
+      dense: true
     });
-    
-    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-    const jsonData = XLSX.utils.sheet_to_json(worksheet, {
-      raw: false,
-      defval: null,
-      blankrows: false
-    }) as RepasseRow[];
 
-    const totalLinhas = jsonData.length;
-    console.log(`Total: ${totalLinhas} registros`);
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    const ref = (worksheet as any)['!ref'] as string | undefined;
+    if (!ref) {
+      throw new Error('Planilha vazia ou inválida');
+    }
+
+    const fullRange = XLSX.utils.decode_range(ref);
+    const headerRowIndex = fullRange.s.r; // Geralmente 0
+
+    // Ler cabeçalho uma única vez
+    const headerRow = XLSX.utils.sheet_to_json(worksheet, {
+      header: 1,
+      range: { s: { r: headerRowIndex, c: fullRange.s.c }, e: { r: headerRowIndex, c: fullRange.e.c } }
+    })[0] as string[] | undefined;
+
+    const headers = Array.isArray(headerRow) ? headerRow : [];
+
+    // Total de linhas de dados (exclui cabeçalho)
+    const totalLinhas = Math.max(0, fullRange.e.r - headerRowIndex);
+    console.log(`Total estimado: ${totalLinhas} registros`);
 
     // Atualizar com total de linhas
     await supabase
@@ -91,122 +102,163 @@ serve(async (req) => {
     let erros = 0;
     const detalhesErros: any[] = [];
 
-    // Processar em lotes pequenos (5 registros por vez)
-    const BATCH_SIZE = 5;
-    
-    for (let batchStart = 0; batchStart < totalLinhas; batchStart += BATCH_SIZE) {
-      const batchEnd = Math.min(batchStart + BATCH_SIZE, totalLinhas);
-      const batch = jsonData.slice(batchStart, batchEnd);
-      
-      for (let idx = 0; idx < batch.length; idx++) {
-        const row = batch[idx];
-        const lineNum = batchStart + idx + 1;
-        
-        try {
-          if (!row.modalidade || !row.especialidade || !row.prioridade || !row.valor) {
-            erros++;
-            if (detalhesErros.length < 50) {
-              detalhesErros.push({ linha: lineNum, erro: 'Campos obrigatórios faltando' });
-            }
-            processados++;
-            continue;
-          }
+    // Configurações de processamento
+    const ROWS_PER_CHUNK = 200; // Linhas lidas da planilha por vez
+    const BATCH_SIZE = 5;       // Registros processados (DB) por vez
 
-          // Buscar médico SE necessário
-          let medico_id = null;
-          if (row.medico_crm) {
-            const { data: medico } = await supabase
-              .from('medicos')
-              .select('id')
-              .eq('crm', row.medico_crm.trim())
-              .eq('ativo', true)
-              .maybeSingle();
-            medico_id = medico?.id;
-          } else if (row.medico_nome) {
-            const { data: medico } = await supabase
-              .from('medicos')
-              .select('id')
-              .ilike('nome', row.medico_nome.trim())
-              .eq('ativo', true)
-              .maybeSingle();
-            medico_id = medico?.id;
-          }
-
-          // Buscar cliente SE necessário
-          let cliente_id = null;
-          if (row.cliente_nome) {
-            const { data: cliente } = await supabase
-              .from('clientes')
-              .select('id')
-              .or(`nome_fantasia.ilike.${row.cliente_nome.trim()},nome.ilike.${row.cliente_nome.trim()}`)
-              .eq('ativo', true)
-              .maybeSingle();
-            cliente_id = cliente?.id;
-          }
-
-          // Escopo
-          let esta_no_escopo = false;
-          if (row.esta_no_escopo) {
-            const valor = String(row.esta_no_escopo).toLowerCase();
-            esta_no_escopo = ['sim', 'yes', 'true', '1', 's', 'y'].includes(valor);
-          }
-
-          const repasseData = {
-            medico_id: medico_id || null,
-            modalidade: row.modalidade.trim(),
-            especialidade: row.especialidade.trim(),
-            categoria: row.categoria?.trim() || null,
-            prioridade: row.prioridade.trim(),
-            valor: Number(row.valor),
-            esta_no_escopo,
-            cliente_id: cliente_id || null
-          };
-
-          // Verificar duplicata
-          let query = supabase
-            .from('medicos_valores_repasse')
+    // Funções auxiliares de busca "sob demanda"
+    const buscarMedicoId = async (row: RepasseRow): Promise<string | null> => {
+      try {
+        if (row.medico_crm) {
+          const { data } = await supabase
+            .from('medicos')
             .select('id')
-            .eq('modalidade', repasseData.modalidade)
-            .eq('especialidade', repasseData.especialidade)
-            .eq('prioridade', repasseData.prioridade);
+            .eq('crm', row.medico_crm.trim())
+            .eq('ativo', true)
+            .maybeSingle();
+          return data?.id ?? null;
+        }
+        if (row.medico_nome) {
+          const name = row.medico_nome.trim();
+          const { data } = await supabase
+            .from('medicos')
+            .select('id')
+            .ilike('nome', name) // busca exata case-insensitive; evite % para não pegar múltiplos
+            .eq('ativo', true)
+            .maybeSingle();
+          return data?.id ?? null;
+        }
+      } catch (_) {}
+      return null;
+    };
 
-          if (medico_id) query = query.eq('medico_id', medico_id);
-          else query = query.is('medico_id', null);
+    const buscarClienteId = async (row: RepasseRow): Promise<string | null> => {
+      try {
+        if (row.cliente_nome) {
+          const term = row.cliente_nome.trim();
+          // Tente primeiro por nome_fantasia
+          let { data } = await supabase
+            .from('clientes')
+            .select('id')
+            .ilike('nome_fantasia', term)
+            .eq('ativo', true)
+            .maybeSingle();
+          if (data?.id) return data.id;
 
-          if (repasseData.categoria) query = query.eq('categoria', repasseData.categoria);
-          else query = query.is('categoria', null);
+          // Tente pelo nome
+          const resp2 = await supabase
+            .from('clientes')
+            .select('id')
+            .ilike('nome', term)
+            .eq('ativo', true)
+            .maybeSingle();
+          return resp2.data?.id ?? null;
+        }
+      } catch (_) {}
+      return null;
+    };
 
-          if (cliente_id) query = query.eq('cliente_id', cliente_id);
-          else query = query.is('cliente_id', null);
+    // Iterar por CHUNKS de linhas da planilha (evita materializar tudo em memória)
+    for (let start = headerRowIndex + 1; start <= fullRange.e.r; start += ROWS_PER_CHUNK) {
+      const end = Math.min(start + ROWS_PER_CHUNK - 1, fullRange.e.r);
 
-          const { data: existente } = await query.maybeSingle();
+      const rows = XLSX.utils.sheet_to_json(worksheet, {
+        raw: false,
+        defval: null,
+        blankrows: false,
+        header: headers.length > 0 ? headers : undefined,
+        range: { s: { r: start, c: fullRange.s.c }, e: { r: end, c: fullRange.e.c } }
+      }) as RepasseRow[];
 
-          if (existente) {
-            await supabase
-              .from('medicos_valores_repasse')
-              .update({ valor: repasseData.valor, esta_no_escopo })
-              .eq('id', existente.id);
-            atualizados++;
+      // Processar a cada BATCH_SIZE registros para reduzir picos de memória
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const lineNum = start + i; // linha real considerando cabeçalho
+
+        try {
+          if (!row || !row.modalidade || !row.especialidade || !row.prioridade || !row.valor) {
+            erros++;
+            if (detalhesErros.length < 50) detalhesErros.push({ linha: lineNum, erro: 'Campos obrigatórios faltando' });
+            processados++;
           } else {
-            await supabase
+            // Normalizações leves
+            const modalidade = String(row.modalidade).trim();
+            const especialidade = String(row.especialidade).trim();
+            const prioridade = String(row.prioridade).trim();
+            const categoria = row.categoria ? String(row.categoria).trim() : null;
+            const valorNum = Number(row.valor);
+
+            let esta_no_escopo = false;
+            if (row.esta_no_escopo) {
+              const v = String(row.esta_no_escopo).toLowerCase();
+              esta_no_escopo = ['sim','yes','true','1','s','y'].includes(v);
+            }
+
+            const medico_id = await buscarMedicoId(row);
+            const cliente_id = await buscarClienteId(row);
+
+            const repasseData = {
+              medico_id: medico_id || null,
+              modalidade,
+              especialidade,
+              categoria,
+              prioridade,
+              valor: valorNum,
+              esta_no_escopo,
+              cliente_id: cliente_id || null
+            } as const;
+
+            // Verificar duplicata
+            let query = supabase
               .from('medicos_valores_repasse')
-              .insert(repasseData);
-            inseridos++;
+              .select('id')
+              .eq('modalidade', repasseData.modalidade)
+              .eq('especialidade', repasseData.especialidade)
+              .eq('prioridade', repasseData.prioridade);
+
+            if (medico_id) query = query.eq('medico_id', medico_id); else query = query.is('medico_id', null);
+            if (repasseData.categoria) query = query.eq('categoria', repasseData.categoria); else query = query.is('categoria', null);
+            if (cliente_id) query = query.eq('cliente_id', cliente_id); else query = query.is('cliente_id', null);
+
+            const { data: existente } = await query.maybeSingle();
+
+            if (existente) {
+              await supabase
+                .from('medicos_valores_repasse')
+                .update({ valor: repasseData.valor, esta_no_escopo })
+                .eq('id', existente.id);
+              atualizados++;
+            } else {
+              await supabase
+                .from('medicos_valores_repasse')
+                .insert(repasseData);
+              inseridos++;
+            }
+
+            processados++;
           }
-          
-          processados++;
         } catch (error: any) {
           erros++;
-          if (detalhesErros.length < 50) {
-            detalhesErros.push({ linha: lineNum, erro: error.message });
-          }
+          if (detalhesErros.length < 50) detalhesErros.push({ linha: lineNum, erro: error?.message || 'Erro desconhecido' });
           processados++;
+        }
+
+        // A cada BATCH_SIZE, persistir progresso
+        if ((i + 1) % BATCH_SIZE === 0) {
+          await supabase
+            .from('processamento_uploads')
+            .update({
+              registros_processados: processados,
+              registros_inseridos: inseridos,
+              registros_atualizados: atualizados,
+              registros_erro: erros
+            })
+            .eq('id', uploadId);
         }
       }
 
-      // Atualizar progresso a cada batch
-      console.log(`Processados ${batchEnd}/${totalLinhas} (${Math.round(batchEnd/totalLinhas*100)}%)`);
-      
+      // Atualizar ao final do chunk
+      console.log(`Progresso: ${Math.min(processados, totalLinhas)}/${totalLinhas}`);
       await supabase
         .from('processamento_uploads')
         .update({
@@ -217,8 +269,8 @@ serve(async (req) => {
         })
         .eq('id', uploadId);
 
-      // Pausa para GC
-      await new Promise(resolve => setTimeout(resolve, 10));
+      // Pausa curta para GC
+      await new Promise((r) => setTimeout(r, 10));
     }
 
     // Atualizar registro final
