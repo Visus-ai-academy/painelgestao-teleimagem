@@ -1447,12 +1447,25 @@ export default function Colaboradores() {
                     </div>
                     <div>
                       <h3 className="font-semibold">{colaborador.nome}</h3>
-                      <div className="text-sm text-gray-600">
-                        {colaborador.funcao} • {colaborador.departamento}
+                      <div className="text-sm text-gray-600 flex items-center gap-2">
+                        <span>{colaborador.funcao}</span>
+                        {colaborador.especialidade_atuacao && (
+                          <>
+                            <span>•</span>
+                            <span>{colaborador.especialidade_atuacao}</span>
+                          </>
+                        )}
                       </div>
-                      {colaborador.email && (
-                        <div className="text-xs text-gray-500">
-                          {colaborador.email}
+                      {colaborador.status && (
+                        <div className="mt-1">
+                          {getStatusBadge(colaborador.status)}
+                        </div>
+                      )}
+                      {colaborador.equipe && (
+                        <div className="mt-1">
+                          <Badge variant="default" className="text-xs">
+                            {colaborador.equipe}
+                          </Badge>
                         </div>
                       )}
                       {/* Mostrar documentos para médicos SOMENTE se houver documentos */}
@@ -1493,7 +1506,6 @@ export default function Colaboradores() {
                     </div>
                     
                     <div className="flex items-center gap-2">
-                      {getStatusBadge(colaborador.status)}
                       <div className="flex gap-1">
                         <Button 
                           variant="ghost" 
@@ -1558,7 +1570,7 @@ export default function Colaboradores() {
                   </div>
                 </div>
                 
-                {(colaborador.modalidades?.length || colaborador.especialidades?.length || colaborador.equipe) && (
+                {(colaborador.modalidades?.length || colaborador.especialidades?.length) && (
                   <div className="mt-3 pt-3 border-t">
                     <div className="flex items-center justify-between flex-wrap gap-2">
                       {colaborador.modalidades && colaborador.modalidades.length > 0 && (
@@ -1583,14 +1595,6 @@ export default function Colaboradores() {
                               </Badge>
                             ))}
                           </div>
-                        </div>
-                      )}
-                      {colaborador.equipe && (
-                        <div>
-                          <p className="text-sm text-gray-600">Equipe:</p>
-                          <Badge variant="default" className="text-xs mt-1">
-                            {colaborador.equipe}
-                          </Badge>
                         </div>
                       )}
                     </div>
