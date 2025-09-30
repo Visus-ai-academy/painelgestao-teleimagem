@@ -1449,25 +1449,21 @@ export default function Colaboradores() {
                       <h3 className="font-semibold">{colaborador.nome}</h3>
                       <div className="text-sm text-gray-600 flex items-center gap-2">
                         <span>{colaborador.funcao}</span>
-                        {colaborador.especialidade_atuacao && (
+                        {colaborador.especialidade_atuacao && colaborador.especialidade_atuacao.trim() !== '' && (
                           <>
                             <span>•</span>
                             <span>{colaborador.especialidade_atuacao}</span>
                           </>
                         )}
                       </div>
-                      {colaborador.status && (
-                        <div className="mt-1">
-                          {getStatusBadge(colaborador.status)}
-                        </div>
-                      )}
-                      {colaborador.equipe && (
-                        <div className="mt-1">
+                      <div className="mt-1 flex items-center gap-2">
+                        {getStatusBadge(colaborador.status)}
+                        {colaborador.equipe && (
                           <Badge variant="default" className="text-xs">
                             {colaborador.equipe}
                           </Badge>
-                        </div>
-                      )}
+                        )}
+                      </div>
                       {/* Mostrar documentos para médicos SOMENTE se houver documentos */}
                       {colaborador.departamento === "Medicina" && colaborador.documentos && colaborador.documentos.length > 0 && (
                         <div className="mt-2">
@@ -1494,7 +1490,7 @@ export default function Colaboradores() {
                   
                   <div className="flex items-center gap-4">
                     <div className="text-right">
-                      {colaborador.crm && (
+                      {colaborador.crm && !colaborador.crm.match(/^CRM-\d+$/) && (
                         <div className="text-xs text-gray-500 mb-1">CRM: {colaborador.crm}</div>
                       )}
                       {colaborador.categoria && (
