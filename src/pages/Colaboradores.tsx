@@ -247,18 +247,19 @@ export default function Colaboradores() {
         }>();
         
         lista.forEach(medico => {
-          const equipe = medico.equipe || 'Sem Equipe';
+          // Considerar apenas médicos ATIVOS
+          if (medico.status !== 'Ativo') return;
+
+          // Normalizar nome da equipe (EQUIPE 1 -> Equipe 1)
+          const equipeNome = (medico.equipe || 'Sem Equipe').replace(/^EQUIPE\s*(\d)$/i, 'Equipe $1');
           const funcao = (medico.funcao || '').toUpperCase();
-          // Usar especialidade_atuacao como prioridade
-          const especialidade = medico.especialidade_atuacao || 'Não especificado';
           
-          // Debug para verificar dados
-          if (medico.equipe?.includes('EQUIPE')) {
-            console.log('Médico:', medico.nome, 'Especialidade Atuação:', medico.especialidade_atuacao, 'Equipe:', medico.equipe);
-          }
+          // Usar Especialidade de Atuação (normalizada) como chave
+          const espRaw = (medico.especialidade_atuacao || '').trim();
+          const especialidade = espRaw ? espRaw.toUpperCase() : 'Não especificado';
           
-          if (!equipesMap.has(equipe)) {
-            equipesMap.set(equipe, {
+          if (!equipesMap.has(equipeNome)) {
+            equipesMap.set(equipeNome, {
               total: 0,
               staff: 0,
               fellow: 0,
@@ -266,7 +267,7 @@ export default function Colaboradores() {
             });
           }
           
-          const equipeData = equipesMap.get(equipe)!;
+          const equipeData = equipesMap.get(equipeNome)!;
           equipeData.total++;
           
           // Contar STAFF e FELLOW baseado na função
@@ -277,7 +278,7 @@ export default function Colaboradores() {
           }
           
           // Contar especialidades - só adiciona se tiver especialidade definida
-          if (especialidade && especialidade !== 'Não especificado') {
+          if (especialidade && especialidade !== 'NÃO ESPECIFICADO') {
             const countEsp = equipeData.especialidades.get(especialidade) || 0;
             equipeData.especialidades.set(especialidade, countEsp + 1);
           }
