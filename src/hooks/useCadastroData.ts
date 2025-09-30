@@ -278,7 +278,7 @@ export const useRepasseMedico = () => {
       // Buscar TODOS os registros usando paginação
       let allData: any[] = [];
       let rangeStart = 0;
-      const rangeSize = 10000;
+      const rangeSize = 1000;
       let hasMore = true;
 
       while (hasMore) {
@@ -286,7 +286,12 @@ export const useRepasseMedico = () => {
           .from('medicos_valores_repasse')
           .select(`
             *,
-            medicos(nome, crm)
+            medicos(nome, crm),
+            clientes:cliente_id (
+              id,
+              nome,
+              nome_fantasia
+            )
           `)
           .order('created_at', { ascending: false })
           .range(rangeStart, rangeStart + rangeSize - 1);
