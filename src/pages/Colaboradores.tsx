@@ -719,29 +719,6 @@ export default function Colaboradores() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <Shield className="h-8 w-8 text-purple-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Níveis de Acesso</p>
-                <p className="text-2xl font-bold text-gray-900">6</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <Settings className="h-8 w-8 text-orange-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Departamentos</p>
-                <p className="text-2xl font-bold text-gray-900">7</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Resumo Cadastros por Equipe */}
