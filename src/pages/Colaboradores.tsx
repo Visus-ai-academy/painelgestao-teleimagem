@@ -125,7 +125,15 @@ export default function Colaboradores() {
     especialidades: [] as string[],
     valoresCombinacoes: {} as Record<string, Record<string, Record<string, Record<string, string>>>>, // modalidade -> especialidade -> categoria_exame -> prioridade -> valor
     crm: "",
-    rqe: ""
+    rqe: "",
+    equipe: "",
+    especialidade_atuacao: "",
+    socio: "",
+    cnpj: "",
+    nome_empresa: "",
+    optante_simples: "",
+    acrescimo_sem_digitador: "",
+    adicional_valor_sem_digitador: ""
   });
 
   // Lista de colaboradores (médicos) da tabela medicos
@@ -490,92 +498,136 @@ export default function Colaboradores() {
 
     // Validação específica para médicos
     if (newColaborador.departamento === "Médico") {
-      if (!medicoData.categoria) {
+      if (!medicoData.crm) {
         toast({
           title: "Erro",
-          description: "Por favor, selecione a categoria do médico.",
+          description: "Por favor, preencha o CRM do médico.",
           variant: "destructive"
         });
         return;
       }
       
-      if (medicoData.modalidades.length === 0) {
+      if (!medicoData.especialidade_atuacao) {
         toast({
-          title: "Erro", 
-          description: "Por favor, selecione pelo menos uma modalidade.",
+          title: "Erro",
+          description: "Por favor, preencha a Especialidade de Atuação.",
           variant: "destructive"
         });
         return;
       }
+    }
 
-      if (medicoData.especialidades.length === 0) {
-        toast({
-          title: "Erro", 
-          description: "Por favor, selecione pelo menos uma especialidade.",
-          variant: "destructive"
-        });
-        return;
-      }
+    try {
+      // Inserir médico no banco de dados
+      const { data, error } = await supabase
+        .from('medicos')
+        .insert([{
+          nome: newColaborador.nome,
+          email: newColaborador.email,
+          telefone: newColaborador.telefone || null,
+          cpf: newColaborador.cpf || null,
+          funcao: newColaborador.funcao,
+          crm: medicoData.crm || null,
+          especialidade: medicoData.especialidade_atuacao || 'GERAL',
+          especialidade_atuacao: medicoData.especialidade_atuacao || null,
+          equipe: medicoData.equipe || null,
+          categoria: medicoData.categoria || null,
+          modalidades: medicoData.modalidades || [],
+          especialidades: medicoData.especialidades || [],
+          socio: medicoData.socio || null,
+          cnpj: medicoData.cnpj || null,
+          nome_empresa: medicoData.nome_empresa || null,
+          optante_simples: medicoData.optante_simples || null,
+          acrescimo_sem_digitador: medicoData.acrescimo_sem_digitador || null,
+          adicional_valor_sem_digitador: medicoData.adicional_valor_sem_digitador ? parseFloat(medicoData.adicional_valor_sem_digitador) : null,
+          ativo: true
+        }])
+        .select();
 
-      // Verificar se todos os valores das combinações foram preenchidos
-      let combinacoesSemValor: string[] = [];
-      medicoData.modalidades.forEach(modalidade => {
-        medicoData.especialidades.forEach(especialidade => {
-          categoriasExame.forEach(categoriaExame => {
-            prioridadesDisponiveis.forEach(prioridade => {
-              const valor = medicoData.valoresCombinacoes[modalidade]?.[especialidade]?.[categoriaExame]?.[prioridade];
-              if (!valor || parseFloat(valor) <= 0) {
-                combinacoesSemValor.push(`${modalidade} - ${especialidade} - ${categoriaExame} - ${prioridade}`);
-              }
-            });
-          });
-        });
+      if (error) throw error;
+
+      toast({
+        title: "✅ Médico cadastrado",
+        description: `${newColaborador.nome} foi adicionado com sucesso!`,
       });
-      
-      if (combinacoesSemValor.length > 0) {
-        toast({
-          title: "Erro",
-          description: `Por favor, defina valores válidos para todas as combinações. Faltam: ${combinacoesSemValor.slice(0, 2).join(', ')}${combinacoesSemValor.length > 2 ? '...' : ''}`,
-          variant: "destructive"
-        });
-        return;
+
+      // Recarregar lista de médicos
+      const { data: medicosData } = await supabase
+        .from('medicos')
+        .select('*')
+        .order('nome');
+
+      if (medicosData) {
+        const lista: Colaborador[] = medicosData.map(medico => ({
+          id: medico.id,
+          nome: medico.nome || '',
+          email: medico.email || '',
+          funcao: medico.funcao || 'Médico',
+          departamento: 'Medicina',
+          nivel: '',
+          status: (medico.ativo ? 'Ativo' : 'Inativo') as "Ativo" | "Inativo" | "Férias" | "Licença",
+          dataAdmissao: '',
+          telefone: medico.telefone || '',
+          cpf: medico.cpf || '',
+          permissoes: [],
+          gestor: '',
+          salario: 0,
+          crm: medico.crm || '',
+          categoria: medico.categoria || '',
+          modalidades: medico.modalidades || [],
+          especialidades: medico.especialidades || [],
+          prioridades: [],
+          documentos: [],
+          equipe: medico.equipe || '',
+          especialidade_atuacao: medico.especialidade_atuacao || '',
+          socio: medico.socio || '',
+          cnpj: medico.cnpj || '',
+          nome_empresa: medico.nome_empresa || '',
+          optante_simples: medico.optante_simples || '',
+          acrescimo_sem_digitador: medico.acrescimo_sem_digitador || '',
+          adicional_valor_sem_digitador: medico.adicional_valor_sem_digitador || 0
+        } as any));
+        setColaboradores(lista);
       }
+
+      // Limpar formulário e fechar dialog
+      setNewColaborador({
+        nome: "",
+        email: "",
+        funcao: "",
+        departamento: "",
+        nivel: "",
+        telefone: "",
+        cpf: "",
+        gestor: "",
+        salario: "",
+        endereco: ""
+      });
+      setMedicoData({
+        categoria: "",
+        modalidades: [],
+        especialidades: [],
+        valoresCombinacoes: {},
+        crm: "",
+        rqe: "",
+        equipe: "",
+        especialidade_atuacao: "",
+        socio: "",
+        cnpj: "",
+        nome_empresa: "",
+        optante_simples: "",
+        acrescimo_sem_digitador: "",
+        adicional_valor_sem_digitador: ""
+      });
+      setShowNewColaboradorDialog(false);
+    } catch (err: any) {
+      console.error('Erro ao criar médico:', err);
+      toast({
+        title: "❌ Erro ao criar médico",
+        description: err.message || "Não foi possível cadastrar o médico",
+        variant: "destructive"
+      });
     }
-
-    // Para médicos, gerar e enviar contrato automaticamente
-    if (newColaborador.departamento === "Médico") {
-      await gerarEnviarContratoMedico();
-    }
-
-    // Simular criação do colaborador
-    console.log("Dados do médico:", medicoData);
-    toast({
-      title: "Colaborador criado",
-      description: `${newColaborador.nome} foi adicionado com sucesso!`,
-    });
-
-    // Limpar formulário e fechar dialog
-    setNewColaborador({
-      nome: "",
-      email: "",
-      funcao: "",
-      departamento: "",
-      nivel: "",
-      telefone: "",
-      cpf: "",
-      gestor: "",
-      salario: "",
-      endereco: ""
-    });
-    setMedicoData({
-      categoria: "",
-      modalidades: [],
-      especialidades: [],
-      valoresCombinacoes: {},
-      crm: "",
-      rqe: ""
-    });
-    setShowNewColaboradorDialog(false);
   };
 
   const gerarEnviarContratoMedico = async () => {
@@ -965,12 +1017,12 @@ export default function Colaboradores() {
                 <DialogTrigger asChild>
                   <Button className="flex items-center gap-2">
                     <UserPlus className="h-4 w-4" />
-                    Novo Colaborador
+                    Novo Cadastro de Médico
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
                   <DialogHeader>
-                    <DialogTitle>Cadastrar Novo Colaborador</DialogTitle>
+                    <DialogTitle>Cadastrar Novo Médico</DialogTitle>
                   </DialogHeader>
                   <ScrollArea className="flex-1 pr-4 overflow-y-auto">
                   <div className="space-y-6">
@@ -1046,34 +1098,122 @@ export default function Colaboradores() {
                             </div>
                             
                             <div>
-                              <Label htmlFor="rqe">RQE</Label>
+                              <Label htmlFor="especialidade_atuacao">Especialidade de Atuação *</Label>
                               <Input
-                                id="rqe"
-                                value={medicoData.rqe || ''}
-                                onChange={(e) => setMedicoData({...medicoData, rqe: e.target.value})}
-                                placeholder="RQE12345"
+                                id="especialidade_atuacao"
+                                value={medicoData.especialidade_atuacao || ''}
+                                onChange={(e) => setMedicoData({...medicoData, especialidade_atuacao: e.target.value})}
+                                placeholder="Especialidade"
+                              />
+                            </div>
+                            
+                            <div>
+                              <Label htmlFor="equipe">Equipe</Label>
+                              <Input
+                                id="equipe"
+                                value={medicoData.equipe || ''}
+                                onChange={(e) => setMedicoData({...medicoData, equipe: e.target.value})}
+                                placeholder="Equipe 1, Equipe 2, etc."
+                              />
+                            </div>
+                            
+                            <div>
+                              <Label htmlFor="socio">Sócio</Label>
+                              <Select value={medicoData.socio} onValueChange={(value) => setMedicoData({...medicoData, socio: value})}>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Selecione" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="SIM">SIM</SelectItem>
+                                  <SelectItem value="NÃO">NÃO</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            
+                            <div>
+                              <Label htmlFor="cnpj">CNPJ</Label>
+                              <Input
+                                id="cnpj"
+                                value={medicoData.cnpj || ''}
+                                onChange={(e) => setMedicoData({...medicoData, cnpj: e.target.value})}
+                                placeholder="00.000.000/0000-00"
+                              />
+                            </div>
+                            
+                            <div>
+                              <Label htmlFor="nome_empresa">Nome da Empresa</Label>
+                              <Input
+                                id="nome_empresa"
+                                value={medicoData.nome_empresa || ''}
+                                onChange={(e) => setMedicoData({...medicoData, nome_empresa: e.target.value})}
+                                placeholder="Nome da empresa"
+                              />
+                            </div>
+                            
+                            <div>
+                              <Label htmlFor="optante_simples">Optante Simples</Label>
+                              <Select value={medicoData.optante_simples} onValueChange={(value) => setMedicoData({...medicoData, optante_simples: value})}>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Selecione" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="SIM">SIM</SelectItem>
+                                  <SelectItem value="NÃO">NÃO</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            
+                            <div>
+                              <Label htmlFor="acrescimo_sem_digitador">Acréscimo sem Digitador</Label>
+                              <Select value={medicoData.acrescimo_sem_digitador} onValueChange={(value) => setMedicoData({...medicoData, acrescimo_sem_digitador: value})}>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Selecione" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="SIM">SIM</SelectItem>
+                                  <SelectItem value="NÃO">NÃO</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            
+                            <div>
+                              <Label htmlFor="adicional_valor_sem_digitador">Valor Adicional sem Digitador</Label>
+                              <Input
+                                id="adicional_valor_sem_digitador"
+                                type="number"
+                                step="0.01"
+                                value={medicoData.adicional_valor_sem_digitador || ''}
+                                onChange={(e) => setMedicoData({...medicoData, adicional_valor_sem_digitador: e.target.value})}
+                                placeholder="0.00"
                               />
                             </div>
                           </>
                         )}
                         
-                        <div>
-                          <Label htmlFor="funcao">Função *</Label>
-                          <Select value={newColaborador.funcao} onValueChange={(value) => setNewColaborador({...newColaborador, funcao: value})}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecione a função" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Médico Radiologista">Médico Radiologista</SelectItem>
-                              <SelectItem value="Médico Cardiologista">Médico Cardiologista</SelectItem>
-                              <SelectItem value="Técnico em Radiologia">Técnico em Radiologia</SelectItem>
-                              <SelectItem value="Enfermeira">Enfermeira</SelectItem>
-                              <SelectItem value="Administrador TI">Administrador TI</SelectItem>
-                              <SelectItem value="Analista Financeiro">Analista Financeiro</SelectItem>
-                              <SelectItem value="Recepcionista">Recepcionista</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
+                         <div>
+                           <Label htmlFor="funcao">Função *</Label>
+                           <Select value={newColaborador.funcao} onValueChange={(value) => setNewColaborador({...newColaborador, funcao: value})}>
+                             <SelectTrigger>
+                               <SelectValue placeholder="Selecione a função" />
+                             </SelectTrigger>
+                             <SelectContent>
+                               {newColaborador.departamento === "Médico" ? (
+                                 <>
+                                   <SelectItem value="STAFF">STAFF</SelectItem>
+                                   <SelectItem value="FELLOW">FELLOW</SelectItem>
+                                 </>
+                               ) : (
+                                 <>
+                                   <SelectItem value="Técnico em Radiologia">Técnico em Radiologia</SelectItem>
+                                   <SelectItem value="Enfermeira">Enfermeira</SelectItem>
+                                   <SelectItem value="Administrador TI">Administrador TI</SelectItem>
+                                   <SelectItem value="Analista Financeiro">Analista Financeiro</SelectItem>
+                                   <SelectItem value="Recepcionista">Recepcionista</SelectItem>
+                                 </>
+                               )}
+                             </SelectContent>
+                           </Select>
+                         </div>
                         
                          <div>
                            <Label htmlFor="departamento">Departamento *</Label>
@@ -1082,16 +1222,24 @@ export default function Colaboradores() {
                              onValueChange={(value) => {
                                setNewColaborador({...newColaborador, departamento: value});
                                // Se não for médico, limpar dados médicos
-                               if (value !== "Médico") {
-                                 setMedicoData({
-                                   categoria: "",
-                                   modalidades: [],
-                                   especialidades: [],
-                                   valoresCombinacoes: {},
-                                   crm: "",
-                                   rqe: ""
-                                 });
-                               }
+                                if (value !== "Médico") {
+                                  setMedicoData({
+                                    categoria: "",
+                                    modalidades: [],
+                                    especialidades: [],
+                                    valoresCombinacoes: {},
+                                    crm: "",
+                                    rqe: "",
+                                    equipe: "",
+                                    especialidade_atuacao: "",
+                                    socio: "",
+                                    cnpj: "",
+                                    nome_empresa: "",
+                                    optante_simples: "",
+                                    acrescimo_sem_digitador: "",
+                                    adicional_valor_sem_digitador: ""
+                                  });
+                                }
                              }}
                            >
                              <SelectTrigger className={newColaborador.departamento === "Médico" ? "border-primary" : ""}>
