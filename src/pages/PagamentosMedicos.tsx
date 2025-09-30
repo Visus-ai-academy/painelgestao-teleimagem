@@ -32,6 +32,8 @@ interface ExameDetalhe {
   valor_total: number;
   cliente_nome: string;
   paciente_nome: string;
+  prioridade: string;
+  sem_valor_configurado: boolean;
 }
 
 interface ResumoMedico {
@@ -41,6 +43,7 @@ interface ResumoMedico {
   descontos: number;
   valor_liquido: number;
   exames: ExameDetalhe[];
+  exames_sem_valor: number;
 }
 
 export default function PagamentosMedicos() {
@@ -132,6 +135,7 @@ export default function PagamentosMedicos() {
 
       // Agrupar por médico
       const resumosPorMedico = new Map<string, ResumoMedico>();
+      let totalSemValor = 0;
 
       volumetria.forEach((registro) => {
         const medicoNome = registro.MEDICO;
@@ -157,12 +161,13 @@ export default function PagamentosMedicos() {
           return matchBasico && !vr.cliente_id;
         });
 
-        if (!valorRepasse) {
+        const semValorConfigurado = !valorRepasse;
+        if (semValorConfigurado) {
           console.warn(`Valor de repasse não encontrado para: ${medicoNome} - ${registro.MODALIDADE}/${registro.ESPECIALIDADE}/${registro.CATEGORIA}/${registro.PRIORIDADE}`);
-          return;
+          totalSemValor++;
         }
 
-        const valorUnitario = Number(valorRepasse.valor) || 0;
+        const valorUnitario = valorRepasse ? Number(valorRepasse.valor) : 0;
         const quantidade = Number(registro.VALORES) || 0;
         const valorTotal = valorUnitario * quantidade;
 
@@ -181,13 +186,17 @@ export default function PagamentosMedicos() {
             valor_bruto: 0,
             descontos: 0,
             valor_liquido: 0,
-            exames: []
+            exames: [],
+            exames_sem_valor: 0
           });
         }
 
         const resumo = resumosPorMedico.get(medicoNome)!;
         resumo.total_exames += quantidade;
         resumo.valor_bruto += valorTotal;
+        if (semValorConfigurado) {
+          resumo.exames_sem_valor++;
+        }
 
         resumo.exames.push({
           id: registro.id,
@@ -195,11 +204,13 @@ export default function PagamentosMedicos() {
           modalidade: registro.MODALIDADE || '',
           especialidade: registro.ESPECIALIDADE || '',
           categoria: registro.CATEGORIA || '',
+          prioridade: registro.PRIORIDADE || '',
           quantidade: quantidade,
           valor_unitario: valorUnitario,
           valor_total: valorTotal,
           cliente_nome: registro.EMPRESA || '',
-          paciente_nome: registro.NOME_PACIENTE || ''
+          paciente_nome: registro.NOME_PACIENTE || '',
+          sem_valor_configurado: semValorConfigurado
         });
       });
 
@@ -212,10 +223,18 @@ export default function PagamentosMedicos() {
       console.log(`Gerados ${resumosArray.length} resumos de pagamento`);
       setResumos(resumosArray);
 
-      toast({
-        title: "Sucesso",
-        description: `Pagamento calculado para ${resumosArray.length} médico(s)`,
-      });
+      if (totalSemValor > 0) {
+        toast({
+          title: "Atenção",
+          description: `${resumosArray.length} médico(s) processados. ${totalSemValor} exame(s) sem valor de repasse configurado.`,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Sucesso",
+          description: `Pagamento calculado para ${resumosArray.length} médico(s)`,
+        });
+      }
     } catch (error) {
       console.error('Erro ao calcular pagamentos:', error);
       toast({
@@ -439,7 +458,15 @@ export default function PagamentosMedicos() {
               <TableBody>
                 {resumosFiltrados.map((resumo) => (
                   <TableRow key={resumo.medico.id}>
-                    <TableCell className="font-medium">{resumo.medico.nome}</TableCell>
+                    <TableCell className="font-medium">
+                      {resumo.medico.nome}
+                      {resumo.exames_sem_valor > 0 && (
+                        <Badge variant="outline" className="ml-2 text-orange-600 border-orange-600">
+                          <AlertCircle className="h-3 w-3 mr-1" />
+                          {resumo.exames_sem_valor} sem valor
+                        </Badge>
+                      )}
+                    </TableCell>
                     <TableCell>{resumo.medico.crm}</TableCell>
                     <TableCell>
                       <Badge variant="outline">{resumo.medico.especialidade}</Badge>
@@ -508,6 +535,7 @@ export default function PagamentosMedicos() {
                                   <TableHead>Cliente</TableHead>
                                   <TableHead>Modalidade</TableHead>
                                   <TableHead>Categoria</TableHead>
+                                  <TableHead>Prioridade</TableHead>
                                   <TableHead className="text-right">Qtd</TableHead>
                                   <TableHead className="text-right">Valor Unit.</TableHead>
                                   <TableHead className="text-right">Total</TableHead>
@@ -515,7 +543,7 @@ export default function PagamentosMedicos() {
                               </TableHeader>
                               <TableBody>
                                 {resumo.exames.map((exame) => (
-                                  <TableRow key={exame.id}>
+                                  <TableRow key={exame.id} className={exame.sem_valor_configurado ? 'bg-orange-50' : ''}>
                                     <TableCell>
                                       {format(new Date(exame.data_exame), 'dd/MM/yyyy', { locale: ptBR })}
                                     </TableCell>
@@ -525,13 +553,23 @@ export default function PagamentosMedicos() {
                                       <Badge variant="outline">{exame.modalidade}</Badge>
                                     </TableCell>
                                     <TableCell>
-                                      <Badge variant={exame.categoria === 'Urgência' ? 'destructive' : 'secondary'}>
-                                        {exame.categoria}
+                                      <Badge variant="outline">{exame.categoria}</Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                      <Badge variant={exame.prioridade === 'URGÊNCIA' ? 'destructive' : 'secondary'}>
+                                        {exame.prioridade}
                                       </Badge>
                                     </TableCell>
                                     <TableCell className="text-right">{exame.quantidade}</TableCell>
                                     <TableCell className="text-right">
-                                      R$ {exame.valor_unitario.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                      {exame.sem_valor_configurado ? (
+                                        <span className="text-orange-600 flex items-center justify-end gap-1">
+                                          <AlertCircle className="h-3 w-3" />
+                                          Não configurado
+                                        </span>
+                                      ) : (
+                                        `R$ ${exame.valor_unitario.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                                      )}
                                     </TableCell>
                                     <TableCell className="text-right">
                                       R$ {exame.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
