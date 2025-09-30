@@ -172,13 +172,51 @@ export default function PagamentosMedicos() {
       console.log('Total de registros volumetria:', volumetria.length);
       console.log('Total de valores de repasse:', valoresRepasse?.length);
 
+      // Função de busca com pontuação para escolher o melhor valor de repasse
+      const buscarValorRepasse = (reg: any) => {
+        const medicoNorm = normalizeStr(reg.MEDICO);
+        const modalidadeNorm = normalizeStr(reg.MODALIDADE);
+        const especialidadeNorm = normalizeStr(reg.ESPECIALIDADE);
+        const categoriaNorm = normalizeCategoria(reg.CATEGORIA);
+        const prioridadeNorm = normalizeStr(reg.PRIORIDADE);
+        const clienteNorm = normalizeStr(reg.EMPRESA);
+        const clienteFantasiaNorm = normalizeStr(reg.Cliente_Nome_Fantasia || reg.cliente_nome_fantasia);
+
+        const candidatosBase = (valoresRepasse || []).filter(vr => 
+          normalizeStr(vr.medicos?.nome) === medicoNorm &&
+          normalizeStr(vr.modalidade) === modalidadeNorm &&
+          normalizeStr(vr.especialidade) === especialidadeNorm
+        );
+
+        let melhor: any = null;
+        let melhorScore = -1;
+
+        for (const vr of candidatosBase) {
+          const catMatch = normalizeCategoria(vr.categoria) === categoriaNorm;
+          const priMatch = normalizeStr(vr.prioridade) === prioridadeNorm;
+          const clienteNomeNorm = normalizeStr(vr.clientes?.nome);
+          const clienteMatch = !!vr.cliente_id && (clienteNomeNorm === clienteNorm || clienteNomeNorm === clienteFantasiaNorm);
+          const generico = !vr.cliente_id;
+
+          let score = 0;
+          if (clienteMatch) score += 10;
+          if (catMatch) score += 5;
+          if (priMatch) score += 3;
+          if (generico) score += 1; // pequeno bônus para genérico na falta de cliente específico
+
+          if (score > melhorScore) {
+            melhor = vr;
+            melhorScore = score;
+          }
+        }
+
+        return melhor;
+      };
+
       volumetria.forEach((registro, index) => {
         const medicoNome = registro.MEDICO;
         if (!medicoNome) return;
 
-        // BUSCA HIERÁRQUICA: do mais específico para o mais genérico
-        let valorRepasse = null;
-        
         // Normalizar campos para comparação (remoção de acentos, espaços extras e case)
         const medicoNorm = normalizeStr(medicoNome);
         const modalidadeNorm = normalizeStr(registro.MODALIDADE);
@@ -197,59 +235,13 @@ export default function PagamentosMedicos() {
           console.log('Cliente:', clienteNorm);
         }
 
-        // NÍVEL 1: Match completo com cliente específico
-        valorRepasse = valoresRepasse?.find(vr => {
-          const medicoMatch = normalizeStr(vr.medicos?.nome) === medicoNorm;
-          const modalidadeMatch = normalizeStr(vr.modalidade) === modalidadeNorm;
-          const especialidadeMatch = normalizeStr(vr.especialidade) === especialidadeNorm;
-          const categoriaMatch = normalizeCategoria(vr.categoria) === categoriaNorm;
-          const prioridadeMatch = normalizeStr(vr.prioridade) === prioridadeNorm;
-          const clienteMatch = !!vr.cliente_id && normalizeStr(vr.clientes?.nome) === clienteNorm;
-          return medicoMatch && modalidadeMatch && especialidadeMatch && categoriaMatch && prioridadeMatch && clienteMatch;
-        });
-
-        // NÍVEL 2: Match completo SEM cliente (genérico)
-        if (!valorRepasse) {
-          valorRepasse = valoresRepasse?.find(vr => {
-            const medicoMatch = normalizeStr(vr.medicos?.nome) === medicoNorm;
-            const modalidadeMatch = normalizeStr(vr.modalidade) === modalidadeNorm;
-            const especialidadeMatch = normalizeStr(vr.especialidade) === especialidadeNorm;
-            const categoriaMatch = normalizeCategoria(vr.categoria) === categoriaNorm;
-            const prioridadeMatch = normalizeStr(vr.prioridade) === prioridadeNorm;
-            return medicoMatch && modalidadeMatch && especialidadeMatch && categoriaMatch && prioridadeMatch && !vr.cliente_id;
-          });
-        }
-
-        // NÍVEL 3: Match sem categoria
-        if (!valorRepasse) {
-          valorRepasse = valoresRepasse?.find(vr => {
-            const medicoMatch = normalizeStr(vr.medicos?.nome) === medicoNorm;
-            const modalidadeMatch = normalizeStr(vr.modalidade) === modalidadeNorm;
-            const especialidadeMatch = normalizeStr(vr.especialidade) === especialidadeNorm;
-            const prioridadeMatch = normalizeStr(vr.prioridade) === prioridadeNorm;
-            const categoriaIsVazia = !normalizeCategoria(vr.categoria);
-            const clienteIsVazio = !vr.cliente_id;
-            return medicoMatch && modalidadeMatch && especialidadeMatch && prioridadeMatch && categoriaIsVazia && clienteIsVazio;
-          });
-        }
-
-        // NÍVEL 4: Match sem categoria E sem prioridade
-        if (!valorRepasse) {
-          valorRepasse = valoresRepasse?.find(vr => {
-            const medicoMatch = normalizeStr(vr.medicos?.nome) === medicoNorm;
-            const modalidadeMatch = normalizeStr(vr.modalidade) === modalidadeNorm;
-            const especialidadeMatch = normalizeStr(vr.especialidade) === especialidadeNorm;
-            const categoriaIsVazia = !normalizeCategoria(vr.categoria);
-            const prioridadeIsVazia = !normalizeStr(vr.prioridade);
-            const clienteIsVazio = !vr.cliente_id;
-            return medicoMatch && modalidadeMatch && especialidadeMatch && categoriaIsVazia && prioridadeIsVazia && clienteIsVazio;
-          });
-        }
+        // Buscar melhor valor de repasse para este registro
+        const valorRepasse = buscarValorRepasse(registro);
 
         if (index < 3) {
           console.log('Valor encontrado?', !!valorRepasse);
           if (valorRepasse) {
-            console.log('Valor unitário:', valorRepasse.valor);
+            console.log('Valor unitário:', valorRepasse.valor, 'Cliente amarrado?', !!valorRepasse.cliente_id);
           }
         }
 
