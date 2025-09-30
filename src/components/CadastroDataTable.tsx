@@ -88,10 +88,11 @@ export function CadastroDataTable({ data, loading, error, type, title }: Cadastr
       case 'repasse':
         return [
           { key: 'medico_nome', label: 'Médico', filterable: true },
-          { key: 'medico_crm', label: 'CRM', filterable: true },
           { key: 'modalidade', label: 'Modalidade', filterable: true },
           { key: 'especialidade', label: 'Especialidade', filterable: true },
+          { key: 'categoria', label: 'Categoria', filterable: true },
           { key: 'prioridade', label: 'Prioridade', filterable: true },
+          { key: 'cliente_nome', label: 'Cliente', filterable: true },
           { key: 'valor', label: 'Valor', filterable: false },
           { key: 'created_at', label: 'Criado em', filterable: false }
         ];
@@ -129,11 +130,11 @@ export function CadastroDataTable({ data, loading, error, type, title }: Cadastr
   const getCellValue = (item: any, key: string) => {
     switch (key) {
       case 'cliente_nome':
-        return item.clientes?.nome || item.cliente_nome || 'Cliente não identificado';
+        return item.clientes?.nome_fantasia || item.clientes?.nome || item.cliente_nome || '-';
       case 'medico_nome':
         return item.medicos?.nome || 'Regra Geral';
-      case 'medico_crm':
-        return item.medicos?.crm || '-';
+      case 'categoria':
+        return item.categoria || '-';
       case 'valor_base':
         return `R$ ${Number(item.valor_base || 0).toFixed(2)}`;
       case 'valor_urgencia':
