@@ -1194,6 +1194,57 @@ export type Database = {
           },
         ]
       }
+      duplicados_repasse_medico: {
+        Row: {
+          categoria: string | null
+          cliente_id: string | null
+          cliente_nome: string | null
+          created_at: string | null
+          especialidade: string | null
+          id: string
+          lote_processamento: string | null
+          medico_id: string | null
+          medico_nome: string | null
+          modalidade: string | null
+          prioridade: string | null
+          quantidade_duplicados: number | null
+          updated_at: string | null
+          valores_diferentes: Json[] | null
+        }
+        Insert: {
+          categoria?: string | null
+          cliente_id?: string | null
+          cliente_nome?: string | null
+          created_at?: string | null
+          especialidade?: string | null
+          id?: string
+          lote_processamento?: string | null
+          medico_id?: string | null
+          medico_nome?: string | null
+          modalidade?: string | null
+          prioridade?: string | null
+          quantidade_duplicados?: number | null
+          updated_at?: string | null
+          valores_diferentes?: Json[] | null
+        }
+        Update: {
+          categoria?: string | null
+          cliente_id?: string | null
+          cliente_nome?: string | null
+          created_at?: string | null
+          especialidade?: string | null
+          id?: string
+          lote_processamento?: string | null
+          medico_id?: string | null
+          medico_nome?: string | null
+          modalidade?: string | null
+          prioridade?: string | null
+          quantidade_duplicados?: number | null
+          updated_at?: string | null
+          valores_diferentes?: Json[] | null
+        }
+        Relationships: []
+      }
       emails_cobranca: {
         Row: {
           assunto: string

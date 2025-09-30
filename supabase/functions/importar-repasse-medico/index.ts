@@ -198,26 +198,18 @@ serve(async (req) => {
         }
       }
 
-      // DEDUPLAR registros dentro do chunk (usar última ocorrência)
-      const dedupMap = new Map<string, any>();
-      for (const item of toUpsert) {
-        const key = `${item.medico_id || 'NULL'}_${item.modalidade}_${item.especialidade}_${item.prioridade}_${item.categoria || 'NULL'}_${item.cliente_id || 'NULL'}`;
-        dedupMap.set(key, item);
-      }
-      const dedupedList = Array.from(dedupMap.values());
-      
-      // UPSERT em lotes (elimina consultas de duplicidade e conflitos)
-      if (dedupedList.length > 0) {
-        for (let i = 0; i < dedupedList.length; i += 500) {
-          const batch = dedupedList.slice(i, i + 500);
-          const { error: upsertError } = await supabase
+      // INSERT direto sem deduplicação - mantém TODOS os registros
+      if (toUpsert.length > 0) {
+        for (let i = 0; i < toUpsert.length; i += 500) {
+          const batch = toUpsert.slice(i, i + 500);
+          const { error: insertError } = await supabase
             .from('medicos_valores_repasse')
-            .upsert(batch, { onConflict: 'medico_id,modalidade,especialidade,prioridade,categoria,cliente_id' });
-          if (upsertError) {
-            console.error('Erro no upsert:', upsertError);
+            .insert(batch);
+          if (insertError) {
+            console.error('Erro no insert:', insertError);
             erros += batch.length;
           } else {
-            atualizados += batch.length;
+            inseridos += batch.length;
           }
         }
       }
@@ -259,11 +251,53 @@ serve(async (req) => {
       // Status final baseado nos contadores atuais
       const { data: upload } = await supabase
         .from('processamento_uploads')
-        .select('registros_inseridos, registros_atualizados, registros_erro, detalhes_erro')
+        .select('registros_inseridos, registros_atualizados, registros_erro, detalhes_erro, arquivo_nome')
         .eq('id', uploadId)
         .maybeSingle();
 
       const temSucesso = (upload?.registros_inseridos || 0) + (upload?.registros_atualizados || 0) > 0;
+      
+      // IDENTIFICAR DUPLICADOS COM VALORES DIFERENTES
+      if (temSucesso) {
+        console.log('🔍 Identificando duplicados com valores diferentes...');
+        
+        // Query para encontrar duplicados
+        const { data: duplicados } = await supabase.rpc('identificar_duplicados_repasse', {
+          p_lote: upload?.arquivo_nome || 'unknown'
+        }).select();
+        
+        if (duplicados && duplicados.length > 0) {
+          console.log(`⚠️ Encontrados ${duplicados.length} grupos de duplicados com valores diferentes`);
+          
+          // Limpar duplicados antigos deste lote
+          await supabase
+            .from('duplicados_repasse_medico')
+            .delete()
+            .eq('lote_processamento', upload?.arquivo_nome || 'unknown');
+          
+          // Inserir novos duplicados encontrados
+          const duplicadosParaInserir = duplicados.map((dup: any) => ({
+            medico_id: dup.medico_id,
+            medico_nome: dup.medico_nome,
+            modalidade: dup.modalidade,
+            especialidade: dup.especialidade,
+            prioridade: dup.prioridade,
+            categoria: dup.categoria,
+            cliente_id: dup.cliente_id,
+            cliente_nome: dup.cliente_nome,
+            valores_diferentes: dup.valores_diferentes,
+            quantidade_duplicados: dup.quantidade_duplicados,
+            lote_processamento: upload?.arquivo_nome || 'unknown'
+          }));
+          
+          await supabase
+            .from('duplicados_repasse_medico')
+            .insert(duplicadosParaInserir);
+          
+          console.log(`✅ Salvos ${duplicadosParaInserir.length} grupos de duplicados`);
+        }
+      }
+      
       await supabase
         .from('processamento_uploads')
         .update({ status: temSucesso ? 'concluido' : 'erro' })
