@@ -62,10 +62,10 @@ serve(async (req) => {
     const arrayBuffer = await file.arrayBuffer();
     const workbook = XLSX.read(arrayBuffer, {
       type: 'array',
-      cellDates: true,
+      cellDates: false,
       cellStyles: false,
       sheetStubs: false,
-      dense: true
+      dense: false
     });
 
     const sheetName = workbook.SheetNames[0];
@@ -103,8 +103,8 @@ serve(async (req) => {
     const detalhesErros: any[] = [];
 
     // Configurações de processamento
-    const ROWS_PER_CHUNK = 200; // Linhas lidas da planilha por vez
-    const BATCH_SIZE = 5;       // Registros processados (DB) por vez
+    const ROWS_PER_CHUNK = 100; // Linhas lidas da planilha por vez
+    const BATCH_SIZE = 3;       // Registros processados (DB) por vez
 
     // Funções auxiliares de busca "sob demanda"
     const buscarMedicoId = async (row: RepasseRow): Promise<string | null> => {
@@ -163,8 +163,7 @@ serve(async (req) => {
       const end = Math.min(start + ROWS_PER_CHUNK - 1, fullRange.e.r);
 
       const rows = XLSX.utils.sheet_to_json(worksheet, {
-        raw: false,
-        defval: null,
+        raw: true,
         blankrows: false,
         header: headers.length > 0 ? headers : undefined,
         range: { s: { r: start, c: fullRange.s.c }, e: { r: end, c: fullRange.e.c } }
