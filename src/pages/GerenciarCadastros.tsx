@@ -22,7 +22,7 @@ import { PrecosSemClienteAnalise } from '@/components/PrecosSemClienteAnalise';
 import { ParametrosFaturamentoList } from '@/components/ParametrosFaturamentoList';
 import { LimparPrecos } from '@/components/LimparPrecos';
 
-
+import * as XLSX from 'xlsx';
 
 import { 
   useCadastroExames, 
@@ -289,28 +289,55 @@ export default function GerenciarCadastros() {
     setRefreshStatusPanel(prev => prev + 1);
   };
 
-  // Handler para repasse médico
+  // Handler para repasse médico (parse no cliente + envio em chunks)
   const handleUploadRepasse = async (file: File) => {
-    console.log('🔄 Iniciando upload de repasse médico:', file.name);
-    
-    const formData = new FormData();
-    formData.append('file', file);
+    console.log('🔄 Iniciando upload de repasse médico (client-parse):', file.name);
 
-    const { data, error } = await supabase.functions.invoke('processar-repasse-medico', {
-      body: formData
+    // Ler e parsear no cliente (mais memória disponível que na edge)
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array', cellDates: false });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+
+    type RepasseRow = {
+      medico_nome?: string;
+      medico_crm?: string;
+      modalidade: string;
+      especialidade: string;
+      categoria?: string;
+      prioridade: string;
+      valor: number;
+      esta_no_escopo?: boolean | string;
+      cliente_nome?: string;
+    };
+
+    const rows = XLSX.utils.sheet_to_json<RepasseRow>(ws, { raw: true, defval: null }) as RepasseRow[];
+    const total = rows.length;
+
+    // Iniciar upload no backend e obter uploadId
+    const startRes = await supabase.functions.invoke('importar-repasse-medico', {
+      body: { action: 'start', fileName: file.name, totalRows: total }
     });
+    if (startRes.error) throw startRes.error;
+    const uploadId = (startRes.data as any)?.upload_id as string;
+    setRepasseUploadId(uploadId);
 
-    if (error) throw error;
-    
-    // Capturar upload_id para mostrar progresso
-    if (data?.upload_id) {
-      setRepasseUploadId(data.upload_id);
+    // Enviar em chunks pequenos
+    const CHUNK = 200;
+    for (let i = 0; i < rows.length; i += CHUNK) {
+      const chunk = rows.slice(i, i + CHUNK);
+      const res = await supabase.functions.invoke('importar-repasse-medico', {
+        body: { action: 'chunk', uploadId, rows: chunk }
+      });
+      if (res.error) throw res.error;
     }
-    
-    toast({
-      title: "Processamento Iniciado!",
-      description: "Acompanhe o progresso abaixo",
+
+    // Finalizar
+    const fin = await supabase.functions.invoke('importar-repasse-medico', {
+      body: { action: 'finish', uploadId }
     });
+    if (fin.error) throw fin.error;
+
+    toast({ title: 'Repasse processado!', description: `Total enviado: ${total}` });
   };
 
   // Handler para modalidades
