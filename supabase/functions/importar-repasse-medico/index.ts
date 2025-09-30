@@ -36,7 +36,7 @@ const KEY_SYNONYMS: Record<string, string> = {
   // prioridade
   prioridade: 'prioridade', prio: 'prioridade',
   // valor
-  valor: 'valor', preco: 'valor', preco_repasse: 'valor', preco_do_repasse: 'valor', preco_medico: 'valor', preco_med: 'valor', preco_: 'valor', preco_total: 'valor', preco__repasse: 'valor', preco_unitario: 'valor', preco_do_medico: 'valor', preco_exame: 'valor', preco__exame: 'valor', preco_repasses: 'valor', preco_repasse_medico: 'valor', preco_repasse__medico: 'valor', preco_bruto: 'valor', preco_liquido: 'valor', preco_final: 'valor', preco__final: 'valor', preco___final: 'valor', pre_o: 'valor',
+  valor: 'valor', preco: 'valor', preco_repasse: 'valor', preco_do_repasse: 'valor', preco_medico: 'valor', preco_med: 'valor', preco_: 'valor', preco_total: 'valor', preco__repasse: 'valor', preco_unitario: 'valor', preco_do_medico: 'valor', preco_exame: 'valor', preco__exame: 'valor', preco_repasses: 'valor', preco_repasse_medico: 'valor', preco_repasse__medico: 'valor', preco_bruto: 'valor', preco_liquido: 'valor', preco_final: 'valor', preco__final: 'valor', preco___final: 'valor', pre_o: 'valor', valores: 'valor', valor_repasse: 'valor', valor_do_repasse: 'valor', valor_medico: 'valor', valor_total: 'valor', valor__repasse: 'valor', valor__total: 'valor',
   // escopo
   esta_no_escopo: 'esta_no_escopo', escopo: 'esta_no_escopo', no_escopo: 'esta_no_escopo', esta_no_escopo_: 'esta_no_escopo',
   // cliente

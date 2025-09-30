@@ -110,20 +110,25 @@ export function RepasseUploadProgress({ uploadId, onComplete }: RepasseUploadPro
             <p className="text-sm font-medium text-destructive">
               {status.registros_erro} registro(s) com erro
             </p>
-            {status.detalhes_erro && Array.isArray(status.detalhes_erro) && status.detalhes_erro.length > 0 && (
-              <div className="mt-2 space-y-1">
-                {status.detalhes_erro.slice(0, 3).map((erro: any, idx: number) => (
-                  <p key={idx} className="text-xs text-muted-foreground">
-                    Linha {erro.linha}: {erro.erro}
-                  </p>
-                ))}
-                {status.detalhes_erro.length > 3 && (
-                  <p className="text-xs text-muted-foreground italic">
-                    ... e mais {status.detalhes_erro.length - 3} erro(s)
-                  </p>
-                )}
-              </div>
-            )}
+            {(() => {
+              const lista = Array.isArray(status.detalhes_erro)
+                ? status.detalhes_erro
+                : (status.detalhes_erro?.erros || []);
+              return lista.length > 0 ? (
+                <div className="mt-2 space-y-1">
+                  {lista.slice(0, 3).map((erro: any, idx: number) => (
+                    <p key={idx} className="text-xs text-muted-foreground">
+                      {erro?.linha ? `Linha ${erro.linha}: ` : ''}{erro?.erro || JSON.stringify(erro)}
+                    </p>
+                  ))}
+                  {lista.length > 3 && (
+                    <p className="text-xs text-muted-foreground italic">
+                      ... e mais {lista.length - 3} erro(s)
+                    </p>
+                  )}
+                </div>
+              ) : null;
+            })()}
           </div>
         )}
 
