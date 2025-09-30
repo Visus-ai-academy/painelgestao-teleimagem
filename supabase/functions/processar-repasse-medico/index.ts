@@ -39,6 +39,26 @@ serve(async (req) => {
 
     console.log(`📊 Processando ${file.name} (${Math.round(file.size/1024)}KB)`);
 
+    // Criar registro de upload inicial
+    const { data: uploadRecord, error: uploadError } = await supabase
+      .from('processamento_uploads')
+      .insert({
+        arquivo_nome: file.name,
+        tipo_arquivo: 'repasse_medico',
+        tipo_dados: 'configuracao',
+        status: 'processando',
+        registros_processados: 0,
+        registros_inseridos: 0,
+        registros_atualizados: 0,
+        registros_erro: 0,
+        tamanho_arquivo: file.size
+      })
+      .select()
+      .single();
+
+    if (uploadError) throw uploadError;
+    const uploadId = uploadRecord.id;
+
     // Ler Excel com opções mínimas de memória
     const arrayBuffer = await file.arrayBuffer();
     const workbook = XLSX.read(arrayBuffer, {
@@ -58,6 +78,12 @@ serve(async (req) => {
 
     const totalLinhas = jsonData.length;
     console.log(`Total: ${totalLinhas} registros`);
+
+    // Atualizar com total de linhas
+    await supabase
+      .from('processamento_uploads')
+      .update({ detalhes_erro: { total_linhas: totalLinhas } })
+      .eq('id', uploadId);
 
     // Buscar médicos e clientes UMA VEZ
     const { data: medicos } = await supabase
@@ -178,33 +204,42 @@ serve(async (req) => {
         }
       });
 
-      // Log progresso
+      // Log progresso a cada 100 registros
       if (batchEnd % 100 === 0 || batchEnd === totalLinhas) {
         console.log(`Processados ${batchEnd}/${totalLinhas} (${Math.round(batchEnd/totalLinhas*100)}%)`);
+        
+        // Atualizar progresso no banco
+        await supabase
+          .from('processamento_uploads')
+          .update({
+            registros_processados: processados,
+            registros_inseridos: inseridos,
+            registros_atualizados: atualizados,
+            registros_erro: erros
+          })
+          .eq('id', uploadId);
       }
 
       // Pequena pausa para GC
       await new Promise(resolve => setTimeout(resolve, 5));
     }
 
-    // Log final
+    // Atualizar registro final
     await supabase
       .from('processamento_uploads')
-      .insert({
-        arquivo_nome: file.name,
-        tipo_arquivo: 'repasse_medico',
-        tipo_dados: 'configuracao',
+      .update({
         status: erros > 0 && inseridos === 0 && atualizados === 0 ? 'erro' : 'concluido',
         registros_processados: processados,
         registros_inseridos: inseridos,
         registros_atualizados: atualizados,
         registros_erro: erros,
-        detalhes_erro: detalhesErros.length > 0 ? detalhesErros : null,
-        tamanho_arquivo: file.size
-      });
+        detalhes_erro: detalhesErros.length > 0 ? { erros: detalhesErros, total_linhas: totalLinhas } : { total_linhas: totalLinhas }
+      })
+      .eq('id', uploadId);
 
     const resultado = {
       sucesso: true,
+      upload_id: uploadId,
       arquivo: file.name,
       processados,
       inseridos,

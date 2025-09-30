@@ -9,6 +9,7 @@ import { CadastroDataTable } from '@/components/CadastroDataTable';
 import { ValoresReferenciaTable } from '@/components/ValoresReferenciaTable';
 import { DeParaPrioridadeUpload } from '@/components/DePara/DeParaPrioridadeUpload';
 import { DeParaPrioridadeList } from '@/components/DePara/DeParaPrioridadeList';
+import { RepasseUploadProgress } from '@/components/RepasseUploadProgress';
 import { FileText, DollarSign, Shield, UserCheck, Database, Trash2, AlertTriangle, Calculator } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -41,6 +42,7 @@ export default function GerenciarCadastros() {
   const [isClearing, setIsClearing] = useState(false);
   const [showClearDialog, setShowClearDialog] = useState(false);
   const [refreshStatusPanel, setRefreshStatusPanel] = useState(0);
+  const [repasseUploadId, setRepasseUploadId] = useState<string | null>(null);
   const [clearOptions, setClearOptions] = useState({
     cadastro_exames: false,
     quebra_exames: false,
@@ -300,17 +302,15 @@ export default function GerenciarCadastros() {
 
     if (error) throw error;
     
+    // Capturar upload_id para mostrar progresso
+    if (data?.upload_id) {
+      setRepasseUploadId(data.upload_id);
+    }
+    
     toast({
-      title: "Repasse Médico Processado!",
-      description: `${data.inseridos} valores cadastrados, ${data.atualizados} atualizados, ${data.erros} erros`,
+      title: "Processamento Iniciado!",
+      description: "Acompanhe o progresso abaixo",
     });
-    
-    // Recarregar dados e status
-    repasseData.refetch();
-    setRefreshStatusPanel(prev => prev + 1);
-    
-    // Disparar evento customizado para atualizar outras páginas (ex: Colaboradores)
-    window.dispatchEvent(new CustomEvent('repasse-updated'));
   };
 
   // Handler para modalidades
@@ -807,12 +807,30 @@ export default function GerenciarCadastros() {
                 </div>
               </div>
               
+              {/* Barra de Progresso em Tempo Real */}
+              {repasseUploadId && (
+                <div className="mt-6">
+                  <RepasseUploadProgress 
+                    uploadId={repasseUploadId}
+                    onComplete={() => {
+                      repasseData.refetch();
+                      setRefreshStatusPanel(prev => prev + 1);
+                      setRepasseUploadId(null);
+                      toast({
+                        title: "Upload Concluído!",
+                        description: "Dados de repasse médico processados com sucesso"
+                      });
+                    }}
+                  />
+                </div>
+              )}
+              
               {/* Status do Upload de Repasse */}
               <div className="mt-6">
                 <UploadStatusPanel 
                   refreshTrigger={refreshStatusPanel} 
                   tipos={['repasse_medico']}
-                  title="Status dos Uploads de Repasse"
+                  title="Histórico de Uploads"
                 />
               </div>
               
