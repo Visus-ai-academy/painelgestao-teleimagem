@@ -808,29 +808,36 @@ export default function Colaboradores() {
     }
   };
 
-  const colaboradoresFiltrados = colaboradores.filter(colaborador => {
-    // Filtro por nome
-    const matchNome = busca === "" || 
-                      colaborador.nome.toLowerCase().includes(busca.toLowerCase());
-    
-    // Filtro por função
-    const matchFuncao = filtroFuncao === "todas" || colaborador.funcao === filtroFuncao;
-    
-    // Filtro por especialidade
-    const matchEspecialidade = filtroEspecialidade === "todas" || 
-                               (colaborador.especialidades && 
-                                colaborador.especialidades.includes(filtroEspecialidade));
-    
-    // Filtro por status ativo
-    const matchStatusAtivo = filtroStatusAtivo === "todos" || 
-                             (filtroStatusAtivo === "ativo" && colaborador.status === "Ativo") ||
-                             (filtroStatusAtivo === "inativo" && colaborador.status === "Inativo");
-    
-    // Filtro por sócio (campo ainda não implementado, sempre true por enquanto)
-    const matchSocio = filtroSocio === "todos";
-    
-    return matchNome && matchFuncao && matchEspecialidade && matchStatusAtivo && matchSocio;
-  });
+  const colaboradoresFiltrados = colaboradores
+    .filter(colaborador => {
+      // Filtro por nome
+      const matchNome = busca === "" || 
+                        colaborador.nome.toLowerCase().includes(busca.toLowerCase());
+      
+      // Filtro por função
+      const matchFuncao = filtroFuncao === "todas" || colaborador.funcao === filtroFuncao;
+      
+      // Filtro por especialidade
+      const matchEspecialidade = filtroEspecialidade === "todas" || 
+                                 (colaborador.especialidades && 
+                                  colaborador.especialidades.includes(filtroEspecialidade));
+      
+      // Filtro por status ativo
+      const matchStatusAtivo = filtroStatusAtivo === "todos" || 
+                               (filtroStatusAtivo === "ativo" && colaborador.status === "Ativo") ||
+                               (filtroStatusAtivo === "inativo" && colaborador.status === "Inativo");
+      
+      // Filtro por sócio (campo ainda não implementado, sempre true por enquanto)
+      const matchSocio = filtroSocio === "todos";
+      
+      return matchNome && matchFuncao && matchEspecialidade && matchStatusAtivo && matchSocio;
+    })
+    .sort((a, b) => {
+      // Remover Dr./Dra. do início para ordenação alfabética
+      const nomeA = a.nome.replace(/^Dr[a]?\.\s*/i, '').trim();
+      const nomeB = b.nome.replace(/^Dr[a]?\.\s*/i, '').trim();
+      return nomeA.localeCompare(nomeB, 'pt-BR');
+    });
 
   const colaboradoresAtivos = colaboradores.filter(c => c.status === "Ativo").length;
   const totalColaboradores = colaboradores.length;
@@ -1518,9 +1525,13 @@ export default function Colaboradores() {
               <div key={colaborador.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                      <span className="text-blue-600 font-semibold">
-                        {colaborador.nome.split(' ').map(n => n[0]).join('').substring(0, 2)}
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                      colaborador.status === 'Ativo' ? 'bg-green-100' : 'bg-gray-100'
+                    }`}>
+                      <span className={`font-bold text-lg ${
+                        colaborador.status === 'Ativo' ? 'text-green-600' : 'text-gray-600'
+                      }`}>
+                        {colaborador.status === 'Ativo' ? 'A' : 'I'}
                       </span>
                     </div>
                     <div>

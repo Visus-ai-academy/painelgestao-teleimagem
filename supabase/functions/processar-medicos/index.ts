@@ -90,7 +90,7 @@ serve(async (req) => {
           adicionalValorNum = parseFloat(valorStr) || 0;
         }
 
-        const espAtu = String(row['especialidade_de_atuacao'] || row['especialidade_atuacao'] || row['especialidade'] || '').trim();
+        const espAtu = String(row['especialidade_de_atuacao'] || row['especialidadede_atuacao'] || row['especialidade_atuacao'] || row['especialidade'] || '').trim();
 
         const medicoData = {
           nome: nomeMed,
