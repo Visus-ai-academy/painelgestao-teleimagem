@@ -1,5 +1,5 @@
-medico_id,modalidade,especialidade,prioridade,valor
-"","MR","NE","Rotina",150.00
-"","MR","NE","Urgente",225.00
-"550e8400-e29b-41d4-a716-446655440003","CT","RA","Rotina",120.00
-"550e8400-e29b-41d4-a716-446655440003","CT","RA","Urgente",180.00
+medico_nome,medico_crm,modalidade,especialidade,categoria,prioridade,valor,esta_no_escopo,cliente_nome
+Dr. João Silva,12345-SP,MR,NEURO,CABEÇA,ROTINA,150.00,SIM,
+Dr. João Silva,12345-SP,MR,NEURO,CABEÇA,URGÊNCIA,225.00,SIM,
+,12345-SP,CT,MEDICINA INTERNA,,ROTINA,120.00,NÃO,CLIENTE_ESPECIAL
+,12345-SP,CT,MEDICINA INTERNA,,URGÊNCIA,180.00,NÃO,CLIENTE_ESPECIAL

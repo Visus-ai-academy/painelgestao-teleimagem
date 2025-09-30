@@ -2110,8 +2110,15 @@ export type Database = {
       }
       medicos_valores_repasse: {
         Row: {
+          ativo: boolean | null
+          categoria: string | null
+          cliente_id: string | null
           created_at: string | null
+          created_by: string | null
+          data_fim_vigencia: string | null
+          data_inicio_vigencia: string | null
           especialidade: string
+          esta_no_escopo: boolean | null
           id: string
           medico_id: string
           modalidade: string
@@ -2120,8 +2127,15 @@ export type Database = {
           valor: number
         }
         Insert: {
+          ativo?: boolean | null
+          categoria?: string | null
+          cliente_id?: string | null
           created_at?: string | null
+          created_by?: string | null
+          data_fim_vigencia?: string | null
+          data_inicio_vigencia?: string | null
           especialidade: string
+          esta_no_escopo?: boolean | null
           id?: string
           medico_id: string
           modalidade: string
@@ -2130,8 +2144,15 @@ export type Database = {
           valor: number
         }
         Update: {
+          ativo?: boolean | null
+          categoria?: string | null
+          cliente_id?: string | null
           created_at?: string | null
+          created_by?: string | null
+          data_fim_vigencia?: string | null
+          data_inicio_vigencia?: string | null
           especialidade?: string
+          esta_no_escopo?: boolean | null
           id?: string
           medico_id?: string
           modalidade?: string
@@ -2140,6 +2161,13 @@ export type Database = {
           valor?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "medicos_valores_repasse_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "medicos_valores_repasse_medico_id_fkey"
             columns: ["medico_id"]

@@ -12,8 +12,11 @@ interface RepasseRow {
   medico_crm?: string;
   modalidade: string;
   especialidade: string;
+  categoria?: string;
   prioridade: string;
   valor: number;
+  esta_no_escopo?: boolean | string;
+  cliente_nome?: string;
   data_inicio_vigencia?: string;
   data_fim_vigencia?: string;
   ativo?: boolean;
@@ -37,13 +40,22 @@ serve(async (req) => {
       throw new Error('Nenhum arquivo foi enviado');
     }
 
-    console.log(`Processando arquivo: ${file.name}, tamanho: ${file.size} bytes`);
+    console.log(`📊 Processando arquivo: ${file.name}, tamanho: ${file.size} bytes`);
 
-    // Ler arquivo Excel
+    // Ler arquivo Excel com opções otimizadas para memória
     const arrayBuffer = await file.arrayBuffer();
-    const workbook = XLSX.read(arrayBuffer);
+    const workbook = XLSX.read(arrayBuffer, {
+      type: 'array',
+      cellDates: true,
+      cellStyles: false, // Não precisamos de estilos
+      sheetStubs: false  // Ignora células vazias
+    });
+    
     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-    const jsonData = XLSX.utils.sheet_to_json(worksheet) as RepasseRow[];
+    const jsonData = XLSX.utils.sheet_to_json(worksheet, {
+      raw: false,
+      defval: null
+    }) as RepasseRow[];
 
     console.log(`Total de linhas encontradas: ${jsonData.length}`);
 
@@ -53,14 +65,20 @@ serve(async (req) => {
     let erros = 0;
     const detalhesErros: any[] = [];
 
-    // Buscar médicos existentes
+    // Buscar médicos e clientes existentes
     const { data: medicos } = await supabase
       .from('medicos')
       .select('id, nome, crm')
       .eq('ativo', true);
 
+    const { data: clientes } = await supabase
+      .from('clientes')
+      .select('id, nome, nome_fantasia')
+      .eq('ativo', true);
+
     const medicoMapNome = new Map(medicos?.map(m => [m.nome.toLowerCase(), m.id]) || []);
-    const medicoMapCrm = new Map(medicos?.map(m => [m.crm.toLowerCase(), m.id]) || []);
+    const medicoMapCrm = new Map(medicos?.map(m => [m.crm?.toLowerCase(), m.id]) || []);
+    const clienteMap = new Map(clientes?.map(c => [c.nome_fantasia?.toLowerCase() || c.nome.toLowerCase(), c.id]) || []);
 
     for (let i = 0; i < jsonData.length; i++) {
       const row = jsonData[i];
@@ -83,13 +101,29 @@ serve(async (req) => {
           throw new Error(`Médico não encontrado: ${row.medico_nome || row.medico_crm}`);
         }
 
+        // Buscar cliente se especificado
+        let cliente_id = null;
+        if (row.cliente_nome) {
+          cliente_id = clienteMap.get(row.cliente_nome.toLowerCase().trim());
+        }
+
+        // Processar esta_no_escopo (aceita sim/não, true/false, 1/0)
+        let esta_no_escopo = false;
+        if (row.esta_no_escopo) {
+          const valorEscopo = String(row.esta_no_escopo).toLowerCase().trim();
+          esta_no_escopo = ['sim', 'yes', 'true', '1', 's', 'y'].includes(valorEscopo);
+        }
+
         // Preparar dados do repasse
         const repasseData = {
           medico_id: medico_id || null,
           modalidade: row.modalidade.trim(),
           especialidade: row.especialidade.trim(),
+          categoria: row.categoria?.trim() || null,
           prioridade: row.prioridade.trim(),
-          valor: Number(row.valor)
+          valor: Number(row.valor),
+          esta_no_escopo,
+          cliente_id: cliente_id || null
         };
 
         // Verificar se já existe
