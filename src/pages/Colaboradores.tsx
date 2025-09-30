@@ -254,8 +254,27 @@ export default function Colaboradores() {
           const equipeNome = (medico.equipe || 'Sem Equipe').replace(/^EQUIPE\s*(\d)$/i, 'Equipe $1');
           const funcao = (medico.funcao || '').toUpperCase();
           
-          // Usar Especialidade de Atuação corretamente (pode ter múltiplas, separadas por vírgula, ponto e vírgula ou barra)
-          const rawAtuacao = (medico.especialidade_atuacao ?? '').trim();
+          // Especialidades: priorizar especialidade_atuacao; se vazio, usar array "especialidades"; se ainda vazio, usar campo "especialidade"
+          const tokens: string[] = [];
+          const addSplit = (txt?: string | null) => {
+            const v = (txt ?? '').trim();
+            if (!v) return;
+            v.split(/[,/;]+/).forEach((p) => {
+              const t = p.trim();
+              if (t) tokens.push(t);
+            });
+          };
+
+          // 1) Especialidade de Atuação (pode ter múltiplas)
+          addSplit(medico.especialidade_atuacao);
+          
+          // 2) Array de especialidades (já vem tokenizado)
+          if (Array.isArray(medico.especialidades) && medico.especialidades.length > 0) {
+            medico.especialidades.forEach((e) => addSplit(e as any));
+          }
+          
+          // 3) Campo especialidade (texto único, mas pode vir com separadores)
+          addSplit((medico as any).especialidade);
 
           if (!equipesMap.has(equipeNome)) {
             equipesMap.set(equipeNome, {
@@ -276,20 +295,13 @@ export default function Colaboradores() {
             equipeData.fellow++;
           }
           
-          // Contar especialidades: ignorar vazios e "não especificado"
-          if (rawAtuacao.length > 0) {
-            const tokens = rawAtuacao
-              .split(/[,/;]+/)
-              .map((s) => s.trim())
-              .filter(Boolean);
-
-            tokens.forEach((t) => {
-              const up = t.toUpperCase();
-              if (up === 'NÃO ESPECIFICADO' || up === 'NAO ESPECIFICADO') return;
-              const current = equipeData.especialidades.get(up) || 0;
-              equipeData.especialidades.set(up, current + 1);
-            });
-          }
+          // Normalizar e deduplicar por médico antes de contar
+          const uniqueTokens = Array.from(new Set(tokens.map((t) => t.toUpperCase().trim())));
+          uniqueTokens.forEach((up) => {
+            if (!up || up === 'NÃO ESPECIFICADO' || up === 'NAO ESPECIFICADO') return;
+            const current = equipeData.especialidades.get(up) || 0;
+            equipeData.especialidades.set(up, current + 1);
+          });
         });
 
         // Converter para array de resumo
