@@ -46,9 +46,11 @@ interface ResumoMedico {
 export default function PagamentosMedicos() {
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [resumos, setResumos] = useState<ResumoMedico[]>([]);
-  const [periodo, setPeriodo] = useState(() => {
+  const [periodoReferencia, setPeriodoReferencia] = useState(() => {
     const hoje = new Date();
-    return format(hoje, 'yyyy-MM');
+    const mes = format(hoje, 'MMM', { locale: ptBR });
+    const ano = format(hoje, 'yy');
+    return `${mes}/${ano}`;
   });
   const [loading, setLoading] = useState(false);
   const [filtroMedico, setFiltroMedico] = useState("");
@@ -60,11 +62,7 @@ export default function PagamentosMedicos() {
     carregarMedicos();
   }, []);
 
-  useEffect(() => {
-    if (periodo) {
-      calcularPagamentos();
-    }
-  }, [periodo]);
+  // Remover auto-cálculo - apenas quando clicar no botão
 
   const carregarMedicos = async () => {
     try {
@@ -87,37 +85,100 @@ export default function PagamentosMedicos() {
   };
 
   const calcularPagamentos = async () => {
-    if (!periodo) return;
+    if (!periodoReferencia) {
+      toast({
+        title: "Atenção",
+        description: "Selecione um período de referência",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setLoading(true);
     try {
-      const [ano, mes] = periodo.split('-');
-      const dataInicio = `${ano}-${mes}-01`;
-      const dataFim = new Date(parseInt(ano), parseInt(mes), 0).toISOString().split('T')[0];
+      console.log('Calculando pagamentos para período:', periodoReferencia);
 
-      // Buscar exames do período com dados de médicos e clientes
-      const { data: exames, error } = await supabase
-        .from('exames')
+      // Buscar volumetria do período
+      const { data: volumetria, error: volumetriaError } = await supabase
+        .from('volumetria_mobilemed')
+        .select('*')
+        .eq('periodo_referencia', periodoReferencia);
+
+      if (volumetriaError) throw volumetriaError;
+
+      console.log(`Encontrados ${volumetria?.length || 0} registros de volumetria`);
+
+      if (!volumetria || volumetria.length === 0) {
+        toast({
+          title: "Aviso",
+          description: "Nenhum registro de volumetria encontrado para este período",
+          variant: "destructive",
+        });
+        setResumos([]);
+        setLoading(false);
+        return;
+      }
+
+      // Buscar valores de repasse com joins para obter nomes
+      const { data: valoresRepasse, error: repasseError } = await supabase
+        .from('medicos_valores_repasse')
         .select(`
           *,
-          medicos!inner(id, nome, crm, especialidade, categoria, email),
-          clientes!inner(nome)
-        `)
-        .gte('data_exame', dataInicio)
-        .lte('data_exame', dataFim);
+          medicos (nome),
+          clientes (nome)
+        `);
 
-      if (error) throw error;
+      if (repasseError) throw repasseError;
 
-      // Agrupar por médico e calcular totais
+      console.log(`Encontrados ${valoresRepasse?.length || 0} registros de valores de repasse`);
+
+      // Agrupar por médico
       const resumosPorMedico = new Map<string, ResumoMedico>();
 
-      exames?.forEach((exame) => {
-        const medico = exame.medicos;
-        const cliente = exame.clientes;
-        
-        if (!resumosPorMedico.has(medico.id)) {
-          resumosPorMedico.set(medico.id, {
-            medico,
+      volumetria.forEach((registro) => {
+        const medicoNome = registro.MEDICO;
+        if (!medicoNome) return;
+
+        // Buscar valor de repasse correspondente
+        const valorRepasse = valoresRepasse?.find(vr => {
+          const medicoMatch = vr.medicos?.nome?.toLowerCase() === medicoNome.toLowerCase();
+          const modalidadeMatch = vr.modalidade === registro.MODALIDADE;
+          const especialidadeMatch = vr.especialidade === registro.ESPECIALIDADE;
+          const categoriaMatch = vr.categoria === registro.CATEGORIA;
+          const prioridadeMatch = vr.prioridade === registro.PRIORIDADE;
+
+          // Match básico
+          const matchBasico = medicoMatch && modalidadeMatch && especialidadeMatch && categoriaMatch && prioridadeMatch;
+
+          // Se tem cliente específico no repasse (Blume, CLINICADIA, HCONSTANTINI)
+          if (vr.clientes?.nome && ['Blume', 'CLINICADIA', 'HCONSTANTINI'].includes(vr.clientes.nome)) {
+            return matchBasico && vr.clientes.nome === registro.EMPRESA;
+          }
+
+          // Se não tem cliente específico, usar para todos (cliente_id null)
+          return matchBasico && !vr.cliente_id;
+        });
+
+        if (!valorRepasse) {
+          console.warn(`Valor de repasse não encontrado para: ${medicoNome} - ${registro.MODALIDADE}/${registro.ESPECIALIDADE}/${registro.CATEGORIA}/${registro.PRIORIDADE}`);
+          return;
+        }
+
+        const valorUnitario = Number(valorRepasse.valor) || 0;
+        const quantidade = Number(registro.VALORES) || 0;
+        const valorTotal = valorUnitario * quantidade;
+
+        // Criar ou atualizar resumo do médico
+        if (!resumosPorMedico.has(medicoNome)) {
+          resumosPorMedico.set(medicoNome, {
+            medico: {
+              id: medicoNome,
+              nome: medicoNome,
+              crm: '',
+              especialidade: registro.ESPECIALIDADE || '',
+              categoria: registro.CATEGORIA || '',
+              email: ''
+            },
             total_exames: 0,
             valor_bruto: 0,
             descontos: 0,
@@ -126,48 +187,37 @@ export default function PagamentosMedicos() {
           });
         }
 
-        const resumo = resumosPorMedico.get(medico.id)!;
-        resumo.total_exames += exame.quantidade;
-        resumo.valor_bruto += Number(exame.valor_total);
-        
-        // Calcular desconto baseado na categoria do médico
-        let percentualDesconto = 0;
-        switch (medico.categoria) {
-          case 'Junior':
-            percentualDesconto = 0.15; // 15%
-            break;
-          case 'Pleno':
-            percentualDesconto = 0.20; // 20%
-            break;
-          case 'Senior':
-            percentualDesconto = 0.25; // 25%
-            break;
-          case 'Expert':
-            percentualDesconto = 0.30; // 30%
-            break;
-          default:
-            percentualDesconto = 0.15;
-        }
-
-        const desconto = Number(exame.valor_total) * percentualDesconto;
-        resumo.descontos += desconto;
-        resumo.valor_liquido = resumo.valor_bruto - resumo.descontos;
+        const resumo = resumosPorMedico.get(medicoNome)!;
+        resumo.total_exames += quantidade;
+        resumo.valor_bruto += valorTotal;
 
         resumo.exames.push({
-          id: exame.id,
-          data_exame: exame.data_exame,
-          modalidade: exame.modalidade,
-          especialidade: exame.especialidade,
-          categoria: exame.categoria,
-          quantidade: exame.quantidade,
-          valor_unitario: Number(exame.valor_unitario),
-          valor_total: Number(exame.valor_total),
-          cliente_nome: cliente.nome,
-          paciente_nome: exame.paciente_nome
+          id: registro.id,
+          data_exame: registro.DATA_LAUDO || registro.DATA_REALIZACAO || '',
+          modalidade: registro.MODALIDADE || '',
+          especialidade: registro.ESPECIALIDADE || '',
+          categoria: registro.CATEGORIA || '',
+          quantidade: quantidade,
+          valor_unitario: valorUnitario,
+          valor_total: valorTotal,
+          cliente_nome: registro.EMPRESA || '',
+          paciente_nome: registro.NOME_PACIENTE || ''
         });
       });
 
-      setResumos(Array.from(resumosPorMedico.values()));
+      // Calcular valor líquido (sem descontos por enquanto)
+      resumosPorMedico.forEach(resumo => {
+        resumo.valor_liquido = resumo.valor_bruto - resumo.descontos;
+      });
+
+      const resumosArray = Array.from(resumosPorMedico.values());
+      console.log(`Gerados ${resumosArray.length} resumos de pagamento`);
+      setResumos(resumosArray);
+
+      toast({
+        title: "Sucesso",
+        description: `Pagamento calculado para ${resumosArray.length} médico(s)`,
+      });
     } catch (error) {
       console.error('Erro ao calcular pagamentos:', error);
       toast({
@@ -191,7 +241,7 @@ export default function PagamentosMedicos() {
         valor_bruto: resumo.valor_bruto,
         descontos: resumo.descontos,
         valor_liquido: resumo.valor_liquido,
-        periodo: periodo
+        periodo: periodoReferencia
       }));
 
       // Criar CSV
@@ -215,7 +265,7 @@ export default function PagamentosMedicos() {
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = `pagamentos_medicos_${periodo}.csv`;
+      link.download = `pagamentos_medicos_${periodoReferencia.replace('/', '_')}.csv`;
       link.click();
 
       toast({
@@ -270,19 +320,20 @@ export default function PagamentosMedicos() {
               <div>
                 <label className="text-sm font-medium mb-2 block flex items-center gap-2">
                   <CalendarIcon className="h-4 w-4" />
-                  Período de Referência
+                  Período de Referência (formato: jan/25, fev/25, etc)
                 </label>
                 <Input
-                  type="month"
-                  value={periodo}
-                  onChange={(e) => setPeriodo(e.target.value)}
+                  type="text"
+                  value={periodoReferencia}
+                  onChange={(e) => setPeriodoReferencia(e.target.value)}
+                  placeholder="jan/25"
                   className="w-full"
                 />
               </div>
               <div className="flex items-end">
                 <Button onClick={calcularPagamentos} className="w-full" disabled={loading}>
                   <Calculator className="h-4 w-4 mr-2" />
-                  Gerar Pagamento Médico
+                  {loading ? 'Processando...' : 'Gerar Pagamento Médico'}
                 </Button>
               </div>
             </div>
