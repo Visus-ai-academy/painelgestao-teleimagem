@@ -198,13 +198,21 @@ serve(async (req) => {
         }
       }
 
+      // DEDUPLAR registros dentro do chunk (usar última ocorrência)
+      const dedupMap = new Map<string, any>();
+      for (const item of toUpsert) {
+        const key = `${item.medico_id || 'NULL'}_${item.modalidade}_${item.especialidade}_${item.prioridade}_${item.categoria || 'NULL'}_${item.cliente_id || 'NULL'}`;
+        dedupMap.set(key, item);
+      }
+      const dedupedList = Array.from(dedupMap.values());
+      
       // UPSERT em lotes (elimina consultas de duplicidade e conflitos)
-      if (toUpsert.length > 0) {
-        for (let i = 0; i < toUpsert.length; i += 1000) {
-          const batch = toUpsert.slice(i, i + 1000);
+      if (dedupedList.length > 0) {
+        for (let i = 0; i < dedupedList.length; i += 500) {
+          const batch = dedupedList.slice(i, i + 500);
           const { error: upsertError } = await supabase
             .from('medicos_valores_repasse')
-            .upsert(batch, { onConflict: 'medico_id,modalidade,especialidade,prioridade' });
+            .upsert(batch, { onConflict: 'medico_id,modalidade,especialidade,prioridade,categoria,cliente_id' });
           if (upsertError) {
             console.error('Erro no upsert:', upsertError);
             erros += batch.length;
