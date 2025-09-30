@@ -136,8 +136,7 @@ serve(async (req) => {
       const clientePorNome = new Map(clientesCache?.map(c => [c.nome?.trim().toLowerCase(), c.id]) || []);
 
       // Preparar listas para batch insert/update
-      const toInsert: any[] = [];
-      const toUpdate: { id: string; valor: number; esta_no_escopo: boolean }[] = [];
+      const toUpsert: any[] = [];
 
       for (let i = 0; i < rows.length; i++) {
         const rawRow = rows[i] as Record<string, any>;
@@ -189,25 +188,8 @@ serve(async (req) => {
             cliente_id: cliente_id || null
           };
 
-          // Verificar duplicata (agora em uma única query)
-          let query = supabase
-            .from('medicos_valores_repasse')
-            .select('id')
-            .eq('modalidade', repasseData.modalidade)
-            .eq('especialidade', repasseData.especialidade)
-            .eq('prioridade', repasseData.prioridade);
-          
-          if (medico_id) query = query.eq('medico_id', medico_id); else query = query.is('medico_id', null);
-          if (repasseData.categoria) query = query.eq('categoria', repasseData.categoria); else query = query.is('categoria', null);
-          if (cliente_id) query = query.eq('cliente_id', cliente_id); else query = query.is('cliente_id', null);
-
-          const { data: existente } = await query.maybeSingle();
-          
-          if (existente) {
-            toUpdate.push({ id: existente.id, valor: repasseData.valor, esta_no_escopo });
-          } else {
-            toInsert.push(repasseData);
-          }
+          // Upsert direto: evitar consulta de duplicatas por linha
+          toUpsert.push(repasseData);
           processados++;
         } catch (e: any) {
           erros++;
@@ -216,31 +198,18 @@ serve(async (req) => {
         }
       }
 
-      // BATCH INSERT (muito mais rápido)
-      if (toInsert.length > 0) {
-        const { error: insertError } = await supabase
-          .from('medicos_valores_repasse')
-          .insert(toInsert);
-        if (!insertError) {
-          inseridos = toInsert.length;
-        } else {
-          console.error('Erro no batch insert:', insertError);
-          erros += toInsert.length;
-        }
-      }
-
-      // BATCH UPDATE (processa em lotes de 100)
-      for (let i = 0; i < toUpdate.length; i += 100) {
-        const batch = toUpdate.slice(i, i + 100);
-        for (const item of batch) {
-          const { error: updateError } = await supabase
+      // UPSERT em lotes (elimina consultas de duplicidade e conflitos)
+      if (toUpsert.length > 0) {
+        for (let i = 0; i < toUpsert.length; i += 1000) {
+          const batch = toUpsert.slice(i, i + 1000);
+          const { error: upsertError } = await supabase
             .from('medicos_valores_repasse')
-            .update({ valor: item.valor, esta_no_escopo: item.esta_no_escopo })
-            .eq('id', item.id);
-          if (!updateError) {
-            atualizados++;
+            .upsert(batch, { onConflict: 'medico_id,modalidade,especialidade,prioridade' });
+          if (upsertError) {
+            console.error('Erro no upsert:', upsertError);
+            erros += batch.length;
           } else {
-            erros++;
+            atualizados += batch.length;
           }
         }
       }
