@@ -254,10 +254,9 @@ export default function Colaboradores() {
           const equipeNome = (medico.equipe || 'Sem Equipe').replace(/^EQUIPE\s*(\d)$/i, 'Equipe $1');
           const funcao = (medico.funcao || '').toUpperCase();
           
-          // Usar Especialidade de Atuação (normalizada) como chave
-          const espRaw = (medico.especialidade_atuacao || '').trim();
-          const especialidade = espRaw ? espRaw.toUpperCase() : 'Não especificado';
-          
+          // Usar Especialidade de Atuação corretamente (pode ter múltiplas, separadas por vírgula, ponto e vírgula ou barra)
+          const rawAtuacao = (medico.especialidade_atuacao ?? '').trim();
+
           if (!equipesMap.has(equipeNome)) {
             equipesMap.set(equipeNome, {
               total: 0,
@@ -277,10 +276,19 @@ export default function Colaboradores() {
             equipeData.fellow++;
           }
           
-          // Contar especialidades - só adiciona se tiver especialidade definida
-          if (especialidade && especialidade !== 'NÃO ESPECIFICADO') {
-            const countEsp = equipeData.especialidades.get(especialidade) || 0;
-            equipeData.especialidades.set(especialidade, countEsp + 1);
+          // Contar especialidades: ignorar vazios e "não especificado"
+          if (rawAtuacao.length > 0) {
+            const tokens = rawAtuacao
+              .split(/[,/;]+/)
+              .map((s) => s.trim())
+              .filter(Boolean);
+
+            tokens.forEach((t) => {
+              const up = t.toUpperCase();
+              if (up === 'NÃO ESPECIFICADO' || up === 'NAO ESPECIFICADO') return;
+              const current = equipeData.especialidades.get(up) || 0;
+              equipeData.especialidades.set(up, current + 1);
+            });
           }
         });
 
