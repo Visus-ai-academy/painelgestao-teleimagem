@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.51.0";
-import * as XLSX from "https://deno.land/x/sheetjs@v0.18.3/xlsx.mjs";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -17,9 +16,6 @@ interface RepasseRow {
   valor: number;
   esta_no_escopo?: boolean | string;
   cliente_nome?: string;
-  data_inicio_vigencia?: string;
-  data_fim_vigencia?: string;
-  ativo?: boolean;
 }
 
 serve(async (req) => {
@@ -40,26 +36,27 @@ serve(async (req) => {
       throw new Error('Nenhum arquivo foi enviado');
     }
 
-    console.log(`📊 Processando arquivo: ${file.name}, tamanho: ${file.size} bytes`);
+    console.log(`📊 Processando arquivo: ${file.name}`);
 
-    // Ler arquivo Excel com opções otimizadas para memória
-    const arrayBuffer = await file.arrayBuffer();
-    const workbook = XLSX.read(arrayBuffer, {
-      type: 'array',
-      cellDates: true,
-      cellStyles: false,
-      sheetStubs: false
-    });
+    // Ler como texto para processar linha por linha (evita memória do XLSX)
+    const text = await file.text();
+    const lines = text.split('\n');
     
-    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-    const jsonData = XLSX.utils.sheet_to_json(worksheet, {
-      raw: false,
-      defval: null
-    }) as RepasseRow[];
+    if (lines.length < 2) {
+      throw new Error('Arquivo vazio ou sem dados');
+    }
 
-    console.log(`Total de linhas encontradas: ${jsonData.length}`);
+    // Parse header
+    const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+    console.log(`Headers: ${headers.join(', ')}`);
 
-    // Buscar médicos e clientes existentes UMA VEZ
+    let processados = 0;
+    let inseridos = 0;
+    let atualizados = 0;
+    let erros = 0;
+    const detalhesErros: any[] = [];
+
+    // Buscar médicos e clientes UMA VEZ
     const { data: medicos } = await supabase
       .from('medicos')
       .select('id, nome, crm')
@@ -74,143 +71,104 @@ serve(async (req) => {
     const medicoMapCrm = new Map(medicos?.map(m => [m.crm?.toLowerCase(), m.id]) || []);
     const clienteMap = new Map(clientes?.map(c => [c.nome_fantasia?.toLowerCase() || c.nome.toLowerCase(), c.id]) || []);
 
-    let processados = 0;
-    let inseridos = 0;
-    let atualizados = 0;
-    let erros = 0;
-    const detalhesErros: any[] = [];
+    // Processar linha por linha (MUITO mais eficiente em memória)
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
 
-    // Processar em lotes de 50 registros por vez
-    const BATCH_SIZE = 50;
-    
-    for (let batchStart = 0; batchStart < jsonData.length; batchStart += BATCH_SIZE) {
-      const batchEnd = Math.min(batchStart + BATCH_SIZE, jsonData.length);
-      const batch = jsonData.slice(batchStart, batchEnd);
-      
-      console.log(`Processando lote ${batchStart}-${batchEnd} de ${jsonData.length}`);
+      processados++;
 
-      for (let i = 0; i < batch.length; i++) {
-        const row = batch[i];
-        const lineNumber = batchStart + i + 1;
-        processados++;
+      try {
+        const values = line.split(',').map(v => v.trim().replace(/"/g, ''));
+        const row: any = {};
+        headers.forEach((h, idx) => {
+          row[h] = values[idx] || null;
+        });
 
-        try {
-          if (!row.modalidade || !row.especialidade || !row.prioridade || !row.valor) {
-            throw new Error('Campos obrigatórios em branco: modalidade, especialidade, prioridade, valor');
-          }
-
-          // Buscar médico
-          let medico_id = null;
-          if (row.medico_crm) {
-            medico_id = medicoMapCrm.get(row.medico_crm.toLowerCase().trim());
-          } else if (row.medico_nome) {
-            medico_id = medicoMapNome.get(row.medico_nome.toLowerCase().trim());
-          }
-
-          // Buscar cliente se especificado
-          let cliente_id = null;
-          if (row.cliente_nome) {
-            cliente_id = clienteMap.get(row.cliente_nome.toLowerCase().trim());
-          }
-
-          // Processar esta_no_escopo
-          let esta_no_escopo = false;
-          if (row.esta_no_escopo) {
-            const valorEscopo = String(row.esta_no_escopo).toLowerCase().trim();
-            esta_no_escopo = ['sim', 'yes', 'true', '1', 's', 'y'].includes(valorEscopo);
-          }
-
-          // Preparar dados do repasse
-          const repasseData = {
-            medico_id: medico_id || null,
-            modalidade: row.modalidade.trim(),
-            especialidade: row.especialidade.trim(),
-            categoria: row.categoria?.trim() || null,
-            prioridade: row.prioridade.trim(),
-            valor: Number(row.valor),
-            esta_no_escopo,
-            cliente_id: cliente_id || null
-          };
-
-          // Usar upsert para simplificar
-          const { error: upsertError } = await supabase
-            .from('medicos_valores_repasse')
-            .upsert(repasseData, {
-              onConflict: 'medico_id,modalidade,especialidade,categoria,prioridade,cliente_id',
-              ignoreDuplicates: false
-            });
-
-          if (upsertError) {
-            // Se falhar, pode ser porque não existe a constraint, então fazer insert/update manual
-            let queryBuilder = supabase
-              .from('medicos_valores_repasse')
-              .select('id')
-              .eq('modalidade', repasseData.modalidade)
-              .eq('especialidade', repasseData.especialidade)
-              .eq('prioridade', repasseData.prioridade);
-
-            if (repasseData.medico_id) {
-              queryBuilder = queryBuilder.eq('medico_id', repasseData.medico_id);
-            } else {
-              queryBuilder = queryBuilder.is('medico_id', null);
-            }
-
-            if (repasseData.categoria) {
-              queryBuilder = queryBuilder.eq('categoria', repasseData.categoria);
-            } else {
-              queryBuilder = queryBuilder.is('categoria', null);
-            }
-
-            if (repasseData.cliente_id) {
-              queryBuilder = queryBuilder.eq('cliente_id', repasseData.cliente_id);
-            } else {
-              queryBuilder = queryBuilder.is('cliente_id', null);
-            }
-
-            const { data: existente } = await queryBuilder.maybeSingle();
-
-            if (existente) {
-              const { error: updateError } = await supabase
-                .from('medicos_valores_repasse')
-                .update({ valor: repasseData.valor, esta_no_escopo: repasseData.esta_no_escopo })
-                .eq('id', existente.id);
-
-              if (updateError) throw updateError;
-              atualizados++;
-            } else {
-              const { error: insertError } = await supabase
-                .from('medicos_valores_repasse')
-                .insert(repasseData);
-
-              if (insertError) throw insertError;
-              inseridos++;
-            }
-          } else {
-            inseridos++;
-          }
-
-          if (lineNumber % 10 === 0) {
-            console.log(`Processadas ${lineNumber} linhas...`);
-          }
-
-        } catch (error: any) {
-          erros++;
-          const detalheErro = {
-            linha: lineNumber,
-            dados: row,
-            erro: error.message
-          };
-          detalhesErros.push(detalheErro);
-          console.error(`Erro na linha ${lineNumber}:`, error.message);
+        // Validação
+        if (!row.modalidade || !row.especialidade || !row.prioridade || !row.valor) {
+          throw new Error('Campos obrigatórios faltando');
         }
+
+        // Buscar médico
+        let medico_id = null;
+        if (row.medico_crm) {
+          medico_id = medicoMapCrm.get(row.medico_crm.toLowerCase());
+        } else if (row.medico_nome) {
+          medico_id = medicoMapNome.get(row.medico_nome.toLowerCase());
+        }
+
+        // Buscar cliente
+        let cliente_id = null;
+        if (row.cliente_nome) {
+          cliente_id = clienteMap.get(row.cliente_nome.toLowerCase());
+        }
+
+        // Escopo
+        let esta_no_escopo = false;
+        if (row.esta_no_escopo) {
+          const valor = String(row.esta_no_escopo).toLowerCase();
+          esta_no_escopo = ['sim', 'yes', 'true', '1', 's', 'y'].includes(valor);
+        }
+
+        const repasseData = {
+          medico_id: medico_id || null,
+          modalidade: row.modalidade,
+          especialidade: row.especialidade,
+          categoria: row.categoria || null,
+          prioridade: row.prioridade,
+          valor: parseFloat(row.valor),
+          esta_no_escopo,
+          cliente_id: cliente_id || null
+        };
+
+        // Verificar duplicata
+        let query = supabase
+          .from('medicos_valores_repasse')
+          .select('id')
+          .eq('modalidade', repasseData.modalidade)
+          .eq('especialidade', repasseData.especialidade)
+          .eq('prioridade', repasseData.prioridade);
+
+        if (medico_id) query = query.eq('medico_id', medico_id);
+        else query = query.is('medico_id', null);
+
+        if (repasseData.categoria) query = query.eq('categoria', repasseData.categoria);
+        else query = query.is('categoria', null);
+
+        if (cliente_id) query = query.eq('cliente_id', cliente_id);
+        else query = query.is('cliente_id', null);
+
+        const { data: existente } = await query.maybeSingle();
+
+        if (existente) {
+          await supabase
+            .from('medicos_valores_repasse')
+            .update({ valor: repasseData.valor, esta_no_escopo: repasseData.esta_no_escopo })
+            .eq('id', existente.id);
+          atualizados++;
+        } else {
+          await supabase
+            .from('medicos_valores_repasse')
+            .insert(repasseData);
+          inseridos++;
+        }
+
+        if (processados % 20 === 0) {
+          console.log(`Processadas ${processados} linhas...`);
+        }
+
+      } catch (error: any) {
+        erros++;
+        detalhesErros.push({
+          linha: i + 1,
+          erro: error.message
+        });
       }
-      
-      // Pequena pausa entre lotes para liberar memória
-      await new Promise(resolve => setTimeout(resolve, 10));
     }
 
-    // Registrar processamento
-    const { error: logError } = await supabase
+    // Log
+    await supabase
       .from('processamento_uploads')
       .insert({
         arquivo_nome: file.name,
@@ -225,10 +183,6 @@ serve(async (req) => {
         tamanho_arquivo: file.size
       });
 
-    if (logError) {
-      console.error('Erro ao registrar log:', logError);
-    }
-
     const resultado = {
       sucesso: true,
       arquivo: file.name,
@@ -236,10 +190,10 @@ serve(async (req) => {
       inseridos,
       atualizados,
       erros,
-      detalhes_erros: detalhesErros
+      detalhes_erros: detalhesErros.slice(0, 10)
     };
 
-    console.log('Processamento concluído:', resultado);
+    console.log('✅ Concluído:', resultado);
 
     return new Response(JSON.stringify(resultado), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -247,12 +201,11 @@ serve(async (req) => {
     });
 
   } catch (error: any) {
-    console.error('Erro geral:', error);
+    console.error('❌ Erro:', error);
     return new Response(
       JSON.stringify({ 
         sucesso: false, 
-        erro: error.message,
-        detalhes: error.stack 
+        erro: error.message
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -523,7 +523,6 @@ export default function GerenciarCadastros() {
           <TabsTrigger value="de-para" className="text-lg px-4 py-3 whitespace-nowrap font-semibold">Fora Padrão</TabsTrigger>
           <TabsTrigger value="precos" className="text-lg px-4 py-3 whitespace-nowrap font-semibold">Preços</TabsTrigger>
           <TabsTrigger value="parametros" className="text-lg px-4 py-3 whitespace-nowrap font-semibold">Parâmetros</TabsTrigger>
-          <TabsTrigger value="regras" className="text-lg px-4 py-3 whitespace-nowrap font-semibold">Regras</TabsTrigger>
           <TabsTrigger value="repasse" className="text-lg px-4 py-3 whitespace-nowrap font-semibold">Repasse</TabsTrigger>
           <TabsTrigger value="legado" className="text-lg px-4 py-3 whitespace-nowrap font-semibold">Legado</TabsTrigger>
           <TabsTrigger value="modalidades" className="text-lg px-4 py-3 whitespace-nowrap font-semibold">Modalidades</TabsTrigger>
@@ -784,50 +783,6 @@ export default function GerenciarCadastros() {
           </Card>
         </TabsContent>
 
-        {/* Regras de Exclusão */}
-        <TabsContent value="regras">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Shield className="h-5 w-5" />
-                Regras de Exclusão
-              </CardTitle>
-              <CardDescription>
-                Upload de regras para exclusão automática de registros do faturamento
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div>
-                  <SimpleFileUpload
-                    title="Upload Regras de Exclusão"
-                    acceptedTypes={['.csv', '.xlsx', '.xls']}
-                    onUpload={handleUploadRegras}
-                  />
-                </div>
-              </div>
-              
-              {/* Status do Upload de Regras */}
-              <div className="mt-6">
-                <UploadStatusPanel 
-                  refreshTrigger={refreshStatusPanel} 
-                  tipos={['regras_exclusao']}
-                  title="Status dos Uploads de Regras"
-                />
-              </div>
-              
-              <div className="mt-8">
-                <CadastroDataTable
-                  data={regrasData.data}
-                  loading={regrasData.loading}
-                  error={regrasData.error}
-                  type="regras"
-                  title="Regras de Exclusão Cadastradas"
-                />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
 
         {/* Repasse Médico */}
         <TabsContent value="repasse">
