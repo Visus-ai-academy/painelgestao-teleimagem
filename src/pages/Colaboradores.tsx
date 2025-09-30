@@ -870,8 +870,9 @@ export default function Colaboradores() {
       // Filtro por sócio (campo ainda não implementado, sempre true por enquanto)
       const matchSocio = filtroSocio === "todos";
       
-      // Filtro por equipe
-      const matchEquipe = filtroEquipe === "todas" || colaborador.equipe === filtroEquipe;
+      // Filtro por equipe - aceita valores vazios quando "todas" está selecionado
+      const matchEquipe = filtroEquipe === "todas" || 
+                          (colaborador.equipe && colaborador.equipe === filtroEquipe);
       
       return matchNome && matchFuncao && matchEspecialidade && matchStatusAtivo && matchSocio && matchEquipe;
     })
