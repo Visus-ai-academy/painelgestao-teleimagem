@@ -56,6 +56,13 @@ interface Colaborador {
   prioridades?: string[];
   equipe?: string;
   especialidade_atuacao?: string;
+  // Campos adicionais do banco de dados
+  socio?: string;
+  cnpj?: string;
+  nome_empresa?: string;
+  optante_simples?: string;
+  acrescimo_sem_digitador?: string;
+  adicional_valor_sem_digitador?: number;
 }
 
 interface DocumentoColaborador {
@@ -181,8 +188,15 @@ export default function Colaboradores() {
           modalidades: medico.modalidades || [],
           especialidades: medico.especialidades || [],
           equipe: medico.equipe || '',
-          especialidade_atuacao: medico.especialidade_atuacao || ''
-        }));
+          especialidade_atuacao: medico.especialidade_atuacao || '',
+          // Campos adicionais do banco
+          socio: medico.socio || '',
+          cnpj: medico.cnpj || '',
+          nome_empresa: medico.nome_empresa || '',
+          optante_simples: medico.optante_simples || '',
+          acrescimo_sem_digitador: medico.acrescimo_sem_digitador || '',
+          adicional_valor_sem_digitador: medico.adicional_valor_sem_digitador || 0
+        } as any));
         setColaboradores(lista);
       }
       
@@ -233,8 +247,15 @@ export default function Colaboradores() {
           prioridades: [],
           documentos: [],
           equipe: medico.equipe || '',
-          especialidade_atuacao: medico.especialidade_atuacao || ''
-        }));
+          especialidade_atuacao: medico.especialidade_atuacao || '',
+          // Campos adicionais do banco
+          socio: medico.socio || '',
+          cnpj: medico.cnpj || '',
+          nome_empresa: medico.nome_empresa || '',
+          optante_simples: medico.optante_simples || '',
+          acrescimo_sem_digitador: medico.acrescimo_sem_digitador || '',
+          adicional_valor_sem_digitador: medico.adicional_valor_sem_digitador || 0
+        } as any));
 
         setColaboradores(lista);
 
@@ -390,8 +411,15 @@ export default function Colaboradores() {
           prioridades: [],
           documentos: [],
           equipe: medico.equipe || '',
-          especialidade_atuacao: medico.especialidade_atuacao || ''
-        }));
+          especialidade_atuacao: medico.especialidade_atuacao || '',
+          // Campos adicionais do banco
+          socio: medico.socio || '',
+          cnpj: medico.cnpj || '',
+          nome_empresa: medico.nome_empresa || '',
+          optante_simples: medico.optante_simples || '',
+          acrescimo_sem_digitador: medico.acrescimo_sem_digitador || '',
+          adicional_valor_sem_digitador: medico.adicional_valor_sem_digitador || 0
+        } as any));
         setColaboradores(lista);
       }
 
@@ -1466,15 +1494,7 @@ export default function Colaboradores() {
                       <p className="text-sm">{selectedColaborador.cpf || 'N/A'}</p>
                     </div>
                     <div>
-                      <Label className="text-xs text-muted-foreground">Departamento</Label>
-                      <p className="text-sm">{selectedColaborador.departamento || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Nível</Label>
-                      <p className="text-sm">{selectedColaborador.nivel || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Gestor</Label>
+                      <Label className="text-xs text-muted-foreground">Coordenador</Label>
                       <p className="text-sm">{selectedColaborador.gestor || 'N/A'}</p>
                     </div>
                     {selectedColaborador.dataAdmissao && (
@@ -1495,7 +1515,7 @@ export default function Colaboradores() {
                 </div>
 
                 {/* Dados Médicos (se aplicável) */}
-                {(selectedColaborador.crm || selectedColaborador.categoria || selectedColaborador.equipe || selectedColaborador.especialidade_atuacao) && (
+                {(selectedColaborador.crm || selectedColaborador.categoria || selectedColaborador.equipe || selectedColaborador.especialidade_atuacao || (selectedColaborador as any).socio || (selectedColaborador as any).cnpj || (selectedColaborador as any).nome_empresa) && (
                   <div>
                     <h4 className="font-semibold text-sm text-primary mb-3">Dados Médicos</h4>
                     <div className="grid grid-cols-2 gap-4">
@@ -1517,48 +1537,56 @@ export default function Colaboradores() {
                           <p className="text-sm">{selectedColaborador.equipe}</p>
                         </div>
                       )}
+                      {selectedColaborador.funcao && (
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Função</Label>
+                          <p className="text-sm">{selectedColaborador.funcao}</p>
+                        </div>
+                      )}
                       {selectedColaborador.especialidade_atuacao && (
                         <div>
                           <Label className="text-xs text-muted-foreground">Especialidade de Atuação</Label>
                           <p className="text-sm">{selectedColaborador.especialidade_atuacao}</p>
                         </div>
                       )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Modalidades */}
-                {selectedColaborador.modalidades && selectedColaborador.modalidades.length > 0 && (
-                  <div>
-                    <h4 className="font-semibold text-sm text-primary mb-3">Modalidades</h4>
-                    <div className="flex flex-wrap gap-2">
-                      {selectedColaborador.modalidades.map((mod, idx) => (
-                        <Badge key={idx} variant="secondary">{mod}</Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Especialidades */}
-                {selectedColaborador.especialidades && selectedColaborador.especialidades.length > 0 && (
-                  <div>
-                    <h4 className="font-semibold text-sm text-primary mb-3">Especialidades</h4>
-                    <div className="flex flex-wrap gap-2">
-                      {selectedColaborador.especialidades.map((esp, idx) => (
-                        <Badge key={idx} variant="outline">{esp}</Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Prioridades */}
-                {selectedColaborador.prioridades && selectedColaborador.prioridades.length > 0 && (
-                  <div>
-                    <h4 className="font-semibold text-sm text-primary mb-3">Prioridades</h4>
-                    <div className="flex flex-wrap gap-2">
-                      {selectedColaborador.prioridades.map((pri, idx) => (
-                        <Badge key={idx} variant="default">{pri}</Badge>
-                      ))}
+                      {(selectedColaborador as any).socio && (
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Sócio</Label>
+                          <p className="text-sm">{(selectedColaborador as any).socio}</p>
+                        </div>
+                      )}
+                      {(selectedColaborador as any).cnpj && (
+                        <div>
+                          <Label className="text-xs text-muted-foreground">CNPJ</Label>
+                          <p className="text-sm">{(selectedColaborador as any).cnpj}</p>
+                        </div>
+                      )}
+                      {(selectedColaborador as any).nome_empresa && (
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Nome da Empresa</Label>
+                          <p className="text-sm">{(selectedColaborador as any).nome_empresa}</p>
+                        </div>
+                      )}
+                      {(selectedColaborador as any).optante_simples && (
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Optante Simples</Label>
+                          <p className="text-sm">{(selectedColaborador as any).optante_simples}</p>
+                        </div>
+                      )}
+                      {(selectedColaborador as any).acrescimo_sem_digitador && (
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Acréscimo sem Digitador</Label>
+                          <p className="text-sm">{(selectedColaborador as any).acrescimo_sem_digitador}</p>
+                        </div>
+                      )}
+                      {(selectedColaborador as any).adicional_valor_sem_digitador != null && (
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Valor Adicional sem Digitador</Label>
+                          <p className="text-sm">
+                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format((selectedColaborador as any).adicional_valor_sem_digitador || 0)}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -1677,6 +1705,8 @@ export default function Colaboradores() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
+                          <SelectItem value="STAFF">STAFF</SelectItem>
+                          <SelectItem value="FELLOW">FELLOW</SelectItem>
                           <SelectItem value="Médico Radiologista">Médico Radiologista</SelectItem>
                           <SelectItem value="Médico Cardiologista">Médico Cardiologista</SelectItem>
                           <SelectItem value="Técnico em Radiologia">Técnico em Radiologia</SelectItem>
@@ -1732,11 +1762,11 @@ export default function Colaboradores() {
                       </Select>
                     </div>
                     <div>
-                      <Label htmlFor="edit-gestor">Gestor</Label>
+                      <Label htmlFor="edit-coordenador">Coordenador</Label>
                       <Input
-                        id="edit-gestor"
+                        id="edit-coordenador"
                         defaultValue={selectedColaborador.gestor}
-                        placeholder="Nome do gestor"
+                        placeholder="Nome do coordenador"
                       />
                     </div>
                     {selectedColaborador.salario && (
@@ -1754,7 +1784,7 @@ export default function Colaboradores() {
                 </div>
 
                 {/* Dados Médicos */}
-                {(selectedColaborador.crm || selectedColaborador.categoria || selectedColaborador.equipe) && (
+                {(selectedColaborador.crm || selectedColaborador.categoria || selectedColaborador.equipe || selectedColaborador.especialidade_atuacao || (selectedColaborador as any).socio || (selectedColaborador as any).cnpj || (selectedColaborador as any).nome_empresa) && (
                   <div>
                     <h4 className="font-semibold text-sm text-primary mb-3 pb-2 border-b">Dados Médicos</h4>
                     <div className="grid grid-cols-2 gap-4">
@@ -1803,66 +1833,80 @@ export default function Colaboradores() {
                           />
                         </div>
                       )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Modalidades */}
-                {selectedColaborador.modalidades && (
-                  <div>
-                    <h4 className="font-semibold text-sm text-primary mb-3 pb-2 border-b">Modalidades</h4>
-                    <div className="grid grid-cols-3 gap-3 p-4 border rounded-lg max-h-48 overflow-y-auto">
-                      {modalidadesDisponiveis.map((modalidade) => (
-                        <div key={modalidade} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`edit-modal-${modalidade}`}
-                            defaultChecked={selectedColaborador.modalidades?.includes(modalidade)}
-                          />
-                          <Label htmlFor={`edit-modal-${modalidade}`} className="text-sm font-normal">
-                            {modalidade}
-                          </Label>
+                      {(selectedColaborador as any).socio != null && (
+                        <div>
+                          <Label htmlFor="edit-socio">Sócio</Label>
+                          <Select defaultValue={(selectedColaborador as any).socio}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="SIM">SIM</SelectItem>
+                              <SelectItem value="NÃO">NÃO</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Especialidades */}
-                {selectedColaborador.especialidades && (
-                  <div>
-                    <h4 className="font-semibold text-sm text-primary mb-3 pb-2 border-b">Especialidades</h4>
-                    <div className="grid grid-cols-2 gap-3 p-4 border rounded-lg max-h-48 overflow-y-auto">
-                      {especialidadesDisponiveis.map((especialidade) => (
-                        <div key={especialidade} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`edit-esp-${especialidade}`}
-                            defaultChecked={selectedColaborador.especialidades?.includes(especialidade)}
+                      )}
+                      {(selectedColaborador as any).cnpj != null && (
+                        <div>
+                          <Label htmlFor="edit-cnpj">CNPJ</Label>
+                          <Input
+                            id="edit-cnpj"
+                            defaultValue={(selectedColaborador as any).cnpj}
+                            placeholder="00.000.000/0000-00"
                           />
-                          <Label htmlFor={`edit-esp-${especialidade}`} className="text-sm font-normal">
-                            {especialidade}
-                          </Label>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Prioridades */}
-                {selectedColaborador.prioridades && (
-                  <div>
-                    <h4 className="font-semibold text-sm text-primary mb-3 pb-2 border-b">Prioridades</h4>
-                    <div className="grid grid-cols-3 gap-3 p-4 border rounded-lg">
-                      {prioridadesDisponiveis.map((prioridade) => (
-                        <div key={prioridade} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`edit-pri-${prioridade}`}
-                            defaultChecked={selectedColaborador.prioridades?.includes(prioridade)}
+                      )}
+                      {(selectedColaborador as any).nome_empresa != null && (
+                        <div>
+                          <Label htmlFor="edit-nome-empresa">Nome da Empresa</Label>
+                          <Input
+                            id="edit-nome-empresa"
+                            defaultValue={(selectedColaborador as any).nome_empresa}
+                            placeholder="Nome da empresa"
                           />
-                          <Label htmlFor={`edit-pri-${prioridade}`} className="text-sm font-normal">
-                            {prioridade}
-                          </Label>
                         </div>
-                      ))}
+                      )}
+                      {(selectedColaborador as any).optante_simples != null && (
+                        <div>
+                          <Label htmlFor="edit-optante-simples">Optante Simples</Label>
+                          <Select defaultValue={(selectedColaborador as any).optante_simples}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="SIM">SIM</SelectItem>
+                              <SelectItem value="NÃO">NÃO</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                      {(selectedColaborador as any).acrescimo_sem_digitador != null && (
+                        <div>
+                          <Label htmlFor="edit-acrescimo-sem-digitador">Acréscimo sem Digitador</Label>
+                          <Select defaultValue={(selectedColaborador as any).acrescimo_sem_digitador}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="SIM">SIM</SelectItem>
+                              <SelectItem value="NÃO">NÃO</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                      {(selectedColaborador as any).adicional_valor_sem_digitador != null && (
+                        <div>
+                          <Label htmlFor="edit-adicional-valor">Valor Adicional sem Digitador</Label>
+                          <Input
+                            id="edit-adicional-valor"
+                            type="number"
+                            step="0.01"
+                            defaultValue={(selectedColaborador as any).adicional_valor_sem_digitador}
+                            placeholder="0.00"
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
