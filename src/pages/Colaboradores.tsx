@@ -124,7 +124,16 @@ export default function Colaboradores() {
   // Lista de colaboradores (médicos) da tabela medicos
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
   const [loadingColaboradores, setLoadingColaboradores] = useState(true);
-  const [distribuicaoFuncoes, setDistribuicaoFuncoes] = useState<{ nome: string; count: number; especialidades: string[]; equipe?: string }[]>([]);
+  
+  interface ResumoEquipe {
+    equipe: string;
+    total: number;
+    staff: number;
+    fellow: number;
+    especialidades: { nome: string; count: number }[];
+  }
+  
+  const [resumoEquipes, setResumoEquipes] = useState<ResumoEquipe[]>([]);
   const [cleaningData, setCleaningData] = useState(false);
 
   // Função para limpar dados fictícios
@@ -229,39 +238,64 @@ export default function Colaboradores() {
 
         setColaboradores(lista);
 
-        // Calcular distribuição por função + equipe (com todas as especialidades)
-        const distribuicaoMap = new Map<string, { count: number; especialidades: Set<string> }>();
+        // Calcular resumo por equipes
+        const equipesMap = new Map<string, {
+          total: number;
+          staff: number;
+          fellow: number;
+          especialidades: Map<string, number>;
+        }>();
         
         lista.forEach(medico => {
-          const funcao = medico.funcao || 'Não especificado';
-          const equipe = medico.equipe || 'Não especificado';
-          const chave = `${funcao}|${equipe}`;
+          const equipe = medico.equipe || 'Sem Equipe';
+          const funcao = (medico.funcao || '').toUpperCase();
+          const especialidade = medico.especialidade_atuacao || medico.especialidades?.[0] || 'Não especificado';
           
-          if (!distribuicaoMap.has(chave)) {
-            distribuicaoMap.set(chave, { count: 0, especialidades: new Set() });
+          if (!equipesMap.has(equipe)) {
+            equipesMap.set(equipe, {
+              total: 0,
+              staff: 0,
+              fellow: 0,
+              especialidades: new Map()
+            });
           }
           
-          const grupo = distribuicaoMap.get(chave)!;
-          grupo.count++;
+          const equipeData = equipesMap.get(equipe)!;
+          equipeData.total++;
           
-          // Adicionar especialidade ao conjunto
-          const especialidade = medico.especialidade_atuacao || medico.especialidades?.[0] || 'Não especificado';
-          grupo.especialidades.add(especialidade);
+          // Contar STAFF e FELLOW baseado na função
+          if (funcao.includes('STAFF')) {
+            equipeData.staff++;
+          } else if (funcao.includes('FELLOW')) {
+            equipeData.fellow++;
+          }
+          
+          // Contar especialidades
+          const countEsp = equipeData.especialidades.get(especialidade) || 0;
+          equipeData.especialidades.set(especialidade, countEsp + 1);
         });
 
-        const distribuicao = Array.from(distribuicaoMap.entries())
-          .map(([chave, dados]) => {
-            const [funcao, equipe] = chave.split('|');
-            return { 
-              nome: funcao, 
-              count: dados.count, 
-              especialidades: Array.from(dados.especialidades),
-              equipe 
-            };
-          })
-          .sort((a, b) => b.count - a.count);
+        // Converter para array de resumo
+        const resumo: ResumoEquipe[] = Array.from(equipesMap.entries())
+          .map(([equipe, dados]) => ({
+            equipe,
+            total: dados.total,
+            staff: dados.staff,
+            fellow: dados.fellow,
+            especialidades: Array.from(dados.especialidades.entries())
+              .map(([nome, count]) => ({ nome, count }))
+              .sort((a, b) => b.count - a.count)
+          }))
+          .sort((a, b) => {
+            // Ordenar: Equipe 1, Equipe 2, depois outras
+            if (a.equipe === 'Equipe 1') return -1;
+            if (b.equipe === 'Equipe 1') return 1;
+            if (a.equipe === 'Equipe 2') return -1;
+            if (b.equipe === 'Equipe 2') return 1;
+            return a.equipe.localeCompare(b.equipe);
+          });
 
-        setDistribuicaoFuncoes(distribuicao);
+        setResumoEquipes(resumo);
 
       } catch (err) {
         console.error('Erro ao carregar médicos:', err);
@@ -701,58 +735,63 @@ export default function Colaboradores() {
         </Card>
       </div>
 
-      {/* Distribuição por Função */}
+      {/* Resumo Cadastros por Equipe */}
       <Card>
         <CardHeader>
-          <CardTitle>Distribuição por Função, Especialidade e Equipe</CardTitle>
+          <CardTitle>Resumo Cadastros</CardTitle>
         </CardHeader>
         <CardContent>
           {loadingColaboradores ? (
             <div className="flex justify-center p-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
-          ) : distribuicaoFuncoes.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {distribuicaoFuncoes.map((item, index) => (
-                <div key={index} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="text-2xl font-bold text-primary">{item.count}</div>
-                    <Badge variant="secondary" className="text-xs">
-                      {item.count === 1 ? '1 pessoa' : `${item.count} pessoas`}
-                    </Badge>
-                  </div>
-                  <div className="space-y-2">
-                    <div>
-                      <div className="text-xs font-medium text-muted-foreground">Função</div>
-                      <div className="font-medium text-sm">{item.nome}</div>
+          ) : resumoEquipes.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {resumoEquipes.map((equipe, index) => (
+                <div key={index} className="border rounded-lg p-6 hover:shadow-lg transition-shadow bg-gradient-to-br from-background to-muted/20">
+                  {/* Cabeçalho da Equipe */}
+                  <div className="mb-4 pb-4 border-b">
+                    <h3 className="text-xl font-bold text-primary mb-3">{equipe.equipe}</h3>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="text-center p-3 rounded-lg bg-primary/5">
+                        <div className="text-2xl font-bold text-primary">{equipe.total}</div>
+                        <div className="text-xs text-muted-foreground mt-1">Total</div>
+                      </div>
+                      <div className="text-center p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20">
+                        <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{equipe.staff}</div>
+                        <div className="text-xs text-muted-foreground mt-1">STAFF</div>
+                      </div>
+                      <div className="text-center p-3 rounded-lg bg-green-50 dark:bg-green-950/20">
+                        <div className="text-2xl font-bold text-green-600 dark:text-green-400">{equipe.fellow}</div>
+                        <div className="text-xs text-muted-foreground mt-1">FELLOW</div>
+                      </div>
                     </div>
-                    {item.especialidades && item.especialidades.length > 0 && (
-                      <div>
-                        <div className="text-xs font-medium text-muted-foreground mb-1">
-                          Especialidade{item.especialidades.length > 1 ? 's' : ''}
-                        </div>
-                        <div className="flex flex-wrap gap-1">
-                          {item.especialidades.map((esp, idx) => (
-                            <Badge 
-                              key={idx} 
-                              variant="outline" 
-                              className="text-xs"
-                              title={esp}
-                            >
-                              {esp.length > 15 ? esp.substring(0, 15) + '...' : esp}
+                  </div>
+                  
+                  {/* Especialidades */}
+                  <div>
+                    <h4 className="text-sm font-semibold text-muted-foreground mb-3">Especialidades</h4>
+                    <div className="space-y-2">
+                      {equipe.especialidades.length > 0 ? (
+                        equipe.especialidades.map((esp, idx) => (
+                          <div 
+                            key={idx} 
+                            className="flex items-center justify-between p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                          >
+                            <span className="text-sm font-medium truncate flex-1" title={esp.nome}>
+                              {esp.nome}
+                            </span>
+                            <Badge variant="secondary" className="ml-2 shrink-0">
+                              {esp.count} {esp.count === 1 ? 'médico' : 'médicos'}
                             </Badge>
-                          ))}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center text-sm text-muted-foreground py-4">
+                          Nenhuma especialidade cadastrada
                         </div>
-                      </div>
-                    )}
-                    {item.equipe && (
-                      <div>
-                        <div className="text-xs font-medium text-muted-foreground">Equipe</div>
-                        <div className="text-sm truncate" title={item.equipe}>
-                          {item.equipe}
-                        </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
