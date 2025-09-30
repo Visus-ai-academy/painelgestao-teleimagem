@@ -1521,11 +1521,11 @@ export default function Colaboradores() {
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <Label className="text-xs text-muted-foreground">CRM</Label>
-                        <p className="text-sm">{selectedColaborador.crm || 'N/A'}</p>
+                        <p className="text-sm">{(!selectedColaborador.crm || /^CRM-\d+$/.test(selectedColaborador.crm)) ? '' : selectedColaborador.crm}</p>
                       </div>
                       <div>
                         <Label className="text-xs text-muted-foreground">Especialidade de Atuação</Label>
-                        <p className="text-sm">{selectedColaborador.especialidade_atuacao || 'N/A'}</p>
+                        <p className="text-sm">{selectedColaborador.especialidade_atuacao || ''}</p>
                       </div>
                       {selectedColaborador.categoria && (
                         <div>
@@ -1766,7 +1766,7 @@ export default function Colaboradores() {
                         <Label htmlFor="edit-crm">CRM</Label>
                         <Input
                           id="edit-crm"
-                          defaultValue={selectedColaborador.crm || ''}
+                          defaultValue={/^CRM-\d+$/.test(selectedColaborador.crm || '') ? '' : (selectedColaborador.crm || '')}
                           placeholder="12345-SP"
                         />
                       </div>

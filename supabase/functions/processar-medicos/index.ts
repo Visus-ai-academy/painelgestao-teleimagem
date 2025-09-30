@@ -90,6 +90,8 @@ serve(async (req) => {
           adicionalValorNum = parseFloat(valorStr) || 0;
         }
 
+        const espAtu = String(row['especialidade_de_atuacao'] || row['especialidade_atuacao'] || row['especialidade'] || '').trim();
+
         const medicoData = {
           nome: nomeMed,
           crm: crmVal || null,
@@ -98,8 +100,8 @@ serve(async (req) => {
           telefone: String(row['telefone'] || '').trim() || null,
           socio: String(row['socio'] || '').trim() || null,
           funcao: String(row['funcao'] || '').trim() || null,
-          especialidade: String(row['especialidade_de_atuacao'] || '').trim() || 'GERAL',
-          especialidade_atuacao: String(row['especialidade_de_atuacao'] || '').trim() || null,
+          especialidade: espAtu || 'GERAL',
+          especialidade_atuacao: espAtu || null,
           equipe: String(row['equipe'] || '').trim() || null,
           acrescimo_sem_digitador: String(row['acrescimo_sem_digitador'] || '').trim() || null,
           adicional_valor_sem_digitador: adicionalValorNum || null,
