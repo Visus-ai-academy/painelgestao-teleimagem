@@ -102,6 +102,7 @@ export default function Colaboradores() {
   const [filtroEspecialidade, setFiltroEspecialidade] = useState("todas");
   const [filtroStatusAtivo, setFiltroStatusAtivo] = useState("todos");
   const [filtroSocio, setFiltroSocio] = useState("todos");
+  const [filtroEquipe, setFiltroEquipe] = useState("todas");
   const [busca, setBusca] = useState("");
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showNewColaboradorDialog, setShowNewColaboradorDialog] = useState(false);
@@ -869,7 +870,10 @@ export default function Colaboradores() {
       // Filtro por sócio (campo ainda não implementado, sempre true por enquanto)
       const matchSocio = filtroSocio === "todos";
       
-      return matchNome && matchFuncao && matchEspecialidade && matchStatusAtivo && matchSocio;
+      // Filtro por equipe
+      const matchEquipe = filtroEquipe === "todas" || colaborador.equipe === filtroEquipe;
+      
+      return matchNome && matchFuncao && matchEspecialidade && matchStatusAtivo && matchSocio && matchEquipe;
     })
     .sort((a, b) => {
       // Remover Dr./Dra. do início para ordenação alfabética
@@ -1082,6 +1086,22 @@ export default function Colaboradores() {
                     <SelectItem value="todos">Todos</SelectItem>
                     <SelectItem value="sim">Sim</SelectItem>
                     <SelectItem value="nao">Não</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Filtro Equipe */}
+              <div className="flex-1 min-w-48">
+                <Label className="text-xs text-muted-foreground mb-1">Equipe</Label>
+                <Select value={filtroEquipe} onValueChange={setFiltroEquipe}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todas">Todas</SelectItem>
+                    {Array.from(new Set(colaboradores.map(c => c.equipe).filter(Boolean))).sort().map(equipe => (
+                      <SelectItem key={equipe} value={equipe!}>{equipe}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
