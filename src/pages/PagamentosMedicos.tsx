@@ -36,6 +36,17 @@ interface ExameDetalhe {
   sem_valor_configurado: boolean;
 }
 
+interface ArranjoAgrupado {
+  modalidade: string;
+  especialidade: string;
+  categoria: string;
+  prioridade: string;
+  quantidade: number;
+  valor_unitario: number;
+  valor_total: number;
+  exames_sem_valor: number;
+}
+
 interface ResumoMedico {
   medico: Medico;
   total_exames: number;
@@ -44,6 +55,7 @@ interface ResumoMedico {
   valor_liquido: number;
   exames: ExameDetalhe[];
   exames_sem_valor: number;
+  arranjos: ArranjoAgrupado[];
 }
 
 export default function PagamentosMedicos() {
@@ -57,6 +69,7 @@ export default function PagamentosMedicos() {
   const [filtroMedico, setFiltroMedico] = useState("");
   const [filtroEspecialidade, setFiltroEspecialidade] = useState("");
   const [medicoDetalhado, setMedicoDetalhado] = useState<ResumoMedico | null>(null);
+  const [medicoExpandido, setMedicoExpandido] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -136,35 +149,97 @@ export default function PagamentosMedicos() {
       // Agrupar por médico
       const resumosPorMedico = new Map<string, ResumoMedico>();
       let totalSemValor = 0;
+      let totalComValor = 0;
 
-      volumetria.forEach((registro) => {
+      console.log('=== INICIANDO CÁLCULO DE PAGAMENTOS ===');
+      console.log('Total de registros volumetria:', volumetria.length);
+      console.log('Total de valores de repasse:', valoresRepasse?.length);
+
+      volumetria.forEach((registro, index) => {
         const medicoNome = registro.MEDICO;
         if (!medicoNome) return;
 
-        // Buscar valor de repasse correspondente
-        const valorRepasse = valoresRepasse?.find(vr => {
-          const medicoMatch = vr.medicos?.nome?.toLowerCase() === medicoNome.toLowerCase();
-          const modalidadeMatch = vr.modalidade === registro.MODALIDADE;
-          const especialidadeMatch = vr.especialidade === registro.ESPECIALIDADE;
-          const categoriaMatch = vr.categoria === registro.CATEGORIA;
-          const prioridadeMatch = vr.prioridade === registro.PRIORIDADE;
+        // BUSCA HIERÁRQUICA: do mais específico para o mais genérico
+        let valorRepasse = null;
+        
+        // Normalizar campos para comparação
+        const medicoNorm = medicoNome.trim().toLowerCase();
+        const modalidadeNorm = registro.MODALIDADE?.trim();
+        const especialidadeNorm = registro.ESPECIALIDADE?.trim();
+        const categoriaNorm = registro.CATEGORIA?.trim();
+        const prioridadeNorm = registro.PRIORIDADE?.trim();
+        const clienteNorm = registro.EMPRESA?.trim();
 
-          // Match básico
-          const matchBasico = medicoMatch && modalidadeMatch && especialidadeMatch && categoriaMatch && prioridadeMatch;
+        if (index < 3) {
+          console.log(`\n--- Registro ${index + 1} ---`);
+          console.log('Médico:', medicoNome);
+          console.log('Modalidade:', modalidadeNorm);
+          console.log('Especialidade:', especialidadeNorm);
+          console.log('Categoria:', categoriaNorm);
+          console.log('Prioridade:', prioridadeNorm);
+          console.log('Cliente:', clienteNorm);
+        }
 
-          // Se tem cliente específico no repasse (Blume, CLINICADIA, HCONSTANTINI)
-          if (vr.clientes?.nome && ['Blume', 'CLINICADIA', 'HCONSTANTINI'].includes(vr.clientes.nome)) {
-            return matchBasico && vr.clientes.nome === registro.EMPRESA;
-          }
-
-          // Se não tem cliente específico, usar para todos (cliente_id null)
-          return matchBasico && !vr.cliente_id;
+        // NÍVEL 1: Match completo com cliente específico
+        valorRepasse = valoresRepasse?.find(vr => {
+          const medicoMatch = vr.medicos?.nome?.trim().toLowerCase() === medicoNorm;
+          const modalidadeMatch = vr.modalidade === modalidadeNorm;
+          const especialidadeMatch = vr.especialidade === especialidadeNorm;
+          const categoriaMatch = vr.categoria === categoriaNorm;
+          const prioridadeMatch = vr.prioridade === prioridadeNorm;
+          const clienteMatch = vr.cliente_id && vr.clientes?.nome?.trim() === clienteNorm;
+          
+          return medicoMatch && modalidadeMatch && especialidadeMatch && categoriaMatch && prioridadeMatch && clienteMatch;
         });
+
+        // NÍVEL 2: Match completo SEM cliente (genérico)
+        if (!valorRepasse) {
+          valorRepasse = valoresRepasse?.find(vr => {
+            const medicoMatch = vr.medicos?.nome?.trim().toLowerCase() === medicoNorm;
+            const modalidadeMatch = vr.modalidade === modalidadeNorm;
+            const especialidadeMatch = vr.especialidade === especialidadeNorm;
+            const categoriaMatch = vr.categoria === categoriaNorm;
+            const prioridadeMatch = vr.prioridade === prioridadeNorm;
+            
+            return medicoMatch && modalidadeMatch && especialidadeMatch && categoriaMatch && prioridadeMatch && !vr.cliente_id;
+          });
+        }
+
+        // NÍVEL 3: Match sem categoria
+        if (!valorRepasse) {
+          valorRepasse = valoresRepasse?.find(vr => {
+            const medicoMatch = vr.medicos?.nome?.trim().toLowerCase() === medicoNorm;
+            const modalidadeMatch = vr.modalidade === modalidadeNorm;
+            const especialidadeMatch = vr.especialidade === especialidadeNorm;
+            const prioridadeMatch = vr.prioridade === prioridadeNorm;
+            
+            return medicoMatch && modalidadeMatch && especialidadeMatch && prioridadeMatch && !vr.categoria && !vr.cliente_id;
+          });
+        }
+
+        // NÍVEL 4: Match sem categoria E sem prioridade
+        if (!valorRepasse) {
+          valorRepasse = valoresRepasse?.find(vr => {
+            const medicoMatch = vr.medicos?.nome?.trim().toLowerCase() === medicoNorm;
+            const modalidadeMatch = vr.modalidade === modalidadeNorm;
+            const especialidadeMatch = vr.especialidade === especialidadeNorm;
+            
+            return medicoMatch && modalidadeMatch && especialidadeMatch && !vr.categoria && !vr.prioridade && !vr.cliente_id;
+          });
+        }
+
+        if (index < 3) {
+          console.log('Valor encontrado?', !!valorRepasse);
+          if (valorRepasse) {
+            console.log('Valor unitário:', valorRepasse.valor);
+          }
+        }
 
         const semValorConfigurado = !valorRepasse;
         if (semValorConfigurado) {
-          console.warn(`Valor de repasse não encontrado para: ${medicoNome} - ${registro.MODALIDADE}/${registro.ESPECIALIDADE}/${registro.CATEGORIA}/${registro.PRIORIDADE}`);
           totalSemValor++;
+        } else {
+          totalComValor++;
         }
 
         const valorUnitario = valorRepasse ? Number(valorRepasse.valor) : 0;
@@ -187,7 +262,8 @@ export default function PagamentosMedicos() {
             descontos: 0,
             valor_liquido: 0,
             exames: [],
-            exames_sem_valor: 0
+            exames_sem_valor: 0,
+            arranjos: []
           });
         }
 
@@ -219,20 +295,57 @@ export default function PagamentosMedicos() {
         resumo.valor_liquido = resumo.valor_bruto - resumo.descontos;
       });
 
+      // Agrupar arranjos para cada médico
+      resumosPorMedico.forEach(resumo => {
+        const arranjosMap = new Map<string, ArranjoAgrupado>();
+        
+        resumo.exames.forEach(exame => {
+          const chave = `${exame.modalidade}|${exame.especialidade}|${exame.categoria}|${exame.prioridade}`;
+          
+          if (!arranjosMap.has(chave)) {
+            arranjosMap.set(chave, {
+              modalidade: exame.modalidade,
+              especialidade: exame.especialidade,
+              categoria: exame.categoria,
+              prioridade: exame.prioridade,
+              quantidade: 0,
+              valor_unitario: exame.valor_unitario,
+              valor_total: 0,
+              exames_sem_valor: 0
+            });
+          }
+          
+          const arranjo = arranjosMap.get(chave)!;
+          arranjo.quantidade += exame.quantidade;
+          arranjo.valor_total += exame.valor_total;
+          if (exame.sem_valor_configurado) {
+            arranjo.exames_sem_valor += exame.quantidade;
+          }
+        });
+        
+        resumo.arranjos = Array.from(arranjosMap.values()).sort((a, b) => b.valor_total - a.valor_total);
+      });
+
       const resumosArray = Array.from(resumosPorMedico.values());
-      console.log(`Gerados ${resumosArray.length} resumos de pagamento`);
+      
+      console.log('\n=== RESULTADO FINAL ===');
+      console.log(`Total de médicos: ${resumosArray.length}`);
+      console.log(`Total de exames COM valor: ${totalComValor}`);
+      console.log(`Total de exames SEM valor: ${totalSemValor}`);
+      console.log(`Valor total a pagar: R$ ${resumosArray.reduce((sum, r) => sum + r.valor_bruto, 0).toFixed(2)}`);
+      
       setResumos(resumosArray);
 
       if (totalSemValor > 0) {
         toast({
           title: "Atenção",
-          description: `${resumosArray.length} médico(s) processados. ${totalSemValor} exame(s) sem valor de repasse configurado.`,
+          description: `${resumosArray.length} médico(s) processados. ${totalComValor} exames com valor, ${totalSemValor} sem valor.`,
           variant: "destructive",
         });
       } else {
         toast({
           title: "Sucesso",
-          description: `Pagamento calculado para ${resumosArray.length} médico(s)`,
+          description: `Pagamento calculado para ${resumosArray.length} médico(s) - ${totalComValor} exames`,
         });
       }
     } catch (error) {
@@ -451,21 +564,68 @@ export default function PagamentosMedicos() {
               </TableHeader>
               <TableBody>
                 {resumosFiltrados.map((resumo) => (
-                  <TableRow key={resumo.medico.id}>
-                    <TableCell className="font-medium">
-                      {resumo.medico.nome}
-                      {resumo.exames_sem_valor > 0 && (
-                        <Badge variant="outline" className="ml-2 text-orange-600 border-orange-600">
-                          <AlertCircle className="h-3 w-3 mr-1" />
-                          {resumo.exames_sem_valor} sem valor
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">{resumo.total_exames}</TableCell>
-                    <TableCell className="text-right font-bold text-green-600">
-                      R$ {resumo.valor_bruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </TableCell>
-                  </TableRow>
+                  <>
+                    <TableRow 
+                      key={resumo.medico.id} 
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => setMedicoExpandido(medicoExpandido === resumo.medico.id ? null : resumo.medico.id)}
+                    >
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          <Eye className="h-4 w-4 text-muted-foreground" />
+                          {resumo.medico.nome}
+                          {resumo.exames_sem_valor > 0 && (
+                            <Badge variant="outline" className="ml-2 text-orange-600 border-orange-600">
+                              <AlertCircle className="h-3 w-3 mr-1" />
+                              {resumo.exames_sem_valor} sem valor
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">{resumo.total_exames}</TableCell>
+                      <TableCell className="text-right font-bold text-green-600">
+                        R$ {resumo.valor_bruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </TableCell>
+                    </TableRow>
+                    
+                    {/* Detalhamento expandido */}
+                    {medicoExpandido === resumo.medico.id && (
+                      <TableRow>
+                        <TableCell colSpan={3} className="bg-muted/30 p-6">
+                          <div className="space-y-4">
+                            <h4 className="font-semibold text-sm">Detalhamento por Arranjo</h4>
+                            <div className="grid gap-2">
+                              {resumo.arranjos.map((arranjo, idx) => (
+                                <div key={idx} className="flex items-center justify-between p-3 bg-background rounded-md border">
+                                  <div className="flex-1">
+                                    <div className="font-medium">
+                                      {arranjo.modalidade} / {arranjo.especialidade} / {arranjo.categoria} / {arranjo.prioridade}
+                                    </div>
+                                    <div className="text-sm text-muted-foreground">
+                                      Quantidade: {arranjo.quantidade} exame(s)
+                                      {arranjo.exames_sem_valor > 0 && (
+                                        <span className="ml-2 text-orange-600">
+                                          ({arranjo.exames_sem_valor} sem valor)
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <div className="font-medium">
+                                      R$ {arranjo.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                    </div>
+                                    <div className="text-sm text-muted-foreground">
+                                      R$ {arranjo.valor_unitario.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} /un
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </>
                 ))}
               </TableBody>
             </Table>
