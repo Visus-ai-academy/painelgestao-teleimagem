@@ -1526,10 +1526,10 @@ export default function Colaboradores() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                      colaborador.status === 'Ativo' ? 'bg-green-100' : 'bg-gray-100'
+                      colaborador.status === 'Ativo' ? 'bg-blue-100' : 'bg-red-100'
                     }`}>
                       <span className={`font-bold text-lg ${
-                        colaborador.status === 'Ativo' ? 'text-green-600' : 'text-gray-600'
+                        colaborador.status === 'Ativo' ? 'text-blue-600' : 'text-red-600'
                       }`}>
                         {colaborador.status === 'Ativo' ? 'A' : 'I'}
                       </span>
@@ -1548,9 +1548,10 @@ export default function Colaboradores() {
                               </>
                             )}
                             {colaborador.equipe && (
-                              <Badge variant="default" className="text-xs">
-                                {colaborador.equipe}
-                              </Badge>
+                              <>
+                                <span>•</span>
+                                <span>{colaborador.equipe}</span>
+                              </>
                             )}
                           </>
                         )}
