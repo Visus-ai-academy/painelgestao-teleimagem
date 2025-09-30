@@ -700,25 +700,12 @@ export default function Colaboradores() {
             <div className="flex items-center">
               <Users className="h-8 w-8 text-blue-600" />
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Total Colaboradores</p>
-                <p className="text-2xl font-bold text-gray-900">{totalColaboradores}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <UserCheck className="h-8 w-8 text-green-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Colaboradores Ativos</p>
+                <p className="text-sm font-medium text-gray-600">Total Médicos Ativos</p>
                 <p className="text-2xl font-bold text-gray-900">{colaboradoresAtivos}</p>
               </div>
             </div>
           </CardContent>
         </Card>
-
       </div>
 
       {/* Resumo Cadastros por Equipe */}
