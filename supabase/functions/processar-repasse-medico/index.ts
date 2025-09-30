@@ -47,8 +47,8 @@ serve(async (req) => {
     const workbook = XLSX.read(arrayBuffer, {
       type: 'array',
       cellDates: true,
-      cellStyles: false, // Não precisamos de estilos
-      sheetStubs: false  // Ignora células vazias
+      cellStyles: false,
+      sheetStubs: false
     });
     
     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
@@ -59,13 +59,7 @@ serve(async (req) => {
 
     console.log(`Total de linhas encontradas: ${jsonData.length}`);
 
-    let processados = 0;
-    let inseridos = 0;
-    let atualizados = 0;
-    let erros = 0;
-    const detalhesErros: any[] = [];
-
-    // Buscar médicos e clientes existentes
+    // Buscar médicos e clientes existentes UMA VEZ
     const { data: medicos } = await supabase
       .from('medicos')
       .select('id, nome, crm')
@@ -80,100 +74,139 @@ serve(async (req) => {
     const medicoMapCrm = new Map(medicos?.map(m => [m.crm?.toLowerCase(), m.id]) || []);
     const clienteMap = new Map(clientes?.map(c => [c.nome_fantasia?.toLowerCase() || c.nome.toLowerCase(), c.id]) || []);
 
-    for (let i = 0; i < jsonData.length; i++) {
-      const row = jsonData[i];
-      processados++;
+    let processados = 0;
+    let inseridos = 0;
+    let atualizados = 0;
+    let erros = 0;
+    const detalhesErros: any[] = [];
 
-      try {
-        if (!row.modalidade || !row.especialidade || !row.prioridade || !row.valor) {
-          throw new Error('Campos obrigatórios em branco: modalidade, especialidade, prioridade, valor');
-        }
+    // Processar em lotes de 50 registros por vez
+    const BATCH_SIZE = 50;
+    
+    for (let batchStart = 0; batchStart < jsonData.length; batchStart += BATCH_SIZE) {
+      const batchEnd = Math.min(batchStart + BATCH_SIZE, jsonData.length);
+      const batch = jsonData.slice(batchStart, batchEnd);
+      
+      console.log(`Processando lote ${batchStart}-${batchEnd} de ${jsonData.length}`);
 
-        // Buscar médico
-        let medico_id = null;
-        if (row.medico_crm) {
-          medico_id = medicoMapCrm.get(row.medico_crm.toLowerCase().trim());
-        } else if (row.medico_nome) {
-          medico_id = medicoMapNome.get(row.medico_nome.toLowerCase().trim());
-        }
+      for (let i = 0; i < batch.length; i++) {
+        const row = batch[i];
+        const lineNumber = batchStart + i + 1;
+        processados++;
 
-        if (!medico_id && (row.medico_nome || row.medico_crm)) {
-          throw new Error(`Médico não encontrado: ${row.medico_nome || row.medico_crm}`);
-        }
+        try {
+          if (!row.modalidade || !row.especialidade || !row.prioridade || !row.valor) {
+            throw new Error('Campos obrigatórios em branco: modalidade, especialidade, prioridade, valor');
+          }
 
-        // Buscar cliente se especificado
-        let cliente_id = null;
-        if (row.cliente_nome) {
-          cliente_id = clienteMap.get(row.cliente_nome.toLowerCase().trim());
-        }
+          // Buscar médico
+          let medico_id = null;
+          if (row.medico_crm) {
+            medico_id = medicoMapCrm.get(row.medico_crm.toLowerCase().trim());
+          } else if (row.medico_nome) {
+            medico_id = medicoMapNome.get(row.medico_nome.toLowerCase().trim());
+          }
 
-        // Processar esta_no_escopo (aceita sim/não, true/false, 1/0)
-        let esta_no_escopo = false;
-        if (row.esta_no_escopo) {
-          const valorEscopo = String(row.esta_no_escopo).toLowerCase().trim();
-          esta_no_escopo = ['sim', 'yes', 'true', '1', 's', 'y'].includes(valorEscopo);
-        }
+          // Buscar cliente se especificado
+          let cliente_id = null;
+          if (row.cliente_nome) {
+            cliente_id = clienteMap.get(row.cliente_nome.toLowerCase().trim());
+          }
 
-        // Preparar dados do repasse
-        const repasseData = {
-          medico_id: medico_id || null,
-          modalidade: row.modalidade.trim(),
-          especialidade: row.especialidade.trim(),
-          categoria: row.categoria?.trim() || null,
-          prioridade: row.prioridade.trim(),
-          valor: Number(row.valor),
-          esta_no_escopo,
-          cliente_id: cliente_id || null
-        };
+          // Processar esta_no_escopo
+          let esta_no_escopo = false;
+          if (row.esta_no_escopo) {
+            const valorEscopo = String(row.esta_no_escopo).toLowerCase().trim();
+            esta_no_escopo = ['sim', 'yes', 'true', '1', 's', 'y'].includes(valorEscopo);
+          }
 
-        // Verificar se já existe
-        let queryBuilder = supabase
-          .from('medicos_valores_repasse')
-          .select('id')
-          .eq('modalidade', repasseData.modalidade)
-          .eq('especialidade', repasseData.especialidade)
-          .eq('prioridade', repasseData.prioridade);
+          // Preparar dados do repasse
+          const repasseData = {
+            medico_id: medico_id || null,
+            modalidade: row.modalidade.trim(),
+            especialidade: row.especialidade.trim(),
+            categoria: row.categoria?.trim() || null,
+            prioridade: row.prioridade.trim(),
+            valor: Number(row.valor),
+            esta_no_escopo,
+            cliente_id: cliente_id || null
+          };
 
-        if (repasseData.medico_id) {
-          queryBuilder = queryBuilder.eq('medico_id', repasseData.medico_id);
-        } else {
-          queryBuilder = queryBuilder.is('medico_id', null);
-        }
-
-        let { data: existente } = await queryBuilder.single();
-
-        if (existente) {
-          // Atualizar existente
-          const { error: updateError } = await supabase
+          // Usar upsert para simplificar
+          const { error: upsertError } = await supabase
             .from('medicos_valores_repasse')
-            .update({ valor: repasseData.valor })
-            .eq('id', existente.id);
+            .upsert(repasseData, {
+              onConflict: 'medico_id,modalidade,especialidade,categoria,prioridade,cliente_id',
+              ignoreDuplicates: false
+            });
 
-          if (updateError) throw updateError;
-          atualizados++;
-        } else {
-          // Inserir novo
-          const { error: insertError } = await supabase
-            .from('medicos_valores_repasse')
-            .insert(repasseData);
+          if (upsertError) {
+            // Se falhar, pode ser porque não existe a constraint, então fazer insert/update manual
+            let queryBuilder = supabase
+              .from('medicos_valores_repasse')
+              .select('id')
+              .eq('modalidade', repasseData.modalidade)
+              .eq('especialidade', repasseData.especialidade)
+              .eq('prioridade', repasseData.prioridade);
 
-          if (insertError) throw insertError;
-          inseridos++;
+            if (repasseData.medico_id) {
+              queryBuilder = queryBuilder.eq('medico_id', repasseData.medico_id);
+            } else {
+              queryBuilder = queryBuilder.is('medico_id', null);
+            }
+
+            if (repasseData.categoria) {
+              queryBuilder = queryBuilder.eq('categoria', repasseData.categoria);
+            } else {
+              queryBuilder = queryBuilder.is('categoria', null);
+            }
+
+            if (repasseData.cliente_id) {
+              queryBuilder = queryBuilder.eq('cliente_id', repasseData.cliente_id);
+            } else {
+              queryBuilder = queryBuilder.is('cliente_id', null);
+            }
+
+            const { data: existente } = await queryBuilder.maybeSingle();
+
+            if (existente) {
+              const { error: updateError } = await supabase
+                .from('medicos_valores_repasse')
+                .update({ valor: repasseData.valor, esta_no_escopo: repasseData.esta_no_escopo })
+                .eq('id', existente.id);
+
+              if (updateError) throw updateError;
+              atualizados++;
+            } else {
+              const { error: insertError } = await supabase
+                .from('medicos_valores_repasse')
+                .insert(repasseData);
+
+              if (insertError) throw insertError;
+              inseridos++;
+            }
+          } else {
+            inseridos++;
+          }
+
+          if (lineNumber % 10 === 0) {
+            console.log(`Processadas ${lineNumber} linhas...`);
+          }
+
+        } catch (error: any) {
+          erros++;
+          const detalheErro = {
+            linha: lineNumber,
+            dados: row,
+            erro: error.message
+          };
+          detalhesErros.push(detalheErro);
+          console.error(`Erro na linha ${lineNumber}:`, error.message);
         }
-
-        const identificacao = row.medico_nome || row.medico_crm || 'GERAL';
-        console.log(`Linha ${i + 1}: Processada com sucesso - ${identificacao} - ${repasseData.modalidade}/${repasseData.especialidade}`);
-
-      } catch (error: any) {
-        erros++;
-        const detalheErro = {
-          linha: i + 1,
-          dados: row,
-          erro: error.message
-        };
-        detalhesErros.push(detalheErro);
-        console.error(`Erro na linha ${i + 1}:`, error.message);
       }
+      
+      // Pequena pausa entre lotes para liberar memória
+      await new Promise(resolve => setTimeout(resolve, 10));
     }
 
     // Registrar processamento
