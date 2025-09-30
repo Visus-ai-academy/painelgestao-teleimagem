@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,22 @@ import { CalendarIcon, Download, Eye, Calculator, Filter, Search, Upload, BarCha
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+
+// Normalização de strings para comparação robusta
+const normalizeStr = (v?: string | null) =>
+  (v ?? "")
+    .toString()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toUpperCase();
+
+const normalizeCategoria = (v?: string | null) => {
+  const n = normalizeStr(v);
+  if (n === "SC") return "SCORE"; // mapeamento comum
+  return n;
+};
 
 interface Medico {
   id: string;
@@ -162,13 +178,13 @@ export default function PagamentosMedicos() {
         // BUSCA HIERÁRQUICA: do mais específico para o mais genérico
         let valorRepasse = null;
         
-        // Normalizar campos para comparação
-        const medicoNorm = medicoNome.trim().toLowerCase();
-        const modalidadeNorm = registro.MODALIDADE?.trim();
-        const especialidadeNorm = registro.ESPECIALIDADE?.trim();
-        const categoriaNorm = registro.CATEGORIA?.trim();
-        const prioridadeNorm = registro.PRIORIDADE?.trim();
-        const clienteNorm = registro.EMPRESA?.trim();
+        // Normalizar campos para comparação (remoção de acentos, espaços extras e case)
+        const medicoNorm = normalizeStr(medicoNome);
+        const modalidadeNorm = normalizeStr(registro.MODALIDADE);
+        const especialidadeNorm = normalizeStr(registro.ESPECIALIDADE);
+        const categoriaNorm = normalizeCategoria(registro.CATEGORIA);
+        const prioridadeNorm = normalizeStr(registro.PRIORIDADE);
+        const clienteNorm = normalizeStr(registro.EMPRESA);
 
         if (index < 3) {
           console.log(`\n--- Registro ${index + 1} ---`);
@@ -182,25 +198,23 @@ export default function PagamentosMedicos() {
 
         // NÍVEL 1: Match completo com cliente específico
         valorRepasse = valoresRepasse?.find(vr => {
-          const medicoMatch = vr.medicos?.nome?.trim().toLowerCase() === medicoNorm;
-          const modalidadeMatch = vr.modalidade === modalidadeNorm;
-          const especialidadeMatch = vr.especialidade === especialidadeNorm;
-          const categoriaMatch = vr.categoria === categoriaNorm;
-          const prioridadeMatch = vr.prioridade === prioridadeNorm;
-          const clienteMatch = vr.cliente_id && vr.clientes?.nome?.trim() === clienteNorm;
-          
+          const medicoMatch = normalizeStr(vr.medicos?.nome) === medicoNorm;
+          const modalidadeMatch = normalizeStr(vr.modalidade) === modalidadeNorm;
+          const especialidadeMatch = normalizeStr(vr.especialidade) === especialidadeNorm;
+          const categoriaMatch = normalizeCategoria(vr.categoria) === categoriaNorm;
+          const prioridadeMatch = normalizeStr(vr.prioridade) === prioridadeNorm;
+          const clienteMatch = !!vr.cliente_id && normalizeStr(vr.clientes?.nome) === clienteNorm;
           return medicoMatch && modalidadeMatch && especialidadeMatch && categoriaMatch && prioridadeMatch && clienteMatch;
         });
 
         // NÍVEL 2: Match completo SEM cliente (genérico)
         if (!valorRepasse) {
           valorRepasse = valoresRepasse?.find(vr => {
-            const medicoMatch = vr.medicos?.nome?.trim().toLowerCase() === medicoNorm;
-            const modalidadeMatch = vr.modalidade === modalidadeNorm;
-            const especialidadeMatch = vr.especialidade === especialidadeNorm;
-            const categoriaMatch = vr.categoria === categoriaNorm;
-            const prioridadeMatch = vr.prioridade === prioridadeNorm;
-            
+            const medicoMatch = normalizeStr(vr.medicos?.nome) === medicoNorm;
+            const modalidadeMatch = normalizeStr(vr.modalidade) === modalidadeNorm;
+            const especialidadeMatch = normalizeStr(vr.especialidade) === especialidadeNorm;
+            const categoriaMatch = normalizeCategoria(vr.categoria) === categoriaNorm;
+            const prioridadeMatch = normalizeStr(vr.prioridade) === prioridadeNorm;
             return medicoMatch && modalidadeMatch && especialidadeMatch && categoriaMatch && prioridadeMatch && !vr.cliente_id;
           });
         }
@@ -208,23 +222,26 @@ export default function PagamentosMedicos() {
         // NÍVEL 3: Match sem categoria
         if (!valorRepasse) {
           valorRepasse = valoresRepasse?.find(vr => {
-            const medicoMatch = vr.medicos?.nome?.trim().toLowerCase() === medicoNorm;
-            const modalidadeMatch = vr.modalidade === modalidadeNorm;
-            const especialidadeMatch = vr.especialidade === especialidadeNorm;
-            const prioridadeMatch = vr.prioridade === prioridadeNorm;
-            
-            return medicoMatch && modalidadeMatch && especialidadeMatch && prioridadeMatch && !vr.categoria && !vr.cliente_id;
+            const medicoMatch = normalizeStr(vr.medicos?.nome) === medicoNorm;
+            const modalidadeMatch = normalizeStr(vr.modalidade) === modalidadeNorm;
+            const especialidadeMatch = normalizeStr(vr.especialidade) === especialidadeNorm;
+            const prioridadeMatch = normalizeStr(vr.prioridade) === prioridadeNorm;
+            const categoriaIsVazia = !normalizeCategoria(vr.categoria);
+            const clienteIsVazio = !vr.cliente_id;
+            return medicoMatch && modalidadeMatch && especialidadeMatch && prioridadeMatch && categoriaIsVazia && clienteIsVazio;
           });
         }
 
         // NÍVEL 4: Match sem categoria E sem prioridade
         if (!valorRepasse) {
           valorRepasse = valoresRepasse?.find(vr => {
-            const medicoMatch = vr.medicos?.nome?.trim().toLowerCase() === medicoNorm;
-            const modalidadeMatch = vr.modalidade === modalidadeNorm;
-            const especialidadeMatch = vr.especialidade === especialidadeNorm;
-            
-            return medicoMatch && modalidadeMatch && especialidadeMatch && !vr.categoria && !vr.prioridade && !vr.cliente_id;
+            const medicoMatch = normalizeStr(vr.medicos?.nome) === medicoNorm;
+            const modalidadeMatch = normalizeStr(vr.modalidade) === modalidadeNorm;
+            const especialidadeMatch = normalizeStr(vr.especialidade) === especialidadeNorm;
+            const categoriaIsVazia = !normalizeCategoria(vr.categoria);
+            const prioridadeIsVazia = !normalizeStr(vr.prioridade);
+            const clienteIsVazio = !vr.cliente_id;
+            return medicoMatch && modalidadeMatch && especialidadeMatch && categoriaIsVazia && prioridadeIsVazia && clienteIsVazio;
           });
         }
 
@@ -564,9 +581,8 @@ export default function PagamentosMedicos() {
               </TableHeader>
               <TableBody>
                 {resumosFiltrados.map((resumo) => (
-                  <>
+                  <Fragment key={resumo.medico.id}>
                     <TableRow 
-                      key={resumo.medico.id} 
                       className="cursor-pointer hover:bg-muted/50"
                       onClick={() => setMedicoExpandido(medicoExpandido === resumo.medico.id ? null : resumo.medico.id)}
                     >
@@ -625,7 +641,7 @@ export default function PagamentosMedicos() {
                         </TableCell>
                       </TableRow>
                     )}
-                  </>
+                  </Fragment>
                 ))}
               </TableBody>
             </Table>
