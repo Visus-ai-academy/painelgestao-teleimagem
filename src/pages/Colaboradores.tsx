@@ -466,12 +466,7 @@ export default function Colaboradores() {
 
       console.log('✅ Resposta do servidor:', data);
 
-      toast({
-        title: "✅ Upload realizado com sucesso!",
-        description: `${data.inseridos} médicos inseridos, ${data.atualizados} atualizados`,
-      });
-
-      // Recarregar lista de médicos
+      // Recarregar lista de médicos ANTES de mostrar o toast
       const { data: medicosData } = await supabase
         .from('medicos')
         .select('*')
@@ -509,6 +504,15 @@ export default function Colaboradores() {
           adicional_valor_sem_digitador: medico.adicional_valor_sem_digitador || 0
         } as any));
         setColaboradores(lista);
+        
+        // Contar ativos e inativos do resultado
+        const totalAtivos = lista.filter(m => m.status === 'Ativo').length;
+        const totalInativos = lista.filter(m => m.status === 'Inativo').length;
+        
+        toast({
+          title: "✅ Upload realizado com sucesso!",
+          description: `${data.inseridos} inseridos, ${data.atualizados} atualizados. Total: ${totalAtivos} ativos, ${totalInativos} inativos`,
+        });
       }
 
       setShowUploadDialog(false);
