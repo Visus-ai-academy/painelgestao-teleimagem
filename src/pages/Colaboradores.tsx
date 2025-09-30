@@ -1514,17 +1514,19 @@ export default function Colaboradores() {
                   </div>
                 </div>
 
-                {/* Dados Médicos (se aplicável) */}
-                {(selectedColaborador.crm || selectedColaborador.categoria || selectedColaborador.equipe || selectedColaborador.especialidade_atuacao || (selectedColaborador as any).socio || (selectedColaborador as any).cnpj || (selectedColaborador as any).nome_empresa) && (
+                {/* Dados Médicos */}
+                {selectedColaborador.departamento === "Medicina" && (
                   <div>
                     <h4 className="font-semibold text-sm text-primary mb-3">Dados Médicos</h4>
                     <div className="grid grid-cols-2 gap-4">
-                      {selectedColaborador.crm && (
-                        <div>
-                          <Label className="text-xs text-muted-foreground">CRM</Label>
-                          <p className="text-sm">{selectedColaborador.crm}</p>
-                        </div>
-                      )}
+                      <div>
+                        <Label className="text-xs text-muted-foreground">CRM</Label>
+                        <p className="text-sm">{selectedColaborador.crm || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Especialidade de Atuação</Label>
+                        <p className="text-sm">{selectedColaborador.especialidade_atuacao || 'N/A'}</p>
+                      </div>
                       {selectedColaborador.categoria && (
                         <div>
                           <Label className="text-xs text-muted-foreground">Categoria</Label>
@@ -1541,12 +1543,6 @@ export default function Colaboradores() {
                         <div>
                           <Label className="text-xs text-muted-foreground">Função</Label>
                           <p className="text-sm">{selectedColaborador.funcao}</p>
-                        </div>
-                      )}
-                      {selectedColaborador.especialidade_atuacao && (
-                        <div>
-                          <Label className="text-xs text-muted-foreground">Especialidade de Atuação</Label>
-                          <p className="text-sm">{selectedColaborador.especialidade_atuacao}</p>
                         </div>
                       )}
                       {(selectedColaborador as any).socio && (
@@ -1707,28 +1703,6 @@ export default function Colaboradores() {
                         <SelectContent>
                           <SelectItem value="STAFF">STAFF</SelectItem>
                           <SelectItem value="FELLOW">FELLOW</SelectItem>
-                          <SelectItem value="Médico Radiologista">Médico Radiologista</SelectItem>
-                          <SelectItem value="Médico Cardiologista">Médico Cardiologista</SelectItem>
-                          <SelectItem value="Técnico em Radiologia">Técnico em Radiologia</SelectItem>
-                          <SelectItem value="Enfermeira">Enfermeira</SelectItem>
-                          <SelectItem value="Administrador TI">Administrador TI</SelectItem>
-                          <SelectItem value="Analista Financeiro">Analista Financeiro</SelectItem>
-                          <SelectItem value="Recepcionista">Recepcionista</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor="edit-departamento">Departamento</Label>
-                      <Select defaultValue={selectedColaborador.departamento}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Comercial">Comercial</SelectItem>
-                          <SelectItem value="Operacional">Operacional</SelectItem>
-                          <SelectItem value="Adm. Financeiro">Adm. Financeiro</SelectItem>
-                          <SelectItem value="Médico">Médico</SelectItem>
-                          <SelectItem value="Medicina">Medicina</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -1784,20 +1758,26 @@ export default function Colaboradores() {
                 </div>
 
                 {/* Dados Médicos */}
-                {(selectedColaborador.crm || selectedColaborador.categoria || selectedColaborador.equipe || selectedColaborador.especialidade_atuacao || (selectedColaborador as any).socio || (selectedColaborador as any).cnpj || (selectedColaborador as any).nome_empresa) && (
+                {selectedColaborador.departamento === "Medicina" && (
                   <div>
                     <h4 className="font-semibold text-sm text-primary mb-3 pb-2 border-b">Dados Médicos</h4>
                     <div className="grid grid-cols-2 gap-4">
-                      {selectedColaborador.crm && (
-                        <div>
-                          <Label htmlFor="edit-crm">CRM</Label>
-                          <Input
-                            id="edit-crm"
-                            defaultValue={selectedColaborador.crm}
-                            placeholder="12345-SP"
-                          />
-                        </div>
-                      )}
+                      <div>
+                        <Label htmlFor="edit-crm">CRM</Label>
+                        <Input
+                          id="edit-crm"
+                          defaultValue={selectedColaborador.crm || ''}
+                          placeholder="12345-SP"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="edit-especialidade-atuacao">Especialidade de Atuação</Label>
+                        <Input
+                          id="edit-especialidade-atuacao"
+                          defaultValue={selectedColaborador.especialidade_atuacao || ''}
+                          placeholder="Especialidade"
+                        />
+                      </div>
                       {selectedColaborador.categoria && (
                         <div>
                           <Label htmlFor="edit-categoria">Categoria</Label>
@@ -1820,16 +1800,6 @@ export default function Colaboradores() {
                             id="edit-equipe"
                             defaultValue={selectedColaborador.equipe}
                             placeholder="Nome da equipe"
-                          />
-                        </div>
-                      )}
-                      {selectedColaborador.especialidade_atuacao && (
-                        <div>
-                          <Label htmlFor="edit-especialidade-atuacao">Especialidade de Atuação</Label>
-                          <Input
-                            id="edit-especialidade-atuacao"
-                            defaultValue={selectedColaborador.especialidade_atuacao}
-                            placeholder="Especialidade"
                           />
                         </div>
                       )}
