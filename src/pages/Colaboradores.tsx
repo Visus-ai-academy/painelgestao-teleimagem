@@ -857,22 +857,39 @@ export default function Colaboradores() {
       // Filtro por função
       const matchFuncao = filtroFuncao === "todas" || colaborador.funcao === filtroFuncao;
       
-      // Filtro por especialidade
-      const matchEspecialidade = filtroEspecialidade === "todas" || 
-                                 (colaborador.especialidades && 
-                                  colaborador.especialidades.includes(filtroEspecialidade));
+      // Helpers de normalização
+      const norm = (s?: string | null) => (s ?? '').toString().trim().toLowerCase();
+      const tokens = new Set<string>();
+      const addSplit = (txt?: string | null) => {
+        const v = norm(txt);
+        if (!v) return;
+        v.split(/[,/;]+/).map(t => t.trim()).filter(Boolean).forEach(t => tokens.add(t));
+      };
+
+      // Construir conjunto de especialidades do colaborador (mesma lógica do resumo)
+      addSplit((colaborador as any).especialidade_atuacao);
+      if (Array.isArray((colaborador as any).especialidades) && (colaborador as any).especialidades.length > 0) {
+        (colaborador as any).especialidades.forEach((e: any) => addSplit(e));
+      }
+      addSplit((colaborador as any).especialidade);
+
+      // Filtro por especialidade (case-insensitive, considera múltiplas fontes)
+      const matchEspecialidade = filtroEspecialidade === "todas" || tokens.has(norm(filtroEspecialidade));
       
       // Filtro por status ativo
       const matchStatusAtivo = filtroStatusAtivo === "todos" || 
                                (filtroStatusAtivo === "ativo" && colaborador.status === "Ativo") ||
                                (filtroStatusAtivo === "inativo" && colaborador.status === "Inativo");
       
-      // Filtro por sócio (campo ainda não implementado, sempre true por enquanto)
-      const matchSocio = filtroSocio === "todos";
+      // Filtro por sócio (suporta booleano e strings variadas)
+      const socioRaw = (colaborador as any).socio;
+      const socioStr = typeof socioRaw === 'boolean' ? (socioRaw ? 'sim' : 'nao') : norm(socioRaw);
+      const isSocio = ["sim","s","true","1","yes"].includes(socioStr);
+      const matchSocio = filtroSocio === "todos" || (filtroSocio === "sim" ? isSocio : !isSocio);
       
       // Filtro por equipe - aceita valores vazios quando "todas" está selecionado
       const matchEquipe = filtroEquipe === "todas" || 
-                          (colaborador.equipe && colaborador.equipe === filtroEquipe);
+                          ((colaborador as any).equipe && (colaborador as any).equipe === filtroEquipe);
       
       return matchNome && matchFuncao && matchEspecialidade && matchStatusAtivo && matchSocio && matchEquipe;
     })
