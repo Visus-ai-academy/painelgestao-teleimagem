@@ -1396,101 +1396,493 @@ export default function Colaboradores() {
 
       {/* Dialog de Visualização */}
       <Dialog open={showViewDialog} onOpenChange={setShowViewDialog}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-3xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>Detalhes do Colaborador</DialogTitle>
           </DialogHeader>
           {selectedColaborador && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-4 pb-4 border-b">
-                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
-                  <span className="text-blue-600 font-semibold text-xl">
-                    {selectedColaborador.nome.split(' ').map(n => n[0]).join('').substring(0, 2)}
-                  </span>
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold">{selectedColaborador.nome}</h3>
-                  <p className="text-sm text-muted-foreground">{selectedColaborador.funcao}</p>
-                  {getStatusBadge(selectedColaborador.status)}
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-xs text-muted-foreground">Email</Label>
-                  <p className="text-sm">{selectedColaborador.email || 'N/A'}</p>
-                </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground">Telefone</Label>
-                  <p className="text-sm">{selectedColaborador.telefone || 'N/A'}</p>
-                </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground">CPF</Label>
-                  <p className="text-sm">{selectedColaborador.cpf || 'N/A'}</p>
-                </div>
-                {selectedColaborador.crm && (
-                  <div>
-                    <Label className="text-xs text-muted-foreground">CRM</Label>
-                    <p className="text-sm">{selectedColaborador.crm}</p>
+            <ScrollArea className="max-h-[75vh] pr-4">
+              <div className="space-y-6">
+                {/* Cabeçalho */}
+                <div className="flex items-center gap-4 pb-4 border-b">
+                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
+                    <span className="text-blue-600 font-semibold text-xl">
+                      {selectedColaborador.nome.split(' ').map(n => n[0]).join('').substring(0, 2)}
+                    </span>
                   </div>
-                )}
-                {selectedColaborador.categoria && (
                   <div>
-                    <Label className="text-xs text-muted-foreground">Categoria</Label>
-                    <p className="text-sm">{selectedColaborador.categoria}</p>
+                    <h3 className="text-xl font-bold">{selectedColaborador.nome}</h3>
+                    <p className="text-sm text-muted-foreground">{selectedColaborador.funcao}</p>
+                    {getStatusBadge(selectedColaborador.status)}
                   </div>
-                )}
-                {selectedColaborador.equipe && (
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Equipe</Label>
-                    <p className="text-sm">{selectedColaborador.equipe}</p>
+                </div>
+                
+                {/* Dados Pessoais */}
+                <div>
+                  <h4 className="font-semibold text-sm text-primary mb-3">Dados Pessoais</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Email</Label>
+                      <p className="text-sm">{selectedColaborador.email || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Telefone</Label>
+                      <p className="text-sm">{selectedColaborador.telefone || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">CPF</Label>
+                      <p className="text-sm">{selectedColaborador.cpf || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Departamento</Label>
+                      <p className="text-sm">{selectedColaborador.departamento || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Nível</Label>
+                      <p className="text-sm">{selectedColaborador.nivel || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Gestor</Label>
+                      <p className="text-sm">{selectedColaborador.gestor || 'N/A'}</p>
+                    </div>
+                    {selectedColaborador.dataAdmissao && (
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Data de Admissão</Label>
+                        <p className="text-sm">{selectedColaborador.dataAdmissao}</p>
+                      </div>
+                    )}
+                    {selectedColaborador.salario && selectedColaborador.salario > 0 && (
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Salário</Label>
+                        <p className="text-sm">
+                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(selectedColaborador.salario)}
+                        </p>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                </div>
 
-              {selectedColaborador.modalidades && selectedColaborador.modalidades.length > 0 && (
-                <div>
-                  <Label className="text-xs text-muted-foreground">Modalidades</Label>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {selectedColaborador.modalidades.map((mod, idx) => (
-                      <Badge key={idx} variant="secondary">{mod}</Badge>
-                    ))}
+                {/* Dados Médicos (se aplicável) */}
+                {(selectedColaborador.crm || selectedColaborador.categoria || selectedColaborador.equipe || selectedColaborador.especialidade_atuacao) && (
+                  <div>
+                    <h4 className="font-semibold text-sm text-primary mb-3">Dados Médicos</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      {selectedColaborador.crm && (
+                        <div>
+                          <Label className="text-xs text-muted-foreground">CRM</Label>
+                          <p className="text-sm">{selectedColaborador.crm}</p>
+                        </div>
+                      )}
+                      {selectedColaborador.categoria && (
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Categoria</Label>
+                          <p className="text-sm">{selectedColaborador.categoria}</p>
+                        </div>
+                      )}
+                      {selectedColaborador.equipe && (
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Equipe</Label>
+                          <p className="text-sm">{selectedColaborador.equipe}</p>
+                        </div>
+                      )}
+                      {selectedColaborador.especialidade_atuacao && (
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Especialidade de Atuação</Label>
+                          <p className="text-sm">{selectedColaborador.especialidade_atuacao}</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {selectedColaborador.especialidades && selectedColaborador.especialidades.length > 0 && (
-                <div>
-                  <Label className="text-xs text-muted-foreground">Especialidades</Label>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {selectedColaborador.especialidades.map((esp, idx) => (
-                      <Badge key={idx} variant="outline">{esp}</Badge>
-                    ))}
+                {/* Modalidades */}
+                {selectedColaborador.modalidades && selectedColaborador.modalidades.length > 0 && (
+                  <div>
+                    <h4 className="font-semibold text-sm text-primary mb-3">Modalidades</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedColaborador.modalidades.map((mod, idx) => (
+                        <Badge key={idx} variant="secondary">{mod}</Badge>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+
+                {/* Especialidades */}
+                {selectedColaborador.especialidades && selectedColaborador.especialidades.length > 0 && (
+                  <div>
+                    <h4 className="font-semibold text-sm text-primary mb-3">Especialidades</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedColaborador.especialidades.map((esp, idx) => (
+                        <Badge key={idx} variant="outline">{esp}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Prioridades */}
+                {selectedColaborador.prioridades && selectedColaborador.prioridades.length > 0 && (
+                  <div>
+                    <h4 className="font-semibold text-sm text-primary mb-3">Prioridades</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedColaborador.prioridades.map((pri, idx) => (
+                        <Badge key={idx} variant="default">{pri}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Permissões */}
+                {selectedColaborador.permissoes && selectedColaborador.permissoes.length > 0 && (
+                  <div>
+                    <h4 className="font-semibold text-sm text-primary mb-3">Permissões</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedColaborador.permissoes.map((perm, idx) => (
+                        <Badge key={idx} variant="secondary" className="text-xs">
+                          <Shield className="h-3 w-3 mr-1" />
+                          {perm}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Documentos */}
+                {selectedColaborador.documentos && selectedColaborador.documentos.length > 0 && (
+                  <div>
+                    <h4 className="font-semibold text-sm text-primary mb-3">Documentos</h4>
+                    <div className="space-y-2">
+                      {selectedColaborador.documentos.map((doc) => (
+                        <div key={doc.id} className="border rounded-lg p-3 bg-muted/50">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              {getStatusDocumentoIcon(doc.status_documento)}
+                              <div>
+                                <p className="text-sm font-medium capitalize">
+                                  {doc.tipo_documento.replace('_', ' ')}
+                                </p>
+                                <p className="text-xs text-muted-foreground">{doc.nome_arquivo}</p>
+                              </div>
+                            </div>
+                            <Badge className={
+                              doc.status_documento === 'assinado' ? 'bg-green-100 text-green-800' :
+                              doc.status_documento === 'assinatura_pendente' ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-red-100 text-red-800'
+                            }>
+                              {getStatusDocumentoText(doc.status_documento)}
+                            </Badge>
+                          </div>
+                          {doc.data_envio && (
+                            <p className="text-xs text-muted-foreground mt-2">
+                              Enviado em: {new Date(doc.data_envio).toLocaleDateString('pt-BR')}
+                            </p>
+                          )}
+                          {doc.data_assinatura && (
+                            <p className="text-xs text-muted-foreground">
+                              Assinado em: {new Date(doc.data_assinatura).toLocaleDateString('pt-BR')}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
           )}
         </DialogContent>
       </Dialog>
 
       {/* Dialog de Edição */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-4xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>Editar Colaborador</DialogTitle>
           </DialogHeader>
           {selectedColaborador && (
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Funcionalidade de edição em desenvolvimento
-              </p>
-              <div className="bg-muted p-4 rounded-lg">
-                <p className="text-sm font-medium">{selectedColaborador.nome}</p>
-                <p className="text-xs text-muted-foreground">{selectedColaborador.email}</p>
+            <ScrollArea className="max-h-[75vh] pr-4">
+              <div className="space-y-6">
+                {/* Dados Pessoais */}
+                <div>
+                  <h4 className="font-semibold text-sm text-primary mb-3 pb-2 border-b">Dados Pessoais</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="col-span-2">
+                      <Label htmlFor="edit-nome">Nome Completo</Label>
+                      <Input
+                        id="edit-nome"
+                        defaultValue={selectedColaborador.nome}
+                        placeholder="Nome completo"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-email">Email</Label>
+                      <Input
+                        id="edit-email"
+                        type="email"
+                        defaultValue={selectedColaborador.email}
+                        placeholder="email@exemplo.com"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-telefone">Telefone</Label>
+                      <Input
+                        id="edit-telefone"
+                        defaultValue={selectedColaborador.telefone}
+                        placeholder="(11) 99999-9999"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-cpf">CPF</Label>
+                      <Input
+                        id="edit-cpf"
+                        defaultValue={selectedColaborador.cpf}
+                        placeholder="000.000.000-00"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-funcao">Função</Label>
+                      <Select defaultValue={selectedColaborador.funcao}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Médico Radiologista">Médico Radiologista</SelectItem>
+                          <SelectItem value="Médico Cardiologista">Médico Cardiologista</SelectItem>
+                          <SelectItem value="Técnico em Radiologia">Técnico em Radiologia</SelectItem>
+                          <SelectItem value="Enfermeira">Enfermeira</SelectItem>
+                          <SelectItem value="Administrador TI">Administrador TI</SelectItem>
+                          <SelectItem value="Analista Financeiro">Analista Financeiro</SelectItem>
+                          <SelectItem value="Recepcionista">Recepcionista</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-departamento">Departamento</Label>
+                      <Select defaultValue={selectedColaborador.departamento}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Comercial">Comercial</SelectItem>
+                          <SelectItem value="Operacional">Operacional</SelectItem>
+                          <SelectItem value="Adm. Financeiro">Adm. Financeiro</SelectItem>
+                          <SelectItem value="Médico">Médico</SelectItem>
+                          <SelectItem value="Medicina">Medicina</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-nivel">Nível</Label>
+                      <Select defaultValue={selectedColaborador.nivel}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Júnior">Júnior</SelectItem>
+                          <SelectItem value="Pleno">Pleno</SelectItem>
+                          <SelectItem value="Sênior">Sênior</SelectItem>
+                          <SelectItem value="Especialista">Especialista</SelectItem>
+                          <SelectItem value="Coordenador">Coordenador</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-status">Status</Label>
+                      <Select defaultValue={selectedColaborador.status}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Ativo">Ativo</SelectItem>
+                          <SelectItem value="Inativo">Inativo</SelectItem>
+                          <SelectItem value="Férias">Férias</SelectItem>
+                          <SelectItem value="Licença">Licença</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-gestor">Gestor</Label>
+                      <Input
+                        id="edit-gestor"
+                        defaultValue={selectedColaborador.gestor}
+                        placeholder="Nome do gestor"
+                      />
+                    </div>
+                    {selectedColaborador.salario && (
+                      <div>
+                        <Label htmlFor="edit-salario">Salário</Label>
+                        <Input
+                          id="edit-salario"
+                          type="number"
+                          defaultValue={selectedColaborador.salario}
+                          placeholder="0.00"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Dados Médicos */}
+                {(selectedColaborador.crm || selectedColaborador.categoria || selectedColaborador.equipe) && (
+                  <div>
+                    <h4 className="font-semibold text-sm text-primary mb-3 pb-2 border-b">Dados Médicos</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      {selectedColaborador.crm && (
+                        <div>
+                          <Label htmlFor="edit-crm">CRM</Label>
+                          <Input
+                            id="edit-crm"
+                            defaultValue={selectedColaborador.crm}
+                            placeholder="12345-SP"
+                          />
+                        </div>
+                      )}
+                      {selectedColaborador.categoria && (
+                        <div>
+                          <Label htmlFor="edit-categoria">Categoria</Label>
+                          <Select defaultValue={selectedColaborador.categoria}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {categoriasMedico.map((cat) => (
+                                <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                      {selectedColaborador.equipe && (
+                        <div>
+                          <Label htmlFor="edit-equipe">Equipe</Label>
+                          <Input
+                            id="edit-equipe"
+                            defaultValue={selectedColaborador.equipe}
+                            placeholder="Nome da equipe"
+                          />
+                        </div>
+                      )}
+                      {selectedColaborador.especialidade_atuacao && (
+                        <div>
+                          <Label htmlFor="edit-especialidade-atuacao">Especialidade de Atuação</Label>
+                          <Input
+                            id="edit-especialidade-atuacao"
+                            defaultValue={selectedColaborador.especialidade_atuacao}
+                            placeholder="Especialidade"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Modalidades */}
+                {selectedColaborador.modalidades && (
+                  <div>
+                    <h4 className="font-semibold text-sm text-primary mb-3 pb-2 border-b">Modalidades</h4>
+                    <div className="grid grid-cols-3 gap-3 p-4 border rounded-lg max-h-48 overflow-y-auto">
+                      {modalidadesDisponiveis.map((modalidade) => (
+                        <div key={modalidade} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`edit-modal-${modalidade}`}
+                            defaultChecked={selectedColaborador.modalidades?.includes(modalidade)}
+                          />
+                          <Label htmlFor={`edit-modal-${modalidade}`} className="text-sm font-normal">
+                            {modalidade}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Especialidades */}
+                {selectedColaborador.especialidades && (
+                  <div>
+                    <h4 className="font-semibold text-sm text-primary mb-3 pb-2 border-b">Especialidades</h4>
+                    <div className="grid grid-cols-2 gap-3 p-4 border rounded-lg max-h-48 overflow-y-auto">
+                      {especialidadesDisponiveis.map((especialidade) => (
+                        <div key={especialidade} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`edit-esp-${especialidade}`}
+                            defaultChecked={selectedColaborador.especialidades?.includes(especialidade)}
+                          />
+                          <Label htmlFor={`edit-esp-${especialidade}`} className="text-sm font-normal">
+                            {especialidade}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Prioridades */}
+                {selectedColaborador.prioridades && (
+                  <div>
+                    <h4 className="font-semibold text-sm text-primary mb-3 pb-2 border-b">Prioridades</h4>
+                    <div className="grid grid-cols-3 gap-3 p-4 border rounded-lg">
+                      {prioridadesDisponiveis.map((prioridade) => (
+                        <div key={prioridade} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`edit-pri-${prioridade}`}
+                            defaultChecked={selectedColaborador.prioridades?.includes(prioridade)}
+                          />
+                          <Label htmlFor={`edit-pri-${prioridade}`} className="text-sm font-normal">
+                            {prioridade}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Documentos (somente visualização) */}
+                {selectedColaborador.documentos && selectedColaborador.documentos.length > 0 && (
+                  <div>
+                    <h4 className="font-semibold text-sm text-primary mb-3 pb-2 border-b">Documentos</h4>
+                    <div className="space-y-2">
+                      {selectedColaborador.documentos.map((doc) => (
+                        <div key={doc.id} className="border rounded-lg p-3 bg-muted/50">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              {getStatusDocumentoIcon(doc.status_documento)}
+                              <div>
+                                <p className="text-sm font-medium capitalize">
+                                  {doc.tipo_documento.replace('_', ' ')}
+                                </p>
+                                <p className="text-xs text-muted-foreground">{doc.nome_arquivo}</p>
+                              </div>
+                            </div>
+                            <Badge className={
+                              doc.status_documento === 'assinado' ? 'bg-green-100 text-green-800' :
+                              doc.status_documento === 'assinatura_pendente' ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-red-100 text-red-800'
+                            }>
+                              {getStatusDocumentoText(doc.status_documento)}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
+            </ScrollArea>
           )}
+          
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <Button variant="outline" onClick={() => setShowEditDialog(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={() => {
+              toast({
+                title: "Alterações salvas",
+                description: "Os dados do colaborador foram atualizados com sucesso",
+              });
+              setShowEditDialog(false);
+            }}>
+              Salvar Alterações
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
