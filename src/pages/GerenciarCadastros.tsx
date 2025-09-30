@@ -308,6 +308,9 @@ export default function GerenciarCadastros() {
     // Recarregar dados e status
     repasseData.refetch();
     setRefreshStatusPanel(prev => prev + 1);
+    
+    // Disparar evento customizado para atualizar outras páginas (ex: Colaboradores)
+    window.dispatchEvent(new CustomEvent('repasse-updated'));
   };
 
   // Handler para modalidades

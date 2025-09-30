@@ -470,6 +470,17 @@ export default function Colaboradores() {
       }
     };
     carregarRepasse();
+
+    // Escutar evento de atualização de repasse (disparado após upload em outra página)
+    const handleRepasseUpdate = () => {
+      console.log('🔄 Evento repasse-updated recebido, recarregando...');
+      carregarRepasse();
+    };
+    window.addEventListener('repasse-updated', handleRepasseUpdate);
+
+    return () => {
+      window.removeEventListener('repasse-updated', handleRepasseUpdate);
+    };
   }, [colaboradores]);
 
   const handleFileUpload = async (file: File) => {
@@ -1353,11 +1364,6 @@ export default function Colaboradores() {
                                <SelectItem value="Médico">Médico</SelectItem>
                              </SelectContent>
                            </Select>
-                           {newColaborador.departamento === "Médico" && (
-                             <p className="text-xs text-primary mt-1">
-                               ✓ Seção de "Serviços Médicos" será exibida abaixo
-                             </p>
-                           )}
                          </div>
                         
                         <div>
@@ -1401,74 +1407,6 @@ export default function Colaboradores() {
                       </div>
                     </div>
 
-                    {/* SEÇÃO 2: SERVIÇOS MÉDICOS */}
-                    {newColaborador.departamento === "Médico" && (
-                      <div className="space-y-4">
-                        <div className="pb-2 border-b">
-                          <h3 className="text-lg font-semibold text-primary">Serviços Médicos</h3>
-                          <p className="text-sm text-muted-foreground">Defina as modalidades, especialidades e valores por serviço</p>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <Label htmlFor="categoria">Categoria *</Label>
-                            <Select value={medicoData.categoria} onValueChange={(value) => setMedicoData({...medicoData, categoria: value})}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Selecione a categoria" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {categoriasMedico.map((categoria) => (
-                                  <SelectItem key={categoria} value={categoria}>
-                                    {categoria}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          
-                          <div className="col-span-2">
-                            <Label>Modalidades que Lauda *</Label>
-                            <div className="grid grid-cols-3 gap-3 mt-2 p-4 border rounded-lg max-h-48 overflow-y-auto">
-                              {modalidadesDisponiveis.map((modalidade) => (
-                                <div key={modalidade} className="flex items-center space-x-2">
-                                  <Checkbox
-                                    id={`modal-${modalidade}`}
-                                    checked={medicoData.modalidades.includes(modalidade)}
-                                    onCheckedChange={(checked) => 
-                                      handleModalidadeChange(modalidade, checked as boolean)
-                                    }
-                                  />
-                                  <Label htmlFor={`modal-${modalidade}`} className="text-sm font-normal">
-                                    {modalidade}
-                                  </Label>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-
-                          <div className="col-span-2">
-                            <Label>Especialidades *</Label>
-                            <div className="grid grid-cols-2 gap-3 mt-2 p-4 border rounded-lg max-h-48 overflow-y-auto">
-                              {especialidadesDisponiveis.map((especialidade) => (
-                                <div key={especialidade} className="flex items-center space-x-2">
-                                  <Checkbox
-                                    id={especialidade}
-                                    checked={medicoData.especialidades.includes(especialidade)}
-                                    onCheckedChange={(checked) => 
-                                      handleEspecialidadeChange(especialidade, checked as boolean)
-                                    }
-                                  />
-                                  <Label htmlFor={especialidade} className="text-sm font-normal">
-                                    {especialidade}
-                                  </Label>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-
-                        </div>
-                      </div>
-                    )}
                   </div>
                   </ScrollArea>
                   
@@ -1510,8 +1448,12 @@ export default function Colaboradores() {
                     <div>
                       <h3 className="font-semibold">
                         {colaborador.nome}
-                        {colaborador.status === 'Ativo' && !medicosComRepasse.has(colaborador.id) && (
-                          <span className="ml-2 text-red-600 font-medium">Sem Valor de Repasse</span>
+                        {colaborador.status === 'Ativo' && (
+                          medicosComRepasse.has(colaborador.id) ? (
+                            <span className="ml-2 text-green-600 font-medium">Repasse Cadastrado</span>
+                          ) : (
+                            <span className="ml-2 text-red-600 font-medium">Sem Valor de Repasse</span>
+                          )
                         )}
                       </h3>
                       <div className="text-sm text-gray-600 flex items-center gap-2 flex-wrap">
