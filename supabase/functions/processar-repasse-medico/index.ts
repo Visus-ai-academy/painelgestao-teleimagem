@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.51.0";
+import * as XLSX from "https://deno.land/x/sheetjs@v0.18.3/xlsx.mjs";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -36,25 +37,27 @@ serve(async (req) => {
       throw new Error('Nenhum arquivo foi enviado');
     }
 
-    console.log(`📊 Processando arquivo: ${file.name}`);
+    console.log(`📊 Processando ${file.name} (${Math.round(file.size/1024)}KB)`);
 
-    // Ler como texto para processar linha por linha (evita memória do XLSX)
-    const text = await file.text();
-    const lines = text.split('\n');
+    // Ler Excel com opções mínimas de memória
+    const arrayBuffer = await file.arrayBuffer();
+    const workbook = XLSX.read(arrayBuffer, {
+      type: 'array',
+      cellDates: true,
+      cellStyles: false,
+      sheetStubs: false,
+      dense: true // Usa array denso (menos memória)
+    });
     
-    if (lines.length < 2) {
-      throw new Error('Arquivo vazio ou sem dados');
-    }
+    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+    const jsonData = XLSX.utils.sheet_to_json(worksheet, {
+      raw: false,
+      defval: null,
+      blankrows: false
+    }) as RepasseRow[];
 
-    // Parse header
-    const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
-    console.log(`Headers: ${headers.join(', ')}`);
-
-    let processados = 0;
-    let inseridos = 0;
-    let atualizados = 0;
-    let erros = 0;
-    const detalhesErros: any[] = [];
+    const totalLinhas = jsonData.length;
+    console.log(`Total: ${totalLinhas} registros`);
 
     // Buscar médicos e clientes UMA VEZ
     const { data: medicos } = await supabase
@@ -71,110 +74,127 @@ serve(async (req) => {
     const medicoMapCrm = new Map(medicos?.map(m => [m.crm?.toLowerCase(), m.id]) || []);
     const clienteMap = new Map(clientes?.map(c => [c.nome_fantasia?.toLowerCase() || c.nome.toLowerCase(), c.id]) || []);
 
-    // Processar linha por linha (MUITO mais eficiente em memória)
-    for (let i = 1; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (!line) continue;
+    let processados = 0;
+    let inseridos = 0;
+    let atualizados = 0;
+    let erros = 0;
+    const detalhesErros: any[] = [];
 
-      processados++;
+    // Processar em lotes MUITO pequenos (10 registros)
+    const BATCH_SIZE = 10;
+    
+    for (let batchStart = 0; batchStart < totalLinhas; batchStart += BATCH_SIZE) {
+      const batchEnd = Math.min(batchStart + BATCH_SIZE, totalLinhas);
+      const batch = jsonData.slice(batchStart, batchEnd);
+      
+      const batchPromises = batch.map(async (row, idx) => {
+        const lineNum = batchStart + idx + 1;
+        
+        try {
+          if (!row.modalidade || !row.especialidade || !row.prioridade || !row.valor) {
+            throw new Error('Campos obrigatórios faltando');
+          }
 
-      try {
-        const values = line.split(',').map(v => v.trim().replace(/"/g, ''));
-        const row: any = {};
-        headers.forEach((h, idx) => {
-          row[h] = values[idx] || null;
-        });
+          // Buscar médico
+          let medico_id = null;
+          if (row.medico_crm) {
+            medico_id = medicoMapCrm.get(row.medico_crm.toLowerCase().trim());
+          } else if (row.medico_nome) {
+            medico_id = medicoMapNome.get(row.medico_nome.toLowerCase().trim());
+          }
 
-        // Validação
-        if (!row.modalidade || !row.especialidade || !row.prioridade || !row.valor) {
-          throw new Error('Campos obrigatórios faltando');
-        }
+          // Buscar cliente
+          let cliente_id = null;
+          if (row.cliente_nome) {
+            cliente_id = clienteMap.get(row.cliente_nome.toLowerCase().trim());
+          }
 
-        // Buscar médico
-        let medico_id = null;
-        if (row.medico_crm) {
-          medico_id = medicoMapCrm.get(row.medico_crm.toLowerCase());
-        } else if (row.medico_nome) {
-          medico_id = medicoMapNome.get(row.medico_nome.toLowerCase());
-        }
+          // Escopo
+          let esta_no_escopo = false;
+          if (row.esta_no_escopo) {
+            const valor = String(row.esta_no_escopo).toLowerCase();
+            esta_no_escopo = ['sim', 'yes', 'true', '1', 's', 'y'].includes(valor);
+          }
 
-        // Buscar cliente
-        let cliente_id = null;
-        if (row.cliente_nome) {
-          cliente_id = clienteMap.get(row.cliente_nome.toLowerCase());
-        }
+          const repasseData = {
+            medico_id: medico_id || null,
+            modalidade: row.modalidade.trim(),
+            especialidade: row.especialidade.trim(),
+            categoria: row.categoria?.trim() || null,
+            prioridade: row.prioridade.trim(),
+            valor: Number(row.valor),
+            esta_no_escopo,
+            cliente_id: cliente_id || null
+          };
 
-        // Escopo
-        let esta_no_escopo = false;
-        if (row.esta_no_escopo) {
-          const valor = String(row.esta_no_escopo).toLowerCase();
-          esta_no_escopo = ['sim', 'yes', 'true', '1', 's', 'y'].includes(valor);
-        }
-
-        const repasseData = {
-          medico_id: medico_id || null,
-          modalidade: row.modalidade,
-          especialidade: row.especialidade,
-          categoria: row.categoria || null,
-          prioridade: row.prioridade,
-          valor: parseFloat(row.valor),
-          esta_no_escopo,
-          cliente_id: cliente_id || null
-        };
-
-        // Verificar duplicata
-        let query = supabase
-          .from('medicos_valores_repasse')
-          .select('id')
-          .eq('modalidade', repasseData.modalidade)
-          .eq('especialidade', repasseData.especialidade)
-          .eq('prioridade', repasseData.prioridade);
-
-        if (medico_id) query = query.eq('medico_id', medico_id);
-        else query = query.is('medico_id', null);
-
-        if (repasseData.categoria) query = query.eq('categoria', repasseData.categoria);
-        else query = query.is('categoria', null);
-
-        if (cliente_id) query = query.eq('cliente_id', cliente_id);
-        else query = query.is('cliente_id', null);
-
-        const { data: existente } = await query.maybeSingle();
-
-        if (existente) {
-          await supabase
+          // Verificar duplicata
+          let query = supabase
             .from('medicos_valores_repasse')
-            .update({ valor: repasseData.valor, esta_no_escopo: repasseData.esta_no_escopo })
-            .eq('id', existente.id);
-          atualizados++;
-        } else {
-          await supabase
-            .from('medicos_valores_repasse')
-            .insert(repasseData);
-          inseridos++;
-        }
+            .select('id')
+            .eq('modalidade', repasseData.modalidade)
+            .eq('especialidade', repasseData.especialidade)
+            .eq('prioridade', repasseData.prioridade);
 
-        if (processados % 20 === 0) {
-          console.log(`Processadas ${processados} linhas...`);
-        }
+          if (medico_id) query = query.eq('medico_id', medico_id);
+          else query = query.is('medico_id', null);
 
-      } catch (error: any) {
-        erros++;
-        detalhesErros.push({
-          linha: i + 1,
-          erro: error.message
-        });
+          if (repasseData.categoria) query = query.eq('categoria', repasseData.categoria);
+          else query = query.is('categoria', null);
+
+          if (cliente_id) query = query.eq('cliente_id', cliente_id);
+          else query = query.is('cliente_id', null);
+
+          const { data: existente } = await query.maybeSingle();
+
+          if (existente) {
+            await supabase
+              .from('medicos_valores_repasse')
+              .update({ valor: repasseData.valor, esta_no_escopo })
+              .eq('id', existente.id);
+            return { tipo: 'atualizado', linha: lineNum };
+          } else {
+            await supabase
+              .from('medicos_valores_repasse')
+              .insert(repasseData);
+            return { tipo: 'inserido', linha: lineNum };
+          }
+        } catch (error: any) {
+          return { tipo: 'erro', linha: lineNum, erro: error.message };
+        }
+      });
+
+      // Processar batch
+      const resultados = await Promise.all(batchPromises);
+      
+      resultados.forEach(r => {
+        processados++;
+        if (r.tipo === 'inserido') inseridos++;
+        else if (r.tipo === 'atualizado') atualizados++;
+        else if (r.tipo === 'erro') {
+          erros++;
+          if (detalhesErros.length < 50) { // Limitar memória de erros
+            detalhesErros.push({ linha: r.linha, erro: r.erro });
+          }
+        }
+      });
+
+      // Log progresso
+      if (batchEnd % 100 === 0 || batchEnd === totalLinhas) {
+        console.log(`Processados ${batchEnd}/${totalLinhas} (${Math.round(batchEnd/totalLinhas*100)}%)`);
       }
+
+      // Pequena pausa para GC
+      await new Promise(resolve => setTimeout(resolve, 5));
     }
 
-    // Log
+    // Log final
     await supabase
       .from('processamento_uploads')
       .insert({
         arquivo_nome: file.name,
         tipo_arquivo: 'repasse_medico',
         tipo_dados: 'configuracao',
-        status: erros === processados ? 'erro' : 'concluido',
+        status: erros > 0 && inseridos === 0 && atualizados === 0 ? 'erro' : 'concluido',
         registros_processados: processados,
         registros_inseridos: inseridos,
         registros_atualizados: atualizados,
@@ -193,7 +213,7 @@ serve(async (req) => {
       detalhes_erros: detalhesErros.slice(0, 10)
     };
 
-    console.log('✅ Concluído:', resultado);
+    console.log(`✅ Concluído: ${inseridos} inseridos, ${atualizados} atualizados, ${erros} erros`);
 
     return new Response(JSON.stringify(resultado), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -201,7 +221,7 @@ serve(async (req) => {
     });
 
   } catch (error: any) {
-    console.error('❌ Erro:', error);
+    console.error('❌ Erro:', error.message);
     return new Response(
       JSON.stringify({ 
         sucesso: false, 
