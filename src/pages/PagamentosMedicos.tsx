@@ -265,47 +265,61 @@ export default function PagamentosMedicos() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className="text-sm font-medium mb-2 block">Período</label>
-              <Input
-                type="month"
-                value={periodo}
-                onChange={(e) => setPeriodo(e.target.value)}
-                className="w-full"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-2 block">Buscar Médico</label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium mb-2 block flex items-center gap-2">
+                  <CalendarIcon className="h-4 w-4" />
+                  Período de Referência
+                </label>
                 <Input
-                  placeholder="Nome do médico..."
-                  value={filtroMedico}
-                  onChange={(e) => setFiltroMedico(e.target.value)}
-                  className="pl-10"
+                  type="month"
+                  value={periodo}
+                  onChange={(e) => setPeriodo(e.target.value)}
+                  className="w-full"
                 />
               </div>
+              <div className="flex items-end">
+                <Button onClick={calcularPagamentos} className="w-full" disabled={loading}>
+                  <Calculator className="h-4 w-4 mr-2" />
+                  Gerar Pagamento Médico
+                </Button>
+              </div>
             </div>
-            <div>
-              <label className="text-sm font-medium mb-2 block">Especialidade</label>
-              <Select value={filtroEspecialidade} onValueChange={setFiltroEspecialidade}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Todas especialidades" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas especialidades</SelectItem>
-                  {especialidades.map(esp => (
-                    <SelectItem key={esp} value={esp}>{esp}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-end">
-              <Button onClick={gerarArquivoPagamento} className="w-full">
-                <Download className="h-4 w-4 mr-2" />
-                Gerar Arquivo
-              </Button>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="text-sm font-medium mb-2 block">Buscar Médico</label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Nome do médico..."
+                    value={filtroMedico}
+                    onChange={(e) => setFiltroMedico(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-2 block">Especialidade</label>
+                <Select value={filtroEspecialidade} onValueChange={setFiltroEspecialidade}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todas especialidades" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas especialidades</SelectItem>
+                    {especialidades.map(esp => (
+                      <SelectItem key={esp} value={esp}>{esp}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-end">
+                <Button onClick={gerarArquivoPagamento} variant="outline" className="w-full">
+                  <Download className="h-4 w-4 mr-2" />
+                  Exportar CSV
+                </Button>
+              </div>
             </div>
           </div>
         </CardContent>
