@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { Label } from "@/components/ui/label";
@@ -11,7 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { FileUpload } from "@/components/FileUpload";
+import { SimpleFileUpload } from "@/components/SimpleFileUpload";
 import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { useMedicoData } from "@/hooks/useMedicoData";
 import { 
   Users, 
@@ -29,7 +31,8 @@ import {
   FileText,
   CheckCircle,
   Clock,
-  AlertCircle
+  AlertCircle,
+  DollarSign
 } from "lucide-react";
 
 interface Colaborador {
@@ -1501,9 +1504,55 @@ export default function Colaboradores() {
                   </div>
                 </DialogContent>
               </Dialog>
+
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <DollarSign className="h-4 w-4 mr-2" />
+                    Upload Valores Repasse
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Upload de Valores de Repasse Médico</DialogTitle>
+                    <DialogDescription>
+                      Faça upload do arquivo com os valores de repasse dos serviços médicos.
+                      <a 
+                        href="/templates/template_repasse_medico.csv" 
+                        download
+                        className="text-primary hover:underline ml-2"
+                      >
+                        Baixar template
+                      </a>
+                    </DialogDescription>
+                  </DialogHeader>
+                  <FileUpload
+                    title="Arquivo de Valores de Repasse"
+                    description="Selecione o arquivo CSV ou Excel com os valores de repasse médico"
+                    expectedFormat={["medico_id", "modalidade", "especialidade", "prioridade", "valor"]}
+                    onUpload={async (file) => {
+                      const formData = new FormData();
+                      formData.append('file', file);
+                      
+                      const { data, error } = await supabase.functions.invoke('processar-repasse-medico', {
+                        body: formData,
+                      });
+                      
+                      if (error) throw error;
+                      
+                      toast({
+                        title: "Sucesso",
+                        description: "Valores de repasse processados com sucesso!",
+                      });
+                    }}
+                    acceptedTypes={['.csv', '.xlsx', '.xls']}
+                    maxSizeInMB={10}
+                  />
+                </DialogContent>
+              </Dialog>
             </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
       {/* Lista de Colaboradores */}
       <Card>
