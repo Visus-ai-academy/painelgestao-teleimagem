@@ -30,8 +30,7 @@ import {
   FileText,
   CheckCircle,
   Clock,
-  AlertCircle,
-  DollarSign
+  AlertCircle
 } from "lucide-react";
 
 interface Colaborador {
@@ -1508,51 +1507,6 @@ export default function Colaboradores() {
                 </DialogContent>
               </Dialog>
 
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    <DollarSign className="h-4 w-4 mr-2" />
-                    Upload Valores Repasse
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-2xl">
-                  <DialogHeader>
-                    <DialogTitle>Upload de Valores de Repasse Médico</DialogTitle>
-                    <DialogDescription>
-                      Faça upload do arquivo com os valores de repasse dos serviços médicos.
-                      <a 
-                        href="/templates/template_repasse_medico.csv" 
-                        download
-                        className="text-primary hover:underline ml-2"
-                      >
-                        Baixar template
-                      </a>
-                    </DialogDescription>
-                  </DialogHeader>
-                  <FileUpload
-                    title="Arquivo de Valores de Repasse"
-                    description="Selecione o arquivo CSV ou Excel com os valores de repasse médico"
-                    expectedFormat={["medico_id", "modalidade", "especialidade", "prioridade", "valor"]}
-                    onUpload={async (file) => {
-                      const formData = new FormData();
-                      formData.append('file', file);
-                      
-                      const { data, error } = await supabase.functions.invoke('processar-repasse-medico', {
-                        body: formData,
-                      });
-                      
-                      if (error) throw error;
-                      
-                      toast({
-                        title: "Sucesso",
-                        description: "Valores de repasse processados com sucesso!",
-                      });
-                    }}
-                    acceptedTypes={['.csv', '.xlsx', '.xls']}
-                    maxSizeInMB={10}
-                  />
-                </DialogContent>
-              </Dialog>
             </div>
           </CardContent>
         </Card>
