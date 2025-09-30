@@ -45,7 +45,7 @@ serve(async (req) => {
       .insert({
         arquivo_nome: file.name,
         tipo_arquivo: 'repasse_medico',
-        tipo_dados: 'configuracao',
+        tipo_dados: 'cadastros',
         status: 'processando',
         registros_processados: 0,
         registros_inseridos: 0,
