@@ -198,10 +198,21 @@ serve(async (req) => {
         }
       }
 
-      // INSERT direto sem deduplicação - mantém TODOS os registros
+      // ESTRATÉGIA: Remover duplicados EXATOS (mesma chave + mesmo valor), manter duplicados com valores diferentes
       if (toUpsert.length > 0) {
-        for (let i = 0; i < toUpsert.length; i += 500) {
-          const batch = toUpsert.slice(i, i + 500);
+        // Deduplic: agrupar por chave composta + valor e manter apenas 1 de cada grupo idêntico
+        const uniqueMap = new Map<string, any>();
+        for (const item of toUpsert) {
+          const key = `${item.medico_id || 'null'}_${item.modalidade}_${item.especialidade}_${item.prioridade}_${item.categoria || 'null'}_${item.cliente_id || 'null'}_${item.valor}`;
+          if (!uniqueMap.has(key)) {
+            uniqueMap.set(key, item);
+          }
+        }
+        const uniqueRecords = Array.from(uniqueMap.values());
+        
+        // Inserir apenas registros únicos (removendo duplicados exatos)
+        for (let i = 0; i < uniqueRecords.length; i += 500) {
+          const batch = uniqueRecords.slice(i, i + 500);
           const { error: insertError } = await supabase
             .from('medicos_valores_repasse')
             .insert(batch);

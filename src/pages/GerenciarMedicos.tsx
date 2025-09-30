@@ -7,11 +7,12 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Edit, Trash2, X } from "lucide-react";
+import { Plus, Edit, Trash2, X, AlertTriangle } from "lucide-react";
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { RoleProtectedRoute } from '@/components/RoleProtectedRoute';
 import { useMedicoData } from '@/hooks/useMedicoData';
+import { DuplicadosRepasseDialog } from '@/components/DuplicadosRepasseDialog';
 
 interface Medico {
   id: string;
@@ -24,6 +25,7 @@ interface Medico {
   email?: string;
   ativo: boolean;
   user_id?: string;
+  temDuplicadosRepasse?: boolean;
 }
 
 export default function GerenciarMedicos() {
@@ -31,6 +33,8 @@ export default function GerenciarMedicos() {
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingMedico, setEditingMedico] = useState<Medico | null>(null);
+  const [duplicadosDialogOpen, setDuplicadosDialogOpen] = useState(false);
+  const [selectedMedicoForDuplicados, setSelectedMedicoForDuplicados] = useState<{ id: string; nome: string } | null>(null);
   const { toast } = useToast();
   const { modalidades, especialidades, categoriasMedico, loading: loadingData } = useMedicoData();
 
@@ -63,7 +67,19 @@ export default function GerenciarMedicos() {
         return;
       }
 
-      setMedicos(data || []);
+      // Buscar duplicados para cada médico
+      const { data: duplicados } = await supabase
+        .from('duplicados_repasse_medico')
+        .select('medico_id');
+
+      const medicosComDuplicados = new Set(duplicados?.map(d => d.medico_id) || []);
+
+      const medicosComIndicador = (data || []).map(medico => ({
+        ...medico,
+        temDuplicadosRepasse: medicosComDuplicados.has(medico.id)
+      }));
+
+      setMedicos(medicosComIndicador);
     } catch (error) {
       console.error('Erro ao buscar médicos:', error);
       toast({
@@ -437,6 +453,7 @@ export default function GerenciarMedicos() {
                     <TableHead>Categoria</TableHead>
                     <TableHead>Contato</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Repasse</TableHead>
                     <TableHead>Ações</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -481,6 +498,24 @@ export default function GerenciarMedicos() {
                         </Badge>
                       </TableCell>
                       <TableCell>
+                        {medico.temDuplicadosRepasse ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-2"
+                            onClick={() => {
+                              setSelectedMedicoForDuplicados({ id: medico.id, nome: medico.nome });
+                              setDuplicadosDialogOpen(true);
+                            }}
+                          >
+                            <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                            Duplicados
+                          </Button>
+                        ) : (
+                          <Badge variant="outline" className="text-muted-foreground">OK</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
                         <div className="flex space-x-2">
                           <Button
                             variant="outline"
@@ -504,8 +539,17 @@ export default function GerenciarMedicos() {
               </Table>
             )}
           </CardContent>
-        </Card>
-      </div>
-    </RoleProtectedRoute>
-  );
-}
+          </Card>
+        </div>
+
+        {selectedMedicoForDuplicados && (
+          <DuplicadosRepasseDialog
+            medicoId={selectedMedicoForDuplicados.id}
+            medicoNome={selectedMedicoForDuplicados.nome}
+            open={duplicadosDialogOpen}
+            onOpenChange={setDuplicadosDialogOpen}
+          />
+        )}
+      </RoleProtectedRoute>
+    );
+  }
