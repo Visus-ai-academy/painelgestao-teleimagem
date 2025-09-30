@@ -196,7 +196,7 @@ export default function Colaboradores() {
           modalidades: medico.modalidades || [],
           especialidades: medico.especialidades || [],
           equipe: medico.equipe || '',
-          especialidade_atuacao: medico.especialidade_atuacao || '',
+          especialidade_atuacao: medico.especialidade_atuacao || medico.especialidade || (Array.isArray(medico.especialidades) ? medico.especialidades[0] : ''),
           // Campos adicionais do banco
           socio: medico.socio || '',
           cnpj: medico.cnpj || '',
@@ -255,7 +255,7 @@ export default function Colaboradores() {
           prioridades: [],
           documentos: [],
           equipe: medico.equipe || '',
-          especialidade_atuacao: medico.especialidade_atuacao || '',
+          especialidade_atuacao: medico.especialidade_atuacao || medico.especialidade || (Array.isArray(medico.especialidades) ? medico.especialidades[0] : ''),
           // Campos adicionais do banco
           socio: medico.socio || '',
           cnpj: medico.cnpj || '',
@@ -497,7 +497,7 @@ export default function Colaboradores() {
           prioridades: [],
           documentos: [],
           equipe: medico.equipe || '',
-          especialidade_atuacao: medico.especialidade_atuacao || '',
+          especialidade_atuacao: medico.especialidade_atuacao || medico.especialidade || (Array.isArray(medico.especialidades) ? medico.especialidades[0] : ''),
           // Campos adicionais do banco
           socio: medico.socio || '',
           cnpj: medico.cnpj || '',
@@ -657,7 +657,7 @@ export default function Colaboradores() {
           prioridades: [],
           documentos: [],
           equipe: medico.equipe || '',
-          especialidade_atuacao: medico.especialidade_atuacao || '',
+          especialidade_atuacao: medico.especialidade_atuacao || medico.especialidade || (Array.isArray(medico.especialidades) ? medico.especialidades[0] : ''),
           socio: medico.socio || '',
           cnpj: medico.cnpj || '',
           nome_empresa: medico.nome_empresa || '',
@@ -1525,25 +1525,23 @@ export default function Colaboradores() {
                     </div>
                     <div>
                       <h3 className="font-semibold">{colaborador.nome}</h3>
-                      <div className="text-sm text-gray-600 flex items-center gap-2">
+                      <div className="text-sm text-gray-600 flex items-center gap-2 flex-wrap">
                         {((colaborador.especialidade_atuacao?.trim() || colaborador.especialidades?.[0] || (colaborador as any).especialidade)?.trim()) && (
                           <>
                             <span>{(colaborador.especialidade_atuacao?.trim() || colaborador.especialidades?.[0] || (colaborador as any).especialidade)?.trim()}</span>
+                            {getStatusBadge(colaborador.status)}
                             {(((colaborador.funcao || '').toUpperCase().includes('STAFF')) || ((colaborador.funcao || '').toUpperCase().includes('FELLOW'))) && (
                               <>
                                 <span>•</span>
                                 <span>{(colaborador.funcao || '').toUpperCase().includes('STAFF') ? 'STAFF' : 'FELLOW'}</span>
                               </>
                             )}
+                            {colaborador.equipe && (
+                              <Badge variant="default" className="text-xs">
+                                {colaborador.equipe}
+                              </Badge>
+                            )}
                           </>
-                        )}
-                      </div>
-                      <div className="mt-1 flex items-center gap-2">
-                        {getStatusBadge(colaborador.status)}
-                        {colaborador.equipe && (
-                          <Badge variant="default" className="text-xs">
-                            {colaborador.equipe}
-                          </Badge>
                         )}
                       </div>
                       {/* Mostrar documentos para médicos SOMENTE se houver documentos */}
@@ -1768,7 +1766,7 @@ export default function Colaboradores() {
                       </div>
                       <div>
                         <Label className="text-xs text-muted-foreground">Especialidade de Atuação</Label>
-                        <p className="text-sm">{selectedColaborador.especialidade_atuacao || ''}</p>
+                        <p className="text-sm">{selectedColaborador.especialidade_atuacao || selectedColaborador.especialidades?.[0] || (selectedColaborador as any).especialidade || ''}</p>
                       </div>
                       {selectedColaborador.categoria && (
                         <div>
@@ -2017,7 +2015,7 @@ export default function Colaboradores() {
                         <Label htmlFor="edit-especialidade-atuacao">Especialidade de Atuação</Label>
                         <Input
                           id="edit-especialidade-atuacao"
-                          defaultValue={selectedColaborador.especialidade_atuacao || ''}
+                          defaultValue={selectedColaborador.especialidade_atuacao || selectedColaborador.especialidades?.[0] || (selectedColaborador as any).especialidade || ''}
                           placeholder="Especialidade"
                         />
                       </div>
