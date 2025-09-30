@@ -48,9 +48,13 @@ export default function PagamentosMedicos() {
   const [resumos, setResumos] = useState<ResumoMedico[]>([]);
   const [periodoReferencia, setPeriodoReferencia] = useState(() => {
     const hoje = new Date();
-    const mes = format(hoje, 'MMM', { locale: ptBR });
+    const mes = format(hoje, 'MMM', { locale: ptBR }).toLowerCase();
     const ano = format(hoje, 'yy');
     return `${mes}/${ano}`;
+  });
+  const [mesAnoSelecionado, setMesAnoSelecionado] = useState(() => {
+    const hoje = new Date();
+    return format(hoje, 'yyyy-MM');
   });
   const [loading, setLoading] = useState(false);
   const [filtroMedico, setFiltroMedico] = useState("");
@@ -317,18 +321,27 @@ export default function PagamentosMedicos() {
         <CardContent>
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium mb-2 block flex items-center gap-2">
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-2">
                   <CalendarIcon className="h-4 w-4" />
-                  Período de Referência (formato: jan/25, fev/25, etc)
+                  Período de Referência
                 </label>
                 <Input
-                  type="text"
-                  value={periodoReferencia}
-                  onChange={(e) => setPeriodoReferencia(e.target.value)}
-                  placeholder="jan/25"
+                  type="month"
+                  min="2025-06"
+                  value={mesAnoSelecionado}
+                  onChange={(e) => {
+                    setMesAnoSelecionado(e.target.value);
+                    // Converter YYYY-MM para mmm/yy (formato da volumetria)
+                    const date = new Date(e.target.value + '-01');
+                    const formatted = format(date, 'MMM/yy', { locale: ptBR }).toLowerCase();
+                    setPeriodoReferencia(formatted);
+                  }}
                   className="w-full"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Formato da volumetria: <span className="font-mono font-semibold">{periodoReferencia}</span>
+                </p>
               </div>
               <div className="flex items-end">
                 <Button onClick={calcularPagamentos} className="w-full" disabled={loading}>
