@@ -1046,15 +1046,6 @@ export default function Colaboradores() {
           <Separator className="my-4" />
             
             <div className="flex gap-2">
-              <Button 
-                onClick={limparDadosFicticios}
-                disabled={cleaningData}
-                variant="destructive"
-                size="sm"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                {cleaningData ? "Limpando..." : "Limpar Fictícios"}
-              </Button>
               
               <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
                 <DialogTrigger asChild>
