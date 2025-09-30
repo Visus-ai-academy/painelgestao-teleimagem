@@ -1810,17 +1810,23 @@ export default function Colaboradores() {
                           <p className="text-sm">{(selectedColaborador as any).optante_simples}</p>
                         </div>
                       )}
-                      {(selectedColaborador as any).acrescimo_sem_digitador && (
+                      {(() => {
+                        const val = (selectedColaborador as any).acrescimo_sem_digitador;
+                        return val && val !== '0' && val !== 0 && val !== '0.00';
+                      })() && (
                         <div>
                           <Label className="text-xs text-muted-foreground">Acréscimo sem Digitador</Label>
                           <p className="text-sm">{(selectedColaborador as any).acrescimo_sem_digitador}</p>
                         </div>
                       )}
-                      {(selectedColaborador as any).adicional_valor_sem_digitador != null && (
+                      {(() => {
+                        const val = (selectedColaborador as any).adicional_valor_sem_digitador;
+                        return typeof val === 'number' && val > 0;
+                      })() && (
                         <div>
                           <Label className="text-xs text-muted-foreground">Valor Adicional sem Digitador</Label>
                           <p className="text-sm">
-                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format((selectedColaborador as any).adicional_valor_sem_digitador || 0)}
+                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format((selectedColaborador as any).adicional_valor_sem_digitador)}
                           </p>
                         </div>
                       )}
@@ -2092,7 +2098,10 @@ export default function Colaboradores() {
                           </Select>
                         </div>
                       )}
-                      {(selectedColaborador as any).acrescimo_sem_digitador != null && (
+                      {(() => {
+                        const val = (selectedColaborador as any).acrescimo_sem_digitador;
+                        return val && val !== '0' && val !== 0 && val !== '0.00';
+                      })() && (
                         <div>
                           <Label htmlFor="edit-acrescimo-sem-digitador">Acréscimo sem Digitador</Label>
                           <Select defaultValue={(selectedColaborador as any).acrescimo_sem_digitador}>
@@ -2106,7 +2115,10 @@ export default function Colaboradores() {
                           </Select>
                         </div>
                       )}
-                      {(selectedColaborador as any).adicional_valor_sem_digitador != null && (
+                      {(() => {
+                        const val = (selectedColaborador as any).adicional_valor_sem_digitador;
+                        return typeof val === 'number' && val > 0;
+                      })() && (
                         <div>
                           <Label htmlFor="edit-adicional-valor">Valor Adicional sem Digitador</Label>
                           <Input
