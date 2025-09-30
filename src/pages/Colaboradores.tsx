@@ -1448,11 +1448,13 @@ export default function Colaboradores() {
                     <div>
                       <h3 className="font-semibold">{colaborador.nome}</h3>
                       <div className="text-sm text-gray-600 flex items-center gap-2">
-                        <span>{colaborador.funcao}</span>
-                        {colaborador.especialidade_atuacao && colaborador.especialidade_atuacao.trim() !== '' && (
+                        {(colaborador.funcao && colaborador.funcao.trim().toLowerCase() !== 'medicina') && (
+                          <span>{colaborador.funcao}</span>
+                        )}
+                        {((colaborador.especialidade_atuacao?.trim() || colaborador.especialidades?.[0] || (colaborador as any).especialidade)?.trim()) && (
                           <>
-                            <span>•</span>
-                            <span>{colaborador.especialidade_atuacao}</span>
+                            {(colaborador.funcao && colaborador.funcao.trim().toLowerCase() !== 'medicina') && <span>•</span>}
+                            <span>{(colaborador.especialidade_atuacao?.trim() || colaborador.especialidades?.[0] || (colaborador as any).especialidade)?.trim()}</span>
                           </>
                         )}
                       </div>
@@ -1566,7 +1568,7 @@ export default function Colaboradores() {
                   </div>
                 </div>
                 
-                {(colaborador.modalidades?.length || colaborador.especialidades?.length) && (
+                {(((colaborador.modalidades?.length ?? 0) > 0) || ((colaborador.especialidades?.length ?? 0) > 0)) && (
                   <div className="mt-3 pt-3 border-t">
                     <div className="flex items-center justify-between flex-wrap gap-2">
                       {colaborador.modalidades && colaborador.modalidades.length > 0 && (
