@@ -693,86 +693,86 @@ export default function Colaboradores() {
 
       
 
-      {/* Métricas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <Users className="h-8 w-8 text-blue-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Total Médicos Ativos</p>
-                <p className="text-2xl font-bold text-gray-900">{colaboradoresAtivos}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Resumo Cadastros por Equipe */}
+      {/* Quadro Operacional */}
       <Card>
         <CardHeader>
-          <CardTitle>Resumo Cadastros</CardTitle>
+          <CardTitle>Quadro Operacional</CardTitle>
         </CardHeader>
         <CardContent>
           {loadingColaboradores ? (
             <div className="flex justify-center p-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
-          ) : resumoEquipes.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {resumoEquipes.map((equipe, index) => (
-                <div key={index} className="border rounded-lg p-6 hover:shadow-lg transition-shadow bg-gradient-to-br from-background to-muted/20">
-                  {/* Cabeçalho da Equipe */}
-                  <div className="mb-4 pb-4 border-b">
-                    <h3 className="text-xl font-bold text-primary mb-3">{equipe.equipe}</h3>
-                    <div className="grid grid-cols-3 gap-3">
-                      <div className="text-center p-3 rounded-lg bg-primary/5">
-                        <div className="text-2xl font-bold text-primary">{equipe.total}</div>
-                        <div className="text-xs text-muted-foreground mt-1">Total</div>
-                      </div>
-                      <div className="text-center p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20">
-                        <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{equipe.staff}</div>
-                        <div className="text-xs text-muted-foreground mt-1">STAFF</div>
-                      </div>
-                      <div className="text-center p-3 rounded-lg bg-green-50 dark:bg-green-950/20">
-                        <div className="text-2xl font-bold text-green-600 dark:text-green-400">{equipe.fellow}</div>
-                        <div className="text-xs text-muted-foreground mt-1">FELLOW</div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Especialidades */}
-                  <div>
-                    <h4 className="text-sm font-semibold text-muted-foreground mb-3">Especialidades</h4>
-                    <div className="space-y-2">
-                      {equipe.especialidades.length > 0 ? (
-                        equipe.especialidades.map((esp, idx) => (
-                          <div 
-                            key={idx} 
-                            className="flex items-center justify-between p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
-                          >
-                            <span className="text-sm font-medium truncate flex-1" title={esp.nome}>
-                              {esp.nome}
-                            </span>
-                            <Badge variant="secondary" className="ml-2 shrink-0">
-                              {esp.count} {esp.count === 1 ? 'médico' : 'médicos'}
-                            </Badge>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="text-center text-sm text-muted-foreground py-4">
-                          Nenhuma especialidade cadastrada
-                        </div>
-                      )}
-                    </div>
+          ) : (
+            <>
+              {/* Total Médicos Ativos */}
+              <div className="mb-6 p-4 rounded-lg bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-950/20 dark:to-blue-900/20 border border-blue-200 dark:border-blue-800">
+                <div className="flex items-center">
+                  <Users className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Total Médicos Ativos</p>
+                    <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{colaboradoresAtivos}</p>
                   </div>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center text-muted-foreground py-8">
-              Nenhum médico cadastrado
-            </div>
+              </div>
+              
+              {resumoEquipes.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {resumoEquipes.map((equipe, index) => (
+                    <div key={index} className="border rounded-lg p-6 hover:shadow-lg transition-shadow bg-gradient-to-br from-background to-muted/20">
+                      {/* Cabeçalho da Equipe */}
+                      <div className="mb-4 pb-4 border-b">
+                        <h3 className="text-xl font-bold text-primary mb-3">{equipe.equipe}</h3>
+                        <div className="grid grid-cols-3 gap-3">
+                          <div className="text-center p-3 rounded-lg bg-primary/5">
+                            <div className="text-2xl font-bold text-primary">{equipe.total}</div>
+                            <div className="text-xs text-muted-foreground mt-1">Total</div>
+                          </div>
+                          <div className="text-center p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20">
+                            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{equipe.staff}</div>
+                            <div className="text-xs text-muted-foreground mt-1">STAFF</div>
+                          </div>
+                          <div className="text-center p-3 rounded-lg bg-green-50 dark:bg-green-950/20">
+                            <div className="text-2xl font-bold text-green-600 dark:text-green-400">{equipe.fellow}</div>
+                            <div className="text-xs text-muted-foreground mt-1">FELLOW</div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Especialidades */}
+                      <div>
+                        <h4 className="text-sm font-semibold text-muted-foreground mb-3">Especialidades</h4>
+                        <div className="space-y-2">
+                          {equipe.especialidades.length > 0 ? (
+                            equipe.especialidades.map((esp, idx) => (
+                              <div 
+                                key={idx} 
+                                className="flex items-center justify-between p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                              >
+                                <span className="text-sm font-medium truncate flex-1" title={esp.nome}>
+                                  {esp.nome}
+                                </span>
+                                <Badge variant="secondary" className="ml-2 shrink-0">
+                                  {esp.count} {esp.count === 1 ? 'médico' : 'médicos'}
+                                </Badge>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="text-center text-sm text-muted-foreground py-4">
+                              Nenhuma especialidade cadastrada
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center text-muted-foreground py-8">
+                  Nenhum médico cadastrado
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
