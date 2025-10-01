@@ -75,12 +75,21 @@ interface ResumoMedico {
   arranjos: ArranjoAgrupado[];
 }
 
+// Cache de resultados por período
+const CACHE_KEY = (periodo: string) => `pag_medicos_${periodo}`;
+function salvarResumosCache(periodo: string, dados: ResumoMedico[]) {
+  try { localStorage.setItem(CACHE_KEY(periodo), JSON.stringify(dados)); } catch (e) { console.warn('Falha ao salvar cache', e); }
+}
+function carregarResumosCache(periodo: string): ResumoMedico[] | null {
+  try { const raw = localStorage.getItem(CACHE_KEY(periodo)); return raw ? JSON.parse(raw) : null; } catch (e) { console.warn('Falha ao ler cache', e); return null; }
+}
+
 export default function PagamentosMedicos() {
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [resumos, setResumos] = useState<ResumoMedico[]>([]);
   const [periodoReferencia, setPeriodoReferencia] = useState(() => {
-    const hoje = new Date();
-    return format(hoje, 'yyyy-MM');
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('pag_medicos_periodo') : null;
+    return saved || format(new Date(), 'yyyy-MM');
   });
   const [loading, setLoading] = useState(false);
   const [filtroMedico, setFiltroMedico] = useState("");
@@ -93,8 +102,14 @@ export default function PagamentosMedicos() {
     carregarMedicos();
   }, []);
 
-  // Remover auto-cálculo - apenas quando clicar no botão
+  // Restaurar do cache ao mudar o período
+  useEffect(() => {
+    const cached = carregarResumosCache(periodoReferencia);
+    if (cached) setResumos(cached);
+  }, [periodoReferencia]);
 
+  // Remover auto-cálculo - apenas quando clicar no botão
+ 
   const carregarMedicos = async () => {
     try {
       const { data, error } = await supabase
@@ -132,7 +147,7 @@ export default function PagamentosMedicos() {
       // Buscar volumetria do período
       const { data: volumetria, error: volumetriaError } = await supabase
         .from('volumetria_mobilemed')
-        .select('*')
+        .select('id, "MEDICO", "MODALIDADE", "ESPECIALIDADE", "CATEGORIA", "PRIORIDADE", "VALORES", "EMPRESA", "Cliente_Nome_Fantasia", "DATA_LAUDO", "DATA_REALIZACAO", "NOME_PACIENTE"')
         .eq('periodo_referencia', periodoReferencia);
 
       if (volumetriaError) throw volumetriaError;
@@ -213,9 +228,10 @@ export default function PagamentosMedicos() {
         return melhor;
       };
 
-      volumetria.forEach((registro, index) => {
+      for (let index = 0; index < volumetria.length; index++) {
+        const registro = volumetria[index];
         const medicoNome = registro.MEDICO;
-        if (!medicoNome) return;
+        if (!medicoNome) continue;
 
         // Normalizar campos para comparação (remoção de acentos, espaços extras e case)
         const medicoNorm = normalizeStr(medicoNome);
@@ -298,7 +314,12 @@ export default function PagamentosMedicos() {
           paciente_nome: registro.NOME_PACIENTE || '',
           sem_valor_configurado: semValorConfigurado
         });
-      });
+
+        // Ceder o thread a cada 1000 registros para evitar travar a UI
+        if (index > 0 && index % 1000 === 0) {
+          await new Promise((r) => setTimeout(r, 0));
+        }
+      }
 
       // Calcular valor líquido (sem descontos por enquanto)
       resumosPorMedico.forEach(resumo => {
@@ -345,6 +366,7 @@ export default function PagamentosMedicos() {
       console.log(`Valor total a pagar: R$ ${resumosArray.reduce((sum, r) => sum + r.valor_bruto, 0).toFixed(2)}`);
       
       setResumos(resumosArray);
+      salvarResumosCache(periodoReferencia, resumosArray);
 
       if (totalSemValor > 0) {
         toast({
