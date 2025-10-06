@@ -118,7 +118,7 @@ serve(async (req: Request) => {
     const valorLiquido = valorBruto - valorFranquia - valorPortal - valorIntegracao - totalImpostos;
 
     // ============= GERAÇÃO DO PDF - MODELO TELEiMAGEM =============
-    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pdf = new jsPDF('l', 'mm', 'a4');
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
     const margin = 15;
