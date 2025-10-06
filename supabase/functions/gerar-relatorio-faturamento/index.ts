@@ -283,7 +283,7 @@ serve(async (req: Request) => {
       });
 
       // Se o valor líquido não foi fornecido, calcular com as alíquotas padrão
-      if (valorLiquido == null || isNaN(valorLiquido)) {
+      if (valorLiquido == null || isNaN(valorLiquido) || valorLiquido === 0) {
         const pisLocal = valorBruto * 0.0065;
         const cofinsLocal = valorBruto * 0.03;
         const csllLocal = valorBruto * 0.01;
@@ -297,6 +297,26 @@ serve(async (req: Request) => {
       // Calcular do zero baseado na volumetria
       valorExames = examesDetalhados.reduce((sum, e) => sum + e.valor_total, 0);
       valorBruto = valorExames + valorFranquia + valorPortal + valorIntegracao;
+
+      // Fallback: alinhar com "Faturamento por Cliente" usando tabela faturamento
+      try {
+        const { data: fatAgg, error: fatErr } = await supabase
+          .from('faturamento')
+          .select('total_bruto:sum(valor_bruto)')
+          .eq('cliente_id', cliente_id)
+          .eq('periodo_referencia', periodo)
+          .single();
+
+        if (!fatErr && fatAgg?.total_bruto != null && Number(fatAgg.total_bruto) > 0) {
+          const totalBrutoAgg = Number(fatAgg.total_bruto);
+          console.log('🔄 Usando valor_bruto agregado de faturamento:', totalBrutoAgg);
+          valorBruto = totalBrutoAgg;
+          // Ajustar valor dos exames para manter consistência com extras
+          valorExames = Math.max(0, valorBruto - valorFranquia - valorPortal - valorIntegracao);
+        }
+      } catch (e) {
+        console.warn('Não foi possível obter agregado de faturamento:', e?.message || e);
+      }
       
       // Calcular impostos (padrão 6.15% para não-simples)
       const pisLocal = valorBruto * 0.0065;
@@ -473,7 +493,7 @@ serve(async (req: Request) => {
       currentY += 10;
       
       const headers = ['Data', 'Paciente', 'Médico', 'Exame', 'Modal.', 'Espec.', 'Categ.', 'Prior.', 'Accession', 'Origem', 'Qtd', 'Valor Total'];
-      const colWidths = [16, 36, 34, 30, 12, 32, 12, 14, 21, 28, 8, 17];
+      const colWidths = [16, 36, 34, 24, 12, 32, 12, 14, 24, 28, 8, 14];
       
       // Cabeçalho
       pdf.setFillColor(220, 220, 220);
@@ -532,7 +552,7 @@ serve(async (req: Request) => {
           (exame.especialidade || '').substring(0, 24),
           (exame.categoria || '').substring(0, 6),
           (exame.prioridade || '').substring(0, 10),
-          (exame.accession_number || '').substring(0, 18),
+          (exame.accession_number || '').substring(0, 22),
           (exame.origem || '').substring(0, 22),
           (exame.quantidade || 1).toString(),
           formatarValor(exame.valor_total)
