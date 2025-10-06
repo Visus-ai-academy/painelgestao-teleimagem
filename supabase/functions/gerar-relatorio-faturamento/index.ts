@@ -92,6 +92,8 @@ serve(async (req: Request) => {
     // Usar dados do demonstrativo se fornecido, senão usar dados calculados
     const dadosFinais = demonstrativo_data || demo || {};
 
+    console.log('📋 Dados finais recebidos:', JSON.stringify(dadosFinais, null, 2));
+
     // Calcular volume total do período para seleção de faixas de preço
     const volumeTotal = (volumetria || []).reduce((sum, v) => sum + (v.VALORES || 0), 0) || dadosFinais.total_exames || 0;
 
@@ -176,26 +178,45 @@ serve(async (req: Request) => {
       valorLiquido = dadosFinais.valor_liquido; // JÁ TEM impostos descontados
       totalImpostos = valorBruto - valorLiquido; // Impostos já foram calculados no demonstrativo
       
-      // Buscar detalhes de franquia, portal e integração se existirem nas observações
-      // Para extrair o valor dos exames: valor_bruto - (franquia + portal + integração)
+      // Buscar detalhes de franquia, portal e integração
       valorFranquia = dadosFinais.valor_franquia || 0;
       valorPortal = dadosFinais.valor_portal_laudos || 0;
       valorIntegracao = dadosFinais.valor_integracao || 0;
-      valorExames = valorBruto - valorFranquia - valorPortal - valorIntegracao;
       
-      // Se não temos os componentes separados, extrair das observações
+      console.log('💰 Valores extraídos:', { valorFranquia, valorPortal, valorIntegracao });
+      
+      // Se não temos os componentes separados, tentar extrair das observações
       if (!valorFranquia && !valorPortal && !valorIntegracao && dadosFinais.observacoes) {
         const obs = dadosFinais.observacoes;
-        const matchFranquia = obs.match(/Franquia:\s*R\$\s*([\d,.]+)/);
-        const matchPortal = obs.match(/Portal:\s*R\$\s*([\d,.]+)/);
-        const matchIntegracao = obs.match(/Integração:\s*R\$\s*([\d,.]+)/);
+        console.log('📝 Tentando extrair das observações:', obs);
         
-        if (matchFranquia) valorFranquia = parseFloat(matchFranquia[1].replace(',', '.'));
-        if (matchPortal) valorPortal = parseFloat(matchPortal[1].replace(',', '.'));
-        if (matchIntegracao) valorIntegracao = parseFloat(matchIntegracao[1].replace(',', '.'));
+        // Função auxiliar para converter valor brasileiro para número
+        const parseValorBR = (str: string) => {
+          if (!str) return 0;
+          // Remove R$, espaços, e pontos de milhar, depois troca vírgula por ponto
+          return parseFloat(str.replace(/R\$|\s/g, '').replace(/\./g, '').replace(',', '.'));
+        };
         
-        valorExames = valorBruto - valorFranquia - valorPortal - valorIntegracao;
+        const matchFranquia = obs.match(/Franquia:\s*R?\$?\s*([\d.,]+)/i);
+        const matchPortal = obs.match(/Portal[^:]*:\s*R?\$?\s*([\d.,]+)/i);
+        const matchIntegracao = obs.match(/Integra[çc][ãa]o:\s*R?\$?\s*([\d.,]+)/i);
+        
+        if (matchFranquia) {
+          valorFranquia = parseValorBR(matchFranquia[1]);
+          console.log('✅ Franquia extraída:', valorFranquia);
+        }
+        if (matchPortal) {
+          valorPortal = parseValorBR(matchPortal[1]);
+          console.log('✅ Portal extraído:', valorPortal);
+        }
+        if (matchIntegracao) {
+          valorIntegracao = parseValorBR(matchIntegracao[1]);
+          console.log('✅ Integração extraída:', valorIntegracao);
+        }
       }
+      
+      valorExames = valorBruto - valorFranquia - valorPortal - valorIntegracao;
+      console.log('📊 Cálculo final:', { valorExames, valorBruto, valorFranquia, valorPortal, valorIntegracao });
     } else {
       // Calcular do zero baseado na volumetria
       valorExames = examesDetalhados.reduce((sum, e) => sum + e.valor_total, 0);
@@ -374,7 +395,7 @@ serve(async (req: Request) => {
       currentY += 10;
       
       const headers = ['Data', 'Paciente', 'Médico', 'Exame', 'Modal.', 'Espec.', 'Categ.', 'Prior.', 'Accession', 'Origem', 'Qtd', 'Valor Total'];
-      const colWidths = [16, 55, 55, 64, 12, 16, 12, 14, 16, 16, 8, 20];
+      const colWidths = [16, 47, 47, 58, 12, 18, 12, 14, 16, 16, 8, 20];
       
       // Cabeçalho
       pdf.setFillColor(220, 220, 220);
@@ -426,11 +447,11 @@ serve(async (req: Request) => {
         
         const cells = [
           dataFormatada,
-          (exame.paciente || '').substring(0, 32),
-          (exame.medico || '').substring(0, 32),
-          (exame.exame || '').substring(0, 38),
+          (exame.paciente || '').substring(0, 28),
+          (exame.medico || '').substring(0, 28),
+          (exame.exame || '').substring(0, 35),
           (exame.modalidade || '').substring(0, 6),
-          (exame.especialidade || '').substring(0, 12),
+          (exame.especialidade || '').substring(0, 13),
           (exame.categoria || '').substring(0, 6),
           (exame.prioridade || '').substring(0, 10),
           (exame.accession_number || '').substring(0, 12),
