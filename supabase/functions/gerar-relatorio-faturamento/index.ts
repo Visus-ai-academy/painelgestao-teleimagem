@@ -189,9 +189,12 @@ serve(async (req: Request) => {
     let valorLiquido = 0;
     let totalImpostos = 0;
     
-    if (dadosFinais.valor_bruto) {
+    // Detecta presença de valores do demonstrativo (banco ou payload)
+    const hasDemoValores = dadosFinais && (dadosFinais.valor_bruto != null || dadosFinais.valor_bruto_total != null || dadosFinais.valor_total_faturamento != null || dadosFinais.valor_exames != null);
+
+    if (hasDemoValores) {
       // Demonstrativo disponível - usar valores já calculados
-      valorBruto = readNumber(dadosFinais.valor_bruto);
+      valorBruto = readNumber(dadosFinais.valor_bruto ?? dadosFinais.valor_bruto_total ?? dadosFinais.valor_total_faturamento ?? 0);
       valorLiquido = readNumber(dadosFinais.valor_liquido);
 
       // Helpers parseValorBR/readNumber já definidos acima (remoção de duplicata)
@@ -439,6 +442,12 @@ serve(async (req: Request) => {
 
     currentY += (resumoItems.length * 6) + 8;
 
+    // Verificar quebra de página antes do destaque
+    if (currentY + 12 > pageHeight - margin) {
+      addFooter();
+      addNewPage();
+    }
+
     // VALOR A PAGAR - Destaque
     pdf.setFillColor(230, 230, 230);
     pdf.rect(margin, currentY, contentWidth, 10, 'F');
@@ -464,7 +473,7 @@ serve(async (req: Request) => {
       currentY += 10;
       
       const headers = ['Data', 'Paciente', 'Médico', 'Exame', 'Modal.', 'Espec.', 'Categ.', 'Prior.', 'Accession', 'Origem', 'Qtd', 'Valor Total'];
-      const colWidths = [16, 36, 34, 37, 12, 32, 12, 14, 18, 28, 8, 20];
+      const colWidths = [16, 36, 34, 30, 12, 32, 12, 14, 21, 28, 8, 17];
       
       // Cabeçalho
       pdf.setFillColor(220, 220, 220);
@@ -518,12 +527,12 @@ serve(async (req: Request) => {
           dataFormatada,
           (exame.paciente || '').substring(0, 21),
           (exame.medico || '').substring(0, 20),
-          (exame.exame || '').substring(0, 22),
+          (exame.exame || '').substring(0, 18),
           (exame.modalidade || '').substring(0, 6),
           (exame.especialidade || '').substring(0, 24),
           (exame.categoria || '').substring(0, 6),
           (exame.prioridade || '').substring(0, 10),
-          (exame.accession_number || '').substring(0, 14),
+          (exame.accession_number || '').substring(0, 18),
           (exame.origem || '').substring(0, 22),
           (exame.quantidade || 1).toString(),
           formatarValor(exame.valor_total)
