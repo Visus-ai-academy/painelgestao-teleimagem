@@ -74,7 +74,8 @@ serve(async (req: Request) => {
         "ACCESSION_NUMBER",
         "EMPRESA",
         "Cliente_Nome_Fantasia",
-        "VALORES"
+        "VALORES",
+        tipo_faturamento
       `)
       .eq('periodo_referencia', periodo)
       .or(`EMPRESA.eq.${cliente.nome},Cliente_Nome_Fantasia.eq.${cliente.nome_fantasia}`)
@@ -82,24 +83,56 @@ serve(async (req: Request) => {
 
     console.log('📊 Volumetria encontrada:', volumetria?.length || 0, 'registros');
 
+    // Buscar preços dos serviços para calcular valores
+    const { data: precos } = await supabase
+      .from('precos_servicos')
+      .select('*')
+      .eq('cliente_id', cliente_id);
+
     // Usar dados do demonstrativo se fornecido, senão usar dados calculados
     const dadosFinais = demonstrativo_data || demo || {};
 
+    // Função para buscar preço do exame
+    const buscarPreco = (exame: any) => {
+      if (!precos || precos.length === 0) return 0;
+      
+      const preco = precos.find(p => 
+        p.exame === exame.ESTUDO_DESCRICAO &&
+        p.modalidade === exame.MODALIDADE &&
+        p.especialidade === exame.ESPECIALIDADE &&
+        p.categoria === exame.CATEGORIA
+      );
+      
+      if (!preco) return 0;
+      
+      // Determinar qual valor usar baseado no tipo de faturamento
+      if (exame.tipo_faturamento === 'urgencia' || exame.PRIORIDADE?.toLowerCase().includes('urgenc')) {
+        return preco.valor_urgencia || preco.valor_base || 0;
+      }
+      
+      return preco.valor_base || 0;
+    };
+
     // Estruturar exames detalhados para o PDF
-    const examesDetalhados = (volumetria || []).map(v => ({
-      data_exame: v.DATA_REALIZACAO || v.DATA_LAUDO || '',
-      paciente: v.NOME_PACIENTE || '',
-      medico: v.MEDICO || '',
-      exame: v.ESTUDO_DESCRICAO || '',
-      modalidade: v.MODALIDADE || '',
-      especialidade: v.ESPECIALIDADE || '',
-      categoria: v.CATEGORIA || '',
-      prioridade: v.PRIORIDADE || '',
-      accession_number: v.ACCESSION_NUMBER || '',
-      origem: v.Cliente_Nome_Fantasia || v.EMPRESA || '',
-      quantidade: v.VALORES || 1,
-      valor_total: 0 // Será calculado depois se necessário
-    }));
+    const examesDetalhados = (volumetria || []).map(v => {
+      const valorUnitario = buscarPreco(v);
+      const quantidade = v.VALORES || 1;
+      
+      return {
+        data_exame: v.DATA_REALIZACAO || v.DATA_LAUDO || '',
+        paciente: v.NOME_PACIENTE || '',
+        medico: v.MEDICO || '',
+        exame: v.ESTUDO_DESCRICAO || '',
+        modalidade: v.MODALIDADE || '',
+        especialidade: v.ESPECIALIDADE || '',
+        categoria: v.CATEGORIA || '',
+        prioridade: v.PRIORIDADE || '',
+        accession_number: v.ACCESSION_NUMBER || '',
+        origem: v.Cliente_Nome_Fantasia || v.EMPRESA || '',
+        quantidade: quantidade,
+        valor_total: valorUnitario * quantidade
+      };
+    });
 
     // Valores padrão para o relatório
     const totalLaudos = volumetria?.reduce((sum, v) => sum + (v.VALORES || 0), 0) || dadosFinais.total_exames || 0;
@@ -270,7 +303,7 @@ serve(async (req: Request) => {
       currentY += 10;
       
       const headers = ['Data', 'Paciente', 'Médico', 'Exame', 'Modal.', 'Espec.', 'Categ.', 'Prior.', 'Accession', 'Origem', 'Qtd', 'Valor Total'];
-      const colWidths = [18, 25, 25, 30, 12, 18, 12, 15, 18, 18, 8, 20];
+      const colWidths = [16, 32, 32, 38, 12, 16, 12, 14, 16, 16, 8, 20];
       
       // Cabeçalho
       pdf.setFillColor(220, 220, 220);
