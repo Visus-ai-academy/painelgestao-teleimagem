@@ -174,31 +174,47 @@ serve(async (req: Request) => {
     
     if (dadosFinais.valor_bruto) {
       // Demonstrativo disponível - usar valores já calculados
-      valorBruto = dadosFinais.valor_bruto;
-      valorLiquido = dadosFinais.valor_liquido;
-      totalImpostos = valorBruto - valorLiquido;
-      
-      // Tentar extrair valores diretos primeiro
-      valorFranquia = dadosFinais.valor_franquia || 0;
-      valorPortal = dadosFinais.valor_portal_laudos || 0;
-      valorIntegracao = dadosFinais.valor_integracao || 0;
-      
-      console.log('💰 Valores diretos:', { valorFranquia, valorPortal, valorIntegracao });
-      
+      valorBruto = Number(dadosFinais.valor_bruto) || 0;
+      valorLiquido = Number(dadosFinais.valor_liquido);
+
       // Função auxiliar para converter valor brasileiro para número
       const parseValorBR = (str: string) => {
         if (!str) return 0;
-        const cleaned = str.replace(/R\$|\s/g, '').replace(/\./g, '').replace(',', '.');
+        const cleaned = String(str).replace(/R\$|\s/g, '').replace(/\./g, '').replace(',', '.');
         const parsed = parseFloat(cleaned);
         return isNaN(parsed) ? 0 : parsed;
       };
-      
-      // Se não temos valores diretos, tentar extrair das observações
+
+      // Ler valores diretos e variações de chaves
+      const readNumber = (v: any) => {
+        if (v == null) return 0;
+        if (typeof v === 'number') return v;
+        return parseValorBR(v);
+      };
+
+      valorFranquia = readNumber(dadosFinais.valor_franquia) 
+        || readNumber(dadosFinais.franquia)
+        || readNumber(dadosFinais.valorFranquia)
+        || readNumber(dadosFinais?.custos?.franquia);
+
+      valorPortal = readNumber(dadosFinais.valor_portal_laudos)
+        || readNumber(dadosFinais.portal_laudos)
+        || readNumber(dadosFinais.portal)
+        || readNumber(dadosFinais.valor_portal)
+        || readNumber(dadosFinais?.custos?.portal);
+
+      valorIntegracao = readNumber(dadosFinais.valor_integracao)
+        || readNumber(dadosFinais.integracao)
+        || readNumber(dadosFinais.taxa_integracao)
+        || readNumber(dadosFinais?.custos?.integracao);
+
+      console.log('💰 Valores diretos (mapeados):', { valorFranquia, valorPortal, valorIntegracao });
+
+      // Se ainda faltarem valores, tentar extrair das observações
       if (dadosFinais.observacoes) {
-        const obs = dadosFinais.observacoes;
+        const obs = String(dadosFinais.observacoes);
         console.log('📝 Buscando nas observações:', obs);
         
-        // Padrões de busca mais flexíveis
         if (valorFranquia === 0) {
           const patterns = [
             /Franquia[:\s]*R?\$?\s*([\d.,]+)/i,
@@ -248,8 +264,8 @@ serve(async (req: Request) => {
         }
       }
       
-      // Calcular valor dos exames
-      valorExames = valorBruto - valorFranquia - valorPortal - valorIntegracao;
+      // Calcular valor dos exames a partir do bruto e adicionais
+      valorExames = Math.max(0, valorBruto - valorFranquia - valorPortal - valorIntegracao);
       console.log('📊 Cálculo final:', { 
         valorBruto, 
         valorFranquia, 
@@ -258,17 +274,29 @@ serve(async (req: Request) => {
         valorExames,
         soma_componentes: valorExames + valorFranquia + valorPortal + valorIntegracao
       });
+
+      // Se o valor líquido não foi fornecido, calcular com as alíquotas padrão
+      if (valorLiquido == null || isNaN(valorLiquido)) {
+        const pisLocal = valorBruto * 0.0065;
+        const cofinsLocal = valorBruto * 0.03;
+        const csllLocal = valorBruto * 0.01;
+        const irrfLocal = valorBruto * 0.015;
+        totalImpostos = pisLocal + cofinsLocal + csllLocal + irrfLocal;
+        valorLiquido = valorBruto - totalImpostos;
+      } else {
+        totalImpostos = valorBruto - valorLiquido;
+      }
     } else {
       // Calcular do zero baseado na volumetria
       valorExames = examesDetalhados.reduce((sum, e) => sum + e.valor_total, 0);
       valorBruto = valorExames + valorFranquia + valorPortal + valorIntegracao;
       
       // Calcular impostos (padrão 6.15% para não-simples)
-      const pis = valorBruto * 0.0065;
-      const cofins = valorBruto * 0.03;
-      const csll = valorBruto * 0.01;
-      const irrf = valorBruto * 0.015;
-      totalImpostos = pis + cofins + csll + irrf;
+      const pisLocal = valorBruto * 0.0065;
+      const cofinsLocal = valorBruto * 0.03;
+      const csllLocal = valorBruto * 0.01;
+      const irrfLocal = valorBruto * 0.015;
+      totalImpostos = pisLocal + cofinsLocal + csllLocal + irrfLocal;
       
       valorLiquido = valorBruto - totalImpostos;
     }
@@ -374,15 +402,11 @@ serve(async (req: Request) => {
     const resumoItems = [
       ['Total de Laudos:', totalLaudos.toString()],
       ['Valor dos Exames:', formatarValor(valorExames)],
+      ['+ Franquia:', formatarValor(valorFranquia)],
+      ['+ Portal de Laudos:', formatarValor(valorPortal)],
+      ['+ Integração:', formatarValor(valorIntegracao)],
+      ['= Valor Bruto Total:', formatarValor(valorBruto)],
     ];
-    
-    // Adicionar adicionais se existirem
-    if (valorFranquia > 0) resumoItems.push(['+ Franquia:', formatarValor(valorFranquia)]);
-    if (valorPortal > 0) resumoItems.push(['+ Portal de Laudos:', formatarValor(valorPortal)]);
-    if (valorIntegracao > 0) resumoItems.push(['+ Integração:', formatarValor(valorIntegracao)]);
-    
-    // Linha do Valor Bruto Total
-    resumoItems.push(['= Valor Bruto Total:', formatarValor(valorBruto)]);
     
     // Impostos
     resumoItems.push(['- PIS (0.65%):', formatarValor(pis)]);
@@ -436,7 +460,7 @@ serve(async (req: Request) => {
       currentY += 10;
       
       const headers = ['Data', 'Paciente', 'Médico', 'Exame', 'Modal.', 'Espec.', 'Categ.', 'Prior.', 'Accession', 'Origem', 'Qtd', 'Valor Total'];
-      const colWidths = [16, 36, 34, 37, 12, 24, 12, 14, 16, 21, 8, 20];
+      const colWidths = [16, 36, 34, 37, 12, 28, 12, 14, 16, 24, 8, 20];
       
       // Cabeçalho
       pdf.setFillColor(220, 220, 220);
@@ -492,11 +516,11 @@ serve(async (req: Request) => {
           (exame.medico || '').substring(0, 20),
           (exame.exame || '').substring(0, 22),
           (exame.modalidade || '').substring(0, 6),
-          (exame.especialidade || '').substring(0, 17),
+          (exame.especialidade || '').substring(0, 20),
           (exame.categoria || '').substring(0, 6),
           (exame.prioridade || '').substring(0, 10),
           (exame.accession_number || '').substring(0, 12),
-          (exame.origem || '').substring(0, 15),
+          (exame.origem || '').substring(0, 18),
           (exame.quantidade || 1).toString(),
           formatarValor(exame.valor_total)
         ];
