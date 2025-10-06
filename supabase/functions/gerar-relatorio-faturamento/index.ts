@@ -91,8 +91,25 @@ serve(async (req: Request) => {
 
     // Usar dados do demonstrativo se fornecido, senão usar dados calculados
     const dadosFinais = demonstrativo_data || demo || {};
-
+    
     console.log('📋 Dados finais recebidos:', JSON.stringify(dadosFinais, null, 2));
+
+    // Helpers de parsing de valores monetários (antes do uso)
+    const parseValorBR = (str: string) => {
+      if (!str) return 0;
+      const cleaned = String(str)
+        .replace(/R\$|\s/g, '')
+        .replace(/\./g, '')
+        .replace(',', '.');
+      const parsed = parseFloat(cleaned);
+      return isNaN(parsed) ? 0 : parsed;
+    };
+
+    const readNumber = (v: any) => {
+      if (v == null) return 0;
+      if (typeof v === 'number') return v;
+      return parseValorBR(v);
+    };
 
     // Calcular volume total do período para seleção de faixas de preço
     const volumeTotal = (volumetria || []).reduce((sum, v) => sum + (v.VALORES || 0), 0) || dadosFinais.total_exames || 0;
@@ -177,20 +194,7 @@ serve(async (req: Request) => {
       valorBruto = readNumber(dadosFinais.valor_bruto);
       valorLiquido = readNumber(dadosFinais.valor_liquido);
 
-      // Função auxiliar para converter valor brasileiro para número
-      const parseValorBR = (str: string) => {
-        if (!str) return 0;
-        const cleaned = String(str).replace(/R\$|\s/g, '').replace(/\./g, '').replace(',', '.');
-        const parsed = parseFloat(cleaned);
-        return isNaN(parsed) ? 0 : parsed;
-      };
-
-      // Ler valores diretos e variações de chaves
-      const readNumber = (v: any) => {
-        if (v == null) return 0;
-        if (typeof v === 'number') return v;
-        return parseValorBR(v);
-      };
+      // Helpers parseValorBR/readNumber já definidos acima (remoção de duplicata)
 
       valorFranquia = readNumber(dadosFinais.valor_franquia) 
         || readNumber(dadosFinais.franquia)
@@ -460,7 +464,7 @@ serve(async (req: Request) => {
       currentY += 10;
       
       const headers = ['Data', 'Paciente', 'Médico', 'Exame', 'Modal.', 'Espec.', 'Categ.', 'Prior.', 'Accession', 'Origem', 'Qtd', 'Valor Total'];
-      const colWidths = [16, 36, 34, 37, 12, 32, 12, 14, 16, 28, 8, 20];
+      const colWidths = [16, 36, 34, 37, 12, 32, 12, 14, 18, 28, 8, 20];
       
       // Cabeçalho
       pdf.setFillColor(220, 220, 220);
@@ -519,7 +523,7 @@ serve(async (req: Request) => {
           (exame.especialidade || '').substring(0, 24),
           (exame.categoria || '').substring(0, 6),
           (exame.prioridade || '').substring(0, 10),
-          (exame.accession_number || '').substring(0, 12),
+          (exame.accession_number || '').substring(0, 14),
           (exame.origem || '').substring(0, 22),
           (exame.quantidade || 1).toString(),
           formatarValor(exame.valor_total)
