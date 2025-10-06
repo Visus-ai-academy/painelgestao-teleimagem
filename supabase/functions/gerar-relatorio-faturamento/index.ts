@@ -102,7 +102,7 @@ serve(async (req: Request) => {
     }));
 
     // Valores padrão para o relatório
-    const totalLaudos = volumetria?.length || dadosFinais.total_exames || 0;
+    const totalLaudos = volumetria?.reduce((sum, v) => sum + (v.VALORES || 0), 0) || dadosFinais.total_exames || 0;
     const valorBruto = dadosFinais.valor_bruto_total || dadosFinais.valor_exames || 0;
     const valorFranquia = dadosFinais.valor_franquia || 0;
     const valorPortal = dadosFinais.valor_portal_laudos || 0;
