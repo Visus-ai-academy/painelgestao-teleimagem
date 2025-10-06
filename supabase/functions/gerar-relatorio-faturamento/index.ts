@@ -34,7 +34,7 @@ serve(async (req: Request) => {
     // Buscar dados do cliente
     const { data: cliente, error: clienteError } = await supabase
       .from('clientes')
-      .select('nome, nome_fantasia, cnpj')
+      .select('nome, nome_fantasia, cnpj, cpf')
       .eq('id', cliente_id)
       .maybeSingle();
 
@@ -190,16 +190,14 @@ serve(async (req: Request) => {
 
     // ================ INFORMAÇÕES DO CLIENTE ================
     const clienteNome = cliente.nome_fantasia || cliente.nome;
-    currentY = addText(`Cliente: ${clienteNome}`, margin, currentY, { fontSize: 11, bold: false });
+    const documentoCliente = cliente.cnpj || cliente.cpf || 'N/A';
+    const tipoDocumento = cliente.cnpj ? 'CNPJ' : cliente.cpf ? 'CPF' : '';
+    
+    currentY = addText(`Cliente: ${clienteNome} - ${tipoDocumento}: ${documentoCliente}`, margin, currentY, { fontSize: 11, bold: false });
     currentY = addText(`Data: ${new Date().toLocaleDateString('pt-BR')}`, margin, currentY + 6, { fontSize: 11 });
     
-    // CNPJ e Período à direita
-    addText(`CNPJ: ${cliente.cnpj || 'N/A'}`, pageWidth - margin, currentY - 6, { 
-      fontSize: 11, 
-      align: 'right',
-      maxWidth: 80
-    });
-    currentY = addText(`Período: ${periodo}`, pageWidth - margin, currentY + 6, { 
+    // Período à direita
+    currentY = addText(`Período: ${periodo}`, pageWidth - margin, currentY, { 
       fontSize: 11, 
       align: 'right',
       maxWidth: 80
