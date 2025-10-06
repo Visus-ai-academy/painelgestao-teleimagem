@@ -436,7 +436,7 @@ serve(async (req: Request) => {
       currentY += 10;
       
       const headers = ['Data', 'Paciente', 'Médico', 'Exame', 'Modal.', 'Espec.', 'Categ.', 'Prior.', 'Accession', 'Origem', 'Qtd', 'Valor Total'];
-      const colWidths = [16, 42, 40, 41, 12, 21, 12, 14, 16, 18, 8, 20];
+      const colWidths = [16, 36, 34, 37, 12, 24, 12, 14, 16, 21, 8, 20];
       
       // Cabeçalho
       pdf.setFillColor(220, 220, 220);
@@ -488,15 +488,15 @@ serve(async (req: Request) => {
         
         const cells = [
           dataFormatada,
-          (exame.paciente || '').substring(0, 25),
-          (exame.medico || '').substring(0, 24),
-          (exame.exame || '').substring(0, 24),
+          (exame.paciente || '').substring(0, 21),
+          (exame.medico || '').substring(0, 20),
+          (exame.exame || '').substring(0, 22),
           (exame.modalidade || '').substring(0, 6),
-          (exame.especialidade || '').substring(0, 15),
+          (exame.especialidade || '').substring(0, 17),
           (exame.categoria || '').substring(0, 6),
           (exame.prioridade || '').substring(0, 10),
           (exame.accession_number || '').substring(0, 12),
-          (exame.origem || '').substring(0, 13),
+          (exame.origem || '').substring(0, 15),
           (exame.quantidade || 1).toString(),
           formatarValor(exame.valor_total)
         ];
