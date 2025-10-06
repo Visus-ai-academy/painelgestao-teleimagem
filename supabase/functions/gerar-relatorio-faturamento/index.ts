@@ -174,49 +174,90 @@ serve(async (req: Request) => {
     
     if (dadosFinais.valor_bruto) {
       // Demonstrativo disponível - usar valores já calculados
-      valorBruto = dadosFinais.valor_bruto; // JÁ INCLUI exames + franquia + portal + integração
-      valorLiquido = dadosFinais.valor_liquido; // JÁ TEM impostos descontados
-      totalImpostos = valorBruto - valorLiquido; // Impostos já foram calculados no demonstrativo
+      valorBruto = dadosFinais.valor_bruto;
+      valorLiquido = dadosFinais.valor_liquido;
+      totalImpostos = valorBruto - valorLiquido;
       
-      // Buscar detalhes de franquia, portal e integração
+      // Tentar extrair valores diretos primeiro
       valorFranquia = dadosFinais.valor_franquia || 0;
       valorPortal = dadosFinais.valor_portal_laudos || 0;
       valorIntegracao = dadosFinais.valor_integracao || 0;
       
-      console.log('💰 Valores extraídos:', { valorFranquia, valorPortal, valorIntegracao });
+      console.log('💰 Valores diretos:', { valorFranquia, valorPortal, valorIntegracao });
       
-      // Se não temos os componentes separados, tentar extrair das observações
-      if (!valorFranquia && !valorPortal && !valorIntegracao && dadosFinais.observacoes) {
+      // Função auxiliar para converter valor brasileiro para número
+      const parseValorBR = (str: string) => {
+        if (!str) return 0;
+        const cleaned = str.replace(/R\$|\s/g, '').replace(/\./g, '').replace(',', '.');
+        const parsed = parseFloat(cleaned);
+        return isNaN(parsed) ? 0 : parsed;
+      };
+      
+      // Se não temos valores diretos, tentar extrair das observações
+      if (dadosFinais.observacoes) {
         const obs = dadosFinais.observacoes;
-        console.log('📝 Tentando extrair das observações:', obs);
+        console.log('📝 Buscando nas observações:', obs);
         
-        // Função auxiliar para converter valor brasileiro para número
-        const parseValorBR = (str: string) => {
-          if (!str) return 0;
-          // Remove R$, espaços, e pontos de milhar, depois troca vírgula por ponto
-          return parseFloat(str.replace(/R\$|\s/g, '').replace(/\./g, '').replace(',', '.'));
-        };
-        
-        const matchFranquia = obs.match(/Franquia:\s*R?\$?\s*([\d.,]+)/i);
-        const matchPortal = obs.match(/Portal[^:]*:\s*R?\$?\s*([\d.,]+)/i);
-        const matchIntegracao = obs.match(/Integra[çc][ãa]o:\s*R?\$?\s*([\d.,]+)/i);
-        
-        if (matchFranquia) {
-          valorFranquia = parseValorBR(matchFranquia[1]);
-          console.log('✅ Franquia extraída:', valorFranquia);
+        // Padrões de busca mais flexíveis
+        if (valorFranquia === 0) {
+          const patterns = [
+            /Franquia[:\s]*R?\$?\s*([\d.,]+)/i,
+            /valor[_\s]+franquia[:\s]*R?\$?\s*([\d.,]+)/i,
+            /franc[:\s]*R?\$?\s*([\d.,]+)/i
+          ];
+          for (const pattern of patterns) {
+            const match = obs.match(pattern);
+            if (match) {
+              valorFranquia = parseValorBR(match[1]);
+              console.log('✅ Franquia encontrada:', valorFranquia, 'usando padrão:', pattern);
+              break;
+            }
+          }
         }
-        if (matchPortal) {
-          valorPortal = parseValorBR(matchPortal[1]);
-          console.log('✅ Portal extraído:', valorPortal);
+        
+        if (valorPortal === 0) {
+          const patterns = [
+            /Portal[^:]*[:\s]*R?\$?\s*([\d.,]+)/i,
+            /valor[_\s]+portal[:\s]*R?\$?\s*([\d.,]+)/i,
+            /portal[_\s]+laudos[:\s]*R?\$?\s*([\d.,]+)/i
+          ];
+          for (const pattern of patterns) {
+            const match = obs.match(pattern);
+            if (match) {
+              valorPortal = parseValorBR(match[1]);
+              console.log('✅ Portal encontrado:', valorPortal, 'usando padrão:', pattern);
+              break;
+            }
+          }
         }
-        if (matchIntegracao) {
-          valorIntegracao = parseValorBR(matchIntegracao[1]);
-          console.log('✅ Integração extraída:', valorIntegracao);
+        
+        if (valorIntegracao === 0) {
+          const patterns = [
+            /Integra[çc][ãa]o[:\s]*R?\$?\s*([\d.,]+)/i,
+            /valor[_\s]+integra[çc][ãa]o[:\s]*R?\$?\s*([\d.,]+)/i,
+            /integr[:\s]*R?\$?\s*([\d.,]+)/i
+          ];
+          for (const pattern of patterns) {
+            const match = obs.match(pattern);
+            if (match) {
+              valorIntegracao = parseValorBR(match[1]);
+              console.log('✅ Integração encontrada:', valorIntegracao, 'usando padrão:', pattern);
+              break;
+            }
+          }
         }
       }
       
+      // Calcular valor dos exames
       valorExames = valorBruto - valorFranquia - valorPortal - valorIntegracao;
-      console.log('📊 Cálculo final:', { valorExames, valorBruto, valorFranquia, valorPortal, valorIntegracao });
+      console.log('📊 Cálculo final:', { 
+        valorBruto, 
+        valorFranquia, 
+        valorPortal, 
+        valorIntegracao, 
+        valorExames,
+        soma_componentes: valorExames + valorFranquia + valorPortal + valorIntegracao
+      });
     } else {
       // Calcular do zero baseado na volumetria
       valorExames = examesDetalhados.reduce((sum, e) => sum + e.valor_total, 0);
