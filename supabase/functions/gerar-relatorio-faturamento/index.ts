@@ -160,19 +160,62 @@ serve(async (req: Request) => {
 
     // Valores padrão para o relatório
     const totalLaudos = volumetria?.reduce((sum, v) => sum + (v.VALORES || 0), 0) || dadosFinais.total_exames || 0;
-    const valorBruto = dadosFinais.valor_bruto_total || dadosFinais.valor_exames || 0;
-    const valorFranquia = dadosFinais.valor_franquia || 0;
-    const valorPortal = dadosFinais.valor_portal_laudos || 0;
-    const valorIntegracao = dadosFinais.valor_integracao || 0;
     
-    // Calcular impostos
+    // Usar valores do demonstrativo se disponível (já calculados corretamente)
+    let valorExames = 0;
+    let valorBruto = 0;
+    let valorFranquia = 0;
+    let valorPortal = 0;
+    let valorIntegracao = 0;
+    let valorLiquido = 0;
+    let totalImpostos = 0;
+    
+    if (dadosFinais.valor_bruto) {
+      // Demonstrativo disponível - usar valores já calculados
+      valorBruto = dadosFinais.valor_bruto; // JÁ INCLUI exames + franquia + portal + integração
+      valorLiquido = dadosFinais.valor_liquido; // JÁ TEM impostos descontados
+      totalImpostos = valorBruto - valorLiquido; // Impostos já foram calculados no demonstrativo
+      
+      // Buscar detalhes de franquia, portal e integração se existirem nas observações
+      // Para extrair o valor dos exames: valor_bruto - (franquia + portal + integração)
+      valorFranquia = dadosFinais.valor_franquia || 0;
+      valorPortal = dadosFinais.valor_portal_laudos || 0;
+      valorIntegracao = dadosFinais.valor_integracao || 0;
+      valorExames = valorBruto - valorFranquia - valorPortal - valorIntegracao;
+      
+      // Se não temos os componentes separados, extrair das observações
+      if (!valorFranquia && !valorPortal && !valorIntegracao && dadosFinais.observacoes) {
+        const obs = dadosFinais.observacoes;
+        const matchFranquia = obs.match(/Franquia:\s*R\$\s*([\d,.]+)/);
+        const matchPortal = obs.match(/Portal:\s*R\$\s*([\d,.]+)/);
+        const matchIntegracao = obs.match(/Integração:\s*R\$\s*([\d,.]+)/);
+        
+        if (matchFranquia) valorFranquia = parseFloat(matchFranquia[1].replace(',', '.'));
+        if (matchPortal) valorPortal = parseFloat(matchPortal[1].replace(',', '.'));
+        if (matchIntegracao) valorIntegracao = parseFloat(matchIntegracao[1].replace(',', '.'));
+        
+        valorExames = valorBruto - valorFranquia - valorPortal - valorIntegracao;
+      }
+    } else {
+      // Calcular do zero baseado na volumetria
+      valorExames = examesDetalhados.reduce((sum, e) => sum + e.valor_total, 0);
+      valorBruto = valorExames + valorFranquia + valorPortal + valorIntegracao;
+      
+      // Calcular impostos (padrão 6.15% para não-simples)
+      const pis = valorBruto * 0.0065;
+      const cofins = valorBruto * 0.03;
+      const csll = valorBruto * 0.01;
+      const irrf = valorBruto * 0.015;
+      totalImpostos = pis + cofins + csll + irrf;
+      
+      valorLiquido = valorBruto - totalImpostos;
+    }
+    
+    // Calcular componentes individuais dos impostos para exibição
     const pis = valorBruto * 0.0065;
     const cofins = valorBruto * 0.03;
     const csll = valorBruto * 0.01;
     const irrf = valorBruto * 0.015;
-    const totalImpostos = pis + cofins + csll + irrf;
-    
-    const valorLiquido = valorBruto - valorFranquia - valorPortal - valorIntegracao - totalImpostos;
 
     // ============= GERAÇÃO DO PDF - MODELO TELEiMAGEM =============
     const pdf = new jsPDF('l', 'mm', 'a4');
@@ -270,18 +313,25 @@ serve(async (req: Request) => {
 
     currentY += 10;
 
-    // Tabela de resumo
+    // Tabela de resumo - Layout melhorado para refletir cálculo correto
     const resumoItems = [
       ['Total de Laudos:', totalLaudos.toString()],
-      ['Valor Bruto:', formatarValor(valorBruto)],
-      ['Franquia:', formatarValor(valorFranquia)],
-      ['Portal de Laudos:', formatarValor(valorPortal)],
-      ['Integração:', formatarValor(valorIntegracao)],
-      ['PIS (0.65%):', formatarValor(pis)],
-      ['COFINS (3%):', formatarValor(cofins)],
-      ['CSLL (1%):', formatarValor(csll)],
-      ['IRRF (1.5%):', formatarValor(irrf)]
+      ['Valor dos Exames:', formatarValor(valorExames)],
     ];
+    
+    // Adicionar adicionais se existirem
+    if (valorFranquia > 0) resumoItems.push(['+ Franquia:', formatarValor(valorFranquia)]);
+    if (valorPortal > 0) resumoItems.push(['+ Portal de Laudos:', formatarValor(valorPortal)]);
+    if (valorIntegracao > 0) resumoItems.push(['+ Integração:', formatarValor(valorIntegracao)]);
+    
+    // Linha do Valor Bruto Total
+    resumoItems.push(['= Valor Bruto Total:', formatarValor(valorBruto)]);
+    
+    // Impostos
+    resumoItems.push(['- PIS (0.65%):', formatarValor(pis)]);
+    resumoItems.push(['- COFINS (3%):', formatarValor(cofins)]);
+    resumoItems.push(['- CSLL (1%):', formatarValor(csll)]);
+    resumoItems.push(['- IRRF (1.5%):', formatarValor(irrf)]);
 
     pdf.setDrawColor(200);
     pdf.setLineWidth(0.1);
