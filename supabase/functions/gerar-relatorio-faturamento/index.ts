@@ -92,25 +92,49 @@ serve(async (req: Request) => {
     // Usar dados do demonstrativo se fornecido, senão usar dados calculados
     const dadosFinais = demonstrativo_data || demo || {};
 
-    // Função para buscar preço do exame
+    // Calcular volume total do período para seleção de faixas de preço
+    const volumeTotal = (volumetria || []).reduce((sum, v) => sum + (v.VALORES || 0), 0) || dadosFinais.total_exames || 0;
+
+    // Função para buscar preço do exame com base em Modalidade + Especialidade + Categoria (+ Prioridade opcional) e faixas de volume
     const buscarPreco = (exame: any) => {
       if (!precos || precos.length === 0) return 0;
-      
-      const preco = precos.find(p => 
-        p.exame === exame.ESTUDO_DESCRICAO &&
-        p.modalidade === exame.MODALIDADE &&
-        p.especialidade === exame.ESPECIALIDADE &&
-        p.categoria === exame.CATEGORIA
+
+      const norm = (s: any) => (s ?? '').toString().trim().toUpperCase();
+
+      // Base de candidatos por chave principal
+      const base = (precos || []).filter((p: any) =>
+        (p.ativo ?? true) === true &&
+        norm(p.modalidade) === norm(exame.MODALIDADE) &&
+        norm(p.especialidade) === norm(exame.ESPECIALIDADE) &&
+        norm(p.categoria) === norm(exame.CATEGORIA)
       );
-      
-      if (!preco) return 0;
-      
-      // Determinar qual valor usar baseado no tipo de faturamento
-      if (exame.tipo_faturamento === 'urgencia' || exame.PRIORIDADE?.toLowerCase().includes('urgenc')) {
-        return preco.valor_urgencia || preco.valor_base || 0;
+
+      // Primeiro tenta preços do cliente; se não houver, usa genéricos (cliente_id nulo)
+      let candidatos = base.filter((p: any) => p.cliente_id === cliente_id);
+      if (candidatos.length === 0) {
+        candidatos = base.filter((p: any) => !p.cliente_id);
       }
-      
-      return preco.valor_base || 0;
+
+      // Filtro por prioridade (preferencial)
+      const priMatch = candidatos.filter((p: any) => norm(p.prioridade) === norm(exame.PRIORIDADE));
+      const pool = priMatch.length > 0 ? priMatch : candidatos;
+
+      // Selecionar faixa por volume
+      const porFaixa = pool
+        .filter((p: any) =>
+          (p.volume_inicial == null || volumeTotal >= p.volume_inicial) &&
+          (p.volume_final == null || volumeTotal <= p.volume_final)
+        )
+        .sort((a: any, b: any) => (b.volume_inicial || 0) - (a.volume_inicial || 0));
+
+      const selecionado = porFaixa[0] || pool[0];
+      if (!selecionado) return 0;
+
+      const prioridadeUrgencia = norm(exame.PRIORIDADE).includes('URG') || norm(exame.PRIORIDADE).includes('PLANT');
+      const usarUrgencia = exame.tipo_faturamento === 'urgencia' || prioridadeUrgencia || !!selecionado.considera_prioridade_plantao;
+
+      const valor = usarUrgencia ? (selecionado.valor_urgencia ?? 0) : (selecionado.valor_base ?? 0);
+      return valor > 0 ? valor : (selecionado.valor_base ?? 0) || 0;
     };
 
     // Estruturar exames detalhados para o PDF
@@ -303,7 +327,7 @@ serve(async (req: Request) => {
       currentY += 10;
       
       const headers = ['Data', 'Paciente', 'Médico', 'Exame', 'Modal.', 'Espec.', 'Categ.', 'Prior.', 'Accession', 'Origem', 'Qtd', 'Valor Total'];
-      const colWidths = [16, 32, 32, 38, 12, 16, 12, 14, 16, 16, 8, 20];
+      const colWidths = [16, 42, 42, 49, 12, 16, 12, 14, 16, 16, 8, 20];
       
       // Cabeçalho
       pdf.setFillColor(220, 220, 220);
@@ -355,9 +379,9 @@ serve(async (req: Request) => {
         
         const cells = [
           dataFormatada,
-          (exame.paciente || '').substring(0, 15),
-          (exame.medico || '').substring(0, 15),
-          (exame.exame || '').substring(0, 20),
+          (exame.paciente || '').substring(0, 24),
+          (exame.medico || '').substring(0, 24),
+          (exame.exame || '').substring(0, 30),
           (exame.modalidade || '').substring(0, 6),
           (exame.especialidade || '').substring(0, 12),
           (exame.categoria || '').substring(0, 6),
