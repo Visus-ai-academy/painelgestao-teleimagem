@@ -271,39 +271,34 @@ serve(async (req: Request) => {
       maxWidth: contentWidth
     });
     
-    currentY = addText('EXCELÊNCIA EM TELERRADIOLOGIA', margin, currentY + 8, {
+    currentY = addText('EXCELÊNCIA EM TELERRADIOLOGIA', margin, currentY + 5, {
       fontSize: 10,
       align: 'center',
       maxWidth: contentWidth
     });
 
-    currentY += 15;
+    currentY += 8;
 
-    currentY = addText('RELATÓRIO DE FATURAMENTO', margin, currentY + 10, {
+    currentY = addText('RELATÓRIO DE FATURAMENTO', margin, currentY, {
       fontSize: 14,
       bold: true,
       align: 'center',
       maxWidth: contentWidth
     });
 
-    currentY += 15;
+    currentY += 10;
 
-    // ================ INFORMAÇÕES DO CLIENTE ================
+    // ================ INFORMAÇÕES DO CLIENTE E PERÍODO ================
     const clienteNome = cliente.nome_fantasia || cliente.nome;
     const documentoCliente = cliente.cnpj || cliente.cpf || 'N/A';
     const tipoDocumento = cliente.cnpj ? 'CNPJ' : cliente.cpf ? 'CPF' : '';
+    const dataRelatorio = new Date().toLocaleDateString('pt-BR');
     
-    currentY = addText(`Cliente: ${clienteNome} - ${tipoDocumento}: ${documentoCliente}`, margin, currentY, { fontSize: 11, bold: false });
-    currentY = addText(`Data: ${new Date().toLocaleDateString('pt-BR')}`, margin, currentY + 6, { fontSize: 11 });
-    
-    // Período à direita
-    currentY = addText(`Período: ${periodo}`, pageWidth - margin, currentY, { 
-      fontSize: 11, 
-      align: 'right',
-      maxWidth: 80
-    });
+    currentY = addText(`Cliente: ${clienteNome} - ${tipoDocumento}: ${documentoCliente}`, margin, currentY, { fontSize: 10, bold: false });
+    currentY = addText(`Período de Referência: ${periodo}`, margin, currentY + 5, { fontSize: 10, bold: true });
+    currentY = addText(`Data de Emissão: ${dataRelatorio}`, margin, currentY + 5, { fontSize: 10 });
 
-    currentY += 10;
+    currentY += 8;
 
     // ================ QUADRO 1 - RESUMO ================
     currentY = addText('QUADRO 1 - RESUMO', margin, currentY + 5, {
@@ -337,14 +332,14 @@ serve(async (req: Request) => {
     pdf.setLineWidth(0.1);
 
     resumoItems.forEach((item, index) => {
-      const itemY = currentY + (index * 7);
+      const itemY = currentY + (index * 6);
       
       if (index % 2 === 0) {
         pdf.setFillColor(245, 245, 245);
-        pdf.rect(margin, itemY - 4, contentWidth, 7, 'F');
+        pdf.rect(margin, itemY - 3, contentWidth, 6, 'F');
       }
       
-      pdf.setFontSize(10);
+      pdf.setFontSize(9);
       pdf.setFont('helvetica', 'normal');
       pdf.text(item[0], margin + 2, itemY);
       pdf.text(item[1], pageWidth - margin - 2, itemY, { align: 'right' });
@@ -352,12 +347,14 @@ serve(async (req: Request) => {
       pdf.line(margin, itemY + 2, pageWidth - margin, itemY + 2);
     });
 
-    currentY += (resumoItems.length * 7) + 10;
+    currentY += (resumoItems.length * 6) + 8;
 
     // VALOR A PAGAR - Destaque
     pdf.setFillColor(230, 230, 230);
     pdf.rect(margin, currentY, contentWidth, 10, 'F');
-    pdf.setFontSize(12);
+    pdf.setDrawColor(100);
+    pdf.rect(margin, currentY, contentWidth, 10, 'D');
+    pdf.setFontSize(13);
     pdf.setFont('helvetica', 'bold');
     pdf.text('VALOR A PAGAR:', margin + 2, currentY + 7);
     pdf.text(formatarValor(valorLiquido), pageWidth - margin - 2, currentY + 7, { align: 'right' });
@@ -377,7 +374,7 @@ serve(async (req: Request) => {
       currentY += 10;
       
       const headers = ['Data', 'Paciente', 'Médico', 'Exame', 'Modal.', 'Espec.', 'Categ.', 'Prior.', 'Accession', 'Origem', 'Qtd', 'Valor Total'];
-      const colWidths = [16, 42, 42, 49, 12, 16, 12, 14, 16, 16, 8, 20];
+      const colWidths = [16, 55, 55, 64, 12, 16, 12, 14, 16, 16, 8, 20];
       
       // Cabeçalho
       pdf.setFillColor(220, 220, 220);
@@ -429,9 +426,9 @@ serve(async (req: Request) => {
         
         const cells = [
           dataFormatada,
-          (exame.paciente || '').substring(0, 24),
-          (exame.medico || '').substring(0, 24),
-          (exame.exame || '').substring(0, 30),
+          (exame.paciente || '').substring(0, 32),
+          (exame.medico || '').substring(0, 32),
+          (exame.exame || '').substring(0, 38),
           (exame.modalidade || '').substring(0, 6),
           (exame.especialidade || '').substring(0, 12),
           (exame.categoria || '').substring(0, 6),
