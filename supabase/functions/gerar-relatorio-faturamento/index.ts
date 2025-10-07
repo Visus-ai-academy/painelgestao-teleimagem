@@ -295,7 +295,10 @@ serve(async (req: Request) => {
       }
     } else {
       // Calcular do zero baseado na volumetria + parâmetros oficiais (RPC)
-      // 1) Tentar usar RPC calcular_faturamento_completo para garantir consistência com o Demonstrativo
+      // 1) Sempre calcular o valor dos exames pela volumetria/preços
+      valorExames = examesDetalhados.reduce((sum, e) => sum + e.valor_total, 0);
+
+      // 2) Tentar usar RPC calcular_faturamento_completo para obter APENAS os adicionais (franquia/portal/integração)
       try {
         const { data: calcData, error: calcErr } = await supabase
           .rpc('calcular_faturamento_completo', {
@@ -306,23 +309,20 @@ serve(async (req: Request) => {
 
         if (!calcErr && calcData && Array.isArray(calcData) && calcData.length > 0) {
           const c = calcData[0];
-          valorExames = Number(c.valor_exames) || 0;
+          // Ignorar c.valor_exames e c.valor_total do RPC, pois a função não retorna o valor dos exames
           valorFranquia = Number(c.valor_franquia) || 0;
           valorPortal = Number(c.valor_portal_laudos) || 0;
           valorIntegracao = Number(c.valor_integracao) || 0;
-          valorBruto = Number(c.valor_total) || (valorExames + valorFranquia + valorPortal + valorIntegracao);
-          console.log('✅ Valores via RPC calcular_faturamento_completo', { valorExames, valorFranquia, valorPortal, valorIntegracao, valorBruto });
+          console.log('✅ Adicionais via RPC calcular_faturamento_completo', { valorFranquia, valorPortal, valorIntegracao });
         } else {
-          // Fallback: calcular pelo preço unitário dos exames (volumetria)
-          valorExames = examesDetalhados.reduce((sum, e) => sum + e.valor_total, 0);
-          valorBruto = valorExames + valorFranquia + valorPortal + valorIntegracao;
-          console.warn('⚠️ RPC indisponível, usando cálculo local', calcErr);
+          console.warn('⚠️ RPC indisponível ou sem dados, mantendo adicionais atuais', calcErr);
         }
       } catch (e) {
         console.warn('Erro RPC calcular_faturamento_completo:', e?.message || e);
-        valorExames = examesDetalhados.reduce((sum, e) => sum + e.valor_total, 0);
-        valorBruto = valorExames + valorFranquia + valorPortal + valorIntegracao;
       }
+
+      // 3) Valor bruto = exames + adicionais
+      valorBruto = valorExames + valorFranquia + valorPortal + valorIntegracao;
       
       // Calcular impostos (padrão 6.15% para não-simples)
       const pisLocal = valorBruto * 0.0065;
