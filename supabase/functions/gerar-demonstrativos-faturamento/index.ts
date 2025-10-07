@@ -184,8 +184,11 @@ serve(async (req) => {
         console.log(`📊 ${nomeFantasia}: ${volumetria.length} registros, ${examesAposPattern} exames (após pattern search)`);
       }
 
-      // Apply CEDIDIAG specific filter
-      if (nomeFantasia === 'CEDIDIAG' && volumetria.length > 0) {
+      // Apply client-specific filters for NC-FT clients
+      const nomeUpper = nomeFantasia.toUpperCase();
+      
+      // CEDIDIAG: Only MEDICINA INTERNA, exclude specific doctors
+      if (nomeUpper === 'CEDIDIAG' && volumetria.length > 0) {
         volumetria = volumetria.filter(vol => {
           const especialidade = (vol.ESPECIALIDADE || '').toString().toUpperCase();
           const medico = (vol.MEDICO || '').toString();
@@ -195,6 +198,135 @@ serve(async (req) => {
           
           return isMedicinaInterna && !isExcludedDoctor;
         });
+        console.log(`🔍 CEDIDIAG: Filtro aplicado, ${volumetria.length} registros restantes`);
+      }
+      
+      // CBU: Only specific modalities/specialties OR plantão
+      if (nomeUpper.includes('CBU') && volumetria.length > 0) {
+        volumetria = volumetria.filter(vol => {
+          const prioridade = (vol.PRIORIDADE || '').toString().toUpperCase();
+          const especialidade = (vol.ESPECIALIDADE || '').toString().toUpperCase();
+          
+          // Plantão sempre fatura
+          if (prioridade === 'PLANTÃO' || prioridade === 'PLANTAO') {
+            return true;
+          }
+          
+          // Apenas MEDICINA INTERNA e MUSCULO ESQUELETICO faturam
+          const isMedicinaInterna = especialidade.includes('MEDICINA INTERNA');
+          const isMusculoEsqueletico = especialidade.includes('MUSCULO ESQUELETICO');
+          
+          return isMedicinaInterna || isMusculoEsqueletico;
+        });
+        console.log(`🔍 CBU: Filtro aplicado, ${volumetria.length} registros restantes`);
+      }
+      
+      // CLIRAM: Only specific specialties OR plantão OR specific doctors
+      if (nomeUpper.includes('CLIRAM') && volumetria.length > 0) {
+        const ESPECIALIDADES_FATURADAS = ['MUSCULO ESQUELETICO', 'NEURO', 'PEDIATRIA'];
+        const MEDICOS_FATURADOS = ['JOAO VITOR DE SOUSA', 'DR. JOAO VITOR DE SOUSA'];
+        
+        volumetria = volumetria.filter(vol => {
+          const prioridade = (vol.PRIORIDADE || '').toString().toUpperCase();
+          const especialidade = (vol.ESPECIALIDADE || '').toString().toUpperCase();
+          const medico = (vol.MEDICO || '').toString().toUpperCase();
+          
+          // Plantão sempre fatura
+          if (prioridade === 'PLANTÃO' || prioridade === 'PLANTAO') {
+            return true;
+          }
+          
+          // Especialidades faturadas
+          const temEspecialidadeFaturada = ESPECIALIDADES_FATURADAS.some(esp => 
+            especialidade.includes(esp)
+          );
+          
+          // Médicos faturados
+          const temMedicoFaturado = MEDICOS_FATURADOS.some(med => 
+            medico.includes(med)
+          );
+          
+          return temEspecialidadeFaturada || temMedicoFaturado;
+        });
+        console.log(`🔍 CLIRAM: Filtro aplicado, ${volumetria.length} registros restantes`);
+      }
+      
+      // RADI-IMAGEM: Specific rules
+      if ((nomeUpper.includes('RADI-IMAGEM') || nomeUpper === 'RADI_IMAGEM') && volumetria.length > 0) {
+        const ESPECIALIDADES_FATURADAS = ['MUSCULO ESQUELETICO', 'NEURO', 'PEDIATRIA'];
+        const MEDICOS_FATURADOS = ['JOAO VITOR DE SOUSA', 'DR. JOAO VITOR DE SOUSA'];
+        
+        volumetria = volumetria.filter(vol => {
+          const prioridade = (vol.PRIORIDADE || '').toString().toUpperCase();
+          const especialidade = (vol.ESPECIALIDADE || '').toString().toUpperCase();
+          const medico = (vol.MEDICO || '').toString().toUpperCase();
+          
+          // Plantão sempre fatura
+          if (prioridade === 'PLANTÃO' || prioridade === 'PLANTAO') {
+            return true;
+          }
+          
+          // MAMA sempre fatura para RADI-IMAGEM
+          if (especialidade.includes('MAMA')) {
+            return true;
+          }
+          
+          // Especialidades faturadas
+          const temEspecialidadeFaturada = ESPECIALIDADES_FATURADAS.some(esp => 
+            especialidade.includes(esp)
+          );
+          
+          // Médicos faturados
+          const temMedicoFaturado = MEDICOS_FATURADOS.some(med => 
+            medico.includes(med)
+          );
+          
+          return temEspecialidadeFaturada || temMedicoFaturado;
+        });
+        console.log(`🔍 RADI-IMAGEM: Filtro aplicado, ${volumetria.length} registros restantes`);
+      }
+      
+      // RADMED: Similar to CBU
+      if (nomeUpper.includes('RADMED') && volumetria.length > 0) {
+        volumetria = volumetria.filter(vol => {
+          const prioridade = (vol.PRIORIDADE || '').toString().toUpperCase();
+          const especialidade = (vol.ESPECIALIDADE || '').toString().toUpperCase();
+          
+          // Plantão sempre fatura
+          if (prioridade === 'PLANTÃO' || prioridade === 'PLANTAO') {
+            return true;
+          }
+          
+          // Apenas MEDICINA INTERNA e MUSCULO ESQUELETICO faturam
+          const isMedicinaInterna = especialidade.includes('MEDICINA INTERNA');
+          const isMusculoEsqueletico = especialidade.includes('MUSCULO ESQUELETICO');
+          
+          return isMedicinaInterna || isMusculoEsqueletico;
+        });
+        console.log(`🔍 RADMED: Filtro aplicado, ${volumetria.length} registros restantes`);
+      }
+      
+      // Other NC clients with standard rules
+      const OUTROS_NC = ['CDICARDIO', 'CDIGOIAS', 'CISP', 'CRWANDERLEY', 'DIAGMAX-PR', 
+                        'GOLD', 'PRODIMAGEM', 'TRANSDUSON', 'ZANELLO', 'CEMVALENCA', 'RMPADUA'];
+      const isOutroNC = OUTROS_NC.some(nc => nomeUpper.includes(nc));
+      
+      if (isOutroNC && tipoFaturamento === 'NC-FT' && volumetria.length > 0) {
+        const ESPECIALIDADES_FATURADAS = ['MUSCULO ESQUELETICO', 'NEURO', 'PEDIATRIA'];
+        
+        volumetria = volumetria.filter(vol => {
+          const prioridade = (vol.PRIORIDADE || '').toString().toUpperCase();
+          const especialidade = (vol.ESPECIALIDADE || '').toString().toUpperCase();
+          
+          // Plantão sempre fatura
+          if (prioridade === 'PLANTÃO' || prioridade === 'PLANTAO') {
+            return true;
+          }
+          
+          // Apenas especialidades específicas faturam
+          return ESPECIALIDADES_FATURADAS.some(esp => especialidade.includes(esp));
+        });
+        console.log(`🔍 ${nomeFantasia} (NC-FT): Filtro aplicado, ${volumetria.length} registros restantes`);
       }
 
       // Calculate total exams (only billable records)

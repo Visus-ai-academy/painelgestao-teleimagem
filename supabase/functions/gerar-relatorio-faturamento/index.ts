@@ -81,7 +81,140 @@ serve(async (req: Request) => {
       .or(`EMPRESA.eq.${cliente.nome},Cliente_Nome_Fantasia.eq.${cliente.nome_fantasia}`)
       .order('DATA_REALIZACAO', { ascending: false });
 
-    console.log('📊 Volumetria encontrada:', volumetria?.length || 0, 'registros');
+    console.log('📊 Volumetria encontrada:', volumetria?.length || 0, 'registros (antes dos filtros)');
+
+    // Apply client-specific billing rules for NC-FT clients
+    let volumetriaFiltrada = volumetria || [];
+    const nomeClienteUpper = (cliente.nome_fantasia || cliente.nome || '').toUpperCase();
+    
+    // CEDIDIAG: Only MEDICINA INTERNA, exclude specific doctors
+    if (nomeClienteUpper.includes('CEDIDIAG') && volumetriaFiltrada.length > 0) {
+      volumetriaFiltrada = volumetriaFiltrada.filter(vol => {
+        const especialidade = (vol.ESPECIALIDADE || '').toString().toUpperCase();
+        const medico = (vol.MEDICO || '').toString();
+        
+        const isMedicinaInterna = especialidade.includes('MEDICINA INTERNA');
+        const isExcludedDoctor = medico.includes('Rodrigo Vaz') || medico.includes('Rodrigo Lima');
+        
+        return isMedicinaInterna && !isExcludedDoctor;
+      });
+      console.log(`🔍 CEDIDIAG: Filtro aplicado, ${volumetriaFiltrada.length} registros restantes`);
+    }
+    
+    // CBU: Only specific modalities/specialties OR plantão
+    if (nomeClienteUpper.includes('CBU') && volumetriaFiltrada.length > 0) {
+      volumetriaFiltrada = volumetriaFiltrada.filter(vol => {
+        const prioridade = (vol.PRIORIDADE || '').toString().toUpperCase();
+        const especialidade = (vol.ESPECIALIDADE || '').toString().toUpperCase();
+        
+        // Plantão always bills
+        if (prioridade === 'PLANTÃO' || prioridade === 'PLANTAO') {
+          return true;
+        }
+        
+        // Only MEDICINA INTERNA and MUSCULO ESQUELETICO bill
+        const isMedicinaInterna = especialidade.includes('MEDICINA INTERNA');
+        const isMusculoEsqueletico = especialidade.includes('MUSCULO ESQUELETICO');
+        
+        return isMedicinaInterna || isMusculoEsqueletico;
+      });
+      console.log(`🔍 CBU: Filtro aplicado, ${volumetriaFiltrada.length} registros restantes`);
+    }
+    
+    // CLIRAM: Only specific specialties OR plantão OR specific doctors
+    if (nomeClienteUpper.includes('CLIRAM') && volumetriaFiltrada.length > 0) {
+      const ESPECIALIDADES_FATURADAS = ['MUSCULO ESQUELETICO', 'NEURO', 'PEDIATRIA'];
+      const MEDICOS_FATURADOS = ['JOAO VITOR DE SOUSA', 'DR. JOAO VITOR DE SOUSA'];
+      
+      volumetriaFiltrada = volumetriaFiltrada.filter(vol => {
+        const prioridade = (vol.PRIORIDADE || '').toString().toUpperCase();
+        const especialidade = (vol.ESPECIALIDADE || '').toString().toUpperCase();
+        const medico = (vol.MEDICO || '').toString().toUpperCase();
+        
+        if (prioridade === 'PLANTÃO' || prioridade === 'PLANTAO') {
+          return true;
+        }
+        
+        const temEspecialidadeFaturada = ESPECIALIDADES_FATURADAS.some(esp => especialidade.includes(esp));
+        const temMedicoFaturado = MEDICOS_FATURADOS.some(med => medico.includes(med));
+        
+        return temEspecialidadeFaturada || temMedicoFaturado;
+      });
+      console.log(`🔍 CLIRAM: Filtro aplicado, ${volumetriaFiltrada.length} registros restantes`);
+    }
+    
+    // RADI-IMAGEM: Specific rules
+    if ((nomeClienteUpper.includes('RADI-IMAGEM') || nomeClienteUpper === 'RADI_IMAGEM') && volumetriaFiltrada.length > 0) {
+      const ESPECIALIDADES_FATURADAS = ['MUSCULO ESQUELETICO', 'NEURO', 'PEDIATRIA'];
+      const MEDICOS_FATURADOS = ['JOAO VITOR DE SOUSA', 'DR. JOAO VITOR DE SOUSA'];
+      
+      volumetriaFiltrada = volumetriaFiltrada.filter(vol => {
+        const prioridade = (vol.PRIORIDADE || '').toString().toUpperCase();
+        const especialidade = (vol.ESPECIALIDADE || '').toString().toUpperCase();
+        const medico = (vol.MEDICO || '').toString().toUpperCase();
+        
+        if (prioridade === 'PLANTÃO' || prioridade === 'PLANTAO') {
+          return true;
+        }
+        
+        if (especialidade.includes('MAMA')) {
+          return true;
+        }
+        
+        const temEspecialidadeFaturada = ESPECIALIDADES_FATURADAS.some(esp => especialidade.includes(esp));
+        const temMedicoFaturado = MEDICOS_FATURADOS.some(med => medico.includes(med));
+        
+        return temEspecialidadeFaturada || temMedicoFaturado;
+      });
+      console.log(`🔍 RADI-IMAGEM: Filtro aplicado, ${volumetriaFiltrada.length} registros restantes`);
+    }
+    
+    // RADMED: Similar to CBU
+    if (nomeClienteUpper.includes('RADMED') && volumetriaFiltrada.length > 0) {
+      volumetriaFiltrada = volumetriaFiltrada.filter(vol => {
+        const prioridade = (vol.PRIORIDADE || '').toString().toUpperCase();
+        const especialidade = (vol.ESPECIALIDADE || '').toString().toUpperCase();
+        
+        if (prioridade === 'PLANTÃO' || prioridade === 'PLANTAO') {
+          return true;
+        }
+        
+        const isMedicinaInterna = especialidade.includes('MEDICINA INTERNA');
+        const isMusculoEsqueletico = especialidade.includes('MUSCULO ESQUELETICO');
+        
+        return isMedicinaInterna || isMusculoEsqueletico;
+      });
+      console.log(`🔍 RADMED: Filtro aplicado, ${volumetriaFiltrada.length} registros restantes`);
+    }
+    
+    // Other NC clients with standard rules
+    const OUTROS_NC = ['CDICARDIO', 'CDIGOIAS', 'CISP', 'CRWANDERLEY', 'DIAGMAX-PR', 
+                      'GOLD', 'PRODIMAGEM', 'TRANSDUSON', 'ZANELLO', 'CEMVALENCA', 'RMPADUA'];
+    const isOutroNC = OUTROS_NC.some(nc => nomeClienteUpper.includes(nc));
+    
+    if (isOutroNC && volumetriaFiltrada.length > 0) {
+      const ESPECIALIDADES_FATURADAS = ['MUSCULO ESQUELETICO', 'NEURO', 'PEDIATRIA'];
+      
+      volumetriaFiltrada = volumetriaFiltrada.filter(vol => {
+        const prioridade = (vol.PRIORIDADE || '').toString().toUpperCase();
+        const especialidade = (vol.ESPECIALIDADE || '').toString().toUpperCase();
+        
+        if (prioridade === 'PLANTÃO' || prioridade === 'PLANTAO') {
+          return true;
+        }
+        
+        return ESPECIALIDADES_FATURADAS.some(esp => especialidade.includes(esp));
+      });
+      console.log(`🔍 ${cliente.nome_fantasia || cliente.nome} (NC-FT): Filtro aplicado, ${volumetriaFiltrada.length} registros restantes`);
+    }
+    
+    // Filter out NC-NF and EXCLUSAO records
+    volumetriaFiltrada = volumetriaFiltrada.filter(vol => {
+      const tipoFat = vol.tipo_faturamento;
+      return tipoFat !== 'NC-NF' && tipoFat !== 'EXCLUSAO';
+    });
+    
+    console.log('📊 Volumetria final após filtros:', volumetriaFiltrada.length, 'registros');
 
     // Buscar preços dos serviços para calcular valores
     const { data: precos } = await supabase
@@ -112,7 +245,7 @@ serve(async (req: Request) => {
     };
 
     // Calcular volume total do período para seleção de faixas de preço
-    const volumeTotal = (volumetria || []).reduce((sum, v) => sum + (v.VALORES || 0), 0) || dadosFinais.total_exames || 0;
+    const volumeTotal = (volumetriaFiltrada || []).reduce((sum, v) => sum + (v.VALORES || 0), 0) || dadosFinais.total_exames || 0;
 
     // Função para buscar preço do exame com base em Modalidade + Especialidade + Categoria (+ Prioridade opcional) e faixas de volume
     const buscarPreco = (exame: any) => {
@@ -157,7 +290,7 @@ serve(async (req: Request) => {
     };
 
     // Estruturar exames detalhados para o PDF
-    const examesDetalhados = (volumetria || []).map(v => {
+    const examesDetalhados = (volumetriaFiltrada || []).map(v => {
       const valorUnitario = buscarPreco(v);
       const quantidade = v.VALORES || 1;
       
@@ -178,7 +311,7 @@ serve(async (req: Request) => {
     });
 
     // Valores padrão para o relatório
-    const totalLaudos = volumetria?.reduce((sum, v) => sum + (v.VALORES || 0), 0) || dadosFinais.total_exames || 0;
+    const totalLaudos = volumetriaFiltrada?.reduce((sum, v) => sum + (v.VALORES || 0), 0) || dadosFinais.total_exames || 0;
     
     // Usar valores do demonstrativo se disponível (já calculados corretamente)
     let valorExames = 0;
