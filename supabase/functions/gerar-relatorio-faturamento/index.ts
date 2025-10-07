@@ -294,28 +294,34 @@ serve(async (req: Request) => {
         totalImpostos = valorBruto - valorLiquido;
       }
     } else {
-      // Calcular do zero baseado na volumetria
-      valorExames = examesDetalhados.reduce((sum, e) => sum + e.valor_total, 0);
-      valorBruto = valorExames + valorFranquia + valorPortal + valorIntegracao;
-
-      // Fallback: alinhar com "Faturamento por Cliente" usando tabela faturamento
+      // Calcular do zero baseado na volumetria + parâmetros oficiais (RPC)
+      // 1) Tentar usar RPC calcular_faturamento_completo para garantir consistência com o Demonstrativo
       try {
-        const { data: fatAgg, error: fatErr } = await supabase
-          .from('faturamento')
-          .select('total_bruto:sum(valor_bruto)')
-          .eq('cliente_id', cliente_id)
-          .eq('periodo_referencia', periodo)
-          .single();
+        const { data: calcData, error: calcErr } = await supabase
+          .rpc('calcular_faturamento_completo', {
+            p_cliente_id: cliente_id,
+            p_periodo: periodo,
+            p_volume_total: totalLaudos
+          });
 
-        if (!fatErr && fatAgg?.total_bruto != null && Number(fatAgg.total_bruto) > 0) {
-          const totalBrutoAgg = Number(fatAgg.total_bruto);
-          console.log('🔄 Usando valor_bruto agregado de faturamento:', totalBrutoAgg);
-          valorBruto = totalBrutoAgg;
-          // Ajustar valor dos exames para manter consistência com extras
-          valorExames = Math.max(0, valorBruto - valorFranquia - valorPortal - valorIntegracao);
+        if (!calcErr && calcData && Array.isArray(calcData) && calcData.length > 0) {
+          const c = calcData[0];
+          valorExames = Number(c.valor_exames) || 0;
+          valorFranquia = Number(c.valor_franquia) || 0;
+          valorPortal = Number(c.valor_portal_laudos) || 0;
+          valorIntegracao = Number(c.valor_integracao) || 0;
+          valorBruto = Number(c.valor_total) || (valorExames + valorFranquia + valorPortal + valorIntegracao);
+          console.log('✅ Valores via RPC calcular_faturamento_completo', { valorExames, valorFranquia, valorPortal, valorIntegracao, valorBruto });
+        } else {
+          // Fallback: calcular pelo preço unitário dos exames (volumetria)
+          valorExames = examesDetalhados.reduce((sum, e) => sum + e.valor_total, 0);
+          valorBruto = valorExames + valorFranquia + valorPortal + valorIntegracao;
+          console.warn('⚠️ RPC indisponível, usando cálculo local', calcErr);
         }
       } catch (e) {
-        console.warn('Não foi possível obter agregado de faturamento:', e?.message || e);
+        console.warn('Erro RPC calcular_faturamento_completo:', e?.message || e);
+        valorExames = examesDetalhados.reduce((sum, e) => sum + e.valor_total, 0);
+        valorBruto = valorExames + valorFranquia + valorPortal + valorIntegracao;
       }
       
       // Calcular impostos (padrão 6.15% para não-simples)
@@ -326,6 +332,34 @@ serve(async (req: Request) => {
       totalImpostos = pisLocal + cofinsLocal + csllLocal + irrfLocal;
       
       valorLiquido = valorBruto - totalImpostos;
+
+      // Último recurso: reconciliar com faturamento agregado se ainda estiver zerado/indefinido
+      if (!isFinite(valorBruto) || valorBruto <= 0) {
+        try {
+          const { data: fatAgg, error: fatErr } = await supabase
+            .from('faturamento')
+            .select('total_bruto:sum(valor_bruto)')
+            .eq('cliente_id', cliente_id)
+            .eq('periodo_referencia', periodo)
+            .single();
+
+          if (!fatErr && fatAgg?.total_bruto != null && Number(fatAgg.total_bruto) > 0) {
+            const totalBrutoAgg = Number(fatAgg.total_bruto);
+            console.log('🔄 Usando valor_bruto agregado de faturamento:', totalBrutoAgg);
+            valorBruto = totalBrutoAgg;
+            // Ajustar valor dos exames para manter consistência com extras
+            valorExames = Math.max(0, valorBruto - valorFranquia - valorPortal - valorIntegracao);
+            const pis2 = valorBruto * 0.0065;
+            const cofins2 = valorBruto * 0.03;
+            const csll2 = valorBruto * 0.01;
+            const irrf2 = valorBruto * 0.015;
+            totalImpostos = pis2 + cofins2 + csll2 + irrf2;
+            valorLiquido = valorBruto - totalImpostos;
+          }
+        } catch (e2) {
+          console.warn('Não foi possível obter agregado de faturamento:', e2?.message || e2);
+        }
+      }
     }
     
     // Calcular componentes individuais dos impostos para exibição
