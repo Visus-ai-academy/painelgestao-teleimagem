@@ -193,11 +193,10 @@ serve(async (req: Request) => {
     const hasDemoValores = dadosFinais && (dadosFinais.valor_bruto != null || dadosFinais.valor_bruto_total != null || dadosFinais.valor_total_faturamento != null || dadosFinais.valor_exames != null);
 
     if (hasDemoValores) {
-      // Demonstrativo disponível - usar valores já calculados
-      valorBruto = readNumber(dadosFinais.valor_bruto ?? dadosFinais.valor_bruto_total ?? dadosFinais.valor_total_faturamento ?? 0);
-      valorLiquido = readNumber(dadosFinais.valor_liquido);
-
-      // Helpers parseValorBR/readNumber já definidos acima (remoção de duplicata)
+      // Demonstrativo disponível - usar e reconciliar valores
+      const brutoInformado = readNumber(dadosFinais.valor_bruto ?? dadosFinais.valor_bruto_total ?? dadosFinais.valor_total_faturamento ?? 0);
+      const liquidoInformado = readNumber(dadosFinais.valor_liquido);
+      const examesInformado = readNumber(dadosFinais.valor_exames);
 
       valorFranquia = readNumber(dadosFinais.valor_franquia) 
         || readNumber(dadosFinais.franquia)
@@ -271,8 +270,18 @@ serve(async (req: Request) => {
         }
       }
       
-      // Calcular valor dos exames a partir do bruto e adicionais
-      valorExames = Math.max(0, valorBruto - valorFranquia - valorPortal - valorIntegracao);
+      // Reconciliar bruto com exames + adicionais
+      if (examesInformado > 0) {
+        valorExames = examesInformado;
+        valorBruto = valorExames + valorFranquia + valorPortal + valorIntegracao;
+      } else {
+        valorBruto = brutoInformado;
+        valorExames = Math.max(0, valorBruto - valorFranquia - valorPortal - valorIntegracao);
+        if (!isFinite(valorBruto) || valorBruto <= 0) {
+          valorBruto = valorExames + valorFranquia + valorPortal + valorIntegracao;
+        }
+      }
+
       console.log('📊 Cálculo final:', { 
         valorBruto, 
         valorFranquia, 
@@ -283,7 +292,7 @@ serve(async (req: Request) => {
       });
 
       // Se o valor líquido não foi fornecido, calcular com as alíquotas padrão
-      if (valorLiquido == null || isNaN(valorLiquido) || valorLiquido === 0) {
+      if (liquidoInformado == null || isNaN(liquidoInformado) || liquidoInformado === 0) {
         const pisLocal = valorBruto * 0.0065;
         const cofinsLocal = valorBruto * 0.03;
         const csllLocal = valorBruto * 0.01;
@@ -291,6 +300,7 @@ serve(async (req: Request) => {
         totalImpostos = pisLocal + cofinsLocal + csllLocal + irrfLocal;
         valorLiquido = valorBruto - totalImpostos;
       } else {
+        valorLiquido = liquidoInformado;
         totalImpostos = valorBruto - valorLiquido;
       }
     } else {
