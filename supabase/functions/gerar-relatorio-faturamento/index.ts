@@ -693,7 +693,7 @@ serve(async (req: Request) => {
       currentY += 10;
       
       const headers = ['Data', 'Paciente', 'Médico', 'Exame', 'Modal.', 'Espec.', 'Categ.', 'Prior.', 'Accession', 'Origem', 'Qtd', 'Valor Total'];
-      const colWidths = [16, 32, 30, 28, 12, 32, 12, 14, 24, 24, 8, 14];
+      const colWidths = [16, 32, 36, 34, 12, 35, 12, 14, 24, 24, 8, 10];
       
       // Cabeçalho
       pdf.setFillColor(220, 220, 220);
