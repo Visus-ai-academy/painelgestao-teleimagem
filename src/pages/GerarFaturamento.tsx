@@ -1615,11 +1615,14 @@ export default function GerarFaturamento() {
 
   // Função para gerar todos os relatórios (nova aba "Relatórios")
   const gerarTodosRelatorios = async () => {
+    // ✅ Garantir que estamos usando o período correto do localStorage
+    const periodoAtual = localStorage.getItem('periodoFaturamentoSelecionado') || periodoSelecionado;
+    
     // ✅ USAR CLIENTES DOS DEMONSTRATIVOS SALVOS
     let clientesParaProcessar = clientesCarregados;
     
     // Tentar carregar clientes dos demonstrativos salvos primeiro
-    const demonstrativosCompletos = localStorage.getItem(`demonstrativos_completos_${periodoSelecionado}`);
+    const demonstrativosCompletos = localStorage.getItem(`demonstrativos_completos_${periodoAtual}`);
     if (demonstrativosCompletos) {
       try {
         const dados = JSON.parse(demonstrativosCompletos);
@@ -1681,7 +1684,7 @@ export default function GerarFaturamento() {
 
           const bodyData: any = {
             cliente_id: clienteIdReal,
-            periodo: periodoSelecionado
+            periodo: periodoAtual // ✅ Usar período correto do localStorage
           };
           
           // Se temos dados do demonstrativo, incluir para gerar PDF completo
