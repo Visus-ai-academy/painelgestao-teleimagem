@@ -1688,8 +1688,15 @@ export default function GerarFaturamento() {
           };
           
           // Se temos dados do demonstrativo, incluir para gerar PDF completo
+          // ✅ CRÍTICO: Validar se o período do demonstrativo coincide com o período atual
           if ((cliente as any).demonstrativo) {
-            bodyData.demonstrativo_data = (cliente as any).demonstrativo;
+            const demonstrativoPeriodo = (cliente as any).demonstrativo.periodo;
+            if (demonstrativoPeriodo === periodoAtual) {
+              console.log('📊 Usando demonstrativo salvo (período correto):', cliente.nome, periodoAtual);
+              bodyData.demonstrativo_data = (cliente as any).demonstrativo;
+            } else {
+              console.warn('⚠️ Demonstrativo tem período diferente:', demonstrativoPeriodo, 'vs', periodoAtual, '- Ignorando e buscando do banco');
+            }
           }
           
           let relatorioData: any = null;
