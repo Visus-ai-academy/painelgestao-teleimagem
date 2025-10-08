@@ -11,6 +11,8 @@ export interface VolumetriaFilters {
   dia: string;
   dataEspecifica?: Date | null;
   cliente: string;
+  tipoCliente: string; // CO, NC
+  tipoFaturamento: string; // CO-FT, NC-FT, NC-NF
   modalidade: string;
   especialidade: string;
   categoria?: string;
@@ -183,6 +185,27 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
       if (filters.medico !== 'todos') {
         allData = allData.filter(item => item.MEDICO === filters.medico);
         console.log(`👩‍⚕️ Filtro médico aplicado: ${filters.medico}, restaram ${allData.length} registros`);
+      }
+      
+      // ✅ NOVOS FILTROS: Tipo de Cliente e Tipo de Faturamento
+      if (filters.tipoCliente !== 'todos') {
+        allData = allData.filter(item => item.tipo_cliente === filters.tipoCliente);
+        console.log(`🏷️ Filtro tipo cliente aplicado: ${filters.tipoCliente}, restaram ${allData.length} registros`);
+      }
+      
+      if (filters.tipoFaturamento !== 'todos') {
+        allData = allData.filter(item => {
+          // Mapear o tipo de faturamento selecionado para o campo do banco
+          if (filters.tipoFaturamento === 'CO-FT') {
+            return item.tipo_cliente === 'CO'; // Clientes CO sempre são faturados
+          } else if (filters.tipoFaturamento === 'NC-FT') {
+            return item.tipo_cliente === 'NC' && item.tipo_faturamento !== 'padrao';
+          } else if (filters.tipoFaturamento === 'NC-NF') {
+            return item.tipo_cliente === 'NC' && item.tipo_faturamento === 'padrao';
+          }
+          return true;
+        });
+        console.log(`💰 Filtro tipo faturamento aplicado: ${filters.tipoFaturamento}, restaram ${allData.length} registros`);
       }
       
       // Aplicar filtros de data: para recorte mensal, usar janela de DATA_LAUDO (1º dia do mês até dia 7 do mês seguinte)
