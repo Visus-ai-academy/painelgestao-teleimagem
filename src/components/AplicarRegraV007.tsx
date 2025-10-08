@@ -8,13 +8,10 @@ import { Loader2, Play, CheckCircle2, AlertCircle } from 'lucide-react';
 
 interface ResultadoV007 {
   sucesso: boolean;
-  total_correcoes_colunas: number;
-  total_correcoes_neuro: number;
-  total_correcoes_onco_med_int: number;
-  total_categorias_aplicadas: number;
-  total_erros: number;
-  registros_restantes: number;
-  observacoes: string;
+  total_corrigidos: number;
+  especialidades_processadas: string[];
+  arquivo_fonte: string;
+  mensagem: string;
 }
 
 export function AplicarRegraV007() {
@@ -28,8 +25,8 @@ export function AplicarRegraV007() {
     try {
       toast.info('🔄 Aplicando regra v007 nos dados existentes...');
       
-      const { data, error } = await supabase.functions.invoke('aplicar-v007-especialidades-existentes', {
-        body: {}
+      const { data, error } = await supabase.functions.invoke('corrigir-especialidades-retroativo', {
+        body: { arquivo_fonte: null } // Aplicar em todos os arquivos
       });
 
       if (error) {
@@ -40,18 +37,12 @@ export function AplicarRegraV007() {
         const resultado = data as ResultadoV007;
         setUltimoResultado(resultado);
         
-        const totalCorrecoes = resultado.total_correcoes_colunas + 
-                              resultado.total_correcoes_neuro + 
-                              resultado.total_correcoes_onco_med_int;
-        
-        toast.success(`✅ Regra v007 aplicada com sucesso! ${totalCorrecoes} correções realizadas`);
+        toast.success(`✅ ${resultado.mensagem}`);
         
         console.log('📊 Resultado da aplicação v007:', {
-          'COLUNAS → MUSCULO ESQUELETICO': resultado.total_correcoes_colunas,
-          'COLUNAS → Neuro (neurologistas)': resultado.total_correcoes_neuro,
-          'ONCO MEDICINA INTERNA → MEDICINA INTERNA': resultado.total_correcoes_onco_med_int,
-          'Categorias aplicadas': resultado.total_categorias_aplicadas,
-          'Registros problemáticos restantes': resultado.registros_restantes
+          'Total corrigidos': resultado.total_corrigidos,
+          'Especialidades processadas': resultado.especialidades_processadas,
+          'Arquivo fonte': resultado.arquivo_fonte
         });
 
       } else {
@@ -64,13 +55,10 @@ export function AplicarRegraV007() {
       
       setUltimoResultado({
         sucesso: false,
-        total_correcoes_colunas: 0,
-        total_correcoes_neuro: 0,
-        total_correcoes_onco_med_int: 0,
-        total_categorias_aplicadas: 0,
-        total_erros: 1,
-        registros_restantes: 0,
-        observacoes: `Erro: ${error.message}`
+        total_corrigidos: 0,
+        especialidades_processadas: [],
+        arquivo_fonte: 'TODOS',
+        mensagem: `Erro: ${error.message}`
       });
     } finally {
       setAplicando(false);
@@ -90,13 +78,17 @@ export function AplicarRegraV007() {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
-          <h4 className="font-semibold text-orange-800 mb-2">Regra v007 - O que será aplicado:</h4>
+          <h4 className="font-semibold text-orange-800 mb-2">Regra v007 Expandida - Especialidades que serão corrigidas:</h4>
           <ul className="text-sm text-orange-700 space-y-1">
-            <li>• <strong>COLUNAS</strong> → <strong>MÚSCULO ESQUELÉTICO</strong> (padrão)</li>
-            <li>• <strong>COLUNAS</strong> → <strong>Neuro</strong> (para 43 médicos neurologistas específicos)</li>
+            <li>• <strong>ANGIOTCS</strong> → <strong>MEDICINA INTERNA</strong></li>
+            <li>• <strong>CABEÇA-PESCOÇO</strong> → <strong>NEURO</strong></li>
+            <li>• <strong>TÓRAX</strong> → <strong>MEDICINA INTERNA</strong></li>
+            <li>• <strong>CORPO</strong> → <strong>MEDICINA INTERNA</strong></li>
+            <li>• <strong>D.O</strong> → <strong>MUSCULO ESQUELETICO</strong></li>
+            <li>• <strong>MAMO</strong> → <strong>MAMA</strong></li>
+            <li>• <strong>TOMOGRAFIA</strong> → <strong>MEDICINA INTERNA</strong></li>
+            <li>• <strong>CARDIO COM SCORE</strong> → <strong>CARDIO</strong></li>
             <li>• <strong>ONCO MEDICINA INTERNA</strong> → <strong>MEDICINA INTERNA</strong></li>
-            <li>• Aplicação de categorias do cadastro de exames quando disponível</li>
-            <li>• Normalização inteligente de nomes de médicos (maiúscula/minúscula, abreviações)</li>
           </ul>
         </div>
 
@@ -132,69 +124,47 @@ export function AplicarRegraV007() {
               </span>
             </div>
             
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="text-center p-3 bg-blue-50 rounded-lg">
-                <div className="text-lg font-bold text-blue-700">
-                  {ultimoResultado.total_correcoes_colunas}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="text-center p-4 bg-blue-50 rounded-lg">
+                <div className="text-2xl font-bold text-blue-700">
+                  {ultimoResultado.total_corrigidos}
                 </div>
-                <div className="text-xs text-blue-600">
-                  COLUNAS → MÚSCULO ESQ.
-                </div>
-              </div>
-              
-              <div className="text-center p-3 bg-purple-50 rounded-lg">
-                <div className="text-lg font-bold text-purple-700">
-                  {ultimoResultado.total_correcoes_neuro}
-                </div>
-                <div className="text-xs text-purple-600">
-                  COLUNAS → Neuro
+                <div className="text-sm text-blue-600">
+                  Total de Registros Corrigidos
                 </div>
               </div>
               
-              <div className="text-center p-3 bg-green-50 rounded-lg">
-                <div className="text-lg font-bold text-green-700">
-                  {ultimoResultado.total_correcoes_onco_med_int}
+              <div className="text-center p-4 bg-purple-50 rounded-lg">
+                <div className="text-2xl font-bold text-purple-700">
+                  {ultimoResultado.especialidades_processadas.length}
                 </div>
-                <div className="text-xs text-green-600">
-                  ONCO MED INT → MED INT
-                </div>
-              </div>
-              
-              <div className="text-center p-3 bg-amber-50 rounded-lg">
-                <div className="text-lg font-bold text-amber-700">
-                  {ultimoResultado.total_categorias_aplicadas}
-                </div>
-                <div className="text-xs text-amber-600">
-                  Categorias Aplicadas
+                <div className="text-sm text-purple-600">
+                  Especialidades Processadas
                 </div>
               </div>
             </div>
 
-            {ultimoResultado.total_erros > 0 && (
-              <div className="p-3 bg-red-50 rounded-lg border border-red-200">
-                <Badge variant="destructive" className="mb-2">
-                  {ultimoResultado.total_erros} Erros
-                </Badge>
-                <p className="text-sm text-red-700">
-                  Alguns registros não puderam ser processados. Verifique os logs para detalhes.
+            {ultimoResultado.especialidades_processadas.length > 0 && (
+              <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+                <p className="text-sm text-green-700 font-semibold mb-2">
+                  Especialidades corrigidas:
                 </p>
-              </div>
-            )}
-
-            {ultimoResultado.registros_restantes > 0 && (
-              <div className="p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-                <Badge variant="outline" className="mb-2">
-                  {ultimoResultado.registros_restantes} Registros Restantes
-                </Badge>
-                <p className="text-sm text-yellow-700">
-                  Ainda existem registros com especialidades "COLUNAS" ou "ONCO MEDICINA INTERNA" que precisam ser verificados.
-                </p>
+                <div className="flex flex-wrap gap-2">
+                  {ultimoResultado.especialidades_processadas.map((esp) => (
+                    <Badge key={esp} variant="outline" className="bg-white">
+                      {esp}
+                    </Badge>
+                  ))}
+                </div>
               </div>
             )}
 
             <div className="p-3 bg-muted rounded-lg">
               <p className="text-sm text-muted-foreground">
-                <strong>Observações:</strong> {ultimoResultado.observacoes}
+                <strong>Mensagem:</strong> {ultimoResultado.mensagem}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                <strong>Arquivo fonte:</strong> {ultimoResultado.arquivo_fonte}
               </p>
             </div>
           </div>
