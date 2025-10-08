@@ -101,9 +101,17 @@ export default function GerarFaturamento() {
   // Controle de período para volumetria retroativa
   const [periodoFaturamentoVolumetria, setPeriodoFaturamentoVolumetria] = useState<{ ano: number; mes: number } | null>(null);
   
-  // Controle de período para upload
-  const [periodoSelecionado, setPeriodoSelecionado] = useState("2025-06"); // Período com dados
+  // Controle de período para upload - persistir no localStorage
+  const [periodoSelecionado, setPeriodoSelecionado] = useState(() => {
+    const saved = localStorage.getItem('periodoFaturamentoSelecionado');
+    return saved || "2025-06"; // Fallback para jun/25
+  });
   const [mostrarApenasEditaveis, setMostrarApenasEditaveis] = useState(true);
+  
+  // Persistir período selecionado no localStorage sempre que mudar
+  useEffect(() => {
+    localStorage.setItem('periodoFaturamentoSelecionado', periodoSelecionado);
+  }, [periodoSelecionado]);
   
   const [clientesCarregados, setClientesCarregados] = useState<Array<{
     id: string;
