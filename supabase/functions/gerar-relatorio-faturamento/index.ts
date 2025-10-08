@@ -777,13 +777,18 @@ serve(async (req: Request) => {
         let cellX = margin;
         cells.forEach((cell, cellIndex) => {
           const align = cellIndex === 10 ? 'center' : cellIndex === 11 ? 'right' : 'left';
+          const colStart = cellX;
+          const colEnd = cellX + colWidths[cellIndex];
           
           if (align === 'right') {
-            pdf.text(cell, cellX + colWidths[cellIndex] - 2, currentY + 4.5, { align: 'right' });
+            // Alinhar à direita: posição no final da coluna menos margem
+            pdf.text(cell, colEnd - 1, currentY + 4.5, { align: 'right' });
           } else if (align === 'center') {
-            pdf.text(cell, cellX + colWidths[cellIndex] / 2, currentY + 4.5, { align: 'center' });
+            // Centralizar na coluna
+            pdf.text(cell, colStart + colWidths[cellIndex] / 2, currentY + 4.5, { align: 'center' });
           } else {
-            pdf.text(cell, cellX + 1, currentY + 4.5);
+            // Alinhar à esquerda: posição no início da coluna mais margem
+            pdf.text(cell, colStart + 1, currentY + 4.5);
           }
           
           cellX += colWidths[cellIndex];
