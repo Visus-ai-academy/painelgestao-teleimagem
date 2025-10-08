@@ -327,7 +327,7 @@ export async function processVolumetriaFile(
             continue;
           }
 
-          // REGRA: Excluir laudos após 07/07/2025 (parser robusto para datas BR)
+          // REGRA: Excluir laudos após data de corte dinâmica (parser robusto para datas BR)
           const dataLaudo = row['DATA_LAUDO'];
           if (dataLaudo) {
             const parseBR = (val: any): Date | null => {
@@ -345,13 +345,26 @@ export async function processVolumetriaFile(
               return isNaN(dt.getTime()) ? null : dt;
             };
             const dataLaudoDate = parseBR(dataLaudo);
-            const dataCorte = new Date('2025-07-07');
+            
+            // Calcular data de corte baseada no período de referência
+            let dataCorte: Date;
+            if (periodoFaturamento) {
+              // Data de corte = dia 7 do mês SEGUINTE ao período de referência
+              const mesCorte = periodoFaturamento.mes === 12 ? 1 : periodoFaturamento.mes + 1;
+              const anoCorte = periodoFaturamento.mes === 12 ? periodoFaturamento.ano + 1 : periodoFaturamento.ano;
+              dataCorte = new Date(anoCorte, mesCorte - 1, 7);
+            } else {
+              // Fallback: se não informar período, usar 60 dias no futuro
+              const hoje = new Date();
+              dataCorte = new Date(hoje.getFullYear(), hoje.getMonth() + 2, 7);
+            }
+            
             if (dataLaudoDate && dataLaudoDate > dataCorte) {
               if (nomeNorm === DEBUG_PACIENTE_NORM) {
                 dbgExcludedByLaudoCutoff++;
-                console.log(`⚠️ DEBUG PACIENTE - descartado por DATA_LAUDO > 07/07/2025: ${empresa} - ${String(dataLaudo)}`);
+                console.log(`⚠️ DEBUG PACIENTE - descartado por DATA_LAUDO > ${dataCorte.toISOString().split('T')[0]}: ${empresa} - ${String(dataLaudo)}`);
               }
-              console.log(`Laudo após 07/07/2025 excluído: ${empresa} - ${dataLaudo}`);
+              console.log(`Laudo após ${dataCorte.toISOString().split('T')[0]} excluído: ${empresa} - ${dataLaudo}`);
               totalErrors++; // Contar como processado mas não inserido
               continue;
             }
