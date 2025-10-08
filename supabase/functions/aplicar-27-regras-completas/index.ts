@@ -139,7 +139,55 @@ Deno.serve(async (req) => {
       // REGRA v007: Correções de especialidades problemáticas
       console.log('  ⚡ Aplicando v007 - Correções especialidades problemáticas')
       
-      // Colunas → Músculo Esquelético  
+      // ANGIOTCS → MEDICINA INTERNA
+      await supabase.from('volumetria_mobilemed')
+        .update({ ESPECIALIDADE: 'MEDICINA INTERNA' })
+        .eq('arquivo_fonte', arquivoAtual)
+        .eq('ESPECIALIDADE', 'ANGIOTCS')
+      
+      // CABEÇA-PESCOÇO → NEURO
+      await supabase.from('volumetria_mobilemed')
+        .update({ ESPECIALIDADE: 'NEURO' })
+        .eq('arquivo_fonte', arquivoAtual)
+        .eq('ESPECIALIDADE', 'CABEÇA-PESCOÇO')
+      
+      // TÓRAX → MEDICINA INTERNA
+      await supabase.from('volumetria_mobilemed')
+        .update({ ESPECIALIDADE: 'MEDICINA INTERNA' })
+        .eq('arquivo_fonte', arquivoAtual)
+        .eq('ESPECIALIDADE', 'TÓRAX')
+      
+      // CORPO → MEDICINA INTERNA
+      await supabase.from('volumetria_mobilemed')
+        .update({ ESPECIALIDADE: 'MEDICINA INTERNA' })
+        .eq('arquivo_fonte', arquivoAtual)
+        .eq('ESPECIALIDADE', 'CORPO')
+      
+      // D.O → MUSCULO ESQUELETICO
+      await supabase.from('volumetria_mobilemed')
+        .update({ ESPECIALIDADE: 'MUSCULO ESQUELETICO' })
+        .eq('arquivo_fonte', arquivoAtual)
+        .eq('ESPECIALIDADE', 'D.O')
+      
+      // MAMO → MAMA
+      await supabase.from('volumetria_mobilemed')
+        .update({ ESPECIALIDADE: 'MAMA' })
+        .eq('arquivo_fonte', arquivoAtual)
+        .eq('ESPECIALIDADE', 'MAMO')
+      
+      // TOMOGRAFIA → MEDICINA INTERNA
+      await supabase.from('volumetria_mobilemed')
+        .update({ ESPECIALIDADE: 'MEDICINA INTERNA' })
+        .eq('arquivo_fonte', arquivoAtual)
+        .eq('ESPECIALIDADE', 'TOMOGRAFIA')
+      
+      // CARDIO COM SCORE → CARDIO
+      await supabase.from('volumetria_mobilemed')
+        .update({ ESPECIALIDADE: 'CARDIO' })
+        .eq('arquivo_fonte', arquivoAtual)
+        .eq('ESPECIALIDADE', 'CARDIO COM SCORE')
+      
+      // Colunas → MUSCULO ESQUELETICO  
       await supabase.from('volumetria_mobilemed')
         .update({ ESPECIALIDADE: 'MUSCULO ESQUELETICO' })
         .eq('arquivo_fonte', arquivoAtual)
