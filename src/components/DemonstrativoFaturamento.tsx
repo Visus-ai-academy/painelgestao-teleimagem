@@ -66,10 +66,20 @@ export default function DemonstrativoFaturamento() {
   const [carregando, setCarregando] = useState(false);
   const [filtroNome, setFiltroNome] = useState("");
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
-  const [periodo, setPeriodo] = useState("2025-06"); // Período com dados carregados
+  // Persistir período selecionado - usar o mesmo localStorage que a página GerarFaturamento
+  const [periodo, setPeriodo] = useState(() => {
+    const saved = localStorage.getItem('periodoFaturamentoSelecionado');
+    return saved || "2025-06"; // Fallback para jun/25
+  });
   const [ordemAlfabetica, setOrdemAlfabetica] = useState(true);
   const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set());
   const hasShownInitialToast = useRef(false);
+  
+  // Persistir período selecionado no localStorage sempre que mudar
+  useEffect(() => {
+    localStorage.setItem('periodoFaturamentoSelecionado', periodo);
+  }, [periodo]);
+  
   // Evita correções em loop: registra tentativas por período e status de execução
   const tcCorrectionTried = useRef<Set<string>>(new Set());
   const tcCorrectionRunning = useRef(false);
