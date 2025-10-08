@@ -15,7 +15,7 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseKey)
 
-    const { periodo_referencia = '2025-06', aplicar_todos_arquivos = true } = await req.json()
+    const { periodo_referencia = '2025-06', aplicar_todos_arquivos = true, arquivo_fonte } = await req.json()
 
     console.log('🚀 APLICANDO 27 REGRAS COMPLETAS - Sistema Otimizado v4')
     console.log(`📁 Arquivo: ${arquivo_fonte || 'TODOS OS ARQUIVOS'}`)
