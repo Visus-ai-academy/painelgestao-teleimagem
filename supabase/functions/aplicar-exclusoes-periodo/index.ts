@@ -66,28 +66,29 @@ serve(async (req) => {
       });
     }
 
-    // Calcular datas para jun/25
+    // Calcular datas baseado no período de referência
+    // RETROATIVOS: DATA_REALIZACAO antiga + DATA_LAUDO no período atual
     let dataLimiteRealizacao: Date;
     let dataInicioJanelaLaudo: Date;
     let dataFimJanelaLaudo: Date;
     
-    if (periodo_referencia === '2025-06') {
-      dataLimiteRealizacao = new Date('2025-06-01'); // v003: excluir >= esta data
-      dataInicioJanelaLaudo = new Date('2025-06-08'); // v002: janela válida início
-      dataFimJanelaLaudo = new Date('2025-07-07');   // v002: janela válida fim
-    } else {
-      const [mes, ano] = periodo_referencia.split('/');
-      const meses: { [key: string]: number } = {
-        'jan': 1, 'fev': 2, 'mar': 3, 'abr': 4, 'mai': 5, 'jun': 6,
-        'jul': 7, 'ago': 8, 'set': 9, 'out': 10, 'nov': 11, 'dez': 12
-      };
-      const anoCompleto = 2000 + parseInt(ano);
-      const mesNumero = meses[mes];
-      
-      dataLimiteRealizacao = new Date(anoCompleto, mesNumero - 1, 1);
-      dataInicioJanelaLaudo = new Date(anoCompleto, mesNumero - 1, 8);
-      dataFimJanelaLaudo = new Date(anoCompleto, mesNumero, 7);
-    }
+    const [mes, ano] = periodo_referencia.split('/');
+    const meses: { [key: string]: number } = {
+      'jan': 1, 'fev': 2, 'mar': 3, 'abr': 4, 'mai': 5, 'jun': 6,
+      'jul': 7, 'ago': 8, 'set': 9, 'out': 10, 'nov': 11, 'dez': 12
+    };
+    const anoCompleto = 2000 + parseInt(ano);
+    const mesNumero = meses[mes];
+    
+    // v003: Excluir DATA_REALIZACAO >= primeiro dia do mês de referência
+    // Para retroativos de set/25, exclui DATA_REALIZACAO >= 2025-09-01
+    // (mantém registros com DATA_REALIZACAO em julho/agosto)
+    dataLimiteRealizacao = new Date(anoCompleto, mesNumero - 1, 1);
+    
+    // v002: Janela válida do DATA_LAUDO (dia 8 do mês ref até dia 7 do mês seguinte)
+    // Para set/25: 2025-09-08 até 2025-10-07
+    dataInicioJanelaLaudo = new Date(anoCompleto, mesNumero - 1, 8);
+    dataFimJanelaLaudo = new Date(anoCompleto, mesNumero, 7);
 
     const dataLimiteRealizacaoStr = dataLimiteRealizacao.toISOString().split('T')[0];
     const dataInicioJanelaLaudoStr = dataInicioJanelaLaudo.toISOString().split('T')[0];
