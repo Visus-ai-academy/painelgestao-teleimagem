@@ -366,6 +366,24 @@ Deno.serve(async (req) => {
 
       console.log(`  ✅ Aplicadas ${regrasAplicadasArquivo.size} regras para ${arquivoAtual}`)
 
+      // APLICAR QUEBRA DE EXAMES AUTOMATICAMENTE
+      console.log('  ⚡ Aplicando quebra de exames automática')
+      try {
+        const { data: quebraResult, error: quebraError } = await supabase.functions.invoke(
+          'aplicar-regras-quebra-exames',
+          { body: { arquivo_fonte: arquivoAtual } }
+        )
+        
+        if (quebraError) {
+          console.error('❌ Erro ao aplicar quebra de exames:', quebraError)
+        } else if (quebraResult) {
+          console.log(`✅ Quebra de exames: ${quebraResult.registros_processados} processados, ${quebraResult.registros_quebrados} quebrados`)
+          resultadosGerais.total_registros_quebrados += quebraResult.registros_quebrados || 0
+        }
+      } catch (quebraErr) {
+        console.error('❌ Erro ao chamar quebra de exames:', quebraErr)
+      }
+
       // Contar registros finais
       const { count: depoisCount } = await supabase
         .from('volumetria_mobilemed')
