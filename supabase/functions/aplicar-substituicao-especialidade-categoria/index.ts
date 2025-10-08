@@ -29,10 +29,7 @@ serve(async (req) => {
     // Especialidades que devem ter substituição
     const especialidadesAlvo = [
       'Cardio com Score',
-      'Corpo',
-      'CORPO', // Adicionar maiúscula também
-      'Onco Medicina Interna',
-      'GERAL' // Adicionar GERAL para corrigir registros genéricos
+      'Onco Medicina Interna'
     ];
     
     // Buscar todos os registros com as especialidades específicas
@@ -75,27 +72,17 @@ serve(async (req) => {
       throw cadastroError;
     }
     
-    // Criar mapa de exames para busca eficiente E VARIAÇÕES
+    // Criar mapa de exames para busca EXATA
     const mapaExames = new Map();
-    const examesParaBuscaParcial: any[] = [];
     
     cadastroExames?.forEach(exame => {
-      // Criar mapa com nome exato
       mapaExames.set(exame.nome, {
-        especialidade: exame.especialidade,
-        categoria: exame.categoria
-      });
-      
-      // Também armazenar para busca parcial
-      examesParaBuscaParcial.push({
-        nome: exame.nome,
-        nomeNormalizado: exame.nome.toLowerCase().trim(),
         especialidade: exame.especialidade,
         categoria: exame.categoria
       });
     });
     
-    console.log(`📚 Cadastro carregado: ${mapaExames.size} exames para busca exata, ${examesParaBuscaParcial.length} para busca parcial`);
+    console.log(`📚 Cadastro carregado: ${mapaExames.size} exames`);
     
     // Processar cada registro
     for (const registro of registrosParaSubstituir) {
@@ -103,37 +90,9 @@ serve(async (req) => {
       
       try {
         const nomeExame = registro.ESTUDO_DESCRICAO;
-        const nomeExameNormalizado = nomeExame.toLowerCase().trim();
         
-        // Primeiro: tentar correspondência exata
-        let dadosCadastro = mapaExames.get(nomeExame);
-        
-        // Segundo: se não encontrou, tentar busca parcial inteligente
-        if (!dadosCadastro) {
-          // Buscar exames que contenham palavras-chave similares
-          const palavrasChave = nomeExameNormalizado.split(' ').filter(p => p.length > 3);
-          
-          for (const exame of examesParaBuscaParcial) {
-            let pontuacao = 0;
-            
-            // Contar quantas palavras-chave do volumetria estão no cadastro
-            for (const palavra of palavrasChave) {
-              if (exame.nomeNormalizado.includes(palavra)) {
-                pontuacao++;
-              }
-            }
-            
-            // Se encontrou pelo menos 60% de correspondência, usar este exame
-            if (pontuacao >= Math.max(2, palavrasChave.length * 0.6)) {
-              dadosCadastro = {
-                especialidade: exame.especialidade,
-                categoria: exame.categoria
-              };
-              console.log(`🔍 Correspondência parcial encontrada: "${nomeExame}" → "${exame.nome}" (${pontuacao}/${palavrasChave.length} palavras)`);
-              break;
-            }
-          }
-        }
+        // Buscar correspondência EXATA no cadastro
+        const dadosCadastro = mapaExames.get(nomeExame);
         
         if (dadosCadastro) {
           // Atualizar especialidade e categoria baseado no cadastro

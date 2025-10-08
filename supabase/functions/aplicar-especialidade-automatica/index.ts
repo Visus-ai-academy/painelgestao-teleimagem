@@ -99,50 +99,6 @@ serve(async (req) => {
               
               console.log(`✅ Especialidade aplicada: "${registro.ESTUDO_DESCRICAO}" - Modalidade: ${modalidade} → Especialidade: ${especialidadeAutomatica}`);
             }
-          } else {
-            // Se não há regra automática, aplicar especialidade genérica baseada no tipo de exame
-            const nomeExame = registro.ESTUDO_DESCRICAO?.toLowerCase() || '';
-            let especialidadeGenerica = 'GERAL'; // Padrão genérico (será corrigido depois)
-            
-            // ✅ ORDEM DE VERIFICAÇÃO ESPECÍFICA PARA GERAL (prioridade maior)
-            if (nomeExame.includes('cranio') || nomeExame.includes('cerebral') || nomeExame.includes('neuro') || nomeExame.includes('encefalo')) {
-              especialidadeGenerica = 'NEURO';
-            } else if (nomeExame.includes('torax') || nomeExame.includes('pulmonar') || nomeExame.includes('cardiaco') || nomeExame.includes('toracica')) {
-              especialidadeGenerica = 'MEDICINA INTERNA';
-            } else if (nomeExame.includes('abdome') || nomeExame.includes('abdominal') || nomeExame.includes('gastro') || nomeExame.includes('hepato')) {
-              especialidadeGenerica = 'MEDICINA INTERNA';
-            } else if (nomeExame.includes('pelve') || nomeExame.includes('pelvic') || nomeExame.includes('bacia')) {
-              especialidadeGenerica = 'MEDICINA INTERNA';
-            } else if (nomeExame.includes('coluna') || nomeExame.includes('vertebral') || nomeExame.includes('lombar') || nomeExame.includes('cervical')) {
-              especialidadeGenerica = 'MUSCULO ESQUELETICO';
-            } else if (nomeExame.includes('membro') || nomeExame.includes('joelho') || nomeExame.includes('ombro') || nomeExame.includes('cotovelo') || nomeExame.includes('punho') || nomeExame.includes('mao') || nomeExame.includes('pe')) {
-              especialidadeGenerica = 'MUSCULO ESQUELETICO';
-            } else if (nomeExame.includes('mama') || nomeExame.includes('mamaria')) {
-              especialidadeGenerica = 'MAMA';
-            }
-
-            const { error: updateError } = await supabaseClient
-              .from('volumetria_mobilemed')
-              .update({
-                'ESPECIALIDADE': especialidadeGenerica,
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', registro.id);
-
-            if (updateError) {
-              console.error(`❌ Erro ao atualizar especialidade genérica do registro ${registro.id}:`, updateError);
-              totalErros++;
-            } else {
-              totalAtualizados++;
-              
-              if (exemplosAplicados.length < 10) {
-                exemplosAplicados.push({
-                  exame: registro.ESTUDO_DESCRICAO,
-                  modalidade: modalidade,
-                  especialidade_aplicada: especialidadeGenerica
-                });
-              }
-            }
           }
         } catch (error) {
           console.error(`❌ Erro ao processar registro ${registro.id}:`, error);
