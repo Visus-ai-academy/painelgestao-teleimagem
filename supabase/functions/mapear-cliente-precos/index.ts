@@ -20,15 +20,17 @@ Deno.serve(async (req) => {
     console.log(`🔄 Mapeando preços de "${nome_origem}" para "${nome_destino}"`)
 
     // Buscar cliente destino
-    const { data: cliente, error: clienteError } = await supabase
+    const { data: clientes, error: clienteError } = await supabase
       .from('clientes')
-      .select('id, nome')
+      .select('id, nome, nome_fantasia, nome_mobilemed')
       .or(`nome.ilike.%${nome_destino}%,nome_fantasia.ilike.%${nome_destino}%,nome_mobilemed.ilike.%${nome_destino}%`)
-      .single()
+      .limit(1)
 
-    if (clienteError || !cliente) {
+    if (clienteError || !clientes || clientes.length === 0) {
       throw new Error(`Cliente destino "${nome_destino}" não encontrado`)
     }
+
+    const cliente = clientes[0]
 
     console.log(`✅ Cliente encontrado: ${cliente.nome} (ID: ${cliente.id})`)
 
