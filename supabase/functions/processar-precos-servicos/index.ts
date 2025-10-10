@@ -15,12 +15,7 @@ serve(async (req) => {
   try {
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
-        },
-      }
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
     const formData = await req.formData()
@@ -242,7 +237,7 @@ serve(async (req) => {
     // 5. Inserir registros no banco em lotes
     let registrosInseridos = 0
     let registrosComErro = 0
-    const BATCH_SIZE = 50
+    const BATCH_SIZE = 1000 // aumentar para reduzir o número de chamadas e evitar timeouts
 
     for (let i = 0; i < registrosParaInserir.length; i += BATCH_SIZE) {
       const lote = registrosParaInserir.slice(i, i + BATCH_SIZE)
