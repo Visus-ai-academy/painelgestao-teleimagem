@@ -20,7 +20,6 @@ import { useValoresReferencia } from '@/hooks/useValoresReferencia';
 import { ClientValidationStatus } from '@/components/ClientValidationStatus';
 import { PrecosSemClienteAnalise } from '@/components/PrecosSemClienteAnalise';
 import { ParametrosFaturamentoList } from '@/components/ParametrosFaturamentoList';
-import { LimparPrecos } from '@/components/LimparPrecos';
 
 import * as XLSX from 'xlsx';
 
