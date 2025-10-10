@@ -217,9 +217,6 @@ serve(async (req) => {
         // Preparar registro para inserção (deduplicado pela chave única lógica)
         const upTrim = (s: string | null | undefined) => String(s ?? '').toUpperCase().trim()
         const categoriaNorm = (categoria && categoria.trim() !== '' ? upTrim(categoria) : 'SC')
-        const prioridadeFinal = prioridade || 'N/A'
-        const modalidadeFinal = modalidade || 'N/A'
-        const especialidadeFinal = especialidade || 'N/A'
         const tipoPreco = 'especial'
         const key = `${clienteId || 'NULL'}|${upTrim(modalidadeFinal)}|${upTrim(especialidadeFinal)}|${categoriaNorm}|${upTrim(prioridadeFinal || 'ROTINA')}|${volInicial ?? -1}|${volFinal ?? -1}|${tipoPreco || 'normal'}`
 
