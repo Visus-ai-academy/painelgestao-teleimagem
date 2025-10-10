@@ -134,7 +134,7 @@ serve(async (req) => {
     }
 
     // 4. Processar dados do Excel
-    const registrosMap = new Map<string, any>()
+    const registrosParaInserir: any[] = []
     const erros: string[] = []
     let registrosProcessados = 0
 
@@ -214,13 +214,8 @@ serve(async (req) => {
         // Arredondar para 2 casas decimais (garantir 2 casas)
         preco = Math.round(preco * 100) / 100
 
-        // Preparar registro para inserção (deduplicado pela chave única lógica)
-        const upTrim = (s: string | null | undefined) => String(s ?? '').toUpperCase().trim()
-        const categoriaNorm = (categoria && categoria.trim() !== '' ? upTrim(categoria) : 'SC')
-        const tipoPreco = 'especial'
-        const key = `${clienteId || 'NULL'}|${upTrim(modalidadeFinal)}|${upTrim(especialidadeFinal)}|${categoriaNorm}|${upTrim(prioridadeFinal || 'ROTINA')}|${volInicial ?? -1}|${volFinal ?? -1}|${tipoPreco || 'normal'}`
-
-        registrosMap.set(key, {
+        // Preparar registro para inserção (SEM deduplicação - aceitar todos os registros)
+        registrosParaInserir.push({
           cliente_id: clienteId || null,
           modalidade: modalidadeFinal,
           especialidade: especialidadeFinal,
@@ -247,8 +242,8 @@ serve(async (req) => {
       }
     }
 
-    const registrosParaInserir = Array.from(registrosMap.values())
-    console.log(`📊 Registros preparados (deduplicados): ${registrosParaInserir.length}`)
+    console.log(`📊 Total de linhas processadas: ${registrosProcessados}`)
+    console.log(`📦 Registros válidos para inserção: ${registrosParaInserir.length}`)
     console.log(`❌ Erros de validação: ${erros.length}`)
 
     // 4.1. Replace por cliente: apagar preços existentes apenas dos clientes presentes no arquivo
