@@ -60,19 +60,44 @@ serve(async (req) => {
 
     // Limpar tabela de preços de serviços se solicitado
     if (options.precos_servicos) {
-      console.log('Limpando tabela precos_servicos...');
-      const { error: errorPrecos, count } = await supabase
-        .from('precos_servicos')
-        .delete()
-        .gte('id', '00000000-0000-0000-0000-000000000000');
+      console.log('Limpando tabela precos_servicos em lotes...');
+      let totalPrecosRemovidos = 0;
+      let loteAtual = 1;
+      const BATCH_SIZE = 500;
+      
+      // Deletar em lotes para evitar timeout
+      while (true) {
+        console.log(`🗑️ Deletando lote ${loteAtual} (tamanho: ${BATCH_SIZE})`);
+        
+        const { error: errorPrecos, count } = await supabase
+          .from('precos_servicos')
+          .delete({ count: 'exact' })
+          .limit(BATCH_SIZE);
 
-      if (errorPrecos) {
-        console.error('Erro ao limpar precos_servicos:', errorPrecos);
-      } else {
-        console.log('Tabela precos_servicos limpa com sucesso');
-        tabelasLimpas.push('precos_servicos');
-        totalLimpezas += count || 0;
+        if (errorPrecos) {
+          console.error(`❌ Erro ao limpar lote ${loteAtual} de precos_servicos:`, errorPrecos);
+          break;
+        }
+        
+        if (!count || count === 0) {
+          console.log('✅ Não há mais registros para remover');
+          break;
+        }
+        
+        totalPrecosRemovidos += count;
+        console.log(`✅ Lote ${loteAtual} removido: ${count} registros (Total: ${totalPrecosRemovidos})`);
+        loteAtual++;
+        
+        // Limite de segurança para evitar loop infinito
+        if (loteAtual > 100) {
+          console.log('⚠️ Limite de lotes atingido');
+          break;
+        }
       }
+      
+      console.log(`✅ Tabela precos_servicos limpa: ${totalPrecosRemovidos} registros removidos`);
+      tabelasLimpas.push('precos_servicos');
+      totalLimpezas += totalPrecosRemovidos;
     }
 
     // Limpar tabela de regras de exclusão se solicitado
