@@ -708,9 +708,6 @@ export default function GerenciarCadastros() {
 
             {/* Análise de Preços Sem Cliente */}
             <PrecosSemClienteAnalise />
-            
-            {/* Limpeza Completa de Preços */}
-            <LimparPrecos />
 
             {/* Upload Preço Clientes */}
             <Card>
