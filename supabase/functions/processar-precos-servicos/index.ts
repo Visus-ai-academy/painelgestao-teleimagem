@@ -68,6 +68,34 @@ serve(async (req) => {
     console.log(`📋 Total de linhas no Excel: ${jsonData.length}`)
     console.log(`🏷️ Headers: ${JSON.stringify(jsonData[0])}`)
 
+    // 🧭 Mapear índices por header para suportar variações de templates
+    const normalizeHeader = (s: any) => String(s ?? '')
+      .toUpperCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+    const headers = (jsonData[0] as any[]).map(normalizeHeader)
+    const findIndex = (...candidates: string[]) => {
+      for (const c of candidates) {
+        const idx = headers.indexOf(c)
+        if (idx !== -1) return idx
+      }
+      return -1
+    }
+    const indices = {
+      cliente: findIndex('CLIENTE', 'NOME DO CLIENTE', 'CLIENTE NOME'),
+      modalidade: findIndex('MODALIDADE'),
+      especialidade: findIndex('ESPECIALIDADE'),
+      prioridade: findIndex('PRIORIDADE'),
+      categoria: findIndex('CATEGORIA'),
+      valor: findIndex('VALOR', 'PRECO', 'PREÇO'),
+      volInicial: findIndex('VOL INICIAL', 'VOLUME INICIAL'),
+      volFinal: findIndex('VOL FINAL', 'VOLUME FINAL'),
+      condVolume: findIndex('VOLUME TOTAL', 'COND VOLUME', 'COND. VOLUME'),
+      consideraPlantao: findIndex('CONSIDERA PLANTAO', 'PLANTAO', 'CONSIDERA PLANTAO?')
+    }
+    console.log('🧭 Índices detectados:', indices)
+
     // 3. Buscar todos os clientes uma vez para melhor performance
     const { data: clientesData, error: clientesError } = await supabaseClient
       .from('clientes')
@@ -106,8 +134,8 @@ serve(async (req) => {
     }
 
     // 4. Processar dados do Excel
-    const registrosParaInserir = []
-    const erros = []
+    const registrosMap = new Map<string, any>()
+    const erros: string[] = []
     let registrosProcessados = 0
 
     for (let i = 1; i < jsonData.length; i++) {
@@ -118,18 +146,18 @@ serve(async (req) => {
           erros.push(`Linha ${i + 1}: linha vazia`)
         }
 
-        // Mapear campos do Excel baseado no template correto
-        // ["CLIENTE","MODALIDADE","ESPECIALIDADE","PRIORIDADE","CATEGORIA","PREÇO","VOL INICIAL","VOL FINAL","COND. VOLUME","CONSIDERA PLANTAO"]
-        const clienteNome = String(row[0] || '').trim()
-        const modalidade = String(row[1] || '').trim() 
-        const especialidade = String(row[2] || '').trim()
-        const prioridade = String(row[3] || '').trim()
-        let categoria = String(row[4] || '').trim()
-        const precoStr = String(row[5] || '').trim()
-        const volInicial = row[6] ? parseInt(String(row[6])) || null : null
-        const volFinal = row[7] ? parseInt(String(row[7])) || null : null
-        const condVolume = row[8] ? parseInt(String(row[8])) || null : null
-        const consideraPlantao = String(row[9] || '').toLowerCase() === 'sim'
+        // Mapear campos do Excel baseado nos headers detectados
+        const get = (idx: number) => (idx >= 0 ? row[idx] : undefined)
+        const clienteNome = String(get(indices.cliente) ?? '').trim()
+        const modalidade = String(get(indices.modalidade) ?? '').trim()
+        const especialidade = String(get(indices.especialidade) ?? '').trim()
+        const prioridade = String(get(indices.prioridade) ?? '').trim()
+        let categoria = String(get(indices.categoria) ?? '').trim()
+        const precoStr = String(get(indices.valor) ?? '').trim()
+        const volInicial = get(indices.volInicial) != null && String(get(indices.volInicial)).trim() !== '' ? parseInt(String(get(indices.volInicial))) || null : null
+        const volFinal = get(indices.volFinal) != null && String(get(indices.volFinal)).trim() !== '' ? parseInt(String(get(indices.volFinal))) || null : null
+        const condVolume = get(indices.condVolume) != null && String(get(indices.condVolume)).trim() !== '' ? parseInt(String(get(indices.condVolume))) || null : null
+        const consideraPlantao = ['sim','s','true','1','x'].includes(String(get(indices.consideraPlantao) ?? '').toLowerCase())
         let observacoesRow = ''
         
         // Tratar categoria vazia ou "Normal" como "N/A"
@@ -186,20 +214,28 @@ serve(async (req) => {
         // Arredondar para 2 casas decimais (garantir 2 casas)
         preco = Math.round(preco * 100) / 100
 
-        // Preparar registro para inserção
-        registrosParaInserir.push({
+        // Preparar registro para inserção (deduplicado pela chave única lógica)
+        const upTrim = (s: string | null | undefined) => String(s ?? '').toUpperCase().trim()
+        const categoriaNorm = (categoria && categoria.trim() !== '' ? upTrim(categoria) : 'SC')
+        const prioridadeFinal = prioridade || 'N/A'
+        const modalidadeFinal = modalidade || 'N/A'
+        const especialidadeFinal = especialidade || 'N/A'
+        const tipoPreco = 'especial'
+        const key = `${clienteId || 'NULL'}|${upTrim(modalidadeFinal)}|${upTrim(especialidadeFinal)}|${categoriaNorm}|${upTrim(prioridadeFinal || 'ROTINA')}|${volInicial ?? -1}|${volFinal ?? -1}|${tipoPreco || 'normal'}`
+
+        registrosMap.set(key, {
           cliente_id: clienteId || null,
           modalidade: modalidadeFinal,
           especialidade: especialidadeFinal,
-          categoria: categoria,
+          categoria: categoria && categoria.trim() !== '' ? categoria : null,
           prioridade: prioridadeFinal,
           valor_base: preco,
-          valor_urgencia: preco, // Por enquanto igual ao valor_base
+          valor_urgencia: preco,
           volume_inicial: volInicial,
           volume_final: volFinal,
           volume_total: condVolume,
           considera_prioridade_plantao: consideraPlantao,
-          tipo_preco: 'especial',
+          tipo_preco: tipoPreco,
           aplicar_legado: true,
           aplicar_incremental: true,
           ativo: true,
@@ -214,7 +250,8 @@ serve(async (req) => {
       }
     }
 
-    console.log(`📊 Registros preparados: ${registrosParaInserir.length}`)
+    const registrosParaInserir = Array.from(registrosMap.values())
+    console.log(`📊 Registros preparados (deduplicados): ${registrosParaInserir.length}`)
     console.log(`❌ Erros de validação: ${erros.length}`)
 
     // 4.1. Replace por cliente: apagar preços existentes apenas dos clientes presentes no arquivo
@@ -234,7 +271,7 @@ serve(async (req) => {
       }
     }
 
-    // 5. Inserir registros no banco em lotes usando UPSERT
+    // 5. Inserir registros no banco em lotes
     let registrosInseridos = 0
     let registrosComErro = 0
     const BATCH_SIZE = 1000 // aumentar para reduzir o número de chamadas e evitar timeouts
@@ -243,19 +280,16 @@ serve(async (req) => {
       const lote = registrosParaInserir.slice(i, i + BATCH_SIZE)
       
       try {
-        const { error: upsertError } = await supabaseClient
+        const { error: insertError } = await supabaseClient
           .from('precos_servicos')
-          .upsert(lote, {
-            onConflict: 'cliente_id,modalidade,especialidade,categoria,prioridade,volume_inicial,volume_final,tipo_preco',
-            ignoreDuplicates: false
-          })
+          .insert(lote)
 
-        if (upsertError) {
-          console.error(`❌ Erro ao inserir lote ${Math.floor(i/BATCH_SIZE) + 1}:`, upsertError)
+        if (insertError) {
+          console.error(`❌ Erro ao inserir lote ${Math.floor(i/BATCH_SIZE) + 1}:`, insertError)
           registrosComErro += lote.length
         } else {
           registrosInseridos += lote.length
-          console.log(`✅ Lote ${Math.floor(i/BATCH_SIZE) + 1} inserido/atualizado: ${lote.length} registros`)
+          console.log(`✅ Lote ${Math.floor(i/BATCH_SIZE) + 1} inserido: ${lote.length} registros`)
         }
       } catch (error) {
         console.error(`❌ Erro no lote ${Math.floor(i/BATCH_SIZE) + 1}:`, error)
