@@ -271,25 +271,34 @@ serve(async (req) => {
     // 5. Inserir registros no banco em lotes
     let registrosInseridos = 0
     let registrosComErro = 0
-    const BATCH_SIZE = 1000 // aumentar para reduzir o número de chamadas e evitar timeouts
+    const BATCH_SIZE = 500 // Reduzido para evitar timeouts
 
     for (let i = 0; i < registrosParaInserir.length; i += BATCH_SIZE) {
       const lote = registrosParaInserir.slice(i, i + BATCH_SIZE)
+      const loteNum = Math.floor(i/BATCH_SIZE) + 1
+      const totalLotes = Math.ceil(registrosParaInserir.length / BATCH_SIZE)
       
       try {
+        console.log(`📦 Inserindo lote ${loteNum}/${totalLotes} (${lote.length} registros)...`)
+        
         const { error: insertError } = await supabaseClient
           .from('precos_servicos')
           .insert(lote)
 
         if (insertError) {
-          console.error(`❌ Erro ao inserir lote ${Math.floor(i/BATCH_SIZE) + 1}:`, insertError)
+          console.error(`❌ Erro ao inserir lote ${loteNum}:`, insertError)
           registrosComErro += lote.length
         } else {
           registrosInseridos += lote.length
-          console.log(`✅ Lote ${Math.floor(i/BATCH_SIZE) + 1} inserido: ${lote.length} registros`)
+          console.log(`✅ Lote ${loteNum}/${totalLotes} inserido com sucesso (${registrosInseridos}/${registrosParaInserir.length})`)
+        }
+        
+        // Pequeno delay entre lotes para evitar sobrecarga
+        if (i + BATCH_SIZE < registrosParaInserir.length) {
+          await new Promise(resolve => setTimeout(resolve, 100))
         }
       } catch (error) {
-        console.error(`❌ Erro no lote ${Math.floor(i/BATCH_SIZE) + 1}:`, error)
+        console.error(`❌ Erro no lote ${loteNum}:`, error)
         registrosComErro += lote.length
       }
     }
