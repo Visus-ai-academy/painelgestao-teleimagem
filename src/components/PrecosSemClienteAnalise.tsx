@@ -15,7 +15,46 @@ interface ClienteNaoAssociado {
 export function PrecosSemClienteAnalise() {
   const [analise, setAnalise] = useState<ClienteNaoAssociado[]>([]);
   const [loading, setLoading] = useState(false);
+  const [mapeandoCliente, setMapeandoCliente] = useState<string | null>(null);
   const { toast } = useToast();
+
+  const mapearCliente = async (nomeOrigem: string, nomeDestino: string) => {
+    try {
+      setMapeandoCliente(nomeOrigem);
+      
+      console.log(`🔄 Mapeando "${nomeOrigem}" para "${nomeDestino}"`);
+
+      const { data, error } = await supabase.functions.invoke('mapear-cliente-precos', {
+        body: {
+          nome_origem: nomeOrigem,
+          nome_destino: nomeDestino
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.sucesso) {
+        toast({
+          title: "Mapeamento Concluído",
+          description: data.mensagem,
+        });
+        
+        // Recarregar análise
+        await analisarNomesNaoAssociados();
+      } else {
+        throw new Error(data.erro || 'Erro desconhecido');
+      }
+    } catch (error) {
+      console.error('❌ Erro ao mapear:', error);
+      toast({
+        title: "Erro",
+        description: `Erro ao mapear cliente: ${(error as Error).message}`,
+        variant: "destructive"
+      });
+    } finally {
+      setMapeandoCliente(null);
+    }
+  };
 
   const analisarNomesNaoAssociados = async () => {
     try {
@@ -154,12 +193,28 @@ export function PrecosSemClienteAnalise() {
                     {item.possiveis_matches.length > 0 ? (
                       <div>
                         <div className="text-sm font-medium mb-2">Possíveis correspondências no cadastro:</div>
-                        <div className="space-y-1">
-                          {item.possiveis_matches.map((match, idx) => (
-                            <div key={idx} className="text-sm bg-blue-50 p-2 rounded">
-                              {match}
-                            </div>
-                          ))}
+                        <div className="space-y-2">
+                          {item.possiveis_matches.map((match, idx) => {
+                            // Extrair o nome do cliente da string "Nome: XXX | ..."
+                            const nomeMatch = match.match(/Nome:\s*([^|]+)/);
+                            const nomeCliente = nomeMatch ? nomeMatch[1].trim() : '';
+                            
+                            return (
+                              <div key={idx} className="flex items-center gap-2 text-sm bg-blue-50 p-2 rounded">
+                                <div className="flex-1">{match}</div>
+                                {nomeCliente && nomeCliente !== 'N/A' && (
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline"
+                                    onClick={() => mapearCliente(item.nome_planilha, nomeCliente)}
+                                    disabled={mapeandoCliente === item.nome_planilha}
+                                  >
+                                    {mapeandoCliente === item.nome_planilha ? 'Mapeando...' : 'Mapear'}
+                                  </Button>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     ) : (
