@@ -63,33 +63,49 @@ serve(async (req) => {
       console.log('Limpando tabela precos_servicos em lotes...');
       let totalPrecosRemovidos = 0;
       let loteAtual = 1;
-      const BATCH_SIZE = 500;
+      const BATCH_SIZE = 1000;
       
-      // Deletar em lotes para evitar timeout
+      // Deletar em lotes usando IDs
       while (true) {
-        console.log(`🗑️ Deletando lote ${loteAtual} (tamanho: ${BATCH_SIZE})`);
+        console.log(`🗑️ Buscando lote ${loteAtual} (tamanho: ${BATCH_SIZE})`);
         
-        const { error: errorPrecos, count } = await supabase
+        // Buscar IDs a serem deletados
+        const { data: idsParaDeletar, error: errorBusca } = await supabase
           .from('precos_servicos')
-          .delete({ count: 'exact' })
+          .select('id')
           .limit(BATCH_SIZE);
 
-        if (errorPrecos) {
-          console.error(`❌ Erro ao limpar lote ${loteAtual} de precos_servicos:`, errorPrecos);
+        if (errorBusca) {
+          console.error(`❌ Erro ao buscar IDs lote ${loteAtual}:`, errorBusca);
           break;
         }
         
-        if (!count || count === 0) {
+        if (!idsParaDeletar || idsParaDeletar.length === 0) {
           console.log('✅ Não há mais registros para remover');
           break;
         }
         
-        totalPrecosRemovidos += count;
-        console.log(`✅ Lote ${loteAtual} removido: ${count} registros (Total: ${totalPrecosRemovidos})`);
+        console.log(`🗑️ Deletando ${idsParaDeletar.length} registros do lote ${loteAtual}`);
+        
+        // Deletar usando os IDs
+        const ids = idsParaDeletar.map(r => r.id);
+        const { error: errorDelete, count } = await supabase
+          .from('precos_servicos')
+          .delete({ count: 'exact' })
+          .in('id', ids);
+
+        if (errorDelete) {
+          console.error(`❌ Erro ao deletar lote ${loteAtual}:`, errorDelete);
+          break;
+        }
+        
+        const deletados = count || idsParaDeletar.length;
+        totalPrecosRemovidos += deletados;
+        console.log(`✅ Lote ${loteAtual} removido: ${deletados} registros (Total: ${totalPrecosRemovidos})`);
         loteAtual++;
         
-        // Limite de segurança para evitar loop infinito
-        if (loteAtual > 100) {
+        // Limite de segurança
+        if (loteAtual > 50) {
           console.log('⚠️ Limite de lotes atingido');
           break;
         }
