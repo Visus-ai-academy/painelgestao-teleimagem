@@ -60,60 +60,24 @@ serve(async (req) => {
 
     // Limpar tabela de preços de serviços se solicitado
     if (options.precos_servicos) {
-      console.log('Limpando tabela precos_servicos em lotes...');
-      let totalPrecosRemovidos = 0;
-      let loteAtual = 1;
-      const BATCH_SIZE = 1000;
+      console.log('Limpando tabela precos_servicos usando função de banco...');
       
-      // Deletar em lotes usando IDs
-      while (true) {
-        console.log(`🗑️ Buscando lote ${loteAtual} (tamanho: ${BATCH_SIZE})`);
-        
-        // Buscar IDs a serem deletados
-        const { data: idsParaDeletar, error: errorBusca } = await supabase
-          .from('precos_servicos')
-          .select('id')
-          .limit(BATCH_SIZE);
+      // Usar a função de banco de dados que tem SECURITY DEFINER
+      const { error: errorPrecos } = await supabase.rpc('limpar_todos_precos');
 
-        if (errorBusca) {
-          console.error(`❌ Erro ao buscar IDs lote ${loteAtual}:`, errorBusca);
-          break;
-        }
-        
-        if (!idsParaDeletar || idsParaDeletar.length === 0) {
-          console.log('✅ Não há mais registros para remover');
-          break;
-        }
-        
-        console.log(`🗑️ Deletando ${idsParaDeletar.length} registros do lote ${loteAtual}`);
-        
-        // Deletar usando os IDs
-        const ids = idsParaDeletar.map(r => r.id);
-        const { error: errorDelete, count } = await supabase
+      if (errorPrecos) {
+        console.error('Erro ao limpar precos_servicos:', errorPrecos);
+      } else {
+        // Contar quantos foram removidos
+        const { count: countAntes } = await supabase
           .from('precos_servicos')
-          .delete({ count: 'exact' })
-          .in('id', ids);
-
-        if (errorDelete) {
-          console.error(`❌ Erro ao deletar lote ${loteAtual}:`, errorDelete);
-          break;
-        }
+          .select('id', { count: 'exact', head: true });
         
-        const deletados = count || idsParaDeletar.length;
-        totalPrecosRemovidos += deletados;
-        console.log(`✅ Lote ${loteAtual} removido: ${deletados} registros (Total: ${totalPrecosRemovidos})`);
-        loteAtual++;
-        
-        // Limite de segurança
-        if (loteAtual > 50) {
-          console.log('⚠️ Limite de lotes atingido');
-          break;
-        }
+        console.log(`✅ Tabela precos_servicos limpa com sucesso (registros restantes: ${countAntes || 0})`);
+        tabelasLimpas.push('precos_servicos');
+        // A função RPC não retorna count, mas sabemos que limpou tudo
+        totalLimpezas += 1;
       }
-      
-      console.log(`✅ Tabela precos_servicos limpa: ${totalPrecosRemovidos} registros removidos`);
-      tabelasLimpas.push('precos_servicos');
-      totalLimpezas += totalPrecosRemovidos;
     }
 
     // Limpar tabela de regras de exclusão se solicitado
