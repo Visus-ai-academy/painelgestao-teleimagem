@@ -234,7 +234,7 @@ serve(async (req) => {
       }
     }
 
-    // 5. Inserir registros no banco em lotes
+    // 5. Inserir registros no banco em lotes usando UPSERT
     let registrosInseridos = 0
     let registrosComErro = 0
     const BATCH_SIZE = 1000 // aumentar para reduzir o número de chamadas e evitar timeouts
@@ -243,16 +243,19 @@ serve(async (req) => {
       const lote = registrosParaInserir.slice(i, i + BATCH_SIZE)
       
       try {
-        const { error: insertError } = await supabaseClient
+        const { error: upsertError } = await supabaseClient
           .from('precos_servicos')
-          .insert(lote)
+          .upsert(lote, {
+            onConflict: 'cliente_id,modalidade,especialidade,categoria,prioridade,volume_inicial,volume_final,tipo_preco',
+            ignoreDuplicates: false
+          })
 
-        if (insertError) {
-          console.error(`❌ Erro ao inserir lote ${Math.floor(i/BATCH_SIZE) + 1}:`, insertError)
+        if (upsertError) {
+          console.error(`❌ Erro ao inserir lote ${Math.floor(i/BATCH_SIZE) + 1}:`, upsertError)
           registrosComErro += lote.length
         } else {
           registrosInseridos += lote.length
-          console.log(`✅ Lote ${Math.floor(i/BATCH_SIZE) + 1} inserido: ${lote.length} registros`)
+          console.log(`✅ Lote ${Math.floor(i/BATCH_SIZE) + 1} inserido/atualizado: ${lote.length} registros`)
         }
       } catch (error) {
         console.error(`❌ Erro no lote ${Math.floor(i/BATCH_SIZE) + 1}:`, error)
