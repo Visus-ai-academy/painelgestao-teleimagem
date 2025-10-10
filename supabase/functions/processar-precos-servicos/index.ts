@@ -268,38 +268,65 @@ serve(async (req) => {
       }
     }
 
-    // 5. Inserir registros no banco em lotes
+    // 5. Inserir registros no banco em lotes com retry automático
     let registrosInseridos = 0
     let registrosComErro = 0
-    const BATCH_SIZE = 500 // Reduzido para evitar timeouts
+    const BATCH_SIZE = 300 // Reduzido ainda mais para evitar timeouts
+    const MAX_RETRIES = 2
 
     for (let i = 0; i < registrosParaInserir.length; i += BATCH_SIZE) {
       const lote = registrosParaInserir.slice(i, i + BATCH_SIZE)
       const loteNum = Math.floor(i/BATCH_SIZE) + 1
       const totalLotes = Math.ceil(registrosParaInserir.length / BATCH_SIZE)
       
-      try {
-        console.log(`📦 Inserindo lote ${loteNum}/${totalLotes} (${lote.length} registros)...`)
-        
-        const { error: insertError } = await supabaseClient
-          .from('precos_servicos')
-          .insert(lote)
+      let tentativa = 0
+      let sucesso = false
+      
+      while (tentativa <= MAX_RETRIES && !sucesso) {
+        try {
+          if (tentativa > 0) {
+            console.log(`🔄 Tentativa ${tentativa + 1}/${MAX_RETRIES + 1} para lote ${loteNum}...`)
+          } else {
+            console.log(`📦 Inserindo lote ${loteNum}/${totalLotes} (${lote.length} registros)...`)
+          }
+          
+          const { error: insertError } = await supabaseClient
+            .from('precos_servicos')
+            .insert(lote)
 
-        if (insertError) {
-          console.error(`❌ Erro ao inserir lote ${loteNum}:`, insertError)
-          registrosComErro += lote.length
-        } else {
-          registrosInseridos += lote.length
-          console.log(`✅ Lote ${loteNum}/${totalLotes} inserido com sucesso (${registrosInseridos}/${registrosParaInserir.length})`)
+          if (insertError) {
+            if (insertError.code === '57014' && tentativa < MAX_RETRIES) {
+              // Timeout - tentar novamente após delay maior
+              console.warn(`⚠️ Timeout no lote ${loteNum}, aguardando para retry...`)
+              await new Promise(resolve => setTimeout(resolve, 2000))
+              tentativa++
+            } else {
+              console.error(`❌ Erro ao inserir lote ${loteNum}:`, insertError)
+              registrosComErro += lote.length
+              sucesso = true // Não tentar mais
+            }
+          } else {
+            registrosInseridos += lote.length
+            console.log(`✅ Lote ${loteNum}/${totalLotes} inserido (${registrosInseridos}/${registrosParaInserir.length})`)
+            sucesso = true
+          }
+          
+        } catch (error) {
+          if (tentativa < MAX_RETRIES) {
+            console.warn(`⚠️ Erro no lote ${loteNum}, tentando novamente...`)
+            await new Promise(resolve => setTimeout(resolve, 2000))
+            tentativa++
+          } else {
+            console.error(`❌ Erro final no lote ${loteNum}:`, error)
+            registrosComErro += lote.length
+            sucesso = true
+          }
         }
-        
-        // Pequeno delay entre lotes para evitar sobrecarga
-        if (i + BATCH_SIZE < registrosParaInserir.length) {
-          await new Promise(resolve => setTimeout(resolve, 100))
-        }
-      } catch (error) {
-        console.error(`❌ Erro no lote ${loteNum}:`, error)
-        registrosComErro += lote.length
+      }
+      
+      // Delay entre lotes para evitar sobrecarga
+      if (i + BATCH_SIZE < registrosParaInserir.length) {
+        await new Promise(resolve => setTimeout(resolve, 200))
       }
     }
 
