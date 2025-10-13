@@ -96,20 +96,61 @@ serve(async (req) => {
     }
     console.log('🧭 Índices detectados:', indices)
 
+    // Normalização de nomes de clientes (espelha regras do banco)
+    const normalizeClientName = (input: any): string => {
+      let s = String(input ?? '').toUpperCase().trim()
+      // Remover acentos
+      s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      // Mapeamentos específicos
+      switch (s) {
+        case 'INTERCOR2': s = 'INTERCOR'; break
+        case 'P-HADVENTISTA': s = 'HADVENTISTA'; break
+        case 'P-UNIMED_CARUARU': s = 'UNIMED_CARUARU'; break
+        case 'PRN - MEDIMAGEM CAMBORIU': s = 'MEDIMAGEM_CAMBORIU'; break
+        case 'UNIMAGEM_CENTRO': s = 'UNIMAGEM_ATIBAIA'; break
+        case 'VIVERCLIN 2': s = 'VIVERCLIN'; break
+        case 'CEDI-RJ':
+        case 'CEDI-RO':
+        case 'CEDI-UNIMED':
+        case 'CEDI_RJ':
+        case 'CEDI_RO':
+        case 'CEDI_UNIMED': s = 'CEDIDIAG'; break
+        default: break
+      }
+      // Remover sufixos comuns
+      const removeSuffix = (str: string, suffix: string) => str.endsWith(suffix) ? str.slice(0, -suffix.length) : str
+      s = removeSuffix(s, '- TELE')
+      s = removeSuffix(s, '-CT')
+      s = removeSuffix(s, '-MR')
+      s = removeSuffix(s, '_PLANTAO')
+      s = removeSuffix(s, '_PLANTÃO')
+      s = removeSuffix(s, '_RMX')
+      return s.trim().toUpperCase()
+    }
+
     // 3. Buscar todos os clientes uma vez para melhor performance
     const { data: clientesData, error: clientesError } = await supabaseClient
       .from('clientes')
-      .select('id, nome')
+      .select('id, nome, nome_mobilemed, nome_fantasia')
       .eq('ativo', true)
 
     if (clientesError) {
       throw new Error(`Erro ao buscar clientes: ${clientesError.message}`)
     }
 
-    // Criar mapa de clientes para busca rápida
-    const clientesMap = new Map()
-    clientesData.forEach(cliente => {
-      clientesMap.set(cliente.nome.toUpperCase().trim(), cliente.id)
+    // Criar mapa de clientes para busca rápida (incluindo variantes)
+    const clientesMap = new Map<string, string>()
+    clientesData.forEach((cliente: any) => {
+      const add = (k?: string | null) => {
+        if (!k) return
+        const keyNorm = normalizeClientName(String(k))
+        if (keyNorm) clientesMap.set(keyNorm, cliente.id)
+        const raw = String(k).toUpperCase().trim()
+        if (raw) clientesMap.set(raw, cliente.id)
+      }
+      add(cliente.nome)
+      add(cliente.nome_fantasia)
+      add(cliente.nome_mobilemed)
     })
 
     console.log(`📋 ${clientesData.length} clientes carregados`)
@@ -183,17 +224,18 @@ serve(async (req) => {
 
         // Aceitar preços vazios (serão tratados como 0)
 
-        // Buscar cliente (com mapeamento de nomes)
-        let clienteNomeBusca = clienteNome.toUpperCase()
+        // Buscar cliente (com normalização e mapeamento de nomes)
+        const clienteNomeBuscaRaw = clienteNome.toUpperCase()
+        let clienteNomeBusca = normalizeClientName(clienteNomeBuscaRaw)
         
-        // Verificar se existe mapeamento para o nome
-        const nomeMapeado = mapeamentosMap.get(clienteNomeBusca)
+        // Verificar se existe mapeamento para o nome (raw e normalizado)
+        const nomeMapeado = mapeamentosMap.get(clienteNomeBuscaRaw) || mapeamentosMap.get(clienteNomeBusca)
         if (nomeMapeado) {
-          clienteNomeBusca = nomeMapeado
+          clienteNomeBusca = normalizeClientName(nomeMapeado)
           console.log(`🔄 Mapeamento aplicado: "${clienteNome}" → "${nomeMapeado}"`)
         }
         
-        const clienteId = clientesMap.get(clienteNomeBusca)
+        const clienteId = clientesMap.get(clienteNomeBusca) || clientesMap.get(clienteNomeBuscaRaw)
         if (!clienteId) {
           observacoesRow += `Cliente não localizado: ${clienteNome}. `
         }
@@ -283,7 +325,7 @@ serve(async (req) => {
           
           const { error: insertError } = await supabaseClient
             .from('precos_servicos')
-            .insert(lote)
+            .upsert(lote, { onConflict: 'ux_precos_servicos_unicos' })
 
           if (insertError) {
             if (insertError.code === '57014' && tentativa < MAX_RETRIES) {
