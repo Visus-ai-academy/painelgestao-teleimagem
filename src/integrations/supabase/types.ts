@@ -4779,6 +4779,19 @@ export type Database = {
         Args: { data: string }
         Returns: string
       }
+      identificar_duplicados_precos_servicos: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          categoria: string
+          cliente_id: string
+          cliente_nome: string
+          especialidade: string
+          modalidade: string
+          prioridade: string
+          total_duplicados: number
+          valores_diferentes: number[]
+        }[]
+      }
       is_admin: {
         Args: Record<PropertyKey, never> | { _user_id?: string }
         Returns: boolean
