@@ -20,6 +20,7 @@ import { useValoresReferencia } from '@/hooks/useValoresReferencia';
 import { ClientValidationStatus } from '@/components/ClientValidationStatus';
 import { PrecosSemClienteAnalise } from '@/components/PrecosSemClienteAnalise';
 import { ParametrosFaturamentoList } from '@/components/ParametrosFaturamentoList';
+import { DuplicadosPrecosList } from '@/components/DuplicadosPrecosList';
 
 import * as XLSX from 'xlsx';
 
@@ -42,6 +43,7 @@ export default function GerenciarCadastros() {
   const [showClearDialog, setShowClearDialog] = useState(false);
   const [refreshStatusPanel, setRefreshStatusPanel] = useState(0);
   const [repasseUploadId, setRepasseUploadId] = useState<string | null>(null);
+  const [duplicadosPrecos, setDuplicadosPrecos] = useState<any[]>([]);
   const [clearOptions, setClearOptions] = useState({
     cadastro_exames: false,
     quebra_exames: false,
@@ -224,9 +226,16 @@ export default function GerenciarCadastros() {
       
       console.log('✅ Resposta da função:', data);
       
+      // Armazenar duplicados para exibição
+      if (data.detalhes_duplicados && data.detalhes_duplicados.length > 0) {
+        setDuplicadosPrecos(data.detalhes_duplicados);
+      } else {
+        setDuplicadosPrecos([]);
+      }
+      
       toast({
         title: "Preços de Clientes Processados!",
-        description: `${data.registros_processados || 0} preços cadastrados, ${data.registros_erro || 0} erros`,
+        description: `${data.registros_processados || 0} preços cadastrados, ${data.registros_erro || 0} erros${data.total_duplicados ? `, ${data.total_duplicados} grupos duplicados` : ''}`,
       });
       
       // Recarregar dados e status
@@ -707,6 +716,11 @@ export default function GerenciarCadastros() {
 
             {/* Análise de Preços Sem Cliente */}
             <PrecosSemClienteAnalise />
+
+            {/* Lista de Duplicados Detectados */}
+            {duplicadosPrecos.length > 0 && (
+              <DuplicadosPrecosList duplicados={duplicadosPrecos} />
+            )}
 
             {/* Upload Preço Clientes */}
             <Card>
