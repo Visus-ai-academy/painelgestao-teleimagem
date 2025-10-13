@@ -83,7 +83,10 @@ serve(async (req) => {
       return -1
     }
     const indices = {
-      cliente: findIndex('CLIENTE', 'NOME DO CLIENTE', 'CLIENTE NOME'),
+      cliente: findIndex(
+        'CLIENTE', 'NOME DO CLIENTE', 'CLIENTE NOME', 'CLIENTE FANTASIA', 'NOME FANTASIA',
+        'CLIENTE/UNIDADE', 'CLIENTE_UNIDADE', 'UNIDADE', 'EMPRESA', 'CLINICA', 'CLÍNICA', 'HOSPITAL', 'PARCEIRO'
+      ),
       modalidade: findIndex('MODALIDADE'),
       especialidade: findIndex('ESPECIALIDADE'),
       prioridade: findIndex('PRIORIDADE'),
@@ -107,6 +110,7 @@ serve(async (req) => {
         case 'P-HADVENTISTA': s = 'HADVENTISTA'; break
         case 'P-UNIMED_CARUARU': s = 'UNIMED_CARUARU'; break
         case 'PRN - MEDIMAGEM CAMBORIU': s = 'MEDIMAGEM_CAMBORIU'; break
+        case 'PRN': s = 'MEDIMAGEM_CAMBORIU'; break
         case 'UNIMAGEM_CENTRO': s = 'UNIMAGEM_ATIBAIA'; break
         case 'VIVERCLIN 2': s = 'VIVERCLIN'; break
         case 'CEDI-RJ':
@@ -117,16 +121,27 @@ serve(async (req) => {
         case 'CEDI_UNIMED': s = 'CEDIDIAG'; break
         default: break
       }
-      // Remover sufixos comuns
+      // Remover prefixos e sufixos comuns
       const removeSuffix = (str: string, suffix: string) => str.endsWith(suffix) ? str.slice(0, -suffix.length) : str
+      const removePrefix = (str: string, prefix: string) => str.startsWith(prefix) ? str.slice(prefix.length) : str
       s = removeSuffix(s, '- TELE')
       s = removeSuffix(s, '-CT')
       s = removeSuffix(s, '-MR')
       s = removeSuffix(s, '_PLANTAO')
       s = removeSuffix(s, '_PLANTÃO')
       s = removeSuffix(s, '_RMX')
+      s = removePrefix(s, 'P-')
+      s = removePrefix(s, 'P_')
+      s = removePrefix(s, 'NL_')
+      // Remover pontos e normalizar espaços
+      s = s.replace(/\./g, ' ')
+      s = s.replace(/\s+/g, ' ').trim()
       return s.trim().toUpperCase()
     }
+
+    // Fingerprint para matching flexível (ignora espaços e pontuação)
+    const fingerprint = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, '')
+    const stripTrailingDigits = (s: string) => s.replace(/\d+$/,'')
 
     // 3. Buscar todos os clientes uma vez para melhor performance
     const { data: clientesData, error: clientesError } = await supabaseClient
@@ -138,15 +153,26 @@ serve(async (req) => {
       throw new Error(`Erro ao buscar clientes: ${clientesError.message}`)
     }
 
-    // Criar mapa de clientes para busca rápida (incluindo variantes)
     const clientesMap = new Map<string, string>()
     clientesData.forEach((cliente: any) => {
       const add = (k?: string | null) => {
         if (!k) return
-        const keyNorm = normalizeClientName(String(k))
-        if (keyNorm) clientesMap.set(keyNorm, cliente.id)
-        const raw = String(k).toUpperCase().trim()
-        if (raw) clientesMap.set(raw, cliente.id)
+        const str = String(k)
+        const keyNorm = normalizeClientName(str)
+        const raw = str.toUpperCase().trim()
+        const variants = new Set<string>([
+          keyNorm,
+          raw,
+          fingerprint(keyNorm),
+          fingerprint(raw),
+          stripTrailingDigits(keyNorm),
+          stripTrailingDigits(raw),
+          fingerprint(stripTrailingDigits(keyNorm)),
+          fingerprint(stripTrailingDigits(raw)),
+        ])
+        for (const v of variants) {
+          if (v) clientesMap.set(v, cliente.id)
+        }
       }
       add(cliente.nome)
       add(cliente.nome_fantasia)
@@ -235,7 +261,23 @@ serve(async (req) => {
           console.log(`🔄 Mapeamento aplicado: "${clienteNome}" → "${nomeMapeado}"`)
         }
         
-        const clienteId = clientesMap.get(clienteNomeBusca) || clientesMap.get(clienteNomeBuscaRaw)
+        // Tentar múltiplas chaves de matching (inclui fingerprint e remoção de dígitos finais)
+        const fpNorm = fingerprint(clienteNomeBusca)
+        const fpRaw = fingerprint(clienteNomeBuscaRaw)
+        const strippedNorm = stripTrailingDigits(clienteNomeBusca)
+        const strippedRaw = stripTrailingDigits(clienteNomeBuscaRaw)
+        const fpStrippedNorm = fingerprint(strippedNorm)
+        const fpStrippedRaw = fingerprint(strippedRaw)
+
+        const clienteId =
+          clientesMap.get(clienteNomeBusca) ||
+          clientesMap.get(clienteNomeBuscaRaw) ||
+          clientesMap.get(fpNorm) ||
+          clientesMap.get(fpRaw) ||
+          clientesMap.get(strippedNorm) ||
+          clientesMap.get(strippedRaw) ||
+          clientesMap.get(fpStrippedNorm) ||
+          clientesMap.get(fpStrippedRaw)
         if (!clienteId) {
           observacoesRow += `Cliente não localizado: ${clienteNome}. `
         }
