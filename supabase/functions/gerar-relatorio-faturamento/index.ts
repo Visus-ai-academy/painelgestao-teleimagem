@@ -307,23 +307,47 @@ serve(async (req: Request) => {
 
       const norm = (s: any) => (s ?? '').toString().trim().toUpperCase();
 
-      // Base de candidatos: exigir correspondência EXATA de categoria (sem coringa)
-      const base = (precos || []).filter((p: any) =>
+      const modalidadeN = norm(exame.MODALIDADE);
+      const especialidadeN = norm(exame.ESPECIALIDADE);
+      const categoriaN = norm(exame.CATEGORIA || 'SC');
+      const prioridadeN = norm(exame.PRIORIDADE || '');
+
+      let pool: any[] = [];
+
+      // 1) Match EXATO com categoria
+      let candidatos = (precos || []).filter((p: any) =>
         (p.ativo ?? true) === true &&
-        norm(p.modalidade) === norm(exame.MODALIDADE) &&
-        norm(p.especialidade) === norm(exame.ESPECIALIDADE) &&
-        norm(p.categoria || 'SC') === norm(exame.CATEGORIA)
+        norm(p.modalidade) === modalidadeN &&
+        norm(p.especialidade) === especialidadeN &&
+        norm(p.categoria || 'SC') === categoriaN
       );
 
-      // Primeiro tenta preços do cliente; se não houver, usa genéricos (cliente_id nulo)
-      let candidatos = base.filter((p: any) => p.cliente_id === cliente_id);
       if (candidatos.length === 0) {
-        candidatos = base.filter((p: any) => !p.cliente_id);
+        // 2) Fallback: ignorar categoria (modalidade+especialidade)
+        candidatos = (precos || []).filter((p: any) =>
+          (p.ativo ?? true) === true &&
+          norm(p.modalidade) === modalidadeN &&
+          norm(p.especialidade) === especialidadeN
+        );
       }
 
+      if (candidatos.length === 0) {
+        // 3) Fallback: somente modalidade
+        candidatos = (precos || []).filter((p: any) =>
+          (p.ativo ?? true) === true &&
+          norm(p.modalidade) === modalidadeN
+        );
+      }
+
+      if (candidatos.length === 0) return 0;
+
+      // Preferência por cliente
+      let candidatosCliente = candidatos.filter((p: any) => p.cliente_id === cliente_id);
+      if (candidatosCliente.length === 0) candidatosCliente = candidatos.filter((p: any) => !p.cliente_id);
+
       // Filtro por prioridade (preferência), com fallback
-      const priMatch = candidatos.filter((p: any) => norm(p.prioridade || '') === norm(exame.PRIORIDADE));
-      const pool = priMatch.length > 0 ? priMatch : candidatos;
+      const priMatch = candidatosCliente.filter((p: any) => norm(p.prioridade || '') === prioridadeN);
+      pool = priMatch.length > 0 ? priMatch : candidatosCliente;
 
       // Selecionar faixa por volume do período
       const porFaixa = pool
@@ -336,7 +360,7 @@ serve(async (req: Request) => {
       const selecionado = porFaixa[0] || pool[0];
       if (!selecionado) return 0;
 
-      const prioridadeUrgencia = norm(exame.PRIORIDADE).includes('URG') || norm(exame.PRIORIDADE).includes('PLANT');
+      const prioridadeUrgencia = prioridadeN.includes('URG') || prioridadeN.includes('PLANT');
       const usarUrgencia = exame.tipo_faturamento === 'urgencia' || prioridadeUrgencia || !!selecionado.considera_prioridade_plantao;
 
       const valor = usarUrgencia ? (selecionado.valor_urgencia ?? 0) : (selecionado.valor_base ?? 0);

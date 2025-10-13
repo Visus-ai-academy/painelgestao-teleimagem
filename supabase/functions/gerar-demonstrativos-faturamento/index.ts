@@ -435,6 +435,7 @@ serve(async (req) => {
       // Calculate prices for each group
       for (const [key, grupo] of Object.entries(gruposExames)) {
         let valorUnitario = 0;
+        let matchedBy = 'none';
         
         if (precosCliente && precosCliente.length > 0) {
           const modalidadeN = norm(grupo.modalidade);
@@ -442,36 +443,82 @@ serve(async (req) => {
           const categoriaN = norm(grupo.categoria || 'SC');
           const prioridadeN = norm(grupo.prioridade || '');
 
-          // Exigir correspondência EXATA de categoria (sem coringa)
-          const candidatos = precosCliente.filter((p: any) =>
+          // 1) Match EXATO com categoria
+          let candidatos = precosCliente.filter((p: any) =>
             norm(p.modalidade) === modalidadeN &&
             norm(p.especialidade) === especialidadeN &&
             norm(p.categoria || 'SC') === categoriaN
           );
 
-          // Preferir prioridade idêntica, senão usar qualquer uma
-          const preferPri = candidatos.filter((p: any) => norm(p.prioridade || '') === prioridadeN);
-          const poolPrioridade = preferPri.length > 0 ? preferPri : candidatos;
+          let poolPrioridade: any[] = [];
+          if (candidatos.length > 0) {
+            const preferPri = candidatos.filter((p: any) => norm(p.prioridade || '') === prioridadeN);
+            poolPrioridade = preferPri.length > 0 ? preferPri : candidatos;
+            matchedBy = 'modalidade+especialidade+categoria';
+          } else {
+            // 2) Fallback: ignorar categoria (modalidade+especialidade)
+            candidatos = precosCliente.filter((p: any) =>
+              norm(p.modalidade) === modalidadeN &&
+              norm(p.especialidade) === especialidadeN
+            );
+            if (candidatos.length > 0) {
+              const preferPri2 = candidatos.filter((p: any) => norm(p.prioridade || '') === prioridadeN);
+              poolPrioridade = preferPri2.length > 0 ? preferPri2 : candidatos;
+              matchedBy = 'modalidade+especialidade';
+            } else {
+              // 3) Fallback: somente modalidade
+              candidatos = precosCliente.filter((p: any) => norm(p.modalidade) === modalidadeN);
+              if (candidatos.length > 0) {
+                const preferPri3 = candidatos.filter((p: any) => norm(p.prioridade || '') === prioridadeN);
+                poolPrioridade = preferPri3.length > 0 ? preferPri3 : candidatos;
+                matchedBy = 'modalidade';
+              }
+            }
+          }
 
-          // Selecionar faixa por volume do período (usar totalExames)
-          const poolFaixa = poolPrioridade
-            .filter((p: any) =>
-              (p.volume_inicial == null || totalExames >= p.volume_inicial) &&
-              (p.volume_final == null || totalExames <= p.volume_final)
-            )
-            .sort((a: any, b: any) => (b.volume_inicial || 0) - (a.volume_inicial || 0));
+          if (poolPrioridade.length > 0) {
+            // Selecionar faixa por volume do período (usar totalExames)
+            const poolFaixa = poolPrioridade
+              .filter((p: any) =>
+                (p.volume_inicial == null || totalExames >= p.volume_inicial) &&
+                (p.volume_final == null || totalExames <= p.volume_final)
+              )
+              .sort((a: any, b: any) => (b.volume_inicial || 0) - (a.volume_inicial || 0));
 
-          const escolhido = poolFaixa[0] || poolPrioridade[0];
-          if (escolhido) {
-            const prioridadeUrg = prioridadeN.includes('URG') || prioridadeN.includes('PLANT');
-            valorUnitario = (prioridadeUrg || escolhido.considera_prioridade_plantao)
-              ? (escolhido.valor_urgencia ?? escolhido.valor_base ?? 0)
-              : (escolhido.valor_base ?? 0);
+            const escolhido = poolFaixa[0] || poolPrioridade[0];
+            if (escolhido) {
+              const prioridadeUrg = prioridadeN.includes('URG') || prioridadeN.includes('PLANT');
+              valorUnitario = (prioridadeUrg || escolhido.considera_prioridade_plantao)
+                ? (escolhido.valor_urgencia ?? escolhido.valor_base ?? 0)
+                : (escolhido.valor_base ?? 0);
+            }
           }
         }
         
         const valorTotalGrupo = valorUnitario * grupo.quantidade;
         valorExamesCalculado += valorTotalGrupo;
+
+        if (valorUnitario === 0) {
+          console.log('⚠️ Sem preço para grupo:', {
+            cliente: nomeFantasia,
+            modalidade: grupo.modalidade,
+            especialidade: grupo.especialidade,
+            categoria: grupo.categoria,
+            prioridade: grupo.prioridade,
+            quantidade: grupo.quantidade
+          });
+        } else {
+          console.log('💵 Preço aplicado:', {
+            cliente: nomeFantasia,
+            by: matchedBy,
+            modalidade: grupo.modalidade,
+            especialidade: grupo.especialidade,
+            categoria: grupo.categoria,
+            prioridade: grupo.prioridade,
+            quantidade: grupo.quantidade,
+            valorUnitario
+          });
+        }
 
         detalhesExames.push({
           modalidade: grupo.modalidade,
