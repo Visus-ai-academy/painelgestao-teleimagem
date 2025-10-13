@@ -4793,6 +4793,8 @@ export type Database = {
           prioridade: string
           total_duplicados: number
           valores_diferentes: number[]
+          volume_final: number
+          volume_inicial: number
         }[]
       }
       is_admin: {
