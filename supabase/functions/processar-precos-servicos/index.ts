@@ -312,7 +312,8 @@ serve(async (req) => {
           aplicar_incremental: true,
           ativo: true,
           observacoes: observacoesRow || null,
-          descricao: clienteId ? null : `Cliente original: ${clienteNome}`
+          descricao: clienteId ? null : `Cliente original: ${clienteNome}`,
+          linha_arquivo: i + 1  // Adicionar número da linha do Excel (1-indexed)
         })
 
         registrosProcessados++

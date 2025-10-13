@@ -2723,6 +2723,7 @@ export type Database = {
           especialidade: string
           especialidade_id: string | null
           id: string
+          linha_arquivo: number | null
           modalidade: string
           modalidade_id: string | null
           observacoes: string | null
@@ -2751,6 +2752,7 @@ export type Database = {
           especialidade: string
           especialidade_id?: string | null
           id?: string
+          linha_arquivo?: number | null
           modalidade: string
           modalidade_id?: string | null
           observacoes?: string | null
@@ -2779,6 +2781,7 @@ export type Database = {
           especialidade?: string
           especialidade_id?: string | null
           id?: string
+          linha_arquivo?: number | null
           modalidade?: string
           modalidade_id?: string | null
           observacoes?: string | null
