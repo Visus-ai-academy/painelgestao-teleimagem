@@ -232,6 +232,44 @@ serve(async (req: Request) => {
     
     console.log('📊 Volumetria final após filtros:', volumetriaFiltrada.length, 'registros');
 
+    // Ajustar categorias/especialidades usando cadastro_exames quando vierem como 'SC' ou vazias
+    try {
+      const norm = (s: any) => (s ?? '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
+      const categoriaCache = new Map<string, { categoria: string; especialidade: string }>();
+      let atualizados = 0;
+      for (const v of volumetriaFiltrada) {
+        const cat = norm(v.CATEGORIA);
+        if (!cat || cat === 'SC') {
+          const descKey = norm(v.ESTUDO_DESCRICAO || '');
+          if (!descKey) continue;
+          let cached = categoriaCache.get(descKey);
+          if (!cached) {
+            const { data: ce } = await supabase
+              .from('cadastro_exames')
+              .select('categoria, especialidade, nome, ativo')
+              .ilike('nome', v.ESTUDO_DESCRICAO || '')
+              .eq('ativo', true)
+              .limit(1)
+              .maybeSingle();
+            cached = { categoria: ce?.categoria?.toString() || '', especialidade: ce?.especialidade?.toString() || '' };
+            categoriaCache.set(descKey, cached);
+          }
+          if (cached.categoria) {
+            v.CATEGORIA = cached.categoria;
+            atualizados++;
+          }
+          if ((!v.ESPECIALIDADE || !norm(v.ESPECIALIDADE)) && cached.especialidade) {
+            v.ESPECIALIDADE = cached.especialidade;
+          }
+        }
+      }
+      if (atualizados > 0) {
+        console.log(`🛠️ Categorias ajustadas via cadastro_exames: ${atualizados}`);
+      }
+    } catch (e) {
+      console.log('⚠️ Erro ao ajustar categorias via cadastro_exames:', e?.message || e);
+    }
+
     // Buscar preços dos serviços para calcular valores
     const { data: precos } = await supabase
       .from('precos_servicos')
