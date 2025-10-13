@@ -227,7 +227,7 @@ serve(async (req) => {
           volume_final: volFinal,
           volume_total: condVolume,
           considera_prioridade_plantao: consideraPlantao,
-          tipo_preco: tipoPreco,
+          tipo_preco: 'especial',
           aplicar_legado: true,
           aplicar_incremental: true,
           ativo: true,
