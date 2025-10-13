@@ -404,23 +404,18 @@ serve(async (req) => {
           const categoriaN = norm(grupo.categoria || 'SC');
           const prioridadeN = norm(grupo.prioridade || '');
 
-          // Base: casar apenas modalidade + especialidade
-          const base = precosCliente.filter((p: any) =>
+          // Exigir correspondência EXATA de categoria (sem coringa)
+          const candidatos = precosCliente.filter((p: any) =>
             norm(p.modalidade) === modalidadeN &&
-            norm(p.especialidade) === especialidadeN
+            norm(p.especialidade) === especialidadeN &&
+            norm(p.categoria || 'SC') === categoriaN
           );
 
-          // Categoria opcional (preço sem categoria é coringa)
-          const porCategoria = base.filter((p: any) => {
-            const cat = norm(p.categoria || '');
-            return cat === '' || cat === categoriaN; // vazio/null => qualquer categoria
-          });
+          // Preferir prioridade idêntica, senão usar qualquer uma
+          const preferPri = candidatos.filter((p: any) => norm(p.prioridade || '') === prioridadeN);
+          const poolPrioridade = preferPri.length > 0 ? preferPri : candidatos;
 
-          // Preferir prioridade igual, senão cair para qualquer
-          const preferPri = porCategoria.filter((p: any) => norm(p.prioridade || '') === prioridadeN);
-          const poolPrioridade = preferPri.length > 0 ? preferPri : porCategoria;
-
-          // Selecionar faixa de volume do período (usar totalExames)
+          // Selecionar faixa por volume do período (usar totalExames)
           const poolFaixa = poolPrioridade
             .filter((p: any) =>
               (p.volume_inicial == null || totalExames >= p.volume_inicial) &&

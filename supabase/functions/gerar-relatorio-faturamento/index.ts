@@ -269,23 +269,18 @@ serve(async (req: Request) => {
 
       const norm = (s: any) => (s ?? '').toString().trim().toUpperCase();
 
-      // Base de candidatos: modalidade + especialidade; categoria é coringa quando vazia
+      // Base de candidatos: exigir correspondência EXATA de categoria (sem coringa)
       const base = (precos || []).filter((p: any) =>
         (p.ativo ?? true) === true &&
         norm(p.modalidade) === norm(exame.MODALIDADE) &&
-        norm(p.especialidade) === norm(exame.ESPECIALIDADE)
+        norm(p.especialidade) === norm(exame.ESPECIALIDADE) &&
+        norm(p.categoria || 'SC') === norm(exame.CATEGORIA)
       );
 
-      // Aplicar categoria (corresponder igual OU aceitar preço sem categoria)
-      const comCategoria = base.filter((p: any) => {
-        const cat = norm(p.categoria || '');
-        return cat === '' || cat === norm(exame.CATEGORIA);
-      });
-
       // Primeiro tenta preços do cliente; se não houver, usa genéricos (cliente_id nulo)
-      let candidatos = comCategoria.filter((p: any) => p.cliente_id === cliente_id);
+      let candidatos = base.filter((p: any) => p.cliente_id === cliente_id);
       if (candidatos.length === 0) {
-        candidatos = comCategoria.filter((p: any) => !p.cliente_id);
+        candidatos = base.filter((p: any) => !p.cliente_id);
       }
 
       // Filtro por prioridade (preferência), com fallback
