@@ -170,11 +170,7 @@ serve(async (req) => {
           console.log(`🔍 Linha ${i + 1}: Cliente="${clienteNome}", Modal="${modalidade}", Espec="${especialidade}", Prior="${prioridade}", Preço="${precoStr}"`)
         }
 
-        // Validar campos obrigatórios (não podem estar vazios)
-        if (!clienteNome || clienteNome.length < 2) {
-          erros.push(`Linha ${i + 1}: Cliente obrigatório inválido - "${clienteNome}"`)
-          continue
-        }
+        // Validação removida - aceitar todos os registros mesmo sem cliente válido
 
         // Aceitar modalidade vazia
         const modalidadeFinal = modalidade || 'N/A'
