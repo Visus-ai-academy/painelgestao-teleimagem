@@ -125,40 +125,32 @@ export function DemonstrativoFaturamentoCompleto({
 
     setLoading(true);
     try {
-      console.log('🔄 Chamando edge function gerar-demonstrativos-faturamento para período:', periodo);
-      
-      const { data, error } = await supabase.functions.invoke('gerar-demonstrativos-faturamento', {
-        body: { periodo }
-      });
+      console.log('🔄 Iniciando geração em lotes para o período:', periodo);
 
-      console.log('📋 Resposta da edge function:', { data, error });
+      // Buscar clientes ativos para processar em lotes (evita timeout na Edge Function)
+      const { data: clientes, error: clientesError } = await supabase
+        .from('clientes')
+        .select('id')
+        .eq('ativo', true)
+        .order('nome');
 
-      if (error) {
-        console.error('❌ Erro na edge function:', error);
-        throw new Error(`Erro na edge function: ${error.message || JSON.stringify(error)}`);
-      }
+      // Caso não consiga carregar clientes, usar fallback: uma chamada única (comportamento anterior)
+      const processarComChamadaUnica = async () => {
+        const { data, error } = await supabase.functions.invoke('gerar-demonstrativos-faturamento', {
+          body: { periodo }
+        });
+        return { data, error } as { data: any; error: any };
+      };
 
-      if (data?.success) {
-        console.log('✅ Demonstrativos gerados com sucesso:');
-        console.log('📋 Data completa:', data);
-        console.log('📊 Resumo:', data.resumo);
-        console.log('📄 Demonstrativos array:', data.demonstrativos);
-        console.log('📏 Quantidade de demonstrativos:', data.demonstrativos?.length);
-        
-        // Verificar se demonstrativos foram retornados
-        if (data.demonstrativos && Array.isArray(data.demonstrativos)) {
-          setDemonstrativos(data.demonstrativos);
-          console.log(`✅ ${data.demonstrativos.length} demonstrativos carregados no estado`);
-        } else {
-          console.warn('⚠️ Nenhum demonstrativo retornado na resposta');
-          setDemonstrativos([]);
-        }
-        
-        if (data.resumo) {
-          setResumo(data.resumo);
-        }
-        
-        // Persistir também para a aba "Demonstrativos"
+      if (clientesError || !clientes || clientes.length === 0) {
+        console.warn('⚠️ Falha ao carregar clientes ou lista vazia. Usando chamada única.', clientesError);
+        const { data, error } = await processarComChamadaUnica();
+        if (error) throw new Error(`Erro na edge function: ${error.message || JSON.stringify(error)}`);
+        if (!data?.success) throw new Error(data?.message || data?.error || 'Erro desconhecido na geração dos demonstrativos');
+
+        setDemonstrativos(Array.isArray(data.demonstrativos) ? data.demonstrativos : []);
+        setResumo(data.resumo || null);
+
         try {
           const dadosParaSalvar = {
             demonstrativos: data.demonstrativos,
@@ -167,58 +159,128 @@ export function DemonstrativoFaturamentoCompleto({
             timestamp: new Date().toISOString()
           };
           localStorage.setItem(`demonstrativos_completos_${periodo}`, JSON.stringify(dadosParaSalvar));
-          console.log('💾 demonstrativos_completos salvos no localStorage');
-          console.log('💾 Dados salvos:', dadosParaSalvar);
-          console.log('💾 Resumo salvo:', dadosParaSalvar.resumo);
         } catch (e) {
-          console.warn('Não foi possível salvar demonstrativos completos no localStorage:', e);
-        }
-        
-        // Marcar como concluído
-        if (onStatusChange) {
-          onStatusChange('concluido');
+          console.warn('Não foi possível salvar demonstrativos completos no localStorage (fallback):', e);
         }
 
-        // Chamar callback se fornecido
-        if (onDemonstrativosGerados) {
-          console.log('📤 Chamando callback onDemonstrativosGerados');
-          onDemonstrativosGerados({ 
-            demonstrativos: data.demonstrativos, 
-            resumo: data.resumo 
-          });
-        }
-        
-        toast({
-          title: "Demonstrativos gerados com sucesso!",
-          description: `${data.resumo?.clientes_processados || 0} clientes processados`
+        if (onStatusChange) onStatusChange('concluido');
+        if (onDemonstrativosGerados) onDemonstrativosGerados({ demonstrativos: data.demonstrativos, resumo: data.resumo });
+        toast({ title: 'Demonstrativos gerados!', description: `${data.resumo?.clientes_processados || 0} clientes processados` });
+        return;
+      }
+
+      // Processar em lotes
+      const chunkSize = 12; // balanceado para evitar CPU Time exceeded
+      const allDemonstrativos: any[] = [];
+      const allAlertas: string[] = [];
+      let resumoAgregado: any = {
+        total_clientes: 0,
+        clientes_processados: 0,
+        valor_bruto_geral: 0,
+        valor_impostos_geral: 0,
+        valor_total_geral: 0,
+        valor_exames_geral: 0,
+        valor_franquias_geral: 0,
+        valor_portal_geral: 0,
+        valor_integracao_geral: 0,
+        clientes_simples_nacional: 0,
+        clientes_regime_normal: 0,
+      };
+
+      const somarResumo = (r: any) => {
+        if (!r) return;
+        resumoAgregado.total_clientes += Number(r.total_clientes || 0);
+        resumoAgregado.clientes_processados += Number(r.clientes_processados || 0);
+        resumoAgregado.valor_bruto_geral += Number(r.valor_bruto_geral || 0);
+        resumoAgregado.valor_impostos_geral += Number(r.valor_impostos_geral || 0);
+        resumoAgregado.valor_total_geral += Number(r.valor_total_geral || 0);
+        resumoAgregado.valor_exames_geral += Number(r.valor_exames_geral || 0);
+        resumoAgregado.valor_franquias_geral += Number(r.valor_franquias_geral || 0);
+        resumoAgregado.valor_portal_geral += Number(r.valor_portal_geral || 0);
+        resumoAgregado.valor_integracao_geral += Number(r.valor_integracao_geral || 0);
+        resumoAgregado.clientes_simples_nacional += Number(r.clientes_simples_nacional || 0);
+        resumoAgregado.clientes_regime_normal += Number(r.clientes_regime_normal || 0);
+      };
+
+      for (let i = 0; i < clientes.length; i += chunkSize) {
+        const chunk = clientes.slice(i, i + chunkSize);
+        const ids = chunk.map(c => c.id);
+        console.log(`🚚 Processando lote ${i / chunkSize + 1} (${ids.length} clientes)`);
+
+        const { data, error } = await supabase.functions.invoke('gerar-demonstrativos-faturamento', {
+          body: { periodo, clientes: ids }
         });
 
-        // ✅ Mostrar alertas se houver clientes inativos com volumetria
-        if (data.alertas && data.alertas.length > 0) {
-          setTimeout(() => {
-            toast({
-              title: "⚠️ Alertas de Segurança",
-              description: `${data.alertas.length} cliente(s) inativo(s)/cancelado(s) com volumetria detectado(s). Verifique os detalhes.`,
-              variant: "destructive",
-            });
-          }, 1000);
+        if (error) {
+          console.error('❌ Erro no lote:', error);
+          // continuar com os próximos lotes, mas avisar
+          toast({ title: 'Lote com erro ignorado', description: `Um lote falhou: ${error.message || 'Erro'}`, variant: 'destructive' });
+          continue;
         }
-      } else {
-        console.error('❌ Resposta sem sucesso:', data);
-        throw new Error(data?.message || data?.error || 'Erro desconhecido na geração dos demonstrativos');
+        if (!data?.success) {
+          console.warn('⚠️ Lote sem sucesso:', data);
+          continue;
+        }
+
+        if (Array.isArray(data.demonstrativos)) {
+          allDemonstrativos.push(...data.demonstrativos);
+        }
+        if (Array.isArray(data.alertas)) {
+          allAlertas.push(...data.alertas);
+        }
+        somarResumo(data.resumo);
+      }
+
+      // Remover duplicados por cliente_id preservando o último
+      const mapByCliente = new Map<string, any>();
+      for (const d of allDemonstrativos) {
+        mapByCliente.set(d.cliente_id, d);
+      }
+      const dedupedDemonstrativos = Array.from(mapByCliente.values());
+
+      setDemonstrativos(dedupedDemonstrativos);
+      setResumo(resumoAgregado);
+
+      // Persistir também para a aba "Demonstrativos"
+      try {
+        const dadosParaSalvar = {
+          demonstrativos: dedupedDemonstrativos,
+          resumo: resumoAgregado,
+          periodo,
+          timestamp: new Date().toISOString()
+        };
+        localStorage.setItem(`demonstrativos_completos_${periodo}`, JSON.stringify(dadosParaSalvar));
+        console.log('💾 demonstrativos_completos salvos (batched)');
+      } catch (e) {
+        console.warn('Não foi possível salvar demonstrativos completos no localStorage (batched):', e);
+      }
+
+      if (onStatusChange) onStatusChange('concluido');
+      if (onDemonstrativosGerados) onDemonstrativosGerados({ demonstrativos: dedupedDemonstrativos, resumo: resumoAgregado });
+
+      toast({
+        title: 'Demonstrativos gerados com sucesso!',
+        description: `${dedupedDemonstrativos.length} clientes processados em ${Math.ceil(clientes.length / chunkSize)} lote(s)`
+      });
+
+      if (allAlertas.length > 0) {
+        setTimeout(() => {
+          toast({
+            title: '⚠️ Alertas de Segurança',
+            description: `${allAlertas.length} alerta(s) detectado(s). Verifique os detalhes.`,
+            variant: 'destructive',
+          });
+        }, 800);
       }
     } catch (error: any) {
       console.error('❌ Erro completo:', error);
-      
-      // Em caso de erro, marcar como pendente novamente
       if (onStatusChange) {
         onStatusChange('pendente');
       }
-      
       toast({
-        title: "Erro ao gerar demonstrativos",
+        title: 'Erro ao gerar demonstrativos',
         description: `${error.message || 'Erro desconhecido'}. Verifique o console para mais detalhes.`,
-        variant: "destructive"
+        variant: 'destructive'
       });
     } finally {
       setLoading(false);
