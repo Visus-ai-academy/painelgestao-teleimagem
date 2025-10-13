@@ -367,7 +367,7 @@ serve(async (req) => {
           
           const { error: insertError } = await supabaseClient
             .from('precos_servicos')
-            .upsert(lote, { onConflict: 'ux_precos_servicos_unicos' })
+            .insert(lote)
 
           if (insertError) {
             if (insertError.code === '57014' && tentativa < MAX_RETRIES) {
@@ -455,15 +455,32 @@ serve(async (req) => {
       erros.slice(0, 10).forEach(erro => console.log(`   - ${erro}`))
     }
 
-    // 8. Retornar resposta
+    // 8. Detectar duplicados após inserção
+    console.log('🔍 Identificando duplicados...')
+    const { data: duplicados, error: dupError } = await supabaseClient.rpc('identificar_duplicados_precos_servicos')
+    
+    if (dupError) {
+      console.error('❌ Erro ao identificar duplicados:', dupError)
+    } else if (duplicados && duplicados.length > 0) {
+      console.log(`⚠️ Encontrados ${duplicados.length} grupos de registros duplicados`)
+      duplicados.slice(0, 10).forEach((dup: any) => {
+        console.log(`   - ${dup.cliente_nome || 'SEM CLIENTE'} | ${dup.modalidade} | ${dup.especialidade} | ${dup.prioridade} | ${dup.categoria}: ${dup.total_duplicados} registros`)
+      })
+    } else {
+      console.log('✅ Nenhum duplicado encontrado')
+    }
+
+    // 9. Retornar resposta
     return new Response(
       JSON.stringify({
         success: registrosInseridos > 0,
         registros_processados: registrosInseridos,
         registros_erro: erros.length + registrosComErro,
         total_linhas: jsonData.length - 1,
-        mensagem: `Processamento concluído. ${registrosInseridos} preços inseridos com sucesso. ${erros.length + registrosComErro} erros encontrados.`,
-        detalhes_erros: erros.slice(0, 10) // Primeiros 10 erros para debugging
+        total_duplicados: duplicados?.length || 0,
+        mensagem: `Processamento concluído. ${registrosInseridos} preços inseridos com sucesso. ${erros.length + registrosComErro} erros encontrados. ${duplicados?.length || 0} grupos duplicados detectados.`,
+        detalhes_erros: erros.slice(0, 10), // Primeiros 10 erros para debugging
+        detalhes_duplicados: duplicados?.slice(0, 20) || [] // Primeiros 20 duplicados
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
