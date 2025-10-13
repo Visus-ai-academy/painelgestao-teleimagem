@@ -404,18 +404,36 @@ serve(async (req) => {
           const categoriaN = norm(grupo.categoria || 'SC');
           const prioridadeN = norm(grupo.prioridade || '');
 
-          const candidatos = precosCliente.filter((p: any) =>
+          // Base: casar apenas modalidade + especialidade
+          const base = precosCliente.filter((p: any) =>
             norm(p.modalidade) === modalidadeN &&
-            norm(p.especialidade) === especialidadeN &&
-            norm(p.categoria || 'SC') === categoriaN
+            norm(p.especialidade) === especialidadeN
           );
 
-          if (candidatos.length > 0) {
-            const escolhido = candidatos[0];
-            const prioridadeUrg = prioridadeN === 'URGENCIA' || prioridadeN === 'URGÊNCIA' || prioridadeN === 'PLANTAO';
+          // Categoria opcional (preço sem categoria é coringa)
+          const porCategoria = base.filter((p: any) => {
+            const cat = norm(p.categoria || '');
+            return cat === '' || cat === categoriaN; // vazio/null => qualquer categoria
+          });
+
+          // Preferir prioridade igual, senão cair para qualquer
+          const preferPri = porCategoria.filter((p: any) => norm(p.prioridade || '') === prioridadeN);
+          const poolPrioridade = preferPri.length > 0 ? preferPri : porCategoria;
+
+          // Selecionar faixa de volume do período (usar totalExames)
+          const poolFaixa = poolPrioridade
+            .filter((p: any) =>
+              (p.volume_inicial == null || totalExames >= p.volume_inicial) &&
+              (p.volume_final == null || totalExames <= p.volume_final)
+            )
+            .sort((a: any, b: any) => (b.volume_inicial || 0) - (a.volume_inicial || 0));
+
+          const escolhido = poolFaixa[0] || poolPrioridade[0];
+          if (escolhido) {
+            const prioridadeUrg = prioridadeN.includes('URG') || prioridadeN.includes('PLANT');
             valorUnitario = (prioridadeUrg || escolhido.considera_prioridade_plantao)
-              ? (escolhido.valor_urgencia || escolhido.valor_base || 0)
-              : (escolhido.valor_base || 0);
+              ? (escolhido.valor_urgencia ?? escolhido.valor_base ?? 0)
+              : (escolhido.valor_base ?? 0);
           }
         }
         
