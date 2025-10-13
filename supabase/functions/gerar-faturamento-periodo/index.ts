@@ -386,15 +386,14 @@ serve(async (req) => {
                     console.log(`[gerar-faturamento-periodo] Erro RPC para ${cliente.nome}:`, rpcError.message);
                     continue;
                   }
-                } else {
-                  unit = 0; // Cliente sem preços configurados
+              } else {
+                  unit = 0; // Cliente sem preços configurados - INSERIR MESMO ASSIM PARA IDENTIFICAR PENDÊNCIAS
                 }
 
                 let valor = Number((unit * qtd).toFixed(2));
 
-                if (tem_precos && valor <= 0) {
-                  continue; // Pular itens com valor zero para clientes com preços
-                }
+                // NÃO pular registros - inserir TODOS, mesmo com valor zero
+                // Isso permite identificar clientes sem preços configurados no faturamento
 
                 const hoje = new Date();
                 const emissao = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0];
