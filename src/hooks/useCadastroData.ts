@@ -299,7 +299,14 @@ export const useRepasseMedico = () => {
         if (error) throw error;
 
         if (dataBatch && dataBatch.length > 0) {
-          allData = [...allData, ...dataBatch];
+          // Normalizar os dados para incluir medico_nome e cliente_nome
+          const normalizedBatch = dataBatch.map(item => ({
+            ...item,
+            medico_nome: item.medicos?.nome || 'Regra Geral',
+            cliente_nome: item.clientes?.nome_fantasia || item.clientes?.nome || 'Regra Geral'
+          }));
+          
+          allData = [...allData, ...normalizedBatch];
           rangeStart += rangeSize;
           hasMore = dataBatch.length === rangeSize;
         } else {
