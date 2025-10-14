@@ -305,8 +305,11 @@ export function DemonstrativoVolumetriaPorCliente({ periodo: periodoInicial }: D
     // Criar workbook
     const wb = XLSX.utils.book_new();
 
+    // Controlar nomes de abas para evitar duplicatas
+    const nomesAbas = new Set<string>();
+
     // Criar uma aba para cada cliente
-    volumetrias.forEach(vol => {
+    volumetrias.forEach((vol, index) => {
       const dadosCliente = vol.detalhes_exames.map(detalhe => ({
         'Modalidade': detalhe.modalidade,
         'Especialidade': detalhe.especialidade,
@@ -330,9 +333,19 @@ export function DemonstrativoVolumetriaPorCliente({ periodo: periodoInicial }: D
 
       const ws = XLSX.utils.json_to_sheet(dadosComTotal);
       
-      // Limitar nome da aba a 31 caracteres (limite do Excel)
-      const nomeAba = vol.cliente_nome.substring(0, 31);
-      XLSX.utils.book_append_sheet(wb, ws, nomeAba);
+      // Limitar nome da aba a 31 caracteres e garantir unicidade
+      let nomeAba = vol.cliente_nome.substring(0, 28);
+      let contador = 1;
+      let nomeAbaFinal = nomeAba;
+      
+      // Se nome já existe, adicionar número
+      while (nomesAbas.has(nomeAbaFinal)) {
+        nomeAbaFinal = `${nomeAba}_${contador}`;
+        contador++;
+      }
+      
+      nomesAbas.add(nomeAbaFinal);
+      XLSX.utils.book_append_sheet(wb, ws, nomeAbaFinal);
     });
 
     // Gerar arquivo
