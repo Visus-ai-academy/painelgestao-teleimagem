@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, FileBarChart, Building, Filter } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Loader2, FileBarChart, Building, Filter, Download, FileSpreadsheet } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import * as XLSX from 'xlsx';
 
 interface DetalheVolumetria {
   modalidade: string;
@@ -251,6 +253,98 @@ export function DemonstrativoVolumetriaPorCliente({ periodo: periodoInicial }: D
     return new Intl.NumberFormat('pt-BR').format(value);
   };
 
+  const exportarRelatorioGeral = () => {
+    if (volumetrias.length === 0) {
+      toast({
+        title: 'Sem dados para exportar',
+        description: 'Não há dados disponíveis para exportação',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    // Preparar dados para exportação
+    const dadosExportacao = volumetrias.flatMap(vol => 
+      vol.detalhes_exames.map(detalhe => ({
+        'Cliente': vol.cliente_nome,
+        'Modalidade': detalhe.modalidade,
+        'Especialidade': detalhe.especialidade,
+        'Categoria': detalhe.categoria,
+        'Prioridade': detalhe.prioridade,
+        'Quantidade': detalhe.quantidade
+      }))
+    );
+
+    // Criar workbook e worksheet
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(dadosExportacao);
+
+    // Adicionar worksheet ao workbook
+    XLSX.utils.book_append_sheet(wb, ws, 'Volumetria Geral');
+
+    // Gerar arquivo
+    const fileName = `Volumetria_Geral_${periodoSelecionado.replace('/', '-')}_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+
+    toast({
+      title: 'Relatório exportado',
+      description: 'Relatório geral exportado com sucesso'
+    });
+  };
+
+  const exportarRelatorioPorCliente = () => {
+    if (volumetrias.length === 0) {
+      toast({
+        title: 'Sem dados para exportar',
+        description: 'Não há dados disponíveis para exportação',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    // Criar workbook
+    const wb = XLSX.utils.book_new();
+
+    // Criar uma aba para cada cliente
+    volumetrias.forEach(vol => {
+      const dadosCliente = vol.detalhes_exames.map(detalhe => ({
+        'Modalidade': detalhe.modalidade,
+        'Especialidade': detalhe.especialidade,
+        'Categoria': detalhe.categoria,
+        'Prioridade': detalhe.prioridade,
+        'Quantidade': detalhe.quantidade
+      }));
+
+      // Adicionar linha de total no início
+      const dadosComTotal = [
+        {
+          'Modalidade': 'TOTAL GERAL',
+          'Especialidade': '',
+          'Categoria': '',
+          'Prioridade': '',
+          'Quantidade': vol.total_exames
+        },
+        {},
+        ...dadosCliente
+      ];
+
+      const ws = XLSX.utils.json_to_sheet(dadosComTotal);
+      
+      // Limitar nome da aba a 31 caracteres (limite do Excel)
+      const nomeAba = vol.cliente_nome.substring(0, 31);
+      XLSX.utils.book_append_sheet(wb, ws, nomeAba);
+    });
+
+    // Gerar arquivo
+    const fileName = `Volumetria_Por_Cliente_${periodoSelecionado.replace('/', '-')}_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+
+    toast({
+      title: 'Relatório exportado',
+      description: `${volumetrias.length} cliente(s) exportado(s) com sucesso`
+    });
+  };
+
   return (
     <div className="space-y-6">
       <Card>
@@ -295,6 +389,27 @@ export function DemonstrativoVolumetriaPorCliente({ periodo: periodoInicial }: D
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="flex items-center gap-2 ml-auto">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={exportarRelatorioGeral}
+                disabled={loading || volumetrias.length === 0}
+              >
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                Relatório Geral
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={exportarRelatorioPorCliente}
+                disabled={loading || volumetrias.length === 0}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Por Cliente
+              </Button>
             </div>
 
             {loading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
