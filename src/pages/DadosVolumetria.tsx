@@ -5,7 +5,8 @@ import {
   Upload,
   BarChart3,
   Settings,
-  Activity
+  Activity,
+  FileBarChart
 } from "lucide-react";
 import { VolumetriaUpload } from "@/components/VolumetriaUpload";
 import { VolumetriaPeriodoSelector } from "@/components/volumetria/VolumetriaPeriodoSelector";
@@ -18,6 +19,7 @@ import { TesteRegras27 } from '@/components/TesteRegras27';
 import { SystemDateTime } from '@/components/SystemDateTime';
 import { LimparUploadTravado } from '@/components/LimparUploadTravado';
 import { FinalizarUploadsTravados } from '@/components/FinalizarUploadsTravados';
+import { DemonstrativoVolumetriaPorCliente } from '@/components/DemonstrativoVolumetriaPorCliente';
 import { VolumetriaProvider } from "@/contexts/VolumetriaContext";
 import { useToast } from "@/hooks/use-toast";
 import { useUploadStatus } from "@/hooks/useUploadStatus";
@@ -55,10 +57,14 @@ export default function DadosVolumetria() {
 
       <VolumetriaProvider>
         <Tabs defaultValue="upload" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="upload" className="flex items-center gap-2">
               <Upload className="h-4 w-4" />
               Upload de Dados
+            </TabsTrigger>
+            <TabsTrigger value="demonstrativo" className="flex items-center gap-2">
+              <FileBarChart className="h-4 w-4" />
+              Demonstrativo
             </TabsTrigger>
             <TabsTrigger value="sistema-regras" className="flex items-center gap-2">
               <Settings className="h-4 w-4" />
@@ -195,6 +201,15 @@ export default function DadosVolumetria() {
                 <VolumetriaExamesNaoIdentificados />
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="demonstrativo" className="space-y-6">
+            <DemonstrativoVolumetriaPorCliente 
+              periodo={periodoFaturamentoVolumetria 
+                ? `${periodoFaturamentoVolumetria.ano}-${String(periodoFaturamentoVolumetria.mes).padStart(2, '0')}` 
+                : ''
+              } 
+            />
           </TabsContent>
 
           <TabsContent value="sistema-regras" className="space-y-6">
