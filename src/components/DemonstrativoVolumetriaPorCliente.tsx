@@ -9,33 +9,25 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
+interface DetalheVolumetria {
+  modalidade: string;
+  especialidade: string;
+  categoria: string;
+  prioridade: string;
+  quantidade: number;
+}
+
 interface VolumetriaCliente {
   cliente_id: string;
   cliente_nome: string;
   periodo: string;
   total_exames: number;
-  total_registros: number;
-  detalhes_modalidades: {
-    modalidade: string;
-    total_exames: number;
-    total_registros: number;
-  }[];
-  detalhes_especialidades: {
-    especialidade: string;
-    total_exames: number;
-    total_registros: number;
-  }[];
-  detalhes_prioridades: {
-    prioridade: string;
-    total_exames: number;
-    total_registros: number;
-  }[];
+  detalhes_exames: DetalheVolumetria[];
 }
 
 interface ResumoVolumetria {
   total_clientes: number;
   total_exames_geral: number;
-  total_registros_geral: number;
   total_modalidades: number;
   total_especialidades: number;
 }
@@ -100,16 +92,16 @@ export function DemonstrativoVolumetriaPorCliente({ periodo: periodoInicial }: D
     try {
       console.log('🔄 Carregando demonstrativo de volumetria para:', periodo);
 
-      // Buscar dados agrupados por cliente
+      // Buscar dados agrupados por cliente com todas as combinações
       const { data: volumetriaData, error: volumetriaError } = await supabase
         .from('volumetria_mobilemed')
-        .select('EMPRESA, MODALIDADE, ESPECIALIDADE, PRIORIDADE, VALORES')
+        .select('EMPRESA, MODALIDADE, ESPECIALIDADE, PRIORIDADE, CATEGORIA, VALORES')
         .eq('periodo_referencia', periodo)
         .not('arquivo_fonte', 'in', '("volumetria_onco_padrao")');
 
       if (volumetriaError) throw volumetriaError;
 
-      // Agrupar por cliente
+      // Agrupar por cliente e combinação de modalidade/especialidade/categoria/prioridade
       const clientesMap = new Map<string, any>();
 
       volumetriaData?.forEach((item: any) => {
@@ -119,10 +111,7 @@ export function DemonstrativoVolumetriaPorCliente({ periodo: periodoInicial }: D
           clientesMap.set(clienteNome, {
             cliente_nome: clienteNome,
             total_exames: 0,
-            total_registros: 0,
-            modalidades: new Map<string, { exames: number, registros: number }>(),
-            especialidades: new Map<string, { exames: number, registros: number }>(),
-            prioridades: new Map<string, { exames: number, registros: number }>()
+            detalhes: new Map<string, DetalheVolumetria>()
           });
         }
 
@@ -130,34 +119,26 @@ export function DemonstrativoVolumetriaPorCliente({ periodo: periodoInicial }: D
         const valores = Number(item.VALORES || 0);
         
         cliente.total_exames += valores;
-        cliente.total_registros += 1;
 
-        // Modalidades
+        // Criar chave única para a combinação
         const modalidade = item.MODALIDADE || 'SEM MODALIDADE';
-        if (!cliente.modalidades.has(modalidade)) {
-          cliente.modalidades.set(modalidade, { exames: 0, registros: 0 });
-        }
-        const modData = cliente.modalidades.get(modalidade);
-        modData.exames += valores;
-        modData.registros += 1;
-
-        // Especialidades
         const especialidade = item.ESPECIALIDADE || 'SEM ESPECIALIDADE';
-        if (!cliente.especialidades.has(especialidade)) {
-          cliente.especialidades.set(especialidade, { exames: 0, registros: 0 });
-        }
-        const espData = cliente.especialidades.get(especialidade);
-        espData.exames += valores;
-        espData.registros += 1;
-
-        // Prioridades
+        const categoria = item.CATEGORIA || 'SEM CATEGORIA';
         const prioridade = item.PRIORIDADE || 'SEM PRIORIDADE';
-        if (!cliente.prioridades.has(prioridade)) {
-          cliente.prioridades.set(prioridade, { exames: 0, registros: 0 });
+        const chave = `${modalidade}|${especialidade}|${categoria}|${prioridade}`;
+
+        if (!cliente.detalhes.has(chave)) {
+          cliente.detalhes.set(chave, {
+            modalidade,
+            especialidade,
+            categoria,
+            prioridade,
+            quantidade: 0
+          });
         }
-        const prioData = cliente.prioridades.get(prioridade);
-        prioData.exames += valores;
-        prioData.registros += 1;
+        
+        const detalhe = cliente.detalhes.get(chave);
+        detalhe.quantidade += valores;
       });
 
       // Converter para array e formatar
@@ -166,39 +147,32 @@ export function DemonstrativoVolumetriaPorCliente({ periodo: periodoInicial }: D
         cliente_nome: clienteNome,
         periodo,
         total_exames: Math.round(dados.total_exames),
-        total_registros: dados.total_registros,
-        detalhes_modalidades: Array.from(dados.modalidades.entries()).map(([modalidade, valores]) => ({
-          modalidade,
-          total_exames: Math.round(valores.exames),
-          total_registros: valores.registros
-        })).sort((a, b) => b.total_exames - a.total_exames),
-        detalhes_especialidades: Array.from(dados.especialidades.entries()).map(([especialidade, valores]) => ({
-          especialidade,
-          total_exames: Math.round(valores.exames),
-          total_registros: valores.registros
-        })).sort((a, b) => b.total_exames - a.total_exames),
-        detalhes_prioridades: Array.from(dados.prioridades.entries()).map(([prioridade, valores]) => ({
-          prioridade,
-          total_exames: Math.round(valores.exames),
-          total_registros: valores.registros
-        })).sort((a, b) => b.total_exames - a.total_exames)
+        detalhes_exames: Array.from(dados.detalhes.values())
+          .map((d: DetalheVolumetria) => ({
+            modalidade: d.modalidade,
+            especialidade: d.especialidade,
+            categoria: d.categoria,
+            prioridade: d.prioridade,
+            quantidade: Math.round(d.quantidade)
+          }))
+          .sort((a, b) => b.quantidade - a.quantidade)
       })).sort((a, b) => a.cliente_nome.localeCompare(b.cliente_nome));
 
       // Calcular resumo
       const totalExamesGeral = volumetriasFormatadas.reduce((acc, v) => acc + v.total_exames, 0);
-      const totalRegistrosGeral = volumetriasFormatadas.reduce((acc, v) => acc + v.total_registros, 0);
       const modalidadesUnicas = new Set<string>();
       const especialidadesUnicas = new Set<string>();
 
       volumetriasFormatadas.forEach(v => {
-        v.detalhes_modalidades.forEach(m => modalidadesUnicas.add(m.modalidade));
-        v.detalhes_especialidades.forEach(e => especialidadesUnicas.add(e.especialidade));
+        v.detalhes_exames.forEach(d => {
+          modalidadesUnicas.add(d.modalidade);
+          especialidadesUnicas.add(d.especialidade);
+        });
       });
 
       const resumoCalculado: ResumoVolumetria = {
         total_clientes: volumetriasFormatadas.length,
         total_exames_geral: totalExamesGeral,
-        total_registros_geral: totalRegistrosGeral,
         total_modalidades: modalidadesUnicas.size,
         total_especialidades: especialidadesUnicas.size
       };
@@ -271,7 +245,7 @@ export function DemonstrativoVolumetriaPorCliente({ periodo: periodoInicial }: D
             <CardTitle>Resumo Geral - {periodoSelecionado}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="text-center">
                 <div className="text-2xl font-bold text-blue-600">
                   {resumo.total_clientes}
@@ -283,12 +257,6 @@ export function DemonstrativoVolumetriaPorCliente({ periodo: periodoInicial }: D
                   {formatNumber(resumo.total_exames_geral)}
                 </div>
                 <div className="text-sm text-muted-foreground">Total Exames</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-purple-600">
-                  {formatNumber(resumo.total_registros_geral)}
-                </div>
-                <div className="text-sm text-muted-foreground">Total Registros</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-orange-600">
@@ -338,86 +306,45 @@ export function DemonstrativoVolumetriaPorCliente({ periodo: periodoInicial }: D
                           <div className="font-medium">{formatNumber(vol.total_exames)}</div>
                           <div className="text-xs text-muted-foreground">Exames</div>
                         </div>
-                        <div className="text-center">
-                          <div className="font-medium">{formatNumber(vol.total_registros)}</div>
-                          <div className="text-xs text-muted-foreground">Registros</div>
-                        </div>
                       </div>
                     </div>
                   </CollapsibleTrigger>
                   
                   <CollapsibleContent>
                     <div className="p-4 border-x border-b rounded-b-lg bg-muted/20">
-                      <div className="space-y-6">
-                        {/* Detalhes por Modalidade */}
+                      {/* Detalhamento por Modalidade/Especialidade/Categoria/Prioridade */}
+                      {vol.detalhes_exames.length > 0 && (
                         <div>
-                          <h4 className="font-semibold mb-3 text-sm">Por Modalidade</h4>
+                          <h4 className="font-semibold mb-3 text-sm flex items-center gap-2">
+                            <FileBarChart className="h-4 w-4" />
+                            Detalhamento por Modalidade/Especialidade
+                          </h4>
                           <Table>
                             <TableHeader>
                               <TableRow>
                                 <TableHead>Modalidade</TableHead>
-                                <TableHead className="text-right">Total Exames</TableHead>
-                                <TableHead className="text-right">Total Registros</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {vol.detalhes_modalidades.map((mod, idx) => (
-                                <TableRow key={idx}>
-                                  <TableCell className="font-medium">{mod.modalidade}</TableCell>
-                                  <TableCell className="text-right">{formatNumber(mod.total_exames)}</TableCell>
-                                  <TableCell className="text-right">{formatNumber(mod.total_registros)}</TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </div>
-
-                        {/* Detalhes por Especialidade */}
-                        <div>
-                          <h4 className="font-semibold mb-3 text-sm">Por Especialidade</h4>
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
                                 <TableHead>Especialidade</TableHead>
-                                <TableHead className="text-right">Total Exames</TableHead>
-                                <TableHead className="text-right">Total Registros</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {vol.detalhes_especialidades.map((esp, idx) => (
-                                <TableRow key={idx}>
-                                  <TableCell className="font-medium">{esp.especialidade}</TableCell>
-                                  <TableCell className="text-right">{formatNumber(esp.total_exames)}</TableCell>
-                                  <TableCell className="text-right">{formatNumber(esp.total_registros)}</TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </div>
-
-                        {/* Detalhes por Prioridade */}
-                        <div>
-                          <h4 className="font-semibold mb-3 text-sm">Por Prioridade</h4>
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
+                                <TableHead>Categoria</TableHead>
                                 <TableHead>Prioridade</TableHead>
-                                <TableHead className="text-right">Total Exames</TableHead>
-                                <TableHead className="text-right">Total Registros</TableHead>
+                                <TableHead className="text-right">Qtd</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {vol.detalhes_prioridades.map((prio, idx) => (
-                                <TableRow key={idx}>
-                                  <TableCell className="font-medium">{prio.prioridade}</TableCell>
-                                  <TableCell className="text-right">{formatNumber(prio.total_exames)}</TableCell>
-                                  <TableCell className="text-right">{formatNumber(prio.total_registros)}</TableCell>
+                              {vol.detalhes_exames.map((item, index) => (
+                                <TableRow key={index}>
+                                  <TableCell>{item.modalidade}</TableCell>
+                                  <TableCell>{item.especialidade}</TableCell>
+                                  <TableCell>{item.categoria}</TableCell>
+                                  <TableCell>{item.prioridade}</TableCell>
+                                  <TableCell className="text-right font-medium">
+                                    {formatNumber(item.quantidade)}
+                                  </TableCell>
                                 </TableRow>
                               ))}
                             </TableBody>
                           </Table>
                         </div>
-                      </div>
+                      )}
                     </div>
                   </CollapsibleContent>
                 </Collapsible>
