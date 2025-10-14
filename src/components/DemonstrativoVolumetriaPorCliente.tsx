@@ -302,51 +302,18 @@ export function DemonstrativoVolumetriaPorCliente({ periodo: periodoInicial }: D
       return;
     }
 
-    // Criar workbook
+    // Preparar dados - uma linha por cliente com total
+    const dadosExportacao = volumetrias.map(vol => ({
+      'Cliente': vol.cliente_nome,
+      'Total de Exames': vol.total_exames
+    }));
+
+    // Criar workbook e worksheet
     const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(dadosExportacao);
 
-    // Controlar nomes de abas para evitar duplicatas
-    const nomesAbas = new Set<string>();
-
-    // Criar uma aba para cada cliente
-    volumetrias.forEach((vol, index) => {
-      const dadosCliente = vol.detalhes_exames.map(detalhe => ({
-        'Modalidade': detalhe.modalidade,
-        'Especialidade': detalhe.especialidade,
-        'Categoria': detalhe.categoria,
-        'Prioridade': detalhe.prioridade,
-        'Quantidade': detalhe.quantidade
-      }));
-
-      // Adicionar linha de total no início
-      const dadosComTotal = [
-        {
-          'Modalidade': 'TOTAL GERAL',
-          'Especialidade': '',
-          'Categoria': '',
-          'Prioridade': '',
-          'Quantidade': vol.total_exames
-        },
-        {},
-        ...dadosCliente
-      ];
-
-      const ws = XLSX.utils.json_to_sheet(dadosComTotal);
-      
-      // Limitar nome da aba a 31 caracteres e garantir unicidade
-      let nomeAba = vol.cliente_nome.substring(0, 28);
-      let contador = 1;
-      let nomeAbaFinal = nomeAba;
-      
-      // Se nome já existe, adicionar número
-      while (nomesAbas.has(nomeAbaFinal)) {
-        nomeAbaFinal = `${nomeAba}_${contador}`;
-        contador++;
-      }
-      
-      nomesAbas.add(nomeAbaFinal);
-      XLSX.utils.book_append_sheet(wb, ws, nomeAbaFinal);
-    });
+    // Adicionar worksheet ao workbook
+    XLSX.utils.book_append_sheet(wb, ws, 'Volumetria por Cliente');
 
     // Gerar arquivo
     const fileName = `Volumetria_Por_Cliente_${periodoSelecionado.replace('/', '-')}_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.xlsx`;
