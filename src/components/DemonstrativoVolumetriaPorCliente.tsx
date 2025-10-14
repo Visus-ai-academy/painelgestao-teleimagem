@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, FileBarChart, Building } from 'lucide-react';
+import { Loader2, FileBarChart, Building, Filter } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronDown, ChevronRight } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface VolumetriaCliente {
   cliente_id: string;
@@ -44,61 +44,61 @@ interface DemonstrativoVolumetriaPorClienteProps {
   periodo: string;
 }
 
-export function DemonstrativoVolumetriaPorCliente({ periodo }: DemonstrativoVolumetriaPorClienteProps) {
+export function DemonstrativoVolumetriaPorCliente({ periodo: periodoInicial }: DemonstrativoVolumetriaPorClienteProps) {
   const [loading, setLoading] = useState(false);
   const [volumetrias, setVolumetrias] = useState<VolumetriaCliente[]>([]);
   const [resumo, setResumo] = useState<ResumoVolumetria | null>(null);
   const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set());
+  const [periodosFiltro, setPeriodosFiltro] = useState<string[]>([]);
+  const [periodoSelecionado, setPeriodoSelecionado] = useState<string>(periodoInicial || '');
   const { toast } = useToast();
 
-  const storageKey = `volumetria_clientes_${periodo}`;
-
-  // Carregar dados do localStorage
+  // Buscar períodos disponíveis
   useEffect(() => {
-    if (periodo) {
-      const savedData = localStorage.getItem(storageKey);
-      if (savedData) {
-        try {
-          const { volumetrias: savedVolumetrias, resumo: savedResumo } = JSON.parse(savedData);
-          setVolumetrias(savedVolumetrias || []);
-          setResumo(savedResumo || null);
-        } catch (error) {
-          console.error('Erro ao carregar dados do localStorage:', error);
+    const fetchPeriodos = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('volumetria_mobilemed')
+          .select('periodo_referencia')
+          .not('arquivo_fonte', 'in', '("volumetria_onco_padrao")')
+          .not('periodo_referencia', 'is', null);
+
+        if (error) throw error;
+
+        const periodosUnicos = Array.from(new Set(data?.map(d => d.periodo_referencia) || []))
+          .filter(p => p)
+          .sort()
+          .reverse();
+
+        setPeriodosFiltro(periodosUnicos as string[]);
+        
+        // Se tem período inicial, usar ele, senão usar o primeiro disponível
+        if (periodoInicial) {
+          setPeriodoSelecionado(periodoInicial);
+        } else if (periodosUnicos.length > 0) {
+          setPeriodoSelecionado(periodosUnicos[0] as string);
         }
+      } catch (error: any) {
+        console.error('Erro ao buscar períodos:', error);
       }
-    }
-  }, [periodo, storageKey]);
+    };
 
-  // Salvar dados no localStorage
+    fetchPeriodos();
+  }, [periodoInicial]);
+
+  // Carregar dados automaticamente quando período mudar
   useEffect(() => {
-    if (periodo && (volumetrias.length > 0 || resumo)) {
-      const dataToSave = { volumetrias, resumo };
-      localStorage.setItem(storageKey, JSON.stringify(dataToSave));
+    if (periodoSelecionado) {
+      carregarDemonstrativo(periodoSelecionado);
     }
-  }, [volumetrias, resumo, periodo, storageKey]);
+  }, [periodoSelecionado]);
 
-  // Limpar dados quando período mudar
-  useEffect(() => {
-    if (periodo) {
-      setVolumetrias([]);
-      setResumo(null);
-      setExpandedClients(new Set());
-    }
-  }, [periodo]);
-
-  const handleGerarDemonstrativo = async () => {
-    if (!periodo) {
-      toast({
-        title: "Período obrigatório",
-        description: "Por favor, informe o período no formato YYYY-MM",
-        variant: "destructive"
-      });
-      return;
-    }
+  const carregarDemonstrativo = async (periodo: string) => {
+    if (!periodo) return;
 
     setLoading(true);
     try {
-      console.log('🔄 Gerando demonstrativo de volumetria por cliente para:', periodo);
+      console.log('🔄 Carregando demonstrativo de volumetria para:', periodo);
 
       // Buscar dados agrupados por cliente
       const { data: volumetriaData, error: volumetriaError } = await supabase
@@ -205,15 +205,10 @@ export function DemonstrativoVolumetriaPorCliente({ periodo }: DemonstrativoVolu
 
       setVolumetrias(volumetriasFormatadas);
       setResumo(resumoCalculado);
-
-      toast({
-        title: 'Demonstrativo gerado com sucesso!',
-        description: `${volumetriasFormatadas.length} clientes processados`
-      });
     } catch (error: any) {
-      console.error('❌ Erro ao gerar demonstrativo:', error);
+      console.error('❌ Erro ao carregar demonstrativo:', error);
       toast({
-        title: 'Erro ao gerar demonstrativo',
+        title: 'Erro ao carregar demonstrativo',
         description: error.message || 'Erro desconhecido',
         variant: 'destructive'
       });
@@ -250,36 +245,30 @@ export function DemonstrativoVolumetriaPorCliente({ periodo }: DemonstrativoVolu
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center gap-4">
-            <div className="flex-1">
-              <div className="text-sm text-muted-foreground">
-                Período selecionado: <strong>{periodo || 'Nenhum período selecionado'}</strong>
-              </div>
+            <div className="flex items-center gap-2 flex-1">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <Select value={periodoSelecionado} onValueChange={setPeriodoSelecionado}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Selecione o período" />
+                </SelectTrigger>
+                <SelectContent>
+                  {periodosFiltro.map((p) => (
+                    <SelectItem key={p} value={p}>
+                      {p}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {loading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
             </div>
-            <Button 
-              onClick={handleGerarDemonstrativo}
-              disabled={loading || !periodo}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Processando...
-                </>
-              ) : (
-                <>
-                  <FileBarChart className="mr-2 h-4 w-4" />
-                  Gerar Demonstrativo
-                </>
-              )}
-            </Button>
           </div>
         </CardContent>
       </Card>
 
-      {resumo && (
+      {resumo && periodoSelecionado && (
         <Card>
           <CardHeader>
-            <CardTitle>Resumo Geral - {periodo}</CardTitle>
+            <CardTitle>Resumo Geral - {periodoSelecionado}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
