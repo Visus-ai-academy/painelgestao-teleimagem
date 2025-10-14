@@ -43,6 +43,8 @@ export function DemonstrativoVolumetriaPorCliente({ periodo: periodoInicial }: D
   const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set());
   const [periodosFiltro, setPeriodosFiltro] = useState<string[]>([]);
   const [periodoSelecionado, setPeriodoSelecionado] = useState<string>(periodoInicial || '');
+  const [tiposCliente, setTiposCliente] = useState<string[]>([]);
+  const [tipoClienteSelecionado, setTipoClienteSelecionado] = useState<string>('todos');
   const { toast } = useToast();
 
   // Buscar períodos disponíveis
@@ -78,12 +80,36 @@ export function DemonstrativoVolumetriaPorCliente({ periodo: periodoInicial }: D
     fetchPeriodos();
   }, [periodoInicial]);
 
-  // Carregar dados automaticamente quando período mudar
+  // Buscar tipos de cliente disponíveis
+  useEffect(() => {
+    const fetchTiposCliente = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('clientes')
+          .select('tipo_cliente')
+          .not('tipo_cliente', 'is', null);
+
+        if (error) throw error;
+
+        const tiposUnicos = Array.from(new Set(data?.map(d => d.tipo_cliente) || []))
+          .filter(t => t)
+          .sort();
+
+        setTiposCliente(tiposUnicos as string[]);
+      } catch (error: any) {
+        console.error('Erro ao buscar tipos de cliente:', error);
+      }
+    };
+
+    fetchTiposCliente();
+  }, []);
+
+  // Carregar dados automaticamente quando período ou tipo de cliente mudar
   useEffect(() => {
     if (periodoSelecionado) {
       carregarDemonstrativo(periodoSelecionado);
     }
-  }, [periodoSelecionado]);
+  }, [periodoSelecionado, tipoClienteSelecionado]);
 
   const carregarDemonstrativo = async (periodo: string) => {
     if (!periodo) return;
@@ -92,12 +118,32 @@ export function DemonstrativoVolumetriaPorCliente({ periodo: periodoInicial }: D
     try {
       console.log('🔄 Carregando demonstrativo de volumetria para:', periodo);
 
+      // Buscar clientes filtrados por tipo (se selecionado)
+      let clientesFiltrados: string[] | null = null;
+      if (tipoClienteSelecionado !== 'todos') {
+        const { data: clientesData, error: clientesError } = await supabase
+          .from('clientes')
+          .select('nome_mobilemed, nome')
+          .eq('tipo_cliente', tipoClienteSelecionado);
+
+        if (clientesError) throw clientesError;
+
+        clientesFiltrados = clientesData?.map(c => c.nome_mobilemed || c.nome).filter(Boolean) || [];
+      }
+
       // Buscar dados agrupados por cliente com todas as combinações
-      const { data: volumetriaData, error: volumetriaError } = await supabase
+      let query = supabase
         .from('volumetria_mobilemed')
         .select('EMPRESA, MODALIDADE, ESPECIALIDADE, PRIORIDADE, CATEGORIA, VALORES')
         .eq('periodo_referencia', periodo)
         .not('arquivo_fonte', 'in', '("volumetria_onco_padrao")');
+
+      // Aplicar filtro de clientes se necessário
+      if (clientesFiltrados && clientesFiltrados.length > 0) {
+        query = query.in('EMPRESA', clientesFiltrados);
+      }
+
+      const { data: volumetriaData, error: volumetriaError } = await query;
 
       if (volumetriaError) throw volumetriaError;
 
@@ -218,8 +264,8 @@ export function DemonstrativoVolumetriaPorCliente({ periodo: periodoInicial }: D
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 flex-1">
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-muted-foreground" />
               <Select value={periodoSelecionado} onValueChange={setPeriodoSelecionado}>
                 <SelectTrigger className="w-[200px]">
@@ -233,8 +279,25 @@ export function DemonstrativoVolumetriaPorCliente({ periodo: periodoInicial }: D
                   ))}
                 </SelectContent>
               </Select>
-              {loading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
             </div>
+            
+            <div className="flex items-center gap-2">
+              <Select value={tipoClienteSelecionado} onValueChange={setTipoClienteSelecionado}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Tipo de Cliente" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos os Tipos</SelectItem>
+                  {tiposCliente.map((tipo) => (
+                    <SelectItem key={tipo} value={tipo}>
+                      {tipo}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {loading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
           </div>
         </CardContent>
       </Card>
