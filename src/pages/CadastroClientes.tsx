@@ -417,6 +417,36 @@ export default function CadastroClientes() {
                   placeholder="Nome do cliente"
                 />
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="nome_fantasia" className="text-sm font-semibold text-foreground">Nome Fantasia</Label>
+                <Input
+                  id="nome_fantasia"
+                  value={clienteData.nome_fantasia}
+                  onChange={(e) => handleInputChange("nome_fantasia", e.target.value)}
+                  placeholder="Nome fantasia do cliente"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="nome_mobilemed" className="text-sm font-semibold text-foreground">Nome MobileMed</Label>
+                <Input
+                  id="nome_mobilemed"
+                  value={clienteData.nome_mobilemed}
+                  onChange={(e) => handleInputChange("nome_mobilemed", e.target.value)}
+                  placeholder="Nome no sistema MobileMed"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="razao_social" className="text-sm font-semibold text-foreground">Razão Social</Label>
+                <Input
+                  id="razao_social"
+                  value={clienteData.razao_social}
+                  onChange={(e) => handleInputChange("razao_social", e.target.value)}
+                  placeholder="Razão social do cliente"
+                />
+              </div>
               
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-sm font-semibold text-foreground">Email*</Label>
@@ -426,6 +456,17 @@ export default function CadastroClientes() {
                   value={clienteData.email}
                   onChange={(e) => handleInputChange("email", e.target.value)}
                   placeholder="email@cliente.com"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="email_envio_nf" className="text-sm font-semibold text-foreground">Email Envio NF</Label>
+                <Input
+                  id="email_envio_nf"
+                  type="email"
+                  value={clienteData.email_envio_nf}
+                  onChange={(e) => handleInputChange("email_envio_nf", e.target.value)}
+                  placeholder="email.nf@cliente.com"
                 />
               </div>
               
@@ -467,6 +508,16 @@ export default function CadastroClientes() {
               )}
               
               <div className="space-y-2">
+                <Label htmlFor="telefone" className="text-sm font-semibold text-foreground">Telefone</Label>
+                <Input
+                  id="telefone"
+                  value={clienteData.telefone}
+                  onChange={(e) => handleInputChange("telefone", e.target.value)}
+                  placeholder="(11) 98765-4321"
+                />
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="cod_cliente" className="text-sm font-semibold text-foreground">Código Cliente</Label>
                 <Input
                   id="cod_cliente"
@@ -494,6 +545,26 @@ export default function CadastroClientes() {
                   onChange={(e) => handleInputChange("estado", e.target.value)}
                   placeholder="SP"
                   maxLength={2}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="bairro" className="text-sm font-semibold text-foreground">Bairro</Label>
+                <Input
+                  id="bairro"
+                  value={clienteData.bairro}
+                  onChange={(e) => handleInputChange("bairro", e.target.value)}
+                  placeholder="Centro"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="cep" className="text-sm font-semibold text-foreground">CEP</Label>
+                <Input
+                  id="cep"
+                  value={clienteData.cep}
+                  onChange={(e) => handleInputChange("cep", e.target.value)}
+                  placeholder="00000-000"
                 />
               </div>
               
