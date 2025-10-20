@@ -296,7 +296,31 @@ export default function CadastroClientes() {
       {/* Ações e Cadastro Manual */}
       <div className="flex gap-4 flex-wrap">
         <Button 
-          onClick={() => setShowNovoCliente(!showNovoCliente)}
+          onClick={() => {
+            // Limpar dados antes de abrir o formulário
+            setClienteData({
+              nome: "",
+              nome_fantasia: "",
+              nome_mobilemed: "",
+              razao_social: "",
+              email: "",
+              email_envio_nf: "",
+              cnpj: "",
+              cpf: "",
+              tipo_pessoa: "",
+              telefone: "",
+              endereco: "",
+              bairro: "",
+              cep: "",
+              cidade: "",
+              estado: "",
+              contato: "",
+              cod_cliente: "",
+              ativo: true,
+              status: "Ativo"
+            });
+            setShowNovoCliente(!showNovoCliente);
+          }}
           className="flex items-center gap-2"
         >
           <Plus className="h-4 w-4" />
