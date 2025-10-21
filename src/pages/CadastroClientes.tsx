@@ -132,10 +132,10 @@ export default function CadastroClientes() {
 
   const handleSalvarCliente = async () => {
     // Validação básica
-    if (!clienteData.nome || !clienteData.email) {
+    if (!clienteData.nome_mobilemed && !clienteData.nome_fantasia) {
       toast({
         title: "Erro",
-        description: "Nome e email são obrigatórios",
+        description: "Pelo menos Nome MobileMed ou Nome Fantasia é obrigatório",
         variant: "destructive"
       });
       return;
@@ -435,14 +435,14 @@ export default function CadastroClientes() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">{/* Aumentado para 4 colunas em telas grandes */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="nome" className="text-sm font-semibold text-foreground">Nome*</Label>
+                <Label htmlFor="nome_mobilemed" className="text-sm font-semibold text-foreground">Nome MobileMed</Label>
                 <Input
-                  id="nome"
-                  value={clienteData.nome}
-                  onChange={(e) => handleInputChange("nome", e.target.value)}
-                  placeholder="Nome do cliente"
+                  id="nome_mobilemed"
+                  value={clienteData.nome_mobilemed}
+                  onChange={(e) => handleInputChange("nome_mobilemed", e.target.value)}
+                  placeholder="Nome no sistema MobileMed"
                 />
               </div>
 
@@ -457,16 +457,6 @@ export default function CadastroClientes() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="nome_mobilemed" className="text-sm font-semibold text-foreground">Nome MobileMed</Label>
-                <Input
-                  id="nome_mobilemed"
-                  value={clienteData.nome_mobilemed}
-                  onChange={(e) => handleInputChange("nome_mobilemed", e.target.value)}
-                  placeholder="Nome no sistema MobileMed"
-                />
-              </div>
-
-              <div className="space-y-2">
                 <Label htmlFor="razao_social" className="text-sm font-semibold text-foreground">Razão Social</Label>
                 <Input
                   id="razao_social"
@@ -475,79 +465,26 @@ export default function CadastroClientes() {
                   placeholder="Razão social do cliente"
                 />
               </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-semibold text-foreground">Email*</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={clienteData.email}
-                  onChange={(e) => handleInputChange("email", e.target.value)}
-                  placeholder="email@cliente.com"
-                />
-              </div>
 
               <div className="space-y-2">
-                <Label htmlFor="email_envio_nf" className="text-sm font-semibold text-foreground">Email Envio NF</Label>
+                <Label htmlFor="cnpj" className="text-sm font-semibold text-foreground">CNPJ</Label>
                 <Input
-                  id="email_envio_nf"
-                  type="email"
-                  value={clienteData.email_envio_nf}
-                  onChange={(e) => handleInputChange("email_envio_nf", e.target.value)}
-                  placeholder="email.nf@cliente.com"
+                  id="cnpj"
+                  value={clienteData.cnpj}
+                  onChange={(e) => handleInputChange("cnpj", e.target.value)}
+                  placeholder="00.000.000/0000-00"
                 />
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="tipo_pessoa" className="text-sm font-semibold text-foreground">Tipo de Pessoa</Label>
-                <Select value={clienteData.tipo_pessoa} onValueChange={(value) => handleInputChange("tipo_pessoa", value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o tipo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="PJ">Pessoa Jurídica (PJ)</SelectItem>
-                    <SelectItem value="PF">Pessoa Física (PF)</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="contato" className="text-sm font-semibold text-foreground">Contato</Label>
+                <Input
+                  id="contato"
+                  value={clienteData.contato}
+                  onChange={(e) => handleInputChange("contato", e.target.value)}
+                  placeholder="Nome do contato"
+                />
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="tipo_cliente" className="text-sm font-semibold text-foreground">Tipo de Cliente</Label>
-                <Select value={clienteData.tipo_cliente || ""} onValueChange={(value) => handleInputChange("tipo_cliente", value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o tipo do cliente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="CO">CO</SelectItem>
-                    <SelectItem value="NC">NC</SelectItem>
-                    <SelectItem value="NC1">NC1</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              {clienteData.tipo_pessoa === "PJ" && (
-                <div className="space-y-2">
-                  <Label htmlFor="cnpj" className="text-sm font-semibold text-foreground">CNPJ</Label>
-                  <Input
-                    id="cnpj"
-                    value={clienteData.cnpj}
-                    onChange={(e) => handleInputChange("cnpj", e.target.value)}
-                    placeholder="00.000.000/0000-00"
-                  />
-                </div>
-              )}
-              
-              {clienteData.tipo_pessoa === "PF" && (
-                <div className="space-y-2">
-                  <Label htmlFor="cpf" className="text-sm font-semibold text-foreground">CPF</Label>
-                  <Input
-                    id="cpf"
-                    value={clienteData.cpf}
-                    onChange={(e) => handleInputChange("cpf", e.target.value)}
-                    placeholder="000.000.000-00"
-                  />
-                </div>
-              )}
               
               <div className="space-y-2">
                 <Label htmlFor="telefone" className="text-sm font-semibold text-foreground">Telefone</Label>
@@ -556,16 +493,6 @@ export default function CadastroClientes() {
                   value={clienteData.telefone}
                   onChange={(e) => handleInputChange("telefone", e.target.value)}
                   placeholder="(11) 98765-4321"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="cod_cliente" className="text-sm font-semibold text-foreground">Código Cliente</Label>
-                <Input
-                  id="cod_cliente"
-                  value={clienteData.cod_cliente}
-                  onChange={(e) => handleInputChange("cod_cliente", e.target.value)}
-                  placeholder="CLI001"
                 />
               </div>
               
@@ -580,13 +507,23 @@ export default function CadastroClientes() {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="estado" className="text-sm font-semibold text-foreground">Estado</Label>
+                <Label htmlFor="estado" className="text-sm font-semibold text-foreground">UF</Label>
                 <Input
                   id="estado"
                   value={clienteData.estado}
                   onChange={(e) => handleInputChange("estado", e.target.value)}
                   placeholder="SP"
                   maxLength={2}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="endereco" className="text-sm font-semibold text-foreground">Endereço</Label>
+                <Input
+                  id="endereco"
+                  value={clienteData.endereco}
+                  onChange={(e) => handleInputChange("endereco", e.target.value)}
+                  placeholder="Rua, número"
                 />
               </div>
 
@@ -609,36 +546,36 @@ export default function CadastroClientes() {
                   placeholder="00000-000"
                 />
               </div>
-              
-               <div className="space-y-2">
-                 <Label htmlFor="contato" className="text-sm font-semibold text-foreground">Contato</Label>
-                 <Input
-                   id="contato"
-                   value={clienteData.contato}
-                   onChange={(e) => handleInputChange("contato", e.target.value)}
-                   placeholder="Nome do contato"
-                 />
-               </div>
 
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="ativo"
-                    checked={clienteData.ativo}
-                    onCheckedChange={(checked) => handleInputChange("ativo", checked)}
-                  />
-                  <Label htmlFor="ativo" className="text-sm font-semibold text-foreground">Cliente Ativo</Label>
-                </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="endereco" className="text-sm font-semibold text-foreground">Endereço</Label>
-              <Textarea
-                id="endereco"
-                value={clienteData.endereco}
-                onChange={(e) => handleInputChange("endereco", e.target.value)}
-                placeholder="Endereço completo do cliente"
-                rows={3}
-              />
+              <div className="space-y-2">
+                <Label htmlFor="tipo_cliente" className="text-sm font-semibold text-foreground">Tipo</Label>
+                <Select value={clienteData.tipo_cliente || ""} onValueChange={(value) => handleInputChange("tipo_cliente", value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="CO">CO</SelectItem>
+                    <SelectItem value="NC">NC</SelectItem>
+                    <SelectItem value="NC1">NC1</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="status" className="text-sm font-semibold text-foreground">Status</Label>
+                <Select value={clienteData.status} onValueChange={(value) => {
+                  handleInputChange("status", value);
+                  handleInputChange("ativo", value === "Ativo");
+                }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Ativo">Ativo</SelectItem>
+                    <SelectItem value="Inativo">Inativo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             
             <div className="flex gap-2 pt-4">
