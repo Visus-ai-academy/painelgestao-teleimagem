@@ -80,6 +80,7 @@ export default function CadastroClientes() {
     estado: "",
     contato: "",
     cod_cliente: "",
+    tipo_cliente: "",
     ativo: true,
     status: "Ativo"
   });
@@ -176,6 +177,7 @@ export default function CadastroClientes() {
         estado: "",
         contato: "",
         cod_cliente: "",
+        tipo_cliente: "",
         ativo: true,
         status: "Ativo"
       });
@@ -211,6 +213,7 @@ export default function CadastroClientes() {
       estado: cliente.estado || "",
       contato: cliente.contato || "",
       cod_cliente: cliente.cod_cliente || "",
+      tipo_cliente: cliente.tipo_cliente || "",
       ativo: cliente.ativo,
       status: cliente.status || (cliente.ativo ? "Ativo" : "Inativo")
     });
@@ -316,6 +319,7 @@ export default function CadastroClientes() {
               estado: "",
               contato: "",
               cod_cliente: "",
+              tipo_cliente: "",
               ativo: true,
               status: "Ativo"
             });
@@ -503,6 +507,20 @@ export default function CadastroClientes() {
                   <SelectContent>
                     <SelectItem value="PJ">Pessoa Jurídica (PJ)</SelectItem>
                     <SelectItem value="PF">Pessoa Física (PF)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="tipo_cliente" className="text-sm font-semibold text-foreground">Tipo de Cliente</Label>
+                <Select value={clienteData.tipo_cliente || ""} onValueChange={(value) => handleInputChange("tipo_cliente", value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o tipo do cliente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="CO">CO</SelectItem>
+                    <SelectItem value="NC">NC</SelectItem>
+                    <SelectItem value="NC1">NC1</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -793,6 +811,20 @@ export default function CadastroClientes() {
                     onChange={(e) => handleInputChange("email_envio_nf", e.target.value)}
                     placeholder="nf@cliente.com"
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-tipo_cliente" className="text-sm font-semibold text-foreground">Tipo de Cliente</Label>
+                  <Select value={clienteData.tipo_cliente || ""} onValueChange={(value) => handleInputChange("tipo_cliente", value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o tipo do cliente" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="CO">CO</SelectItem>
+                      <SelectItem value="NC">NC</SelectItem>
+                      <SelectItem value="NC1">NC1</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 
                 <div className="space-y-2">
