@@ -503,15 +503,13 @@ export default function ContratosClientes() {
           console.error(`Erro ao buscar parâmetros para cliente ${cliente.nome}:`, parametrosError);
         }
         
-        // 4. Só gera contrato se cliente tem preços configurados
-        if (precosCliente && precosCliente.length > 0) {
-          // Calcular data de início e fim do contrato
-          const dataInicio = new Date().toISOString().split('T')[0];
-          const dataFim = new Date();
-          dataFim.setFullYear(dataFim.getFullYear() + 1); // 1 ano de contrato
-          
-          // Preparar serviços contratados baseados nos preços
-          const servicosContratados = precosCliente.map(preco => ({
+        // 4. Calcular data de início e fim do contrato
+        const dataInicio = new Date().toISOString().split('T')[0];
+        const dataFim = new Date();
+        dataFim.setFullYear(dataFim.getFullYear() + 1); // 1 ano de contrato
+        
+        // Preparar serviços contratados baseados nos preços (se houver)
+        const servicosContratados = (precosCliente && precosCliente.length > 0) ? precosCliente.map(preco => ({
             modalidade: preco.modalidade,
             especialidade: preco.especialidade,
             categoria: preco.categoria,
@@ -520,10 +518,10 @@ export default function ContratosClientes() {
             valor_urgencia: preco.valor_urgencia,
             volume_inicial: preco.volume_inicial,
             volume_final: preco.volume_final
-          }));
+          })) : [];
 
-          // Preparar configurações baseadas nos parâmetros de faturamento
-          const configuracoesFranquia = parametrosCliente ? {
+        // Preparar configurações baseadas nos parâmetros de faturamento
+        const configuracoesFranquia = parametrosCliente ? {
             tem_franquia: parametrosCliente.aplicar_franquia,
             valor_franquia: parametrosCliente.valor_franquia,
             volume_franquia: parametrosCliente.volume_franquia,
@@ -532,50 +530,51 @@ export default function ContratosClientes() {
             frequencia_por_volume: parametrosCliente.frequencia_por_volume
           } : {};
 
-          const configuracoesIntegracao = parametrosCliente ? {
-            cobra_integracao: parametrosCliente.cobrar_integracao,
-            valor_integracao: parametrosCliente.valor_integracao,
-            portal_laudos: parametrosCliente.portal_laudos,
-            incluir_medico_solicitante: parametrosCliente.incluir_medico_solicitante,
-            incluir_access_number: parametrosCliente.incluir_access_number,
-            incluir_empresa_origem: parametrosCliente.incluir_empresa_origem
-          } : {};
-          
-          // 5. Criar contrato no banco
-          const { error: contratoError } = await supabase
-            .from('contratos_clientes')
-            .insert({
-              cliente_id: cliente.id,
-              numero_contrato: `CT-${Date.now()}-${cliente.id.slice(-8)}`,
-              data_inicio: dataInicio,
-              data_fim: dataFim.toISOString().split('T')[0],
-              status: 'ativo',
-              servicos_contratados: servicosContratados,
-              modalidades: [...new Set(precosCliente.map(p => p.modalidade))],
-              especialidades: [...new Set(precosCliente.map(p => p.especialidade))],
-              tem_precos_configurados: true,
-              tem_parametros_configurados: parametrosCliente ? true : false,
-              considera_plantao: false,
-              cond_volume: 'MOD/ESP/CAT',
-              dia_vencimento: parametrosCliente?.forma_cobranca === 'Mensal' ? 10 : 30,
-              desconto_percentual: 0,
-              acrescimo_percentual: 0,
-              faixas_volume: [],
-              configuracoes_franquia: configuracoesFranquia,
-              configuracoes_integracao: configuracoesIntegracao,
-              // Campos adicionais dos parâmetros
-              tipo_faturamento: parametrosCliente?.tipo_faturamento || 'CO-FT',
-              forma_pagamento: parametrosCliente?.forma_cobranca || 'Mensal',
-              observacoes_contratuais: parametrosCliente ? `Parâmetros: ${parametrosCliente.tipo_faturamento || 'CO-FT'}` : 'Sem parâmetros configurados'
-            });
-          
-          if (contratoError) {
-            console.error(`Erro ao criar contrato para cliente ${cliente.nome}:`, contratoError);
-            continue;
-          }
-          
-          contratosGerados++;
+        const configuracoesIntegracao = parametrosCliente ? {
+          cobra_integracao: parametrosCliente.cobrar_integracao,
+          valor_integracao: parametrosCliente.valor_integracao,
+          portal_laudos: parametrosCliente.portal_laudos,
+          incluir_medico_solicitante: parametrosCliente.incluir_medico_solicitante,
+          incluir_access_number: parametrosCliente.incluir_access_number,
+          incluir_empresa_origem: parametrosCliente.incluir_empresa_origem
+        } : {};
+        
+        // 5. Criar contrato no banco
+        const { error: contratoError } = await supabase
+          .from('contratos_clientes')
+          .insert({
+            cliente_id: cliente.id,
+            numero_contrato: `CT-${Date.now()}-${cliente.id.slice(-8)}`,
+            data_inicio: dataInicio,
+            data_fim: dataFim.toISOString().split('T')[0],
+            status: 'ativo',
+            servicos_contratados: servicosContratados,
+            modalidades: precosCliente && precosCliente.length > 0 ? [...new Set(precosCliente.map(p => p.modalidade))] : [],
+            especialidades: precosCliente && precosCliente.length > 0 ? [...new Set(precosCliente.map(p => p.especialidade))] : [],
+            tem_precos_configurados: precosCliente && precosCliente.length > 0,
+            tem_parametros_configurados: parametrosCliente ? true : false,
+            considera_plantao: false,
+            cond_volume: 'MOD/ESP/CAT',
+            dia_vencimento: parametrosCliente?.forma_cobranca === 'Mensal' ? 10 : 30,
+            desconto_percentual: 0,
+            acrescimo_percentual: 0,
+            faixas_volume: [],
+            configuracoes_franquia: configuracoesFranquia,
+            configuracoes_integracao: configuracoesIntegracao,
+            // Campos adicionais dos parâmetros
+            tipo_faturamento: parametrosCliente?.tipo_faturamento || 'CO-FT',
+            forma_pagamento: parametrosCliente?.forma_cobranca || 'Mensal',
+            observacoes_contratuais: (precosCliente && precosCliente.length > 0) 
+              ? (parametrosCliente ? `Parâmetros: ${parametrosCliente.tipo_faturamento || 'CO-FT'}` : 'Aguardando configuração de parâmetros')
+              : 'Aguardando configuração de preços e parâmetros'
+          });
+        
+        if (contratoError) {
+          console.error(`Erro ao criar contrato para cliente ${cliente.nome}:`, contratoError);
+          continue;
         }
+        
+        contratosGerados++;
       }
       
       toast({
