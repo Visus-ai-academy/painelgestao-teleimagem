@@ -226,9 +226,10 @@ export default function GerenciarCadastros() {
       
       console.log('✅ Resposta da função:', data);
       
-      // Armazenar duplicados para exibição
+      // Armazenar duplicados para exibição (apenas quando todos os campos e o preço são idênticos)
       if (data.detalhes_duplicados && data.detalhes_duplicados.length > 0) {
-        setDuplicadosPrecos(data.detalhes_duplicados);
+        const apenasIguais = data.detalhes_duplicados.filter((d: any) => Array.isArray(d.valores_diferentes) && d.valores_diferentes.length === 1);
+        setDuplicadosPrecos(apenasIguais);
       } else {
         setDuplicadosPrecos([]);
       }
