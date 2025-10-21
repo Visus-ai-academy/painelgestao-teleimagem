@@ -10,6 +10,8 @@ interface DuplicadoPreco {
   especialidade: string;
   prioridade: string;
   categoria: string;
+  volume_inicial: number;
+  volume_final: number;
   total_duplicados: number;
   valores_diferentes: number[];
 }
@@ -46,6 +48,8 @@ export function DuplicadosPrecosList({ duplicados }: DuplicadosPrecosListProps) 
                 <TableHead>Especialidade</TableHead>
                 <TableHead>Prioridade</TableHead>
                 <TableHead>Categoria</TableHead>
+                <TableHead className="text-right">Vol. Inicial</TableHead>
+                <TableHead className="text-right">Vol. Final</TableHead>
                 <TableHead className="text-right">Qtd Duplicados</TableHead>
                 <TableHead className="text-right">Valores</TableHead>
               </TableRow>
@@ -65,6 +69,12 @@ export function DuplicadosPrecosList({ duplicados }: DuplicadosPrecosListProps) 
                   <TableCell>{dup.especialidade}</TableCell>
                   <TableCell>{dup.prioridade}</TableCell>
                   <TableCell>{dup.categoria || 'N/A'}</TableCell>
+                  <TableCell className="text-right">
+                    {dup.volume_inicial === -1 ? 'N/A' : dup.volume_inicial}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {dup.volume_final === -1 ? 'N/A' : dup.volume_final}
+                  </TableCell>
                   <TableCell className="text-right">
                     <Badge variant="outline">{dup.total_duplicados}x</Badge>
                   </TableCell>
