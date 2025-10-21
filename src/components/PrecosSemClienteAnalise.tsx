@@ -60,58 +60,76 @@ export function PrecosSemClienteAnalise() {
     try {
       setLoading(true);
       
-      console.log('🔍 Analisando preços sem cliente...');
+      console.log('🔍 Analisando TODOS os preços sem cliente...');
 
-      // Buscar preços sem cliente_id que tenham informação do cliente original na descrição
+      // Buscar TODOS os preços sem cliente_id
       const { data: precosSemCliente, error } = await supabase
         .from('precos_servicos')
         .select('*')
         .is('cliente_id', null)
-        .not('descricao', 'is', null)
-        .like('descricao', 'Cliente original:%')
-        .limit(100);
+        .limit(1000);
 
       if (error) {
         throw new Error(`Erro ao buscar preços: ${error.message}`);
       }
 
-      console.log('📊 Preços sem cliente encontrados:', precosSemCliente?.length || 0);
+      console.log('📊 Total de preços sem cliente encontrados:', precosSemCliente?.length || 0);
 
       if (!precosSemCliente || precosSemCliente.length === 0) {
         toast({
           title: "Informação",
-          description: "Nenhum preço sem cliente foi encontrado com informações de cliente original.",
+          description: "Nenhum preço sem cliente foi encontrado.",
         });
         setAnalise([]);
         return;
       }
 
-      // Agrupar por nome de cliente original
+      // Agrupar por nome de cliente (tentar extrair de descrição ou observações)
       const grupos = new Map<string, any[]>();
       
       precosSemCliente.forEach(preco => {
-        // Extrair nome do cliente da descrição "Cliente original: NOME_CLIENTE"
-        const match = preco.descricao?.match(/Cliente original:\s*(.+)/);
-        if (match) {
-          const nomeCliente = match[1].trim();
-          if (!grupos.has(nomeCliente)) {
-            grupos.set(nomeCliente, []);
+        let nomeCliente = 'DESCONHECIDO';
+        
+        // Tentar extrair da descrição "Cliente original: NOME"
+        if (preco.descricao) {
+          const matchDescricao = preco.descricao.match(/Cliente original:\s*(.+)/);
+          if (matchDescricao) {
+            nomeCliente = matchDescricao[1].trim();
+          } else {
+            // Se não tem "Cliente original:", usar a descrição completa
+            nomeCliente = preco.descricao.substring(0, 50); // Limitar tamanho
           }
-          grupos.get(nomeCliente)?.push(preco);
         }
+        
+        // Se tem observações, adicionar ao identificador
+        if (preco.observacoes && !nomeCliente.includes(preco.observacoes.substring(0, 30))) {
+          nomeCliente += ` | ${preco.observacoes.substring(0, 30)}`;
+        }
+        
+        if (!grupos.has(nomeCliente)) {
+          grupos.set(nomeCliente, []);
+        }
+        grupos.get(nomeCliente)?.push(preco);
       });
 
       console.log('📋 Grupos de clientes encontrados:', grupos.size);
 
       // Para cada grupo, buscar possíveis correspondências
       const analisePromises = Array.from(grupos.entries()).map(async ([nomeCliente, registros]) => {
-        console.log(`🔍 Buscando correspondências para: ${nomeCliente}`);
+        console.log(`🔍 Analisando grupo: ${nomeCliente} (${registros.length} registros)`);
+        
+        // Tentar extrair nome limpo para busca
+        let nomeBusca = nomeCliente;
+        if (nomeCliente.includes('Cliente original:')) {
+          const match = nomeCliente.match(/Cliente original:\s*(.+)/);
+          if (match) nomeBusca = match[1].trim();
+        }
         
         // Buscar clientes similares usando ILIKE para busca flexível
         const { data: clientesSimilares } = await supabase
           .from('clientes')
           .select('nome, nome_fantasia, nome_mobilemed')
-          .or(`nome.ilike.%${nomeCliente}%,nome_fantasia.ilike.%${nomeCliente}%,nome_mobilemed.ilike.%${nomeCliente}%`)
+          .or(`nome.ilike.%${nomeBusca}%,nome_fantasia.ilike.%${nomeBusca}%,nome_mobilemed.ilike.%${nomeBusca}%`)
           .limit(5);
 
         const possiveisMatches = clientesSimilares?.map(c => 
@@ -133,9 +151,11 @@ export function PrecosSemClienteAnalise() {
       
       setAnalise(resultadoAnalise);
       
+      const totalRegistros = resultadoAnalise.reduce((sum, item) => sum + item.total_registros, 0);
+      
       toast({
         title: "Análise Concluída",
-        description: `Encontrados ${resultadoAnalise.length} nomes de clientes não associados em ${precosSemCliente.length} registros de preços.`,
+        description: `Encontrados ${resultadoAnalise.length} grupos de clientes não associados em ${totalRegistros} registros de preços.`,
       });
 
     } catch (error) {
