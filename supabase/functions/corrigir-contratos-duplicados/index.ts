@@ -40,9 +40,9 @@ serve(async (req) => {
 
     const { data: todosClientesParaConsolidar, error: errorClientesConsolidar } = await supabaseClient
       .from('clientes')
-      .select('id, nome_fantasia, created_at')
-      .eq('ativo', true)
-      .order('nome_fantasia');
+      .select('id, nome_fantasia, created_at, ativo')
+      .order('nome_fantasia')
+      .order('created_at', { ascending: false });
 
     if (errorClientesConsolidar) {
       console.error('Erro ao buscar clientes para consolidar:', errorClientesConsolidar);
@@ -63,10 +63,11 @@ serve(async (req) => {
       if (clientes.length > 1) {
         console.log(`\n🔄 Consolidando ${clientes.length} registros de: ${nomeFantasia}`);
         
-        // Ordenar por created_at (mais recente primeiro)
-        clientes.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-        const clientePrincipal = clientes[0];
-        const clientesParaRemover = clientes.slice(1);
+        // Priorizar clientes ativos; entre eles, o mais recente
+        const ordenados = [...clientes].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        const preferidos = ordenados.filter((c: any) => c.ativo);
+        const clientePrincipal = (preferidos.length ? preferidos : ordenados)[0];
+        const clientesParaRemover = ordenados.filter((c: any) => c.id !== clientePrincipal.id);
 
         console.log(`   Mantendo cliente: ${clientePrincipal.id}`);
         console.log(`   Removendo clientes: ${clientesParaRemover.map(c => c.id).join(', ')}`);

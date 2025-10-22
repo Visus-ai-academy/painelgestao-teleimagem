@@ -254,7 +254,12 @@ export default function ContratosClientes() {
 
       // Buscar parâmetros de faturamento separadamente para evitar duplicatas
       const clienteIds = contratosData?.map(c => c.cliente_id) || [];
+      const nomesFantasia = (contratosData || [])
+        .map(c => c.clientes?.nome_fantasia)
+        .filter((n: any) => Boolean(n)) as string[];
+
       let parametrosPorCliente: Record<string, any> = {};
+      let parametrosPorNome: Record<string, any> = {};
       
       if (clienteIds.length > 0) {
         const { data: parametrosData } = await supabase
@@ -271,10 +276,25 @@ export default function ContratosClientes() {
         });
       }
 
+      if (nomesFantasia.length > 0) {
+        const uniqueNomes = Array.from(new Set(nomesFantasia));
+        const { data: paramsByNome } = await supabase
+          .from('parametros_faturamento')
+          .select('*')
+          .in('nome_fantasia', uniqueNomes);
+
+        paramsByNome?.forEach((p: any) => {
+          const key = (p.nome_fantasia || '').toString();
+          if (!parametrosPorNome[key] || parametrosPorNome[key].updated_at < p.updated_at) {
+            parametrosPorNome[key] = p;
+          }
+        });
+      }
+
       // Transformar dados do Supabase para o formato da interface
       const contratosFormatados: ContratoCliente[] = (contratosData || []).map(contrato => {
         const cliente = contrato.clientes;
-        const parametros = parametrosPorCliente[contrato.cliente_id] || null;
+        const parametros = parametrosPorCliente[contrato.cliente_id] || (cliente?.nome_fantasia ? parametrosPorNome[cliente.nome_fantasia] : null) || null;
         
         const hoje = new Date();
         hoje.setHours(0, 0, 0, 0); // Normalizar para início do dia
