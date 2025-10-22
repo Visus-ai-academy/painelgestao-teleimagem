@@ -53,13 +53,15 @@ interface DemonstrativoFaturamentoCompletoProps {
   onDemonstrativosGerados?: (dados: { demonstrativos: DemonstrativoCliente[], resumo: Resumo }) => void;
   onResetarStatus?: () => void;
   onStatusChange?: (status: 'pendente' | 'processando' | 'concluido') => void;
+  renderMode?: 'full' | 'button-only'; // full = com Card, button-only = apenas botão
 }
 
 export function DemonstrativoFaturamentoCompleto({ 
   periodo, 
   onDemonstrativosGerados, 
   onResetarStatus,
-  onStatusChange 
+  onStatusChange,
+  renderMode = 'full'
 }: DemonstrativoFaturamentoCompletoProps) {
   const [loading, setLoading] = useState(false);
   const [demonstrativos, setDemonstrativos] = useState<DemonstrativoCliente[]>([]);
@@ -314,6 +316,31 @@ export function DemonstrativoFaturamentoCompleto({
     return <Badge variant="default">Aplicada</Badge>;
   };
 
+  // Renderizar apenas o botão se renderMode = 'button-only'
+  if (renderMode === 'button-only') {
+    return (
+      <Button 
+        onClick={handleGerarDemonstrativos}
+        disabled={loading || !periodo}
+        size="lg"
+        className="min-w-[280px] bg-blue-600 hover:bg-blue-700"
+      >
+        {loading ? (
+          <>
+            <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+            Processando...
+          </>
+        ) : (
+          <>
+            <FileText className="h-5 w-5 mr-2" />
+            📊 Gerar Demonstrativos
+          </>
+        )}
+      </Button>
+    );
+  }
+
+  // Renderização completa com Card (padrão)
   return (
     <div className="space-y-6">
       <Card>

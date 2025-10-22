@@ -2208,63 +2208,57 @@ export default function GerarFaturamento() {
                   <FileBarChart2 className="h-4 w-4" />
                   Etapa 1: Gerar Demonstrativo de Faturamento Completo
                 </h4>
-                <div className="text-sm text-gray-600 mb-4">
-                  {demonstrativoGerado ? (
-                    <div className="flex items-center gap-2 text-green-600">
-                      <CheckCircle className="h-4 w-4" />
-                      ✅ Demonstrativo gerado com sucesso! Você pode prosseguir para a Etapa 2.
-                    </div>
-                  ) : (
-                    <div className="text-blue-700">
-                      <FileBarChart2 className="h-4 w-4 inline mr-2" />
-                      Generate o demonstrativo completo com franquias para todos os clientes do período selecionado.
-                    </div>
-                  )}
-                </div>
-
-                {/* Componente de geração de demonstrativos */}
-                <DemonstrativoFaturamentoCompleto 
-                  periodo={periodoSelecionado} 
-                  onResetarStatus={resetarTodosStatus}
-                  onStatusChange={handleStatusDemonstrativo}
-                  onDemonstrativosGerados={(dados) => {
-                    console.log('🔄 Callback onDemonstrativosGerados recebido:');
-                    console.log('📊 Dados completos:', dados);
-                    console.log('📋 Demonstrativos:', dados?.demonstrativos);
-                    console.log('📏 Quantidade:', dados?.demonstrativos?.length);
-                    
-                    if (!dados?.demonstrativos || !Array.isArray(dados.demonstrativos)) {
-                      console.error('❌ Demonstrativos não encontrados ou não é um array');
-                      return;
+                <div className="flex flex-col sm:flex-row gap-3 items-center">
+                  <DemonstrativoFaturamentoCompleto 
+                    periodo={periodoSelecionado}
+                    renderMode="button-only"
+                    onResetarStatus={resetarTodosStatus}
+                    onStatusChange={handleStatusDemonstrativo}
+                    onDemonstrativosGerados={(dados) => {
+                      console.log('🔄 Callback onDemonstrativosGerados recebido:');
+                      console.log('📊 Dados completos:', dados);
+                      console.log('📋 Demonstrativos:', dados?.demonstrativos);
+                      console.log('📏 Quantidade:', dados?.demonstrativos?.length);
+                      
+                      if (!dados?.demonstrativos || !Array.isArray(dados.demonstrativos)) {
+                        console.error('❌ Demonstrativos não encontrados ou não é um array');
+                        return;
+                      }
+                      
+                      // Atualizar a lista de clientes para relatórios
+                      const clientesParaRelatorio = dados.demonstrativos.map(d => ({
+                        id: d.cliente_id,
+                        nome: d.cliente_nome,
+                        email: '' // Email será buscado conforme necessário
+                      }));
+                      
+                      console.log('👥 Clientes para relatório:', clientesParaRelatorio);
+                      setClientesCarregados(clientesParaRelatorio);
+                      
+                      // Atualizar conjunto de clientes que tiveram demonstrativos gerados
+                      const clientesProcessados = new Set(dados.demonstrativos.map(d => d.cliente_nome));
+                      console.log('✅ Clientes processados:', Array.from(clientesProcessados));
+                      setDemonstrativosGeradosPorCliente(clientesProcessados);
+                      // Persistir no localStorage
+                      localStorage.setItem(`demonstrativosGerados_${periodoSelecionado}`, JSON.stringify(Array.from(clientesProcessados)));
+                      
+                      setDemonstrativoGerado(true);
+                      localStorage.setItem('demonstrativoGerado', 'true');
+                      
+                      toast({
+                        title: `${dados.resumo?.clientes_processados || 0} clientes únicos encontrados na volumetria do período ${periodoSelecionado}`,
+                        description: "Agora você pode prosseguir para a Etapa 2 - Gerar Relatórios",
+                        variant: "default",
+                      });
+                    }}
+                  />
+                  <p className="text-sm text-blue-700">
+                    {demonstrativoGerado 
+                      ? "✅ Demonstrativo gerado com sucesso! Você pode prosseguir para a Etapa 2." 
+                      : "Gera demonstrativo completo com franquias para todos os clientes do período"
                     }
-                    
-                    // Atualizar a lista de clientes para relatórios
-                    const clientesParaRelatorio = dados.demonstrativos.map(d => ({
-                      id: d.cliente_id,
-                      nome: d.cliente_nome,
-                      email: '' // Email será buscado conforme necessário
-                    }));
-                    
-                    console.log('👥 Clientes para relatório:', clientesParaRelatorio);
-                    setClientesCarregados(clientesParaRelatorio);
-                    
-                    // Atualizar conjunto de clientes que tiveram demonstrativos gerados
-                    const clientesProcessados = new Set(dados.demonstrativos.map(d => d.cliente_nome));
-                    console.log('✅ Clientes processados:', Array.from(clientesProcessados));
-                    setDemonstrativosGeradosPorCliente(clientesProcessados);
-                    // Persistir no localStorage
-                    localStorage.setItem(`demonstrativosGerados_${periodoSelecionado}`, JSON.stringify(Array.from(clientesProcessados)));
-                    
-                    setDemonstrativoGerado(true);
-                    localStorage.setItem('demonstrativoGerado', 'true');
-                    
-                    toast({
-                      title: `${dados.resumo?.clientes_processados || 0} clientes únicos encontrados na volumetria do período ${periodoSelecionado}`,
-                      description: "Agora você pode prosseguir para a Etapa 2 - Gerar Relatórios",
-                      variant: "default",
-                    });
-                  }}
-                />
+                  </p>
+                </div>
               </div>
 
               {/* Etapa 2: Gerar Relatórios */}
