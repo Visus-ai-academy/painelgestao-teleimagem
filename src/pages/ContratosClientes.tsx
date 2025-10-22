@@ -350,11 +350,11 @@ export default function ContratosClientes() {
           termosAditivos: [],
           documentos: [],
           // Usar dados dos parâmetros de faturamento para sincronização
+          // Usar número dos parâmetros; se ausente, exibir vazio (ignorar CT- gerado)
           numeroContrato: (() => {
             const p = parametros?.numero_contrato?.toString().trim();
             if (p) return p;
-            const c = contrato.numero_contrato?.toString().trim();
-            return c || '';
+            return '';
           })(),
           razaoSocial: parametros?.razao_social || cliente?.razao_social || cliente?.nome || 'Não informado',
           aplicarFranquia: parametros?.aplicar_franquia ?? configuracoesFranquia.tem_franquia ?? false,

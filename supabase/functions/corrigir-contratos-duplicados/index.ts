@@ -165,15 +165,14 @@ serve(async (req) => {
         continue;
       }
 
-      // Se há número de contrato nos parâmetros e é diferente do atual
-      if (parametros?.numero_contrato && parametros.numero_contrato !== contrato.numero_contrato) {
-        const numeroAntigo = contrato.numero_contrato;
-        const numeroNovo = parametros.numero_contrato;
+      const numeroParam = parametros?.numero_contrato?.toString().trim();
+      const numeroAtual = (contrato as any).numero_contrato?.toString().trim();
 
-        // Atualizar número do contrato
+      if (numeroParam && numeroParam !== numeroAtual) {
+        // Atualizar para o número dos parâmetros
         const { error: errorUpdate } = await supabaseClient
           .from('contratos_clientes')
-          .update({ numero_contrato: numeroNovo })
+          .update({ numero_contrato: numeroParam })
           .eq('id', contrato.id);
 
         if (errorUpdate) {
@@ -181,18 +180,43 @@ serve(async (req) => {
           resultados.push({
             cliente_nome,
             acao: 'erro_atualizacao',
-            numero_contrato_antigo: numeroAntigo,
-            numero_contrato_novo: numeroNovo,
-            detalhes: errorUpdate.message
+            numero_contrato_antigo: numeroAtual,
+            numero_contrato_novo: numeroParam,
+            detalhes: (errorUpdate as any).message
           });
         } else {
-          console.log(`✅ ${cliente_nome}: ${numeroAntigo} → ${numeroNovo}`);
+          console.log(`✅ ${cliente_nome}: ${numeroAtual} → ${numeroParam}`);
           resultados.push({
             cliente_nome,
             acao: 'numero_corrigido',
-            numero_contrato_antigo: numeroAntigo,
-            numero_contrato_novo: numeroNovo
+            numero_contrato_antigo: numeroAtual,
+            numero_contrato_novo: numeroParam
           });
+        }
+      } else if (!numeroParam) {
+        // Sem número nos parâmetros: se o contrato atual é um "CT-" gerado, zerar
+        if (numeroAtual && /^CT-/i.test(numeroAtual)) {
+          const { error: errorZerar } = await supabaseClient
+            .from('contratos_clientes')
+            .update({ numero_contrato: null })
+            .eq('id', contrato.id);
+
+          if (errorZerar) {
+            console.error(`❌ Erro ao zerar número de ${cliente_nome}:`, errorZerar);
+            resultados.push({
+              cliente_nome,
+              acao: 'erro_zerar_numero',
+              numero_contrato_antigo: numeroAtual,
+              detalhes: (errorZerar as any).message
+            });
+          } else {
+            console.log(`🧹 ${cliente_nome}: número "${numeroAtual}" removido por ausência em parâmetros`);
+            resultados.push({
+              cliente_nome,
+              acao: 'numero_zerado_por_parametros_ausentes',
+              numero_contrato_antigo: numeroAtual
+            });
+          }
         }
       }
     }
