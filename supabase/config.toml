@@ -160,3 +160,6 @@ verify_jwt = true
 
 [functions.resetar-status-nf-omie]
 verify_jwt = true
+
+[functions.corrigir-contratos-duplicados]
+verify_jwt = true
