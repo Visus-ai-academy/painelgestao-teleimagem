@@ -80,7 +80,19 @@ export function CorrigirContratosDuplicados() {
       
       const { data, error } = await supabase.functions.invoke('limpar-numeros-contrato', {
         body: {
-          clientesParaLimpar: ['CLINICA_CRL', 'CLIRAM', 'DIAGNOSTICA', 'CDICARDIO']
+          clientesParaLimpar: [
+            'CLINICA_CRL',
+            'CLIRAM',
+            'DIAGNOSTICA',
+            'CDICARDIO',
+            'DIAGSAUDE-PR',
+            'GA_SM',
+            'GOLD',
+            'GOLD_RMX',
+            'NOVAMED',
+            'RADIOCAMP',
+            'ZANELLO'
+          ]
         }
       });
       
