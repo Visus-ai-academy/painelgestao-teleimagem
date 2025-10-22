@@ -35,36 +35,94 @@ serve(async (req) => {
 
     const resultados: ResultadoCorrecao[] = [];
 
-    // ETAPA 1: Identificar clientes duplicados
-    console.log('\n📋 ETAPA 1: Identificando clientes duplicados...');
+    // ETAPA 0: Consolidar clientes duplicados (mesmo nome_fantasia)
+    console.log('\n📋 ETAPA 0: Consolidando clientes duplicados...');
 
-    const { data: todosClientes, error: errorClientes } = await supabaseClient
+    const { data: todosClientesParaConsolidar, error: errorClientesConsolidar } = await supabaseClient
       .from('clientes')
-      .select('id, nome_fantasia')
-      .eq('ativo', true);
+      .select('id, nome_fantasia, created_at')
+      .eq('ativo', true)
+      .order('nome_fantasia');
 
-    if (errorClientes) {
-      console.error('Erro ao buscar clientes:', errorClientes);
-      throw errorClientes;
+    if (errorClientesConsolidar) {
+      console.error('Erro ao buscar clientes para consolidar:', errorClientesConsolidar);
+      throw errorClientesConsolidar;
     }
 
-    // Agrupar clientes por nome_fantasia
-    const clientesPorNome = new Map<string, string[]>();
-    for (const cliente of todosClientes || []) {
-      if (!clientesPorNome.has(cliente.nome_fantasia)) {
-        clientesPorNome.set(cliente.nome_fantasia, []);
+    // Agrupar por nome_fantasia
+    const clientesPorNomeFantasia = new Map<string, any[]>();
+    for (const cliente of todosClientesParaConsolidar || []) {
+      if (!clientesPorNomeFantasia.has(cliente.nome_fantasia)) {
+        clientesPorNomeFantasia.set(cliente.nome_fantasia, []);
       }
-      clientesPorNome.get(cliente.nome_fantasia)!.push(cliente.id);
+      clientesPorNomeFantasia.get(cliente.nome_fantasia)!.push(cliente);
     }
 
-    // Identificar duplicados
-    const clientesDuplicados = Array.from(clientesPorNome.entries())
-      .filter(([_, ids]) => ids.length > 1)
-      .map(([nome, ids]) => ({ nome_fantasia: nome, ids, total: ids.length }));
+    // Consolidar clientes duplicados
+    for (const [nomeFantasia, clientes] of clientesPorNomeFantasia.entries()) {
+      if (clientes.length > 1) {
+        console.log(`\n🔄 Consolidando ${clientes.length} registros de: ${nomeFantasia}`);
+        
+        // Ordenar por created_at (mais recente primeiro)
+        clientes.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        const clientePrincipal = clientes[0];
+        const clientesParaRemover = clientes.slice(1);
 
-    console.log(`✅ Encontrados ${clientesDuplicados.length} clientes duplicados`);
-    for (const dup of clientesDuplicados) {
-      console.log(`   - ${dup.nome_fantasia}: ${dup.total} registros`);
+        console.log(`   Mantendo cliente: ${clientePrincipal.id}`);
+        console.log(`   Removendo clientes: ${clientesParaRemover.map(c => c.id).join(', ')}`);
+
+        // Para cada cliente a ser removido, mover contratos e parâmetros
+        for (const clienteRemover of clientesParaRemover) {
+          // Mover contratos
+          const { error: errorMoverContratos } = await supabaseClient
+            .from('contratos_clientes')
+            .update({ cliente_id: clientePrincipal.id })
+            .eq('cliente_id', clienteRemover.id);
+
+          if (errorMoverContratos) {
+            console.error(`❌ Erro ao mover contratos de ${clienteRemover.id}:`, errorMoverContratos);
+          }
+
+          // Mover parâmetros de faturamento
+          const { error: errorMoverParametros } = await supabaseClient
+            .from('parametros_faturamento')
+            .update({ cliente_id: clientePrincipal.id })
+            .eq('cliente_id', clienteRemover.id);
+
+          if (errorMoverParametros) {
+            console.error(`❌ Erro ao mover parâmetros de ${clienteRemover.id}:`, errorMoverParametros);
+          }
+
+          // Mover preços
+          const { error: errorMoverPrecos } = await supabaseClient
+            .from('precos_servicos')
+            .update({ cliente_id: clientePrincipal.id })
+            .eq('cliente_id', clienteRemover.id);
+
+          if (errorMoverPrecos) {
+            console.error(`❌ Erro ao mover preços de ${clienteRemover.id}:`, errorMoverPrecos);
+          }
+
+          // Desativar cliente antigo
+          const { error: errorDesativar } = await supabaseClient
+            .from('clientes')
+            .update({ ativo: false })
+            .eq('id', clienteRemover.id);
+
+          if (errorDesativar) {
+            console.error(`❌ Erro ao desativar cliente ${clienteRemover.id}:`, errorDesativar);
+          }
+        }
+
+        resultados.push({
+          cliente_nome: nomeFantasia,
+          acao: 'clientes_consolidados',
+          contratos_removidos: clientesParaRemover.length,
+          detalhes: `Consolidados ${clientes.length} registros de cliente em um único`
+        });
+
+        console.log(`✅ ${nomeFantasia}: Consolidados ${clientes.length} registros`);
+      }
     }
 
     // ETAPA 2: Corrigir números de contrato baseados nos parâmetros
