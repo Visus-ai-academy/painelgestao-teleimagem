@@ -350,7 +350,12 @@ export default function ContratosClientes() {
           termosAditivos: [],
           documentos: [],
           // Usar dados dos parâmetros de faturamento para sincronização
-          numeroContrato: parametros?.numero_contrato || contrato.numero_contrato || `CT-${contrato.id.slice(-8)}`,
+          numeroContrato: (() => {
+            const p = parametros?.numero_contrato?.toString().trim();
+            if (p) return p;
+            const c = contrato.numero_contrato?.toString().trim();
+            return c || '';
+          })(),
           razaoSocial: parametros?.razao_social || cliente?.razao_social || cliente?.nome || 'Não informado',
           aplicarFranquia: parametros?.aplicar_franquia ?? configuracoesFranquia.tem_franquia ?? false,
           valorFranquia: Number(parametros?.valor_franquia ?? configuracoesFranquia.valor_franquia ?? 0),
@@ -541,8 +546,10 @@ export default function ContratosClientes() {
         } : {};
         
         // 5. Criar contrato no banco
-        // Usar número de contrato dos parâmetros se disponível, senão gerar automaticamente
-        const numeroContrato = parametrosCliente?.numero_contrato || `CT-${Date.now()}-${cliente.id.slice(-8)}`;
+        // Usar número de contrato dos parâmetros; se ausente, deixar em branco (NULL)
+        const numeroContrato = (parametrosCliente?.numero_contrato && String(parametrosCliente.numero_contrato).trim())
+          ? String(parametrosCliente.numero_contrato).trim()
+          : null;
         
         const { error: contratoError } = await supabase
           .from('contratos_clientes')
