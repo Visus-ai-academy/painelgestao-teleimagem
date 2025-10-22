@@ -25,7 +25,7 @@ export type Database = {
           horario_checkin: string | null
           horario_checkout: string | null
           id: string
-          ip_address: unknown | null
+          ip_address: unknown
           medico_id: string
           observacoes: string | null
           status_ativacao: string
@@ -41,7 +41,7 @@ export type Database = {
           horario_checkin?: string | null
           horario_checkout?: string | null
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           medico_id: string
           observacoes?: string | null
           status_ativacao?: string
@@ -57,7 +57,7 @@ export type Database = {
           horario_checkin?: string | null
           horario_checkout?: string | null
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           medico_id?: string
           observacoes?: string | null
           status_ativacao?: string
@@ -77,7 +77,7 @@ export type Database = {
         Row: {
           evento_tipo: string | null
           id: string
-          ip_address: unknown | null
+          ip_address: unknown
           new_data: Json | null
           old_data: Json | null
           operation: string
@@ -93,7 +93,7 @@ export type Database = {
         Insert: {
           evento_tipo?: string | null
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           new_data?: Json | null
           old_data?: Json | null
           operation: string
@@ -109,7 +109,7 @@ export type Database = {
         Update: {
           evento_tipo?: string | null
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           new_data?: Json | null
           old_data?: Json | null
           operation?: string
@@ -719,7 +719,7 @@ export type Database = {
           impostos_ab_min: number | null
           indice_reajuste: string | null
           modalidades: string[] | null
-          numero_contrato: string
+          numero_contrato: string | null
           observacoes: string | null
           observacoes_contratuais: string | null
           omie_codigo_cliente: string | null
@@ -760,7 +760,7 @@ export type Database = {
           impostos_ab_min?: number | null
           indice_reajuste?: string | null
           modalidades?: string[] | null
-          numero_contrato: string
+          numero_contrato?: string | null
           observacoes?: string | null
           observacoes_contratuais?: string | null
           omie_codigo_cliente?: string | null
@@ -801,7 +801,7 @@ export type Database = {
           impostos_ab_min?: number | null
           indice_reajuste?: string | null
           modalidades?: string[] | null
-          numero_contrato?: string
+          numero_contrato?: string | null
           observacoes?: string | null
           observacoes_contratuais?: string | null
           omie_codigo_cliente?: string | null
@@ -963,7 +963,7 @@ export type Database = {
           action: string
           data_classification: string | null
           id: string
-          ip_address: unknown | null
+          ip_address: unknown
           resource_id: string | null
           resource_type: string
           sensitive_data_accessed: boolean | null
@@ -976,7 +976,7 @@ export type Database = {
           action: string
           data_classification?: string | null
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           resource_id?: string | null
           resource_type: string
           sensitive_data_accessed?: boolean | null
@@ -989,7 +989,7 @@ export type Database = {
           action?: string
           data_classification?: string | null
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           resource_id?: string | null
           resource_type?: string
           sensitive_data_accessed?: boolean | null
@@ -1936,7 +1936,7 @@ export type Database = {
           expires_at: string | null
           granted: boolean
           id: string
-          ip_address: unknown | null
+          ip_address: unknown
           legal_basis: string
           purpose: string
           timestamp: string | null
@@ -1950,7 +1950,7 @@ export type Database = {
           expires_at?: string | null
           granted: boolean
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           legal_basis: string
           purpose: string
           timestamp?: string | null
@@ -1964,7 +1964,7 @@ export type Database = {
           expires_at?: string | null
           granted?: boolean
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           legal_basis?: string
           purpose?: string
           timestamp?: string | null
@@ -2015,7 +2015,7 @@ export type Database = {
           acao: string
           ativacao_id: string
           id: string
-          ip_address: unknown | null
+          ip_address: unknown
           medico_id: string
           observacoes: string | null
           timestamp_acao: string
@@ -2025,7 +2025,7 @@ export type Database = {
           acao: string
           ativacao_id: string
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           medico_id: string
           observacoes?: string | null
           timestamp_acao?: string
@@ -2035,7 +2035,7 @@ export type Database = {
           acao?: string
           ativacao_id?: string
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           medico_id?: string
           observacoes?: string | null
           timestamp_acao?: string
@@ -2930,7 +2930,7 @@ export type Database = {
           registros_processados: number | null
           status: string
           tamanho_arquivo: number | null
-          tempo_processamento: unknown | null
+          tempo_processamento: unknown
           tipo_arquivo: string
           tipo_dados: string
         }
@@ -2949,7 +2949,7 @@ export type Database = {
           registros_processados?: number | null
           status?: string
           tamanho_arquivo?: number | null
-          tempo_processamento?: unknown | null
+          tempo_processamento?: unknown
           tipo_arquivo: string
           tipo_dados?: string
         }
@@ -2968,7 +2968,7 @@ export type Database = {
           registros_processados?: number | null
           status?: string
           tamanho_arquivo?: number | null
-          tempo_processamento?: unknown | null
+          tempo_processamento?: unknown
           tipo_arquivo?: string
           tipo_dados?: string
         }
@@ -3335,7 +3335,7 @@ export type Database = {
           auto_resolved: boolean | null
           description: string
           id: string
-          ip_address: unknown | null
+          ip_address: unknown
           metadata: Json | null
           severity: string
           status: string | null
@@ -3348,7 +3348,7 @@ export type Database = {
           auto_resolved?: boolean | null
           description: string
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           metadata?: Json | null
           severity: string
           status?: string | null
@@ -3361,7 +3361,7 @@ export type Database = {
           auto_resolved?: boolean | null
           description?: string
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           metadata?: Json | null
           severity?: string
           status?: string | null
@@ -4231,14 +4231,8 @@ export type Database = {
         Args: { p_cobertura_id: string; p_medico_aceitou_id: string }
         Returns: Json
       }
-      analyze_partitioning_need: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
-      aplicar_categorias_volumetria: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
+      analyze_partitioning_need: { Args: never; Returns: Json }
+      aplicar_categorias_volumetria: { Args: never; Returns: Json }
       aplicar_data_referencia_por_periodo: {
         Args: {
           p_ano: number
@@ -4252,10 +4246,7 @@ export type Database = {
         Args: { arquivo_fonte_param?: string }
         Returns: Json
       }
-      aplicar_de_para_prioridade: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
+      aplicar_de_para_prioridade: { Args: never; Returns: Json }
       aplicar_quebras_pendentes: {
         Args: { arquivo_fonte_param?: string }
         Returns: Json
@@ -4314,6 +4305,12 @@ export type Database = {
           updated_at: string
           VALORES: number | null
         }
+        SetofOptions: {
+          from: "volumetria_mobilemed"
+          to: "volumetria_mobilemed"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       aplicar_regras_quebra_exames: {
         Args: { arquivo_fonte_param?: string }
@@ -4323,14 +4320,8 @@ export type Database = {
         Args: { lote_upload_param?: string }
         Returns: Json
       }
-      aplicar_valores_de_para: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
-      archive_old_volumetria_data: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
+      aplicar_valores_de_para: { Args: never; Returns: Json }
+      archive_old_volumetria_data: { Args: never; Returns: number }
       buscar_nome_fantasia_cliente: {
         Args: { p_unidade_origem: string }
         Returns: string
@@ -4355,17 +4346,9 @@ export type Database = {
           valor_total: number
         }[]
       }
-      calcular_preco_exame: {
-        Args:
-          | {
-              p_categoria: string
-              p_cliente: string
-              p_especialidade: string
-              p_modalidade: string
-              p_periodo: string
-              p_prioridade: string
-            }
-          | {
+      calcular_preco_exame:
+        | {
+            Args: {
               p_categoria?: string
               p_cliente_id: string
               p_especialidade: string
@@ -4374,8 +4357,19 @@ export type Database = {
               p_prioridade?: string
               p_volume_total?: number
             }
-        Returns: number
-      }
+            Returns: number
+          }
+        | {
+            Args: {
+              p_categoria: string
+              p_cliente: string
+              p_especialidade: string
+              p_modalidade: string
+              p_periodo: string
+              p_prioridade: string
+            }
+            Returns: number
+          }
       calcular_volume_total: {
         Args: {
           p_categoria?: string
@@ -4386,22 +4380,10 @@ export type Database = {
         }
         Returns: number
       }
-      calculate_custom_metric: {
-        Args: { metric_name: string }
-        Returns: Json
-      }
-      can_edit_data: {
-        Args: { data_referencia: string }
-        Returns: boolean
-      }
-      can_insert_data: {
-        Args: { data_referencia: string }
-        Returns: boolean
-      }
-      can_view_data: {
-        Args: { data_referencia: string }
-        Returns: boolean
-      }
+      calculate_custom_metric: { Args: { metric_name: string }; Returns: Json }
+      can_edit_data: { Args: { data_referencia: string }; Returns: boolean }
+      can_insert_data: { Args: { data_referencia: string }; Returns: boolean }
+      can_view_data: { Args: { data_referencia: string }; Returns: boolean }
       check_rate_limit: {
         Args: {
           action_type: string
@@ -4411,14 +4393,8 @@ export type Database = {
         }
         Returns: boolean
       }
-      cleanup_old_audit_logs: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
-      cleanup_old_performance_logs: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
+      cleanup_old_audit_logs: { Args: never; Returns: number }
+      cleanup_old_performance_logs: { Args: never; Returns: number }
       create_security_alert: {
         Args: {
           p_alert_type: string
@@ -4429,42 +4405,18 @@ export type Database = {
         }
         Returns: string
       }
-      criar_contratos_clientes_automatico: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
-      detectar_tipo_documento: {
-        Args: { documento: string }
-        Returns: string
-      }
-      diagnosticar_limitacoes_supabase: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
-      encerrar_uploads_travados: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
-      enhanced_security_audit: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
-      enviar_escala_mensal: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      exec_truncate_volumetria: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
+      criar_contratos_clientes_automatico: { Args: never; Returns: Json }
+      detectar_tipo_documento: { Args: { documento: string }; Returns: string }
+      diagnosticar_limitacoes_supabase: { Args: never; Returns: Json }
+      encerrar_uploads_travados: { Args: never; Returns: Json }
+      enhanced_security_audit: { Args: never; Returns: Json }
+      enviar_escala_mensal: { Args: never; Returns: undefined }
+      exec_truncate_volumetria: { Args: never; Returns: undefined }
       executar_rollback_upload: {
         Args: { p_motivo: string; p_upload_id: string }
         Returns: Json
       }
-      expirar_coberturas_automaticamente: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
+      expirar_coberturas_automaticamente: { Args: never; Returns: undefined }
       fazer_checkin_ativacao: {
         Args: {
           p_dispositivo_info?: Json
@@ -4482,7 +4434,7 @@ export type Database = {
         Returns: Json
       }
       get_all_volumetria_data: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           CATEGORIA: string
           DATA_LAUDO: string
@@ -4501,7 +4453,7 @@ export type Database = {
         }[]
       }
       get_clientes_com_volumetria: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           ativo: boolean
           cidade: string
@@ -4519,7 +4471,7 @@ export type Database = {
         }[]
       }
       get_clientes_stats_completos: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           empresa: string
           especialidades_unicas: string[]
@@ -4533,12 +4485,9 @@ export type Database = {
           valor_medio_exame: number
         }[]
       }
-      get_current_timestamp: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
+      get_current_timestamp: { Args: never; Returns: string }
       get_laudos_atrasados_completos: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           CATEGORIA: string
           DATA_LAUDO: string
@@ -4584,7 +4533,7 @@ export type Database = {
         }[]
       }
       get_regras_aplicadas_detalhadas: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           registros_processados: number
           registros_rejeitados: number
@@ -4594,7 +4543,7 @@ export type Database = {
         }[]
       }
       get_regras_aplicadas_stats: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           regra: string
           total_aplicacoes: number
@@ -4602,18 +4551,15 @@ export type Database = {
         }[]
       }
       get_tempo_medio_atraso_clientes: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           empresa: string
           tempo_medio_atraso_horas: number
         }[]
       }
-      get_user_role: {
-        Args: { user_id: string }
-        Returns: string
-      }
+      get_user_role: { Args: { user_id: string }; Returns: string }
       get_volumetria_aggregated_stats: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           arquivo_fonte: string
           records_with_value: number
@@ -4623,7 +4569,7 @@ export type Database = {
         }[]
       }
       get_volumetria_complete_data: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           CATEGORIA: string
           DATA_LAUDO: string
@@ -4642,7 +4588,7 @@ export type Database = {
         }[]
       }
       get_volumetria_cursor_complete: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           CATEGORIA: string
           DATA_LAUDO: string
@@ -4661,7 +4607,7 @@ export type Database = {
         }[]
       }
       get_volumetria_dashboard_stats: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           clientes_unicos: string[]
           especialidades_unicas: string[]
@@ -4681,7 +4627,7 @@ export type Database = {
         }[]
       }
       get_volumetria_force_complete: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           CATEGORIA: string
           DATA_LAUDO: string
@@ -4713,19 +4659,16 @@ export type Database = {
         }[]
       }
       get_volumetria_total_atraso: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           percentual_atraso: number
           total_atrasados: number
           total_laudos: number
         }[]
       }
-      get_volumetria_total_count: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
+      get_volumetria_total_count: { Args: never; Returns: number }
       get_volumetria_unlimited: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           CATEGORIA: string
           DATA_LAUDO: string
@@ -4745,7 +4688,7 @@ export type Database = {
         }[]
       }
       get_volumetria_unlimited_force: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           CATEGORIA: string
           DATA_LAUDO: string
@@ -4763,10 +4706,7 @@ export type Database = {
           VALORES: number
         }[]
       }
-      has_metrics_access: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
+      has_metrics_access: { Args: never; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -4774,16 +4714,10 @@ export type Database = {
         }
         Returns: boolean
       }
-      has_volumetria_access: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
-      hash_personal_data: {
-        Args: { data: string }
-        Returns: string
-      }
+      has_volumetria_access: { Args: never; Returns: boolean }
+      hash_personal_data: { Args: { data: string }; Returns: string }
       identificar_duplicados_precos_servicos: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           categoria: string
           cliente_id: string
@@ -4797,18 +4731,13 @@ export type Database = {
           volume_inicial: number
         }[]
       }
-      is_admin: {
-        Args: Record<PropertyKey, never> | { _user_id?: string }
-        Returns: boolean
-      }
-      is_manager_or_admin: {
-        Args: Record<PropertyKey, never> | { _user_id?: string }
-        Returns: boolean
-      }
-      limpar_dados_ficticios: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
+      is_admin:
+        | { Args: never; Returns: boolean }
+        | { Args: { _user_id?: string }; Returns: boolean }
+      is_manager_or_admin:
+        | { Args: never; Returns: boolean }
+        | { Args: { _user_id?: string }; Returns: boolean }
+      limpar_dados_ficticios: { Args: never; Returns: Json }
       limpar_dados_volumetria: {
         Args: { arquivos_fonte: string[] }
         Returns: {
@@ -4820,22 +4749,10 @@ export type Database = {
         Args: { p_periodo_referencia: string }
         Returns: number
       }
-      limpar_nome_cliente: {
-        Args: { nome_cliente: string }
-        Returns: string
-      }
-      limpar_staging_processado: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
-      limpar_todos_precos: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      limpar_uploads_travados: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
+      limpar_nome_cliente: { Args: { nome_cliente: string }; Returns: string }
+      limpar_staging_processado: { Args: never; Returns: number }
+      limpar_todos_precos: { Args: never; Returns: undefined }
+      limpar_uploads_travados: { Args: never; Returns: Json }
       listar_coberturas_disponiveis: {
         Args: { p_medico_id: string }
         Returns: {
@@ -4890,14 +4807,8 @@ export type Database = {
         Args: { upload_id_param: string }
         Returns: Json
       }
-      normalizar_clientes_cedi: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
-      normalizar_medico: {
-        Args: { medico_nome: string }
-        Returns: string
-      }
+      normalizar_clientes_cedi: { Args: never; Returns: Json }
+      normalizar_medico: { Args: { medico_nome: string }; Returns: string }
       obter_status_ativacao_atual: {
         Args: { p_medico_id?: string }
         Returns: {
@@ -4924,46 +4835,25 @@ export type Database = {
         }
         Returns: Json
       }
-      perform_security_audit: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
+      perform_security_audit: { Args: never; Returns: Json }
       periodo_esta_fechado: {
         Args: { p_periodo_referencia: string }
         Returns: boolean
       }
-      popular_categorias_faltantes: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
+      popular_categorias_faltantes: { Args: never; Returns: Json }
       prepare_partition_structure: {
         Args: { partition_date: string; table_name: string }
         Returns: Json
       }
-      processar_checkout_automatico: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
-      processar_tasks_sistema: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
-      promote_user_to_admin: {
-        Args: { user_email: string }
-        Returns: boolean
-      }
+      processar_checkout_automatico: { Args: never; Returns: number }
+      processar_tasks_sistema: { Args: never; Returns: Json }
+      promote_user_to_admin: { Args: { user_email: string }; Returns: boolean }
       reabrir_periodo_faturamento: {
         Args: { p_periodo_referencia: string }
         Returns: Json
       }
-      refresh_dashboard_summary: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      refresh_volumetria_dashboard: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
+      refresh_dashboard_summary: { Args: never; Returns: undefined }
+      refresh_volumetria_dashboard: { Args: never; Returns: undefined }
       replicar_escala_medico: {
         Args: {
           p_ano_destino: number
@@ -4982,42 +4872,21 @@ export type Database = {
         Args: { arquivo_fonte_param?: string }
         Returns: Json
       }
-      reprocessar_volumetria_sem_regras: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
-      resetar_sistema_upload: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
+      reprocessar_volumetria_sem_regras: { Args: never; Returns: Json }
+      resetar_sistema_upload: { Args: never; Returns: Json }
       security_health_check: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           area: string
           details: string
           status: string
         }[]
       }
-      sincronizar_parametros_completos_contratos: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
-      sincronizar_parametros_para_contratos: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
-      sincronizar_precos_servicos_contratos: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
-      testar_sistema_upload: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
-      truncate_volumetria_table: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
+      sincronizar_parametros_completos_contratos: { Args: never; Returns: Json }
+      sincronizar_parametros_para_contratos: { Args: never; Returns: number }
+      sincronizar_precos_servicos_contratos: { Args: never; Returns: Json }
+      testar_sistema_upload: { Args: never; Returns: Json }
+      truncate_volumetria_table: { Args: never; Returns: undefined }
       update_categoria_by_modalidade: {
         Args: {
           p_arquivo_fonte: string
@@ -5026,10 +4895,7 @@ export type Database = {
         }
         Returns: number
       }
-      update_custom_metrics: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
+      update_custom_metrics: { Args: never; Returns: number }
       update_modalidade_cr_dx_to_rx: {
         Args: { p_arquivo_fonte: string }
         Returns: number
@@ -5042,14 +4908,8 @@ export type Database = {
         Args: { empresa_name: string }
         Returns: boolean
       }
-      validate_cnpj: {
-        Args: { cnpj: string }
-        Returns: boolean
-      }
-      validate_cpf: {
-        Args: { cpf: string }
-        Returns: boolean
-      }
+      validate_cnpj: { Args: { cnpj: string }; Returns: boolean }
+      validate_cpf: { Args: { cpf: string }; Returns: boolean }
       validate_file_upload: {
         Args: {
           file_name: string
@@ -5063,14 +4923,8 @@ export type Database = {
         Args: { input_text: string }
         Returns: boolean
       }
-      validate_security_configuration: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
-      verificar_e_aplicar_regras_automaticas: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
+      validate_security_configuration: { Args: never; Returns: Json }
+      verificar_e_aplicar_regras_automaticas: { Args: never; Returns: Json }
     }
     Enums: {
       app_role: "admin" | "manager" | "user" | "medico"
