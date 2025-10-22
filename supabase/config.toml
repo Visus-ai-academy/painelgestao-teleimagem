@@ -163,3 +163,6 @@ verify_jwt = true
 
 [functions.corrigir-contratos-duplicados]
 verify_jwt = true
+
+[functions.limpar-numeros-contrato]
+verify_jwt = true

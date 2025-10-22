@@ -72,6 +72,51 @@ export function CorrigirContratosDuplicados() {
     }
   };
 
+  const limparNumerosContrato = async () => {
+    try {
+      setProcessando(true);
+      
+      console.log('🧹 Limpando números de contrato...');
+      
+      const { data, error } = await supabase.functions.invoke('limpar-numeros-contrato', {
+        body: {
+          clientesParaLimpar: ['CLINICA_CRL', 'CLIRAM', 'DIAGNOSTICA', 'CDICARDIO']
+        }
+      });
+      
+      if (error) {
+        console.error('Erro ao limpar números:', error);
+        toast({
+          title: "Erro",
+          description: `Erro ao limpar números: ${error.message}`,
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      console.log('✅ Limpeza concluída:', data);
+      
+      toast({
+        title: "Números limpos!",
+        description: `${data.clientesAtualizados} clientes atualizados. Recarregando...`,
+      });
+      
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+      
+    } catch (error: any) {
+      console.error('Erro ao limpar números:', error);
+      toast({
+        title: "Erro",
+        description: error.message || "Erro desconhecido",
+        variant: "destructive",
+      });
+    } finally {
+      setProcessando(false);
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -96,23 +141,42 @@ export function CorrigirContratosDuplicados() {
           </AlertDescription>
         </Alert>
 
-        <Button 
-          onClick={corrigirContratos} 
-          disabled={processando}
-          className="w-full"
-        >
-          {processando ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Processando...
-            </>
-          ) : (
-            <>
-              <CheckCircle className="mr-2 h-4 w-4" />
-              Executar Correção
-            </>
-          )}
-        </Button>
+        <div className="grid grid-cols-2 gap-3">
+          <Button 
+            onClick={corrigirContratos} 
+            disabled={processando}
+          >
+            {processando ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Processando...
+              </>
+            ) : (
+              <>
+                <CheckCircle className="mr-2 h-4 w-4" />
+                Corrigir Duplicados
+              </>
+            )}
+          </Button>
+
+          <Button 
+            onClick={limparNumerosContrato} 
+            disabled={processando}
+            variant="outline"
+          >
+            {processando ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Limpando...
+              </>
+            ) : (
+              <>
+                <CheckCircle className="mr-2 h-4 w-4" />
+                Limpar Números
+              </>
+            )}
+          </Button>
+        </div>
 
         {resultado && (
           <div className="space-y-4 mt-6">
