@@ -328,11 +328,6 @@ export function DemonstrativoFaturamentoCompleto({
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center gap-4">
-            <div className="flex-1">
-              <div className="text-sm text-muted-foreground">
-                Período selecionado: <strong>{periodo || 'Nenhum período selecionado'}</strong>
-              </div>
-            </div>
             <Button 
               onClick={handleGerarDemonstrativos}
               disabled={loading || !periodo}
@@ -350,6 +345,9 @@ export function DemonstrativoFaturamentoCompleto({
                 </>
               )}
             </Button>
+            <div className="text-sm text-muted-foreground">
+              Período selecionado: <strong>{periodo || 'Nenhum período selecionado'}</strong>
+            </div>
           </div>
         </CardContent>
       </Card>
