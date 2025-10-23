@@ -327,9 +327,43 @@ serve(async (req) => {
         console.log(`🔍 RADMED: ${antesFiltro} → ${volumetria.length} registros (removidos ${antesFiltro - volumetria.length})`);
       }
       
+      // CEMVALENCA_RX: Only RX modality
+      if (nomeUpper.includes('CEMVALENCA_RX') && volumetria.length > 0) {
+        const antesFiltro = volumetria.length;
+        
+        volumetria = volumetria.filter(vol => {
+          const modalidade = (vol.MODALIDADE || '').toString().toUpperCase();
+          return modalidade === 'RX';
+        });
+        console.log(`🔍 CEMVALENCA_RX: ${antesFiltro} → ${volumetria.length} registros (removidos ${antesFiltro - volumetria.length})`);
+      }
+      
+      // CEMVALENCA_PL: Only PLANTÃO priority
+      if (nomeUpper.includes('CEMVALENCA_PL') && volumetria.length > 0) {
+        const antesFiltro = volumetria.length;
+        
+        volumetria = volumetria.filter(vol => {
+          const prioridade = (vol.PRIORIDADE || '').toString().toUpperCase();
+          return prioridade === 'PLANTÃO' || prioridade === 'PLANTAO';
+        });
+        console.log(`🔍 CEMVALENCA_PL: ${antesFiltro} → ${volumetria.length} registros (removidos ${antesFiltro - volumetria.length})`);
+      }
+      
+      // CEMVALENCA: Only MEDICINA INTERNA and MAMA specialties
+      if (nomeUpper === 'CEMVALENCA' && volumetria.length > 0) {
+        const ESPECIALIDADES_FATURADAS = ['MEDICINA INTERNA', 'MAMA'];
+        const antesFiltro = volumetria.length;
+        
+        volumetria = volumetria.filter(vol => {
+          const especialidade = (vol.ESPECIALIDADE || '').toString().toUpperCase();
+          return ESPECIALIDADES_FATURADAS.some(esp => especialidade.includes(esp));
+        });
+        console.log(`🔍 CEMVALENCA: ${antesFiltro} → ${volumetria.length} registros (removidos ${antesFiltro - volumetria.length})`);
+      }
+      
       // Other NC clients with standard rules
       const OUTROS_NC = ['CDICARDIO', 'CDIGOIAS', 'CISP', 'CRWANDERLEY', 'DIAGMAX-PR', 
-                        'GOLD', 'PRODIMAGEM', 'TRANSDUSON', 'ZANELLO', 'CEMVALENCA', 'RMPADUA'];
+                        'GOLD', 'PRODIMAGEM', 'TRANSDUSON', 'ZANELLO', 'RMPADUA'];
       const isOutroNC = OUTROS_NC.some(nc => nomeUpper.includes(nc));
       
       if (isOutroNC && tipoFaturamento === 'NC-FT' && volumetria.length > 0) {
