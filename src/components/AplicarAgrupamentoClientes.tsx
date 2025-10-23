@@ -66,11 +66,12 @@ export function AplicarAgrupamentoClientes() {
         <CardDescription>
           Aplica regras de agrupamento aos dados já existentes na volumetria:
           <ul className="list-disc list-inside mt-2 space-y-1">
+            <li>Preserva nome original em "unidade_origem" para relatórios de faturamento</li>
             <li>Aplica mapeamento nome_mobilemed → nome_fantasia (ex: CLIMAGEM → CLIMAGEM1)</li>
             <li>Agrupa todos "DIAGNOSTICA PLANTAO_*" como "DIAGNOSTICA"</li>
             <li>Move CEMVALENCA RX PLANTÃO para "CEMVALENCA_RX"</li>
             <li>Move CEMVALENCA não-RX PLANTÃO para "CEMVALENCA_PL"</li>
-            <li>Mantém CEMVALENCA com demais registros</li>
+            <li>Retorna registros sem PLANTÃO de volta para "CEMVALENCA"</li>
           </ul>
         </CardDescription>
       </CardHeader>

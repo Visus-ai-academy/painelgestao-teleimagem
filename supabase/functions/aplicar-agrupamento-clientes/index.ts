@@ -18,7 +18,21 @@ Deno.serve(async (req) => {
 
     console.log('🔄 Iniciando aplicação de agrupamento de clientes...')
 
-    // 0. Aplicar mapeamento de nome_mobilemed para nome_fantasia
+    // 0. Preservar nome original em unidade_origem antes de aplicar mapeamentos
+    console.log('📋 Preservando nomes originais em unidade_origem...')
+    const { data: preservados, error: errorPreservar } = await supabase
+      .from('volumetria_mobilemed')
+      .update({ unidade_origem: supabase.raw('EMPRESA') })
+      .is('unidade_origem', null)
+      .select('id')
+
+    if (errorPreservar) {
+      console.error('❌ Erro ao preservar nomes originais:', errorPreservar)
+    } else {
+      console.log(`✅ Preservados ${preservados?.length || 0} nomes originais em unidade_origem`)
+    }
+
+    // 1. Aplicar mapeamento de nome_mobilemed para nome_fantasia
     console.log('📋 Buscando mapeamento de clientes...')
     const { data: clientes, error: errorClientes } = await supabase
       .from('clientes')
@@ -60,7 +74,7 @@ Deno.serve(async (req) => {
 
     console.log(`✅ Total de registros mapeados: ${totalMapeados}`)
 
-    // 1. Agrupar DIAGNOSTICA PLANTAO_* como DIAGNOSTICA
+    // 2. Agrupar DIAGNOSTICA PLANTAO_* como DIAGNOSTICA
     const { data: diagnosticaData, error: diagnosticaError } = await supabase
       .from('volumetria_mobilemed')
       .update({ EMPRESA: 'DIAGNOSTICA' })
@@ -74,7 +88,7 @@ Deno.serve(async (req) => {
 
     console.log(`✅ Agrupados ${diagnosticaData?.length || 0} registros de DIAGNOSTICA PLANTAO_* para DIAGNOSTICA`)
 
-    // 2. Garantir que CEMVALENCA RX com prioridade PLANTÃO vá para CEMVALENCA_RX
+    // 3. Garantir que CEMVALENCA RX com prioridade PLANTÃO vá para CEMVALENCA_RX
     const { data: cemvalencaRxData, error: cemvalencaRxError } = await supabase
       .from('volumetria_mobilemed')
       .update({ EMPRESA: 'CEMVALENCA_RX' })
@@ -90,7 +104,7 @@ Deno.serve(async (req) => {
 
     console.log(`✅ Movidos ${cemvalencaRxData?.length || 0} registros RX PLANTÃO para CEMVALENCA_RX`)
 
-    // 3. Garantir que CEMVALENCA não-RX com prioridade PLANTÃO vá para CEMVALENCA_PL
+    // 4. Garantir que CEMVALENCA não-RX com prioridade PLANTÃO vá para CEMVALENCA_PL
     const { data: cemvalencaPlData, error: cemvalencaPlError } = await supabase
       .from('volumetria_mobilemed')
       .update({ EMPRESA: 'CEMVALENCA_PL' })
@@ -106,7 +120,7 @@ Deno.serve(async (req) => {
 
     console.log(`✅ Movidos ${cemvalencaPlData?.length || 0} registros não-RX PLANTÃO para CEMVALENCA_PL`)
 
-    // 3.1: Retornar registros indevidos (sem PLANTÃO) de CEMVALENCA_PL para CEMVALENCA
+    // 5. Retornar registros indevidos (sem PLANTÃO) de CEMVALENCA_PL para CEMVALENCA
     const { data: cemvalencaPlRetData, error: cemvalencaPlRetError } = await supabase
       .from('volumetria_mobilemed')
       .update({ EMPRESA: 'CEMVALENCA' })
@@ -122,7 +136,7 @@ Deno.serve(async (req) => {
 
     console.log(`✅ Retornados ${cemvalencaPlRetData?.length || 0} registros de CEMVALENCA_PL → CEMVALENCA (sem PLANTÃO) `)
 
-    // 3.2: Retornar registros indevidos (sem PLANTÃO) de CEMVALENCA_RX para CEMVALENCA
+    // 6. Retornar registros indevidos (sem PLANTÃO) de CEMVALENCA_RX para CEMVALENCA
     const { data: cemvalencaRxRetData, error: cemvalencaRxRetError } = await supabase
       .from('volumetria_mobilemed')
       .update({ EMPRESA: 'CEMVALENCA' })
@@ -138,7 +152,7 @@ Deno.serve(async (req) => {
 
     console.log(`✅ Retornados ${cemvalencaRxRetData?.length || 0} registros de CEMVALENCA_RX → CEMVALENCA (sem PLANTÃO) `)
 
-    // 4. Verificar quantos registros CEMVALENCA restaram
+    // 7. Verificar quantos registros CEMVALENCA restaram
     const { count: cemvalencaCount, error: countError } = await supabase
       .from('volumetria_mobilemed')
       .select('id', { count: 'exact', head: true })
