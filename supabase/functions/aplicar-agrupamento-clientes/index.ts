@@ -64,6 +64,38 @@ Deno.serve(async (req) => {
 
     console.log(`✅ Movidos ${cemvalencaPlData?.length || 0} registros não-RX PLANTÃO para CEMVALENCA_PL`)
 
+    // 3.1: Retornar registros indevidos (sem PLANTÃO) de CEMVALENCA_PL para CEMVALENCA
+    const { data: cemvalencaPlRetData, error: cemvalencaPlRetError } = await supabase
+      .from('volumetria_mobilemed')
+      .update({ EMPRESA: 'CEMVALENCA' })
+      .eq('EMPRESA', 'CEMVALENCA_PL')
+      .not('PRIORIDADE', 'ilike', '%PLANTÃO%')
+      .not('PRIORIDADE', 'ilike', '%PLANTAO%')
+      .select('id')
+
+    if (cemvalencaPlRetError) {
+      console.error('❌ Erro ao retornar indevidos de CEMVALENCA_PL:', cemvalencaPlRetError)
+      throw cemvalencaPlRetError
+    }
+
+    console.log(`✅ Retornados ${cemvalencaPlRetData?.length || 0} registros de CEMVALENCA_PL → CEMVALENCA (sem PLANTÃO) `)
+
+    // 3.2: Retornar registros indevidos (sem PLANTÃO) de CEMVALENCA_RX para CEMVALENCA
+    const { data: cemvalencaRxRetData, error: cemvalencaRxRetError } = await supabase
+      .from('volumetria_mobilemed')
+      .update({ EMPRESA: 'CEMVALENCA' })
+      .eq('EMPRESA', 'CEMVALENCA_RX')
+      .not('PRIORIDADE', 'ilike', '%PLANTÃO%')
+      .not('PRIORIDADE', 'ilike', '%PLANTAO%')
+      .select('id')
+
+    if (cemvalencaRxRetError) {
+      console.error('❌ Erro ao retornar indevidos de CEMVALENCA_RX:', cemvalencaRxRetError)
+      throw cemvalencaRxRetError
+    }
+
+    console.log(`✅ Retornados ${cemvalencaRxRetData?.length || 0} registros de CEMVALENCA_RX → CEMVALENCA (sem PLANTÃO) `)
+
     // 4. Verificar quantos registros CEMVALENCA restaram
     const { count: cemvalencaCount, error: countError } = await supabase
       .from('volumetria_mobilemed')
@@ -81,6 +113,8 @@ Deno.serve(async (req) => {
       diagnostica_agrupados: diagnosticaData?.length || 0,
       cemvalenca_rx_movidos: cemvalencaRxData?.length || 0,
       cemvalenca_pl_movidos: cemvalencaPlData?.length || 0,
+      cemvalenca_pl_retorno: cemvalencaPlRetData?.length || 0,
+      cemvalenca_rx_retorno: cemvalencaRxRetData?.length || 0,
       cemvalenca_restantes: cemvalencaCount || 0,
       mensagem: 'Agrupamento de clientes aplicado com sucesso'
     }

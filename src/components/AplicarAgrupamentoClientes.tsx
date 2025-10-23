@@ -31,6 +31,8 @@ export function AplicarAgrupamentoClientes() {
             <p>• DIAGNOSTICA agrupados: {data.diagnostica_agrupados}</p>
             <p>• CEMVALENCA_RX movidos: {data.cemvalenca_rx_movidos}</p>
             <p>• CEMVALENCA_PL movidos: {data.cemvalenca_pl_movidos}</p>
+            <p>• CEMVALENCA_PL devolvidos: {data.cemvalenca_pl_retorno}</p>
+            <p>• CEMVALENCA_RX devolvidos: {data.cemvalenca_rx_retorno}</p>
             <p>• CEMVALENCA restantes: {data.cemvalenca_restantes}</p>
           </div>
         ),
