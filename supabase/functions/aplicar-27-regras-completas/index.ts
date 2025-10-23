@@ -233,6 +233,26 @@ Deno.serve(async (req) => {
         .like('EMPRESA', '%SANTA HELENA%')
       regrasAplicadasArquivo.add('v010')
 
+      // REGRA v010b: Separação automática CEMVALENCA
+      console.log('  ⚡ Aplicando v010b - Separação CEMVALENCA (PL/RX/Principal)')
+      
+      // Separar PLANTÃO para CEMVALENCA_PL
+      await supabase.from('volumetria_mobilemed')
+        .update({ EMPRESA: 'CEMVALENCA_PL' })
+        .eq('arquivo_fonte', arquivoAtual)
+        .eq('EMPRESA', 'CEMVALENCA')
+        .eq('PRIORIDADE', 'PLANTÃO')
+      
+      // Separar RX (não PLANTÃO) para CEMVALENCA_RX
+      await supabase.from('volumetria_mobilemed')
+        .update({ EMPRESA: 'CEMVALENCA_RX' })
+        .eq('arquivo_fonte', arquivoAtual)
+        .eq('EMPRESA', 'CEMVALENCA')
+        .eq('MODALIDADE', 'RX')
+        .neq('PRIORIDADE', 'PLANTÃO')
+      
+      regrasAplicadasArquivo.add('v010b')
+
       // REGRA v011: Aplicação categoria padrão
       console.log('  ⚡ Aplicando v011 - Categoria padrão')
       await supabase.from('volumetria_mobilemed')
