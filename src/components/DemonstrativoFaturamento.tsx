@@ -33,8 +33,13 @@ interface ClienteFaturamento {
   status_pagamento: 'pendente' | 'pago' | 'vencido';
   data_vencimento: string;
   observacoes?: string;
-  tipo_faturamento?: string; // ✅ ADICIONAR tipo_faturamento
-  alertas?: string[]; // ✅ ADICIONAR alertas
+  tipo_faturamento?: string;
+  alertas?: string[];
+  valor_exames?: number;
+  valor_franquia?: number;
+  valor_portal?: number;
+  valor_integracao?: number;
+  valor_impostos?: number;
   detalhes_exames?: Array<{
     modalidade: string;
     especialidade: string;
@@ -340,6 +345,11 @@ export default function DemonstrativoFaturamento() {
                    total_exames: demo.total_exames || 0,
                    valor_bruto: valorBrutoCompleto,
                    valor_liquido: valorLiquidoCompleto,
+                   valor_exames: valorExames,
+                   valor_franquia: valorFranquia,
+                   valor_portal: valorPortal,
+                   valor_integracao: valorIntegracao,
+                   valor_impostos: valorImpostos,
                    periodo: periodo,
                    status_pagamento: 'pendente' as const,
                    data_vencimento: new Date().toISOString().split('T')[0],
@@ -878,6 +888,11 @@ export default function DemonstrativoFaturamento() {
                   total_exames: dadosCliente.total_exames,
                   valor_bruto: Number(valorBrutoFinal.toFixed(2)),
                   valor_liquido: Number(valorLiquidoFinal.toFixed(2)),
+                  valor_exames: Number(valorTotalCliente.toFixed(2)),
+                  valor_franquia: Number(vFranquia.toFixed(2)),
+                  valor_portal: Number(vPortal.toFixed(2)),
+                  valor_integracao: Number(vIntegracao.toFixed(2)),
+                  valor_impostos: Number((vISS + vIRRF).toFixed(2)),
                   periodo: periodo,
                   status_pagamento: 'pendente' as const,
                   data_vencimento: new Date().toISOString().split('T')[0],
@@ -1172,40 +1187,66 @@ export default function DemonstrativoFaturamento() {
     }
 
     const dados = clientesFiltrados.map((c) => ({
-      Cliente: c.nome,
-      "Total Exames": c.total_exames,
-      "Valor Bruto": Number(c.valor_bruto || 0),
+      "Nome do Cliente": c.nome,
+      "Quantidade de Exames": c.total_exames,
+      "Valor Total Exames": Number(c.valor_exames || 0),
+      "Valor Franquia": Number(c.valor_franquia || 0),
+      "Valor Integração": Number(c.valor_integracao || 0),
+      "Valor Portal Laudos": Number(c.valor_portal || 0),
+      "Impostos": Number(c.valor_impostos || 0),
       "Valor Líquido": Number(c.valor_liquido || 0),
-      Status: c.status_pagamento,
-      Período: c.periodo,
     }));
 
     const ws = XLSX.utils.json_to_sheet(dados);
-    // Formatar cabeçalhos e números
+    
+    // Formatar colunas de valores como moeda
+    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+    for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+      for (let C = 2; C <= 7; ++C) { // Colunas de valor (C a H)
+        const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+        if (ws[cellAddress] && typeof ws[cellAddress].v === 'number') {
+          ws[cellAddress].z = 'R$ #,##0.00';
+        }
+      }
+    }
+    
+    // Definir larguras das colunas
     const colWidths = [
-      { wch: 40 }, // Cliente
-      { wch: 14 }, // Total Exames
-      { wch: 16 }, // Valor Bruto
+      { wch: 40 }, // Nome do Cliente
+      { wch: 18 }, // Quantidade de Exames
+      { wch: 18 }, // Valor Total Exames
+      { wch: 16 }, // Valor Franquia
+      { wch: 18 }, // Valor Integração
+      { wch: 20 }, // Valor Portal Laudos
+      { wch: 14 }, // Impostos
       { wch: 16 }, // Valor Líquido
-      { wch: 12 }, // Status
-      { wch: 10 }, // Período
     ];
     (ws as any)["!cols"] = colWidths;
 
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Demonstrativo");
+    XLSX.utils.book_append_sheet(wb, ws, "Faturamento");
 
-    const fileName = `demonstrativo_faturamento_${periodo}.xlsx`;
+    const fileName = `relatorio_faturamento_${periodo}.xlsx`;
     XLSX.writeFile(wb, fileName);
 
-    toast({ title: "Exportado", description: "Arquivo Excel gerado com sucesso." });
+    toast({ title: "Exportado com sucesso!", description: `Arquivo ${fileName} gerado.` });
   };
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900">Demonstrativo de Faturamento</h2>
-        <p className="text-gray-600 mt-1">Visualize e analise o faturamento por cliente</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Demonstrativo de Faturamento</h2>
+          <p className="text-gray-600 mt-1">Visualize e analise o faturamento por cliente</p>
+        </div>
+        <Button
+          onClick={exportarExcel}
+          disabled={carregando || clientesFiltrados.length === 0}
+          className="flex items-center gap-2"
+        >
+          <FileSpreadsheet className="h-4 w-4" />
+          Exportar Excel
+        </Button>
       </div>
 
       {/* ✅ RESUMO GERAL - Agora na aba correta */}
