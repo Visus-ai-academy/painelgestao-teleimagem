@@ -121,12 +121,11 @@ Deno.serve(async (req) => {
     console.log(`✅ Movidos ${cemvalencaPlData?.length || 0} registros não-RX PLANTÃO para CEMVALENCA_PL`)
 
     // 5. Retornar registros indevidos (sem PLANTÃO) de CEMVALENCA_PL para CEMVALENCA
-    // Inclui registros onde PRIORIDADE é null, vazio ou não contém PLANTÃO/PLANTAO
     const { data: cemvalencaPlRetData, error: cemvalencaPlRetError } = await supabase
       .from('volumetria_mobilemed')
       .update({ EMPRESA: 'CEMVALENCA' })
       .eq('EMPRESA', 'CEMVALENCA_PL')
-      .or('PRIORIDADE.is.null,PRIORIDADE.eq.,and(not.PRIORIDADE.ilike.%PLANTÃO%,not.PRIORIDADE.ilike.%PLANTAO%)')
+      .not('PRIORIDADE', 'ilike', '%PLANT%')
       .select('id')
 
     if (cemvalencaPlRetError) {
@@ -137,12 +136,11 @@ Deno.serve(async (req) => {
     console.log(`✅ Retornados ${cemvalencaPlRetData?.length || 0} registros de CEMVALENCA_PL → CEMVALENCA (sem PLANTÃO) `)
 
     // 6. Retornar registros indevidos (sem PLANTÃO) de CEMVALENCA_RX para CEMVALENCA
-    // Inclui registros onde PRIORIDADE é null, vazio ou não contém PLANTÃO/PLANTAO
     const { data: cemvalencaRxRetData, error: cemvalencaRxRetError } = await supabase
       .from('volumetria_mobilemed')
       .update({ EMPRESA: 'CEMVALENCA' })
       .eq('EMPRESA', 'CEMVALENCA_RX')
-      .or('PRIORIDADE.is.null,PRIORIDADE.eq.,and(not.PRIORIDADE.ilike.%PLANTÃO%,not.PRIORIDADE.ilike.%PLANTAO%)')
+      .not('PRIORIDADE', 'ilike', '%PLANT%')
       .select('id')
 
     if (cemvalencaRxRetError) {
