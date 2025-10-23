@@ -169,12 +169,7 @@ export function DemonstrativoVolumetriaPorCliente({ periodo: periodoInicial }: D
       const clientesMap = new Map<string, any>();
 
       volumetriaData?.forEach((item: any) => {
-        const prioridadeStr = String(item.PRIORIDADE || '').toUpperCase();
-        const isPlantao = prioridadeStr.includes('PLANTÃO') || prioridadeStr.includes('PLANTAO');
-        let empresaBase = item.EMPRESA || 'SEM CLIENTE';
-        if ((empresaBase === 'CEMVALENCA_PL' || empresaBase === 'CEMVALENCA_RX') && !isPlantao) {
-          empresaBase = 'CEMVALENCA';
-        }
+        const empresaBase = item.EMPRESA || 'SEM CLIENTE';
         const origemKey = String(item.unidade_origem || empresaBase || '').trim().toUpperCase();
         const clienteNome = nomeMap.get(origemKey) || empresaBase || 'SEM CLIENTE';
         
