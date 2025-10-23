@@ -18,6 +18,48 @@ Deno.serve(async (req) => {
 
     console.log('🔄 Iniciando aplicação de agrupamento de clientes...')
 
+    // 0. Aplicar mapeamento de nome_mobilemed para nome_fantasia
+    console.log('📋 Buscando mapeamento de clientes...')
+    const { data: clientes, error: errorClientes } = await supabase
+      .from('clientes')
+      .select('nome_mobilemed, nome_fantasia')
+      .not('nome_mobilemed', 'is', null)
+      .not('nome_fantasia', 'is', null)
+
+    if (errorClientes) {
+      console.error('❌ Erro ao buscar clientes:', errorClientes)
+      throw errorClientes
+    }
+
+    console.log(`📋 Carregados ${clientes?.length || 0} mapeamentos de clientes`)
+
+    // Criar mapa para lookup rápido
+    const mapeamentoClientes: Record<string, string> = {}
+    clientes?.forEach(cliente => {
+      if (cliente.nome_mobilemed && cliente.nome_fantasia) {
+        mapeamentoClientes[cliente.nome_mobilemed] = cliente.nome_fantasia
+      }
+    })
+
+    // Aplicar mapeamento para cada cliente encontrado
+    let totalMapeados = 0
+    for (const [nomeMobilemed, nomeFantasia] of Object.entries(mapeamentoClientes)) {
+      const { data: dadosMapeados, error: errorMapeamento } = await supabase
+        .from('volumetria_mobilemed')
+        .update({ EMPRESA: nomeFantasia })
+        .eq('EMPRESA', nomeMobilemed)
+        .select('id')
+      
+      if (!errorMapeamento && dadosMapeados) {
+        totalMapeados += dadosMapeados.length
+        if (dadosMapeados.length > 0) {
+          console.log(`✅ Mapeado "${nomeMobilemed}" → "${nomeFantasia}": ${dadosMapeados.length} registros`)
+        }
+      }
+    }
+
+    console.log(`✅ Total de registros mapeados: ${totalMapeados}`)
+
     // 1. Agrupar DIAGNOSTICA PLANTAO_* como DIAGNOSTICA
     const { data: diagnosticaData, error: diagnosticaError } = await supabase
       .from('volumetria_mobilemed')
@@ -110,6 +152,7 @@ Deno.serve(async (req) => {
 
     const resultado = {
       success: true,
+      total_mapeados: totalMapeados,
       diagnostica_agrupados: diagnosticaData?.length || 0,
       cemvalenca_rx_movidos: cemvalencaRxData?.length || 0,
       cemvalenca_pl_movidos: cemvalencaPlData?.length || 0,

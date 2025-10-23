@@ -28,6 +28,7 @@ export function AplicarAgrupamentoClientes() {
         title: "✅ Agrupamento aplicado!",
         description: (
           <div className="space-y-1 text-sm">
+            <p>• Nomes mapeados: {data.total_mapeados}</p>
             <p>• DIAGNOSTICA agrupados: {data.diagnostica_agrupados}</p>
             <p>• CEMVALENCA_RX movidos: {data.cemvalenca_rx_movidos}</p>
             <p>• CEMVALENCA_PL movidos: {data.cemvalenca_pl_movidos}</p>
@@ -65,6 +66,7 @@ export function AplicarAgrupamentoClientes() {
         <CardDescription>
           Aplica regras de agrupamento aos dados já existentes na volumetria:
           <ul className="list-disc list-inside mt-2 space-y-1">
+            <li>Aplica mapeamento nome_mobilemed → nome_fantasia (ex: CLIMAGEM → CLIMAGEM1)</li>
             <li>Agrupa todos "DIAGNOSTICA PLANTAO_*" como "DIAGNOSTICA"</li>
             <li>Move CEMVALENCA RX PLANTÃO para "CEMVALENCA_RX"</li>
             <li>Move CEMVALENCA não-RX PLANTÃO para "CEMVALENCA_PL"</li>
