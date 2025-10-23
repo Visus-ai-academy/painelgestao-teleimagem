@@ -335,6 +335,14 @@ export default function DemonstrativoFaturamento() {
                  const valorIntegracao = Number(demo.valor_integracao ?? 0);
                  const valorImpostos = Number(demo.valor_impostos ?? 0);
                  
+                 console.log(`🔍 Cliente ${nomeCliente} - Valores:`, {
+                   valorExames,
+                   valorFranquia,
+                   valorPortal,
+                   valorIntegracao,
+                   valorImpostos
+                 });
+                 
                  const valorBrutoCompleto = valorExames + valorFranquia + valorPortal + valorIntegracao;
                  const valorLiquidoCompleto = valorBrutoCompleto - valorImpostos;
                  
@@ -1186,16 +1194,39 @@ export default function DemonstrativoFaturamento() {
       return;
     }
 
-    const dados = clientesFiltrados.map((c) => ({
-      "Nome do Cliente": c.nome,
-      "Quantidade de Exames": c.total_exames,
-      "Valor Total Exames": Number(c.valor_exames || 0),
-      "Valor Franquia": Number(c.valor_franquia || 0),
-      "Valor Integração": Number(c.valor_integracao || 0),
-      "Valor Portal Laudos": Number(c.valor_portal || 0),
-      "Impostos": Number(c.valor_impostos || 0),
-      "Valor Líquido": Number(c.valor_liquido || 0),
-    }));
+    // Log de debug para verificar os valores
+    if (clientesFiltrados.length > 0) {
+      console.log('📊 Exportando Excel - Amostra do primeiro cliente:', {
+        nome: clientesFiltrados[0].nome,
+        valor_exames: clientesFiltrados[0].valor_exames,
+        valor_franquia: clientesFiltrados[0].valor_franquia,
+        valor_integracao: clientesFiltrados[0].valor_integracao,
+        valor_portal: clientesFiltrados[0].valor_portal,
+        valor_impostos: clientesFiltrados[0].valor_impostos,
+        valor_liquido: clientesFiltrados[0].valor_liquido,
+        valor_bruto: clientesFiltrados[0].valor_bruto
+      });
+    }
+
+    const dados = clientesFiltrados.map((c) => {
+      const valorExames = c.valor_exames ?? c.valor_bruto ?? 0;
+      const valorFranquia = c.valor_franquia ?? 0;
+      const valorIntegracao = c.valor_integracao ?? 0;
+      const valorPortal = c.valor_portal ?? 0;
+      const valorImpostos = c.valor_impostos ?? 0;
+      const valorLiquido = c.valor_liquido ?? 0;
+
+      return {
+        "Nome do Cliente": c.nome,
+        "Quantidade de Exames": c.total_exames,
+        "Valor Total Exames": parseFloat(valorExames.toString()),
+        "Valor Franquia": parseFloat(valorFranquia.toString()),
+        "Valor Integração": parseFloat(valorIntegracao.toString()),
+        "Valor Portal Laudos": parseFloat(valorPortal.toString()),
+        "Impostos": parseFloat(valorImpostos.toString()),
+        "Valor Líquido": parseFloat(valorLiquido.toString()),
+      };
+    });
 
     const ws = XLSX.utils.json_to_sheet(dados);
     
