@@ -102,7 +102,6 @@ Deno.serve(async (req) => {
         .update({ EMPRESA: 'CEMVALENCA_RX' })
         .eq('EMPRESA', 'CEMVALENCA')
         .eq('MODALIDADE', 'RX')
-        .ilike(prioridadeCol, '%PLANT%')
         .select('id')
 
     cemvalencaRxData = rxResp.data
@@ -163,7 +162,7 @@ Deno.serve(async (req) => {
         .from('volumetria_mobilemed')
         .update({ EMPRESA: 'CEMVALENCA' })
         .eq('EMPRESA', 'CEMVALENCA_RX')
-        .not(prioridadeCol, 'ilike', '%PLANT%')
+        .neq('MODALIDADE', 'RX')
         .select('id')
 
     cemvalencaRxRetData = rxRetResp.data
