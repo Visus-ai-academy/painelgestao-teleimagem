@@ -95,12 +95,16 @@ Deno.serve(async (req) => {
     console.log(`✅ Agrupados ${diagnosticaData?.length || 0} registros de DIAGNOSTICA PLANTAO_* para DIAGNOSTICA`)
 
     // 3. Garantir que CEMVALENCA RX com prioridade PLANTÃO vá para CEMVALENCA_RX
+    const plantaoFilter = prioridadeCol === 'PRIORIDADE' 
+      ? 'PRIORIDADE.ilike.%PLANT%'
+      : 'prioridade.ilike.%PLANT%'
+    
     const { data: cemvalencaRxData, error: cemvalencaRxError } = await supabase
       .from('volumetria_mobilemed')
       .update({ EMPRESA: 'CEMVALENCA_RX' })
       .eq('EMPRESA', 'CEMVALENCA')
       .eq('MODALIDADE', 'RX')
-      .ilike(prioridadeCol, '%PLANT%')
+      .or(plantaoFilter)
       .select('id')
 
     if (cemvalencaRxError) {
@@ -116,7 +120,7 @@ Deno.serve(async (req) => {
       .update({ EMPRESA: 'CEMVALENCA_PL' })
       .eq('EMPRESA', 'CEMVALENCA')
       .neq('MODALIDADE', 'RX')
-      .ilike(prioridadeCol, '%PLANT%')
+      .or(plantaoFilter)
       .select('id')
 
     if (cemvalencaPlError) {
