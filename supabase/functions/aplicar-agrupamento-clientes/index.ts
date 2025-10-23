@@ -100,7 +100,7 @@ Deno.serve(async (req) => {
       .update({ EMPRESA: 'CEMVALENCA_RX' })
       .eq('EMPRESA', 'CEMVALENCA')
       .eq('MODALIDADE', 'RX')
-      .or(`${prioridadeCol}.ilike.%PLANTÃO%,${prioridadeCol}.ilike.%PLANTAO%`)
+      .ilike(prioridadeCol, '%PLANT%')
       .select('id')
 
     if (cemvalencaRxError) {
@@ -116,7 +116,7 @@ Deno.serve(async (req) => {
       .update({ EMPRESA: 'CEMVALENCA_PL' })
       .eq('EMPRESA', 'CEMVALENCA')
       .neq('MODALIDADE', 'RX')
-      .or(`${prioridadeCol}.ilike.%PLANTÃO%,${prioridadeCol}.ilike.%PLANTAO%`)
+      .ilike(prioridadeCol, '%PLANT%')
       .select('id')
 
     if (cemvalencaPlError) {
