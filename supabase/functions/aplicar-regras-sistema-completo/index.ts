@@ -106,65 +106,20 @@ serve(async (req) => {
     for (const arquivo of arquivosParaProcessar) {
       console.log(`\n🔄 Processando arquivo: ${arquivo}`);
       
-      // Pré-processamento específico CEMVALENCA (v010a/v010b)
+      // Aplicar agrupamento automático de clientes (inclui CEMVALENCA, DIAGNOSTICA e mapeamento geral)
       try {
-        // v010a: Converter P-CEMVALENCA_MG -> CEMVALENCA
-        await supabase
-          .from('volumetria_mobilemed')
-          .update({ EMPRESA: 'CEMVALENCA' })
-          .eq('arquivo_fonte', arquivo)
-          .eq('EMPRESA', 'P-CEMVALENCA_MG');
-
-        // v010b: Corrigir nome legado CEMVALENCA_PLANTÃO -> CEMVALENCA_PL
-        await supabase
-          .from('volumetria_mobilemed')
-          .update({ EMPRESA: 'CEMVALENCA_PL' })
-          .eq('arquivo_fonte', arquivo)
-          .eq('EMPRESA', 'CEMVALENCA_PLANTÃO');
-
-        // v010b: Corrigir legado P-CEMVALENCA_PL (com ou sem espaço) -> CEMVALENCA_PL
-        await supabase
-          .from('volumetria_mobilemed')
-          .update({ EMPRESA: 'CEMVALENCA_PL' })
-          .eq('arquivo_fonte', arquivo)
-          .or('EMPRESA.eq.P-CEMVALENCA_PL,EMPRESA.eq.P- CEMVALENCA_PL');
-
-        // v010b: Corrigir legado P-CEMVALENCA_RX -> CEMVALENCA_RX
-        await supabase
-          .from('volumetria_mobilemed')
-          .update({ EMPRESA: 'CEMVALENCA_RX' })
-          .eq('arquivo_fonte', arquivo)
-          .eq('EMPRESA', 'P-CEMVALENCA_RX');
-
-        // v010b: Separar PLANTÃO para CEMVALENCA_PL (qualquer prioridade com PLANTÃO/PLANTAO)
-        await supabase
-          .from('volumetria_mobilemed')
-          .update({ EMPRESA: 'CEMVALENCA_PL' })
-          .eq('arquivo_fonte', arquivo)
-          .eq('EMPRESA', 'CEMVALENCA')
-          .or('PRIORIDADE.ilike.%PLANTÃO%,PRIORIDADE.ilike.%PLANTAO%,PRIORIDADE.eq.PLANTÃO');
-
-        // v010b: Separar RX para CEMVALENCA_RX (TODOS os RX que não são PLANTÃO)
-        await supabase
-          .from('volumetria_mobilemed')
-          .update({ EMPRESA: 'CEMVALENCA_RX' })
-          .eq('arquivo_fonte', arquivo)
-          .eq('EMPRESA', 'CEMVALENCA')
-          .eq('MODALIDADE', 'RX')
-          .not('PRIORIDADE', 'ilike', '%PLANTÃO%')
-          .not('PRIORIDADE', 'ilike', '%PLANTAO%');
-
-        // v010b: CEMVALENCA permanece com as demais modalidades (CT, RM, US, MG, DO) que não são PLANTÃO
-
-        // v010c: Agrupar todos DIAGNOSTICA PLANTAO_* como DIAGNOSTICA
-        await supabase
-          .from('volumetria_mobilemed')
-          .update({ EMPRESA: 'DIAGNOSTICA' })
-          .eq('arquivo_fonte', arquivo)
-          .ilike('EMPRESA', 'DIAGNOSTICA PLANTAO_%');
-
+        console.log('🔗 Aplicando agrupamento automático de clientes...');
+        const { data: agrupamentoResult, error: agrupamentoError } = await supabase.functions.invoke(
+          'aplicar-agrupamento-clientes'
+        );
+        
+        if (agrupamentoError) {
+          console.warn('⚠️ Erro no agrupamento automático:', agrupamentoError);
+        } else {
+          console.log('✅ Agrupamento automático concluído:', agrupamentoResult);
+        }
       } catch (e) {
-        console.warn('⚠️ Pré-processamento CEMVALENCA falhou:', e);
+        console.warn('⚠️ Agrupamento automático falhou:', e);
       }
 
       // Buscar TODOS os registros que precisam de correção
