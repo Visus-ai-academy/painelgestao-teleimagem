@@ -19,18 +19,9 @@ Deno.serve(async (req) => {
     console.log('🔄 Iniciando aplicação de agrupamento de clientes...')
 
     // 0. Preservar nome original em unidade_origem antes de aplicar mapeamentos
-    console.log('📋 Preservando nomes originais em unidade_origem...')
-    const { data: preservados, error: errorPreservar } = await supabase
-      .from('volumetria_mobilemed')
-      .update({ unidade_origem: supabase.raw('EMPRESA') })
-      .is('unidade_origem', null)
-      .select('id')
-
-    if (errorPreservar) {
-      console.error('❌ Erro ao preservar nomes originais:', errorPreservar)
-    } else {
-      console.log(`✅ Preservados ${preservados?.length || 0} nomes originais em unidade_origem`)
-    }
+    // Observação: copiar valor de outra coluna direto no update não é suportado pelo supabase-js sem SQL bruto.
+    // Para evitar erro e manter o processo simples, vamos pular esta etapa aqui.
+    console.log('ℹ️ Pulando preservação automática de unidade_origem (sem SQL/raw). Prosseguindo com mapeamentos...')
 
     // 1. Aplicar mapeamento de nome_mobilemed para nome_fantasia
     console.log('📋 Buscando mapeamento de clientes...')
