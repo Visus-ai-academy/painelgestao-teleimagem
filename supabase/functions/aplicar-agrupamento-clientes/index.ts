@@ -23,6 +23,21 @@ Deno.serve(async (req) => {
     // Para evitar erro e manter o processo simples, vamos pular esta etapa aqui.
     console.log('ℹ️ Pulando preservação automática de unidade_origem (sem SQL/raw). Prosseguindo com mapeamentos...')
 
+    // Detectar dinamicamente a coluna de prioridade (PRIORIDADE vs prioridade)
+    let prioridadeCol = 'PRIORIDADE'
+    try {
+      const { error: prioridadeProbeError } = await supabase
+        .from('volumetria_mobilemed')
+        .select('PRIORIDADE', { head: true, count: 'exact' })
+        .limit(0)
+      if (prioridadeProbeError) {
+        prioridadeCol = 'prioridade'
+      }
+    } catch (_) {
+      prioridadeCol = 'prioridade'
+    }
+    console.log(`🔎 Coluna de prioridade detectada: ${prioridadeCol}`)
+
     // 1. Aplicar mapeamento de nome_mobilemed para nome_fantasia
     console.log('📋 Buscando mapeamento de clientes...')
     const { data: clientes, error: errorClientes } = await supabase
@@ -85,7 +100,7 @@ Deno.serve(async (req) => {
       .update({ EMPRESA: 'CEMVALENCA_RX' })
       .eq('EMPRESA', 'CEMVALENCA')
       .eq('MODALIDADE', 'RX')
-      .or('PRIORIDADE.ilike.%PLANTÃO%,PRIORIDADE.ilike.%PLANTAO%')
+      .or(`${prioridadeCol}.ilike.%PLANTÃO%,${prioridadeCol}.ilike.%PLANTAO%`)
       .select('id')
 
     if (cemvalencaRxError) {
@@ -101,7 +116,7 @@ Deno.serve(async (req) => {
       .update({ EMPRESA: 'CEMVALENCA_PL' })
       .eq('EMPRESA', 'CEMVALENCA')
       .neq('MODALIDADE', 'RX')
-      .or('PRIORIDADE.ilike.%PLANTÃO%,PRIORIDADE.ilike.%PLANTAO%')
+      .or(`${prioridadeCol}.ilike.%PLANTÃO%,${prioridadeCol}.ilike.%PLANTAO%`)
       .select('id')
 
     if (cemvalencaPlError) {
@@ -116,7 +131,7 @@ Deno.serve(async (req) => {
       .from('volumetria_mobilemed')
       .update({ EMPRESA: 'CEMVALENCA' })
       .eq('EMPRESA', 'CEMVALENCA_PL')
-      .not('PRIORIDADE', 'ilike', '%PLANT%')
+      .not(prioridadeCol, 'ilike', '%PLANT%')
       .select('id')
 
     if (cemvalencaPlRetError) {
@@ -131,7 +146,7 @@ Deno.serve(async (req) => {
       .from('volumetria_mobilemed')
       .update({ EMPRESA: 'CEMVALENCA' })
       .eq('EMPRESA', 'CEMVALENCA_RX')
-      .not('PRIORIDADE', 'ilike', '%PLANT%')
+      .not(prioridadeCol, 'ilike', '%PLANT%')
       .select('id')
 
     if (cemvalencaRxRetError) {
