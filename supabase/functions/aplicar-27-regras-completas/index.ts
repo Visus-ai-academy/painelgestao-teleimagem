@@ -282,6 +282,14 @@ Deno.serve(async (req) => {
       
       regrasAplicadasArquivo.add('v010b')
 
+      // v010c: Agrupar todos DIAGNOSTICA PLANTAO_* como DIAGNOSTICA
+      await supabase.from('volumetria_mobilemed')
+        .update({ EMPRESA: 'DIAGNOSTICA' })
+        .eq('arquivo_fonte', arquivoAtual)
+        .ilike('EMPRESA', 'DIAGNOSTICA PLANTAO_%')
+      
+      regrasAplicadasArquivo.add('v010c')
+
       // REGRA v011: Aplicação categoria padrão
       console.log('  ⚡ Aplicando v011 - Categoria padrão')
       await supabase.from('volumetria_mobilemed')

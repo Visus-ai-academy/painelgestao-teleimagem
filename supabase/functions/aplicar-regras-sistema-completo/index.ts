@@ -156,6 +156,13 @@ serve(async (req) => {
 
         // v010b: CEMVALENCA permanece com as demais modalidades (CT, RM, US, MG, DO) que não são PLANTÃO
 
+        // v010c: Agrupar todos DIAGNOSTICA PLANTAO_* como DIAGNOSTICA
+        await supabase
+          .from('volumetria_mobilemed')
+          .update({ EMPRESA: 'DIAGNOSTICA' })
+          .eq('arquivo_fonte', arquivo)
+          .ilike('EMPRESA', 'DIAGNOSTICA PLANTAO_%');
+
       } catch (e) {
         console.warn('⚠️ Pré-processamento CEMVALENCA falhou:', e);
       }
