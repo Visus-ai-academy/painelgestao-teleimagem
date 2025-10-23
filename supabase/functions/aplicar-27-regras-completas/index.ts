@@ -278,12 +278,7 @@ Deno.serve(async (req) => {
         .not('PRIORIDADE', 'ilike', '%PLANTÃO%')
         .not('PRIORIDADE', 'ilike', '%PLANTAO%')
       
-      // Os demais registros CEMVALENCA (CT, RM, US, etc) ficam em CEMVALENCA_PL
-      await supabase.from('volumetria_mobilemed')
-        .update({ EMPRESA: 'CEMVALENCA_PL' })
-        .eq('arquivo_fonte', arquivoAtual)
-        .eq('EMPRESA', 'CEMVALENCA')
-        .or('MODALIDADE.eq.CT,MODALIDADE.eq.RM,MODALIDADE.eq.US,MODALIDADE.eq.MG,MODALIDADE.eq.DO')
+      // CEMVALENCA permanece com as demais modalidades (CT, RM, US, MG, DO) que não são PLANTÃO
       
       regrasAplicadasArquivo.add('v010b')
 
