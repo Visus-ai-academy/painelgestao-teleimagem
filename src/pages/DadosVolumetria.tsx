@@ -24,6 +24,7 @@ import { VolumetriaProvider } from "@/contexts/VolumetriaContext";
 import { useToast } from "@/hooks/use-toast";
 import { useUploadStatus } from "@/hooks/useUploadStatus";
 import { useAutoRegras } from "@/hooks/useAutoRegras";
+import { SepararClientesCemvalenca } from "@/components/SepararClientesCemvalenca";
 
 
 // Período atual - onde estão os dados carregados (junho/2025)
@@ -213,6 +214,9 @@ export default function DadosVolumetria() {
           </TabsContent>
 
           <TabsContent value="sistema-regras" className="space-y-6">
+            {/* Separação CEMVALENCA */}
+            <SepararClientesCemvalenca />
+            
             {/* Teste das 27 Regras Completas */}
             <TesteRegras27 />
             
