@@ -86,6 +86,20 @@ const REGRAS_SISTEMA = [
     implementacao: 'Função SQL: aplicar_regras_quebra_exames() + tabela regras_quebra_exames'
   },
   {
+    id: 'v010a',
+    nome: 'Conversão P-CEMVALENCA_MG → CEMVALENCA',
+    categoria: 'Dados',
+    criterio: 'Normaliza unidade MG para a matriz CEMVALENCA.',
+    implementacao: 'Edge: aplicar-27-regras-completas e aplicar-regras-sistema-completo'
+  },
+  {
+    id: 'v010b',
+    nome: 'Separação CEMVALENCA (PL/RX)',
+    categoria: 'Dados',
+    criterio: 'PLANTÃO → P-CEMVALENCA_PL; RX (não plantão) → CEMVALENCA_RX.',
+    implementacao: 'Edge: aplicar-27-regras-completas e aplicar-regras-sistema-completo'
+  },
+  {
     id: 'v011',
     nome: 'Processamento de Categorias de Exames',
     categoria: 'Categoria',

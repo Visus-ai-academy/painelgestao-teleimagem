@@ -106,6 +106,42 @@ serve(async (req) => {
     for (const arquivo of arquivosParaProcessar) {
       console.log(`\n🔄 Processando arquivo: ${arquivo}`);
       
+      // Pré-processamento específico CEMVALENCA (v010a/v010b)
+      try {
+        // v010a: Converter P-CEMVALENCA_MG -> CEMVALENCA
+        await supabase
+          .from('volumetria_mobilemed')
+          .update({ EMPRESA: 'CEMVALENCA' })
+          .eq('arquivo_fonte', arquivo)
+          .eq('EMPRESA', 'P-CEMVALENCA_MG');
+
+        // v010b: Separar PLANTÃO para P-CEMVALENCA_PL
+        await supabase
+          .from('volumetria_mobilemed')
+          .update({ EMPRESA: 'P-CEMVALENCA_PL' })
+          .eq('arquivo_fonte', arquivo)
+          .eq('EMPRESA', 'CEMVALENCA')
+          .eq('PRIORIDADE', 'PLANTÃO');
+
+        // v010b: Corrigir nome legado CEMVALENCA_PLANTÃO -> P-CEMVALENCA_PL
+        await supabase
+          .from('volumetria_mobilemed')
+          .update({ EMPRESA: 'P-CEMVALENCA_PL' })
+          .eq('arquivo_fonte', arquivo)
+          .eq('EMPRESA', 'CEMVALENCA_PLANTÃO');
+
+        // v010b: Separar RX (não PLANTÃO) para CEMVALENCA_RX
+        await supabase
+          .from('volumetria_mobilemed')
+          .update({ EMPRESA: 'CEMVALENCA_RX' })
+          .eq('arquivo_fonte', arquivo)
+          .eq('EMPRESA', 'CEMVALENCA')
+          .eq('MODALIDADE', 'RX')
+          .neq('PRIORIDADE', 'PLANTÃO');
+      } catch (e) {
+        console.warn('⚠️ Pré-processamento CEMVALENCA falhou:', e);
+      }
+
       // Buscar TODOS os registros que precisam de correção
       const { data: registros, error: errorFetch } = await supabase
         .from('volumetria_mobilemed')
