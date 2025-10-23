@@ -234,18 +234,18 @@ Deno.serve(async (req) => {
       regrasAplicadasArquivo.add('v010')
 
       // REGRA v010b: Separação automática CEMVALENCA
-      console.log('  ⚡ Aplicando v010b - Separação CEMVALENCA (PL/RX/Principal)')
+      console.log('  ⚡ Aplicando v010b - Separação CEMVALENCA (PLANTÃO/RX/Principal)')
       
-      // Separar PLANTÃO para CEMVALENCA_PL
+      // Separar PLANTÃO para CEMVALENCA_PLANTÃO
       await supabase.from('volumetria_mobilemed')
-        .update({ EMPRESA: 'CEMVALENCA_PL' })
+        .update({ EMPRESA: 'CEMVALENCA_PLANTÃO' })
         .eq('arquivo_fonte', arquivoAtual)
         .eq('EMPRESA', 'CEMVALENCA')
         .eq('PRIORIDADE', 'PLANTÃO')
       
-      // Separar RX (não PLANTÃO) para CEMVALENCA_RX
+      // Separar RX (não PLANTÃO) para P-CEMVALENCA_RX
       await supabase.from('volumetria_mobilemed')
-        .update({ EMPRESA: 'CEMVALENCA_RX' })
+        .update({ EMPRESA: 'P-CEMVALENCA_RX' })
         .eq('arquivo_fonte', arquivoAtual)
         .eq('EMPRESA', 'CEMVALENCA')
         .eq('MODALIDADE', 'RX')
