@@ -115,20 +115,20 @@ serve(async (req) => {
           .eq('arquivo_fonte', arquivo)
           .eq('EMPRESA', 'P-CEMVALENCA_MG');
 
-        // v010b: Separar PLANTÃO para P-CEMVALENCA_PL
+        // v010b: Corrigir nome legado CEMVALENCA_PLANTÃO -> CEMVALENCA_PL
         await supabase
           .from('volumetria_mobilemed')
-          .update({ EMPRESA: 'P-CEMVALENCA_PL' })
+          .update({ EMPRESA: 'CEMVALENCA_PL' })
+          .eq('arquivo_fonte', arquivo)
+          .eq('EMPRESA', 'CEMVALENCA_PLANTÃO');
+
+        // v010b: Separar PLANTÃO para CEMVALENCA_PL
+        await supabase
+          .from('volumetria_mobilemed')
+          .update({ EMPRESA: 'CEMVALENCA_PL' })
           .eq('arquivo_fonte', arquivo)
           .eq('EMPRESA', 'CEMVALENCA')
           .eq('PRIORIDADE', 'PLANTÃO');
-
-        // v010b: Corrigir nome legado CEMVALENCA_PLANTÃO -> P-CEMVALENCA_PL
-        await supabase
-          .from('volumetria_mobilemed')
-          .update({ EMPRESA: 'P-CEMVALENCA_PL' })
-          .eq('arquivo_fonte', arquivo)
-          .eq('EMPRESA', 'CEMVALENCA_PLANTÃO');
 
         // v010b: Separar RX (não PLANTÃO) para CEMVALENCA_RX
         await supabase

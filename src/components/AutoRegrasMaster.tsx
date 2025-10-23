@@ -96,7 +96,7 @@ const REGRAS_SISTEMA = [
     id: 'v010b',
     nome: 'Separação CEMVALENCA (PL/RX)',
     categoria: 'Dados',
-    criterio: 'PLANTÃO → P-CEMVALENCA_PL; RX (não plantão) → CEMVALENCA_RX.',
+    criterio: 'PLANTÃO → CEMVALENCA_PL; RX (não plantão) → CEMVALENCA_RX; Corrige CEMVALENCA_PLANTÃO → CEMVALENCA_PL.',
     implementacao: 'Edge: aplicar-27-regras-completas e aplicar-regras-sistema-completo'
   },
   {

@@ -97,9 +97,9 @@ serve(async (req) => {
 
       // Buscar volumetria usando multiple search strategies
       const aliasSet = new Set<string>([
-        cliente.nome,
-        cliente.nome_fantasia || cliente.nome,
-        cliente.nome_mobilemed || cliente.nome
+        cliente.nome?.trim(),
+        cliente.nome_fantasia?.trim() || cliente.nome?.trim(),
+        cliente.nome_mobilemed?.trim() || cliente.nome?.trim()
       ].filter(Boolean));
 
       // Add sibling clients with same nome_fantasia
@@ -110,8 +110,8 @@ serve(async (req) => {
           .eq('nome_fantasia', cliente.nome_fantasia)
           .eq('ativo', true);
         (siblings || []).forEach((s: any) => {
-          if (s?.nome) aliasSet.add(s.nome);
-          if (s?.nome_mobilemed) aliasSet.add(s.nome_mobilemed);
+          if (s?.nome) aliasSet.add(s.nome.trim());
+          if (s?.nome_mobilemed) aliasSet.add(s.nome_mobilemed.trim());
         });
       }
 
