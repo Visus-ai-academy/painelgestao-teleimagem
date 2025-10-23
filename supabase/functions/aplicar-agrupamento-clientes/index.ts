@@ -95,17 +95,28 @@ Deno.serve(async (req) => {
     console.log(`✅ Agrupados ${diagnosticaData?.length || 0} registros de DIAGNOSTICA PLANTAO_* para DIAGNOSTICA`)
 
     // 3. Garantir que CEMVALENCA RX com prioridade PLANTÃO vá para CEMVALENCA_RX
-    const plantaoFilter = prioridadeCol === 'PRIORIDADE' 
-      ? 'PRIORIDADE.ilike.%PLANT%'
-      : 'prioridade.ilike.%PLANT%'
-    
-    const { data: cemvalencaRxData, error: cemvalencaRxError } = await supabase
+    let cemvalencaRxData: any[] | null = null
+    let cemvalencaRxError: any = null
+    let rxResp = await supabase
       .from('volumetria_mobilemed')
       .update({ EMPRESA: 'CEMVALENCA_RX' })
       .eq('EMPRESA', 'CEMVALENCA')
       .eq('MODALIDADE', 'RX')
-      .or(plantaoFilter)
+      .or('PRIORIDADE.ilike.%PLANT%')
       .select('id')
+
+    if (rxResp.error && rxResp.error.code === '42703') {
+      rxResp = await supabase
+        .from('volumetria_mobilemed')
+        .update({ EMPRESA: 'CEMVALENCA_RX' })
+        .eq('EMPRESA', 'CEMVALENCA')
+        .eq('MODALIDADE', 'RX')
+        .or('prioridade.ilike.%PLANT%')
+        .select('id')
+    }
+
+    cemvalencaRxData = rxResp.data
+    cemvalencaRxError = rxResp.error
 
     if (cemvalencaRxError) {
       console.error('❌ Erro ao processar CEMVALENCA_RX:', cemvalencaRxError)
@@ -115,13 +126,28 @@ Deno.serve(async (req) => {
     console.log(`✅ Movidos ${cemvalencaRxData?.length || 0} registros RX PLANTÃO para CEMVALENCA_RX`)
 
     // 4. Garantir que CEMVALENCA não-RX com prioridade PLANTÃO vá para CEMVALENCA_PL
-    const { data: cemvalencaPlData, error: cemvalencaPlError } = await supabase
+    let cemvalencaPlData: any[] | null = null
+    let cemvalencaPlError: any = null
+    let plResp = await supabase
       .from('volumetria_mobilemed')
       .update({ EMPRESA: 'CEMVALENCA_PL' })
       .eq('EMPRESA', 'CEMVALENCA')
       .neq('MODALIDADE', 'RX')
-      .or(plantaoFilter)
+      .or('PRIORIDADE.ilike.%PLANT%')
       .select('id')
+
+    if (plResp.error && plResp.error.code === '42703') {
+      plResp = await supabase
+        .from('volumetria_mobilemed')
+        .update({ EMPRESA: 'CEMVALENCA_PL' })
+        .eq('EMPRESA', 'CEMVALENCA')
+        .neq('MODALIDADE', 'RX')
+        .or('prioridade.ilike.%PLANT%')
+        .select('id')
+    }
+
+    cemvalencaPlData = plResp.data
+    cemvalencaPlError = plResp.error
 
     if (cemvalencaPlError) {
       console.error('❌ Erro ao processar CEMVALENCA_PL:', cemvalencaPlError)
@@ -131,12 +157,26 @@ Deno.serve(async (req) => {
     console.log(`✅ Movidos ${cemvalencaPlData?.length || 0} registros não-RX PLANTÃO para CEMVALENCA_PL`)
 
     // 5. Retornar registros indevidos (sem PLANTÃO) de CEMVALENCA_PL para CEMVALENCA
-    const { data: cemvalencaPlRetData, error: cemvalencaPlRetError } = await supabase
+    let cemvalencaPlRetData: any[] | null = null
+    let cemvalencaPlRetError: any = null
+    let plRetResp = await supabase
       .from('volumetria_mobilemed')
       .update({ EMPRESA: 'CEMVALENCA' })
       .eq('EMPRESA', 'CEMVALENCA_PL')
-      .not(prioridadeCol, 'ilike', '%PLANT%')
+      .not('PRIORIDADE', 'ilike', '%PLANT%')
       .select('id')
+
+    if (plRetResp.error && plRetResp.error.code === '42703') {
+      plRetResp = await supabase
+        .from('volumetria_mobilemed')
+        .update({ EMPRESA: 'CEMVALENCA' })
+        .eq('EMPRESA', 'CEMVALENCA_PL')
+        .not('prioridade', 'ilike', '%PLANT%')
+        .select('id')
+    }
+
+    cemvalencaPlRetData = plRetResp.data
+    cemvalencaPlRetError = plRetResp.error
 
     if (cemvalencaPlRetError) {
       console.error('❌ Erro ao retornar indevidos de CEMVALENCA_PL:', cemvalencaPlRetError)
@@ -146,12 +186,26 @@ Deno.serve(async (req) => {
     console.log(`✅ Retornados ${cemvalencaPlRetData?.length || 0} registros de CEMVALENCA_PL → CEMVALENCA (sem PLANTÃO) `)
 
     // 6. Retornar registros indevidos (sem PLANTÃO) de CEMVALENCA_RX para CEMVALENCA
-    const { data: cemvalencaRxRetData, error: cemvalencaRxRetError } = await supabase
+    let cemvalencaRxRetData: any[] | null = null
+    let cemvalencaRxRetError: any = null
+    let rxRetResp = await supabase
       .from('volumetria_mobilemed')
       .update({ EMPRESA: 'CEMVALENCA' })
       .eq('EMPRESA', 'CEMVALENCA_RX')
-      .not(prioridadeCol, 'ilike', '%PLANT%')
+      .not('PRIORIDADE', 'ilike', '%PLANT%')
       .select('id')
+
+    if (rxRetResp.error && rxRetResp.error.code === '42703') {
+      rxRetResp = await supabase
+        .from('volumetria_mobilemed')
+        .update({ EMPRESA: 'CEMVALENCA' })
+        .eq('EMPRESA', 'CEMVALENCA_RX')
+        .not('prioridade', 'ilike', '%PLANT%')
+        .select('id')
+    }
+
+    cemvalencaRxRetData = rxRetResp.data
+    cemvalencaRxRetError = rxRetResp.error
 
     if (cemvalencaRxRetError) {
       console.error('❌ Erro ao retornar indevidos de CEMVALENCA_RX:', cemvalencaRxRetError)
