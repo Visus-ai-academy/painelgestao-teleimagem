@@ -250,32 +250,40 @@ Deno.serve(async (req) => {
         .eq('arquivo_fonte', arquivoAtual)
         .eq('EMPRESA', 'CEMVALENCA_PLANTÃO')
       
-      // Corrigir legado P-CEMVALENCA_PL -> CEMVALENCA_PL
+      // Corrigir legado P-CEMVALENCA_PL (com ou sem espaço) -> CEMVALENCA_PL
       await supabase.from('volumetria_mobilemed')
         .update({ EMPRESA: 'CEMVALENCA_PL' })
         .eq('arquivo_fonte', arquivoAtual)
-        .eq('EMPRESA', 'P-CEMVALENCA_PL')
-      
-      // Separar PLANTÃO para CEMVALENCA_PL
-      await supabase.from('volumetria_mobilemed')
-        .update({ EMPRESA: 'CEMVALENCA_PL' })
-        .eq('arquivo_fonte', arquivoAtual)
-        .eq('EMPRESA', 'CEMVALENCA')
-        .eq('PRIORIDADE', 'PLANTÃO')
-      
-      // Separar RX (não PLANTÃO) para CEMVALENCA_RX
-      await supabase.from('volumetria_mobilemed')
-        .update({ EMPRESA: 'CEMVALENCA_RX' })
-        .eq('arquivo_fonte', arquivoAtual)
-        .eq('EMPRESA', 'CEMVALENCA')
-        .eq('MODALIDADE', 'RX')
-        .neq('PRIORIDADE', 'PLANTÃO')
+        .or('EMPRESA.eq.P-CEMVALENCA_PL,EMPRESA.eq.P- CEMVALENCA_PL')
       
       // Corrigir legado P-CEMVALENCA_RX -> CEMVALENCA_RX
       await supabase.from('volumetria_mobilemed')
         .update({ EMPRESA: 'CEMVALENCA_RX' })
         .eq('arquivo_fonte', arquivoAtual)
         .eq('EMPRESA', 'P-CEMVALENCA_RX')
+      
+      // Separar PLANTÃO para CEMVALENCA_PL (qualquer prioridade com PLANTÃO/PLANTAO)
+      await supabase.from('volumetria_mobilemed')
+        .update({ EMPRESA: 'CEMVALENCA_PL' })
+        .eq('arquivo_fonte', arquivoAtual)
+        .eq('EMPRESA', 'CEMVALENCA')
+        .or('PRIORIDADE.ilike.%PLANTÃO%,PRIORIDADE.ilike.%PLANTAO%,PRIORIDADE.eq.PLANTÃO')
+      
+      // Separar RX para CEMVALENCA_RX (TODOS os RX que não são PLANTÃO)
+      await supabase.from('volumetria_mobilemed')
+        .update({ EMPRESA: 'CEMVALENCA_RX' })
+        .eq('arquivo_fonte', arquivoAtual)
+        .eq('EMPRESA', 'CEMVALENCA')
+        .eq('MODALIDADE', 'RX')
+        .not('PRIORIDADE', 'ilike', '%PLANTÃO%')
+        .not('PRIORIDADE', 'ilike', '%PLANTAO%')
+      
+      // Os demais registros CEMVALENCA (CT, RM, US, etc) ficam em CEMVALENCA_PL
+      await supabase.from('volumetria_mobilemed')
+        .update({ EMPRESA: 'CEMVALENCA_PL' })
+        .eq('arquivo_fonte', arquivoAtual)
+        .eq('EMPRESA', 'CEMVALENCA')
+        .or('MODALIDADE.eq.CT,MODALIDADE.eq.RM,MODALIDADE.eq.US,MODALIDADE.eq.MG,MODALIDADE.eq.DO')
       
       regrasAplicadasArquivo.add('v010b')
 

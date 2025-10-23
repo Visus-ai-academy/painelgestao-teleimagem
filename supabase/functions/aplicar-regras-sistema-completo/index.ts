@@ -122,29 +122,12 @@ serve(async (req) => {
           .eq('arquivo_fonte', arquivo)
           .eq('EMPRESA', 'CEMVALENCA_PLANTÃO');
 
-        // v010b: Corrigir legado P-CEMVALENCA_PL -> CEMVALENCA_PL
+        // v010b: Corrigir legado P-CEMVALENCA_PL (com ou sem espaço) -> CEMVALENCA_PL
         await supabase
           .from('volumetria_mobilemed')
           .update({ EMPRESA: 'CEMVALENCA_PL' })
           .eq('arquivo_fonte', arquivo)
-          .eq('EMPRESA', 'P-CEMVALENCA_PL');
-
-        // v010b: Separar PLANTÃO para CEMVALENCA_PL
-        await supabase
-          .from('volumetria_mobilemed')
-          .update({ EMPRESA: 'CEMVALENCA_PL' })
-          .eq('arquivo_fonte', arquivo)
-          .eq('EMPRESA', 'CEMVALENCA')
-          .eq('PRIORIDADE', 'PLANTÃO');
-
-        // v010b: Separar RX (não PLANTÃO) para CEMVALENCA_RX
-        await supabase
-          .from('volumetria_mobilemed')
-          .update({ EMPRESA: 'CEMVALENCA_RX' })
-          .eq('arquivo_fonte', arquivo)
-          .eq('EMPRESA', 'CEMVALENCA')
-          .eq('MODALIDADE', 'RX')
-          .neq('PRIORIDADE', 'PLANTÃO');
+          .or('EMPRESA.eq.P-CEMVALENCA_PL,EMPRESA.eq.P- CEMVALENCA_PL');
 
         // v010b: Corrigir legado P-CEMVALENCA_RX -> CEMVALENCA_RX
         await supabase
@@ -152,6 +135,33 @@ serve(async (req) => {
           .update({ EMPRESA: 'CEMVALENCA_RX' })
           .eq('arquivo_fonte', arquivo)
           .eq('EMPRESA', 'P-CEMVALENCA_RX');
+
+        // v010b: Separar PLANTÃO para CEMVALENCA_PL (qualquer prioridade com PLANTÃO/PLANTAO)
+        await supabase
+          .from('volumetria_mobilemed')
+          .update({ EMPRESA: 'CEMVALENCA_PL' })
+          .eq('arquivo_fonte', arquivo)
+          .eq('EMPRESA', 'CEMVALENCA')
+          .or('PRIORIDADE.ilike.%PLANTÃO%,PRIORIDADE.ilike.%PLANTAO%,PRIORIDADE.eq.PLANTÃO');
+
+        // v010b: Separar RX para CEMVALENCA_RX (TODOS os RX que não são PLANTÃO)
+        await supabase
+          .from('volumetria_mobilemed')
+          .update({ EMPRESA: 'CEMVALENCA_RX' })
+          .eq('arquivo_fonte', arquivo)
+          .eq('EMPRESA', 'CEMVALENCA')
+          .eq('MODALIDADE', 'RX')
+          .not('PRIORIDADE', 'ilike', '%PLANTÃO%')
+          .not('PRIORIDADE', 'ilike', '%PLANTAO%');
+
+        // v010b: Os demais registros CEMVALENCA (CT, RM, US, etc) ficam em CEMVALENCA_PL
+        await supabase
+          .from('volumetria_mobilemed')
+          .update({ EMPRESA: 'CEMVALENCA_PL' })
+          .eq('arquivo_fonte', arquivo)
+          .eq('EMPRESA', 'CEMVALENCA')
+          .or('MODALIDADE.eq.CT,MODALIDADE.eq.RM,MODALIDADE.eq.US,MODALIDADE.eq.MG,MODALIDADE.eq.DO');
+
       } catch (e) {
         console.warn('⚠️ Pré-processamento CEMVALENCA falhou:', e);
       }
