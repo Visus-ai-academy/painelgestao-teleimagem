@@ -152,6 +152,7 @@ serve(async (req) => {
           .update({ EMPRESA: 'CEMVALENCA_RX' })
           .eq('arquivo_fonte', arquivo)
           .eq('EMPRESA', 'P-CEMVALENCA_RX');
+      } catch (e) {
         console.warn('⚠️ Pré-processamento CEMVALENCA falhou:', e);
       }
 
