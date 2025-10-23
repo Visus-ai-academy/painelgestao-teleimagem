@@ -1871,13 +1871,7 @@ export default function GerarFaturamento() {
         </TabsList>
 
         <TabsContent value="demonstrativo" className="space-y-6">
-          <div className="bg-muted/30 p-4 rounded-lg">
-            <h3 className="text-lg font-semibold mb-3">Demonstrativos de Faturamento</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Visualiza os demonstrativos gerados na aba "Gerar" ou cria demonstrativo simples sem franquias
-            </p>
-            <DemonstrativoFaturamento />
-          </div>
+          <DemonstrativoFaturamento />
         </TabsContent>
 
         {/* Tab: Relatórios - Simplificada */}
