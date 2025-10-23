@@ -208,9 +208,43 @@ serve(async (req: Request) => {
       console.log(`🔍 RADMED: ${antesFiltro} → ${volumetriaFiltrada.length} registros (removidos ${antesFiltro - volumetriaFiltrada.length})`);
     }
     
+    // CEMVALENCA_RX: Only RX modality
+    if (nomeClienteUpper.includes('CEMVALENCA_RX') && volumetriaFiltrada.length > 0) {
+      const antesFiltro = volumetriaFiltrada.length;
+      
+      volumetriaFiltrada = volumetriaFiltrada.filter(vol => {
+        const modalidade = (vol.MODALIDADE || '').toString().toUpperCase();
+        return modalidade === 'RX';
+      });
+      console.log(`🔍 CEMVALENCA_RX: ${antesFiltro} → ${volumetriaFiltrada.length} registros (removidos ${antesFiltro - volumetriaFiltrada.length})`);
+    }
+    
+    // CEMVALENCA_PL: Only PLANTÃO priority
+    if (nomeClienteUpper.includes('CEMVALENCA_PL') && volumetriaFiltrada.length > 0) {
+      const antesFiltro = volumetriaFiltrada.length;
+      
+      volumetriaFiltrada = volumetriaFiltrada.filter(vol => {
+        const prioridade = (vol.PRIORIDADE || '').toString().toUpperCase();
+        return prioridade === 'PLANTÃO' || prioridade === 'PLANTAO';
+      });
+      console.log(`🔍 CEMVALENCA_PL: ${antesFiltro} → ${volumetriaFiltrada.length} registros (removidos ${antesFiltro - volumetriaFiltrada.length})`);
+    }
+    
+    // CEMVALENCA: Only MEDICINA INTERNA and MAMA specialties
+    if (nomeClienteUpper === 'CEMVALENCA' && volumetriaFiltrada.length > 0) {
+      const ESPECIALIDADES_FATURADAS = ['MEDICINA INTERNA', 'MAMA'];
+      const antesFiltro = volumetriaFiltrada.length;
+      
+      volumetriaFiltrada = volumetriaFiltrada.filter(vol => {
+        const especialidade = (vol.ESPECIALIDADE || '').toString().toUpperCase();
+        return ESPECIALIDADES_FATURADAS.some(esp => especialidade.includes(esp));
+      });
+      console.log(`🔍 CEMVALENCA: ${antesFiltro} → ${volumetriaFiltrada.length} registros (removidos ${antesFiltro - volumetriaFiltrada.length})`);
+    }
+    
     // Other NC clients with standard rules
     const OUTROS_NC = ['CDICARDIO', 'CDIGOIAS', 'CISP', 'CRWANDERLEY', 'DIAGMAX-PR', 
-                      'GOLD', 'PRODIMAGEM', 'TRANSDUSON', 'ZANELLO', 'CEMVALENCA', 'RMPADUA'];
+                      'GOLD', 'PRODIMAGEM', 'TRANSDUSON', 'ZANELLO', 'RMPADUA'];
     const isOutroNC = OUTROS_NC.some(nc => nomeClienteUpper.includes(nc));
     
     if (isOutroNC && volumetriaFiltrada.length > 0) {
