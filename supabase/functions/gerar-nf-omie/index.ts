@@ -131,6 +131,22 @@ serve(async (req) => {
         console.log(`Processando NF para cliente: ${demo.cliente_nome}`);
 
         const clienteData = clientesData?.find(c => c.id === demo.cliente_id);
+        
+        // Validar tipo de faturamento - clientes com tipo terminando em "-NF" não geram NF
+        if (clienteData?.contratos_clientes?.[0]?.tipo_faturamento) {
+          const tipoFaturamento = String(clienteData.contratos_clientes[0].tipo_faturamento).toUpperCase();
+          if (tipoFaturamento.endsWith('-NF')) {
+            console.log(`⏭️ Pulando ${demo.cliente_nome} - Tipo de faturamento ${tipoFaturamento} não gera NF`);
+            resultados.push({
+              cliente: demo.cliente_nome,
+              sucesso: true,
+              pulado: true,
+              motivo: `Cliente com tipo de faturamento ${tipoFaturamento} não gera NF no Omie`,
+              tipo_faturamento: tipoFaturamento
+            });
+            continue;
+          }
+        }
         const detalhes = typeof demo.detalhes_relatorio === 'string'
           ? JSON.parse(demo.detalhes_relatorio)
           : demo.detalhes_relatorio;
