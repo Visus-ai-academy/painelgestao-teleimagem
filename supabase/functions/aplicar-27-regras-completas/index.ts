@@ -250,6 +250,12 @@ Deno.serve(async (req) => {
         .eq('arquivo_fonte', arquivoAtual)
         .eq('EMPRESA', 'CEMVALENCA_PLANTÃO')
       
+      // Corrigir legado P-CEMVALENCA_PL -> CEMVALENCA_PL
+      await supabase.from('volumetria_mobilemed')
+        .update({ EMPRESA: 'CEMVALENCA_PL' })
+        .eq('arquivo_fonte', arquivoAtual)
+        .eq('EMPRESA', 'P-CEMVALENCA_PL')
+      
       // Separar PLANTÃO para CEMVALENCA_PL
       await supabase.from('volumetria_mobilemed')
         .update({ EMPRESA: 'CEMVALENCA_PL' })
@@ -264,6 +270,12 @@ Deno.serve(async (req) => {
         .eq('EMPRESA', 'CEMVALENCA')
         .eq('MODALIDADE', 'RX')
         .neq('PRIORIDADE', 'PLANTÃO')
+      
+      // Corrigir legado P-CEMVALENCA_RX -> CEMVALENCA_RX
+      await supabase.from('volumetria_mobilemed')
+        .update({ EMPRESA: 'CEMVALENCA_RX' })
+        .eq('arquivo_fonte', arquivoAtual)
+        .eq('EMPRESA', 'P-CEMVALENCA_RX')
       
       regrasAplicadasArquivo.add('v010b')
 

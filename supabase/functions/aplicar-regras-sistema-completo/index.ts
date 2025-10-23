@@ -122,6 +122,13 @@ serve(async (req) => {
           .eq('arquivo_fonte', arquivo)
           .eq('EMPRESA', 'CEMVALENCA_PLANTÃO');
 
+        // v010b: Corrigir legado P-CEMVALENCA_PL -> CEMVALENCA_PL
+        await supabase
+          .from('volumetria_mobilemed')
+          .update({ EMPRESA: 'CEMVALENCA_PL' })
+          .eq('arquivo_fonte', arquivo)
+          .eq('EMPRESA', 'P-CEMVALENCA_PL');
+
         // v010b: Separar PLANTÃO para CEMVALENCA_PL
         await supabase
           .from('volumetria_mobilemed')
@@ -138,7 +145,13 @@ serve(async (req) => {
           .eq('EMPRESA', 'CEMVALENCA')
           .eq('MODALIDADE', 'RX')
           .neq('PRIORIDADE', 'PLANTÃO');
-      } catch (e) {
+
+        // v010b: Corrigir legado P-CEMVALENCA_RX -> CEMVALENCA_RX
+        await supabase
+          .from('volumetria_mobilemed')
+          .update({ EMPRESA: 'CEMVALENCA_RX' })
+          .eq('arquivo_fonte', arquivo)
+          .eq('EMPRESA', 'P-CEMVALENCA_RX');
         console.warn('⚠️ Pré-processamento CEMVALENCA falhou:', e);
       }
 
