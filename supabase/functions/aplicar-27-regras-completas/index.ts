@@ -233,6 +233,14 @@ Deno.serve(async (req) => {
         .like('EMPRESA', '%SANTA HELENA%')
       regrasAplicadasArquivo.add('v010')
 
+      // REGRA v010a: Conversão P-CEMVALENCA_MG para CEMVALENCA
+      console.log('  ⚡ Aplicando v010a - Conversão P-CEMVALENCA_MG')
+      await supabase.from('volumetria_mobilemed')
+        .update({ EMPRESA: 'CEMVALENCA' })
+        .eq('arquivo_fonte', arquivoAtual)
+        .eq('EMPRESA', 'P-CEMVALENCA_MG')
+      regrasAplicadasArquivo.add('v010a')
+
       // REGRA v010b: Separação automática CEMVALENCA
       console.log('  ⚡ Aplicando v010b - Separação CEMVALENCA (PLANTÃO/RX/Principal)')
       
