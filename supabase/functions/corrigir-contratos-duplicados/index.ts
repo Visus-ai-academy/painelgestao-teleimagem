@@ -1,5 +1,5 @@
-import { createClient } from 'supabase';
-import { corsHeaders } from 'cors';
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.51.0";
+import { corsHeaders } from "../_shared/cors.ts";
 
 interface ResultadoCorrecao {
   cliente_nome: string;
