@@ -133,10 +133,26 @@ export function DemonstrativoVolumetriaPorCliente({ periodo: periodoInicial }: D
         clientesFiltrados = clientesData?.map(c => c.nome_mobilemed || c.nome).filter(Boolean) || [];
       }
 
+      // Buscar mapeamento nome_mobilemed -> nome_fantasia
+      const { data: mapData, error: mapError } = await supabase
+        .from('clientes')
+        .select('nome_mobilemed, nome_fantasia')
+        .not('nome_mobilemed', 'is', null)
+        .not('nome_fantasia', 'is', null);
+
+      if (mapError) throw mapError;
+
+      const nomeMap = new Map<string, string>();
+      mapData?.forEach((c: any) => {
+        const key = String(c.nome_mobilemed || '').trim().toUpperCase();
+        const val = String(c.nome_fantasia || '').trim();
+        if (key && val) nomeMap.set(key, val);
+      });
+
       // Buscar dados agrupados por cliente com todas as combinações
       let query = supabase
         .from('volumetria_mobilemed')
-        .select('EMPRESA, MODALIDADE, ESPECIALIDADE, PRIORIDADE, CATEGORIA, VALORES')
+        .select('EMPRESA, MODALIDADE, ESPECIALIDADE, PRIORIDADE, CATEGORIA, VALORES, unidade_origem')
         .eq('periodo_referencia', periodo)
         .not('arquivo_fonte', 'in', '("volumetria_onco_padrao")');
 
@@ -153,7 +169,14 @@ export function DemonstrativoVolumetriaPorCliente({ periodo: periodoInicial }: D
       const clientesMap = new Map<string, any>();
 
       volumetriaData?.forEach((item: any) => {
-        const clienteNome = item.EMPRESA || 'SEM CLIENTE';
+        const prioridadeStr = String(item.PRIORIDADE || '').toUpperCase();
+        const isPlantao = prioridadeStr.includes('PLANTÃO') || prioridadeStr.includes('PLANTAO');
+        let empresaBase = item.EMPRESA || 'SEM CLIENTE';
+        if ((empresaBase === 'CEMVALENCA_PL' || empresaBase === 'CEMVALENCA_RX') && !isPlantao) {
+          empresaBase = 'CEMVALENCA';
+        }
+        const origemKey = String(item.unidade_origem || empresaBase || '').trim().toUpperCase();
+        const clienteNome = nomeMap.get(origemKey) || empresaBase || 'SEM CLIENTE';
         
         if (!clientesMap.has(clienteNome)) {
           clientesMap.set(clienteNome, {
