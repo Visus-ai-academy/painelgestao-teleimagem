@@ -539,7 +539,7 @@ serve(async (req) => {
       let detalhesFranquia = {};
 
       console.log(`📋 Calculando franquia para ${nomeFantasia} - Volume: ${totalExames}`);
-      console.log('📋 Parâmetros encontrados:', parametros);
+      console.log('📋 Parâmetros encontrados:', JSON.stringify(parametros, null, 2));
 
       // Calcular franquia baseado nos parâmetros do cliente
       if (parametros) {
@@ -642,6 +642,16 @@ serve(async (req) => {
       let valorISS = 0;
       let valorIRRF = 0;
 
+      console.log(`💰 ${nomeFantasia} - Valores calculados:`, {
+        valorExamesCalculado,
+        valorFranquia,
+        valorPortalLaudos,
+        valorIntegracao,
+        valorBruto,
+        percentual_iss: parametros?.percentual_iss,
+        simples: parametros?.simples
+      });
+
       if (parametros && parametros.percentual_iss) {
         valorISS = valorBruto * (parametros.percentual_iss / 100);
         if (parametros.simples && parametros.impostos_ab_min) {
@@ -656,6 +666,13 @@ serve(async (req) => {
 
       const totalImpostos = valorISS + valorIRRF;
       const valorLiquido = valorBruto - totalImpostos;
+
+      console.log(`💰 ${nomeFantasia} - Impostos:`, {
+        valorISS,
+        valorIRRF,
+        totalImpostos,
+        valorLiquido
+      });
 
       const demonstrativo: DemonstrativoCliente = {
         cliente_id: cliente.id,
@@ -683,6 +700,17 @@ serve(async (req) => {
         },
         tipo_faturamento: tipoFaturamento
       };
+
+      console.log(`✅ ${nomeFantasia} - Demonstrativo final:`, {
+        total_exames: demonstrativo.total_exames,
+        valor_exames: demonstrativo.valor_exames,
+        valor_franquia: demonstrativo.valor_franquia,
+        valor_portal_laudos: demonstrativo.valor_portal_laudos,
+        valor_integracao: demonstrativo.valor_integracao,
+        valor_bruto: demonstrativo.valor_bruto,
+        valor_impostos: demonstrativo.valor_impostos,
+        valor_total: demonstrativo.valor_total
+      });
 
       // Include if has exams OR net value > 0
       if (totalExames > 0 || valorLiquido > 0) {
