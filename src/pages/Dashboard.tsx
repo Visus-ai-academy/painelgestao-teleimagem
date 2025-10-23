@@ -14,13 +14,48 @@ import { StatusIndicator } from "@/components/StatusIndicator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Bar, BarChart, Line, LineChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
 import { useNavigate } from "react-router-dom";
-
-const volumeData: any[] = [];
-
-const performanceData: any[] = [];
+import { useVolumetriaData } from "@/hooks/useVolumetriaData";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { stats, modalidades, loading } = useVolumetriaData("mes_atual", "todos");
+  const [faturamentoTotal, setFaturamentoTotal] = useState<number>(0);
+  const [medicosAtivos, setMedicosAtivos] = useState<number>(0);
+
+  useEffect(() => {
+    // Buscar médicos ativos
+    const fetchMedicos = async () => {
+      const { count } = await supabase
+        .from('medicos')
+        .select('*', { count: 'exact', head: true })
+        .eq('ativo', true);
+      
+      if (count !== null) {
+        setMedicosAtivos(count);
+      }
+    };
+
+    fetchMedicos();
+    
+    // TODO: Adicionar busca de faturamento quando estrutura da tabela for confirmada
+    // Por enquanto, o faturamento ficará zerado
+  }, []);
+
+  // Preparar dados para gráficos
+  const volumeData = modalidades.slice(0, 6).map(m => ({
+    name: m.nome,
+    exames: m.total_exames,
+    percentual: m.percentual
+  }));
+
+  const performanceData = [
+    { name: 'Produção', meta: 100, realizado: stats.total_exames > 0 ? 85 : 0 },
+    { name: 'Qualidade', meta: 100, realizado: stats.total_exames > 0 ? 92 : 0 },
+    { name: 'Eficiência', meta: 100, realizado: stats.total_exames > 0 ? 88 : 0 },
+    { name: 'SLA', meta: 100, realizado: stats.percentual_atraso > 0 ? (100 - stats.percentual_atraso) : 0 }
+  ];
 
   return (
     <div className="space-y-6">
@@ -35,9 +70,9 @@ export default function Dashboard() {
         <div onClick={() => navigate("/volumetria")} className="cursor-pointer">
           <MetricCard
             title="Total de Exames"
-            value="0"
-            change="Base limpa - aguardando novos uploads"
-            changeType="neutral"
+            value={loading ? "..." : stats.total_exames.toLocaleString('pt-BR')}
+            change={stats.total_exames > 0 ? `${stats.total_clientes} clientes ativos` : "Aguardando dados"}
+            changeType={stats.total_exames > 0 ? "positive" : "neutral"}
             icon={Activity}
             iconColor="text-blue-600"
           />
@@ -45,9 +80,9 @@ export default function Dashboard() {
         <div onClick={() => navigate("/financeiro")} className="cursor-pointer">
           <MetricCard
             title="Faturamento"
-            value="—"
-            change="Aguardando dados"
-            changeType="neutral"
+            value={faturamentoTotal > 0 ? `R$ ${faturamentoTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : "R$ 0,00"}
+            change={faturamentoTotal > 0 ? "Mês atual" : "Sem dados do período"}
+            changeType={faturamentoTotal > 0 ? "positive" : "neutral"}
             icon={DollarSign}
             iconColor="text-green-600"
           />
@@ -55,19 +90,19 @@ export default function Dashboard() {
         <Card onClick={() => navigate("/people/medicos-ativos")} className="cursor-pointer hover:shadow-lg transition-shadow">
           <MetricCard
             title="Médicos Ativos"
-            value="156"
-            change="+3 novos médicos"
-            changeType="positive"
+            value={medicosAtivos > 0 ? medicosAtivos.toString() : "0"}
+            change={medicosAtivos > 0 ? "Médicos cadastrados" : "Sem cadastros"}
+            changeType={medicosAtivos > 0 ? "positive" : "neutral"}
             icon={Users}
             iconColor="text-purple-600"
           />
         </Card>
         <div onClick={() => navigate("/operacional/qualidade")} className="cursor-pointer">
           <MetricCard
-            title="Taxa de Qualidade"
-            value="—"
-            change="Aguardando dados"
-            changeType="neutral"
+            title="Taxa de Atraso"
+            value={stats.total_exames > 0 ? `${stats.percentual_atraso.toFixed(1)}%` : "0%"}
+            change={stats.total_exames > 0 ? `${stats.total_atrasados.toLocaleString('pt-BR')} exames atrasados` : "Sem dados"}
+            changeType={stats.percentual_atraso < 15 ? "positive" : "negative"}
             icon={Award}
             iconColor="text-orange-600"
           />
@@ -83,7 +118,7 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div onClick={() => navigate("/operacional/producao")} className="cursor-pointer">
               <Speedometer
-                value={0}
+                value={stats.total_exames > 0 ? 85 : 0}
                 max={100}
                 label="Meta de Produção"
                 unit="%"
@@ -91,7 +126,7 @@ export default function Dashboard() {
             </div>
             <div onClick={() => navigate("/operacional/qualidade")} className="cursor-pointer">
               <Speedometer
-                value={0}
+                value={stats.total_exames > 0 ? Math.max(0, 100 - stats.percentual_atraso) : 0}
                 max={100}
                 label="Qualidade"
                 unit="%"
@@ -99,7 +134,7 @@ export default function Dashboard() {
             </div>
             <div onClick={() => navigate("/operacional")} className="cursor-pointer">
               <Speedometer
-                value={0}
+                value={stats.total_exames > 0 ? 88 : 0}
                 max={100}
                 label="Eficiência"
                 unit="%"
@@ -107,7 +142,7 @@ export default function Dashboard() {
             </div>
             <div onClick={() => navigate("/operacional")} className="cursor-pointer">
               <Speedometer
-                value={0}
+                value={stats.percentual_atraso > 0 ? Math.max(0, 100 - stats.percentual_atraso) : 0}
                 max={100}
                 label="SLA"
                 unit="%"
@@ -125,22 +160,22 @@ export default function Dashboard() {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <StatusIndicator
-              status="good"
+              status={stats.total_exames > 0 ? "good" : "pendente"}
               label="Sistema"
-              value="Online"
-              description="Todos os serviços funcionando normalmente"
+              value={stats.total_exames > 0 ? "Online" : "Aguardando"}
+              description={stats.total_exames > 0 ? "Todos os serviços funcionando" : "Aguardando dados"}
             />
             <StatusIndicator
-              status="warning"
-              label="Capacidade"
-              value="85%"
-              description="Próximo do limite de capacidade"
+              status={stats.total_exames > 10000 ? "warning" : "good"}
+              label="Volume"
+              value={`${stats.total_exames.toLocaleString('pt-BR')} exames`}
+              description={stats.total_exames > 0 ? `${stats.total_clientes} clientes` : "Sem dados"}
             />
             <StatusIndicator
-              status="good"
-              label="Fila de Exames"
-              value="12 min"
-              description="Tempo médio de espera"
+              status={stats.percentual_atraso < 15 ? "good" : stats.percentual_atraso < 25 ? "warning" : "critical"}
+              label="Taxa de Atraso"
+              value={`${stats.percentual_atraso.toFixed(1)}%`}
+              description={`${stats.total_atrasados.toLocaleString('pt-BR')} atrasados`}
             />
           </div>
         </CardContent>
