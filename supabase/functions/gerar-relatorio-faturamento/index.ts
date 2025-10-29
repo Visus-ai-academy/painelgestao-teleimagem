@@ -231,7 +231,7 @@ serve(async (req: Request) => {
     }
     
     // CEMVALENCA: Only MEDICINA INTERNA and MAMA specialties
-    if (nomeClienteUpper === 'CEMVALENCA' && volumetriaFiltrada.length > 0) {
+    if (nomeClienteUpper.includes('CEMVALENCA') && !nomeClienteUpper.includes('CEMVALENCA_RX') && !nomeClienteUpper.includes('CEMVALENCA_PL') && volumetriaFiltrada.length > 0) {
       const ESPECIALIDADES_FATURADAS = ['MEDICINA INTERNA', 'MAMA'];
       const antesFiltro = volumetriaFiltrada.length;
       
