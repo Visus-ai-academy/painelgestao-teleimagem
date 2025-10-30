@@ -2153,12 +2153,111 @@ export default function Colaboradores() {
             <Button variant="outline" onClick={() => setShowEditDialog(false)}>
               Cancelar
             </Button>
-            <Button onClick={() => {
-              toast({
-                title: "Alterações salvas",
-                description: "Os dados do colaborador foram atualizados com sucesso",
-              });
-              setShowEditDialog(false);
+            <Button onClick={async () => {
+              try {
+                // Capturar valores dos inputs
+                const nome = (document.getElementById('edit-nome') as HTMLInputElement)?.value;
+                const email = (document.getElementById('edit-email') as HTMLInputElement)?.value;
+                const telefone = (document.getElementById('edit-telefone') as HTMLInputElement)?.value;
+                const cpf = (document.getElementById('edit-cpf') as HTMLInputElement)?.value;
+                const coordenador = (document.getElementById('edit-coordenador') as HTMLInputElement)?.value;
+                const salario = parseFloat((document.getElementById('edit-salario') as HTMLInputElement)?.value || '0');
+                
+                // Capturar valores dos selects
+                const funcaoSelect = document.querySelector('[id*="edit-funcao"]')?.parentElement?.querySelector('[role="combobox"]');
+                const funcao = funcaoSelect?.textContent || selectedColaborador?.funcao;
+                
+                const nivelSelect = document.querySelector('[id*="edit-nivel"]')?.parentElement?.querySelector('[role="combobox"]');
+                const nivel = nivelSelect?.textContent || selectedColaborador?.nivel;
+                
+                const statusSelect = document.querySelector('[id*="edit-status"]')?.parentElement?.querySelector('[role="combobox"]');
+                const status = statusSelect?.textContent || selectedColaborador?.status;
+                
+                // Dados médicos
+                const crm = (document.getElementById('edit-crm') as HTMLInputElement)?.value || null;
+                const especialidade_atuacao = (document.getElementById('edit-especialidade-atuacao') as HTMLInputElement)?.value || null;
+                const equipe = (document.getElementById('edit-equipe') as HTMLInputElement)?.value || null;
+                
+                const categoriaSelect = document.querySelector('[id*="edit-categoria"]')?.parentElement?.querySelector('[role="combobox"]');
+                const categoria = categoriaSelect?.textContent || selectedColaborador?.categoria;
+                
+                const socioSelect = document.querySelector('[id*="edit-socio"]')?.parentElement?.querySelector('[role="combobox"]');
+                const socio = socioSelect?.textContent || (selectedColaborador as any)?.socio;
+                
+                const cnpj = (document.getElementById('edit-cnpj') as HTMLInputElement)?.value || null;
+                const nome_empresa = (document.getElementById('edit-nome-empresa') as HTMLInputElement)?.value || null;
+                
+                const optanteSelect = document.querySelector('[id*="edit-optante-simples"]')?.parentElement?.querySelector('[role="combobox"]');
+                const optante_simples = optanteSelect?.textContent || (selectedColaborador as any)?.optante_simples;
+                
+                const acrescimoSelect = document.querySelector('[id*="edit-acrescimo-sem-digitador"]')?.parentElement?.querySelector('[role="combobox"]');
+                const acrescimo_sem_digitador = acrescimoSelect?.textContent || (selectedColaborador as any)?.acrescimo_sem_digitador;
+                
+                const adicional_valor = parseFloat((document.getElementById('edit-adicional-valor') as HTMLInputElement)?.value || '0');
+
+                // Preparar dados para atualização
+                const updateData: any = {
+                  nome,
+                  email,
+                  telefone,
+                  cpf,
+                  funcao,
+                  ativo: status === 'Ativo',
+                  crm,
+                  especialidade_atuacao,
+                  equipe,
+                  categoria,
+                  socio,
+                  cnpj,
+                  nome_empresa,
+                  optante_simples,
+                  acrescimo_sem_digitador,
+                  adicional_valor_sem_digitador: adicional_valor,
+                  updated_at: new Date().toISOString()
+                };
+
+                // Remover campos null ou undefined
+                Object.keys(updateData).forEach(key => {
+                  if (updateData[key] === null || updateData[key] === undefined || updateData[key] === '') {
+                    delete updateData[key];
+                  }
+                });
+
+                // Atualizar no banco de dados
+                const { error } = await supabase
+                  .from('medicos')
+                  .update(updateData)
+                  .eq('id', selectedColaborador!.id);
+
+                if (error) throw error;
+
+                // Atualizar estado local
+                setColaboradores(prev => prev.map(c => 
+                  c.id === selectedColaborador!.id 
+                    ? {
+                        ...c,
+                        ...updateData,
+                        status: status as any,
+                        gestor: coordenador,
+                        salario
+                      }
+                    : c
+                ));
+
+                toast({
+                  title: "✅ Alterações salvas",
+                  description: "Os dados do colaborador foram atualizados com sucesso",
+                });
+                
+                setShowEditDialog(false);
+              } catch (error: any) {
+                console.error('Erro ao salvar alterações:', error);
+                toast({
+                  title: "❌ Erro ao salvar",
+                  description: error.message || "Não foi possível salvar as alterações",
+                  variant: "destructive"
+                });
+              }
             }}>
               Salvar Alterações
             </Button>
