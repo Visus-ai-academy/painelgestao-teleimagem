@@ -6,20 +6,44 @@ import * as XLSX from 'xlsx';
 export const DownloadTemplateCadastroMedico = () => {
   const handleDownload = () => {
     try {
-      // Criar planilha com as colunas esperadas
+      // Criar planilha com as colunas corretas para cadastro médico
       const headers = [
-        'nome', 'especialidade', 'categoria', 'celular_pessoal', 'celular_coorporativo',
-        'cpf', 'data_nascimento', 'pis', 'cep', 'rua', 'numero', 'complemento',
-        'bairro', 'cidade', 'estado', 'pix', 'tipo_pix', 'banco', 'agencia', 'conta',
-        'tipo_conta', 'crm', 'uf_crm', 'rqe'
+        'Nome_Médico',
+        'CRM',
+        'CPF',
+        'Status_Ativo_Médico',
+        'Sócio?',
+        'Função',
+        'Especialidadede Atuação',
+        'Equipe',
+        'Acrescimo sem digitador',
+        'Adicional de Valor sem utilizar digitador',
+        'Nome_empresa',
+        'CNPJ',
+        'Telefone',
+        'E-MAIL',
+        'Optante pelo simples',
+        'Contas a Pagar'
       ];
       
       // Criar exemplo de linha
       const exampleRow = [
-        'Dr. João Silva', 'Cardiologia', 'Categoria A', '(11) 99999-9999', '(11) 88888-8888',
-        '123.456.789-00', '01/01/1980', '12345678900', '12345-678', 'Rua Exemplo', '100', 'Apto 101',
-        'Centro', 'São Paulo', 'SP', '11999999999', 'celular', 'Banco do Brasil', '1234', '12345-6',
-        'Corrente', '123456', 'SP', '1234'
+        'Dr. João Silva',
+        '123456',
+        '123.456.789-00',
+        'Ativo',
+        'Sim',
+        'Médico',
+        'Cardiologia',
+        'Equipe A',
+        '100',
+        '50',
+        'Clínica Exemplo LTDA',
+        '12.345.678/0001-90',
+        '(11) 99999-9999',
+        'joao.silva@exemplo.com',
+        'Sim',
+        'Conta Exemplo'
       ];
       
       // Criar workbook e worksheet

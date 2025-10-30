@@ -510,12 +510,24 @@ export default function Colaboradores() {
               return;
             }
             
-            const headers = jsonData[0].map((h: any) => String(h).toLowerCase().trim());
+            const headers = jsonData[0].map((h: any) => String(h).trim());
             const expectedHeaders = [
-              'nome', 'especialidade', 'categoria', 'celular_pessoal', 'celular_coorporativo',
-              'cpf', 'data_nascimento', 'pis', 'cep', 'rua', 'numero', 'complemento',
-              'bairro', 'cidade', 'estado', 'pix', 'tipo_pix', 'banco', 'agencia', 'conta',
-              'tipo_conta', 'crm', 'uf_crm', 'rqe'
+              'Nome_Médico',
+              'CRM',
+              'CPF',
+              'Status_Ativo_Médico',
+              'Sócio?',
+              'Função',
+              'Especialidadede Atuação',
+              'Equipe',
+              'Acrescimo sem digitador',
+              'Adicional de Valor sem utilizar digitador',
+              'Nome_empresa',
+              'CNPJ',
+              'Telefone',
+              'E-MAIL',
+              'Optante pelo simples',
+              'Contas a Pagar'
             ];
             
             const missingHeaders = expectedHeaders.filter(h => !headers.includes(h));
