@@ -35,8 +35,8 @@ export const UploadRepasseMedico = ({ onUploadComplete }: UploadRepasseMedicoPro
               return;
             }
             
-            const headers = jsonData[0].map((h: any) => String(h).toLowerCase().trim());
-            const expectedHeaders = ['nome', 'cpf', 'modalidade', 'especialidade', 'categoria', 'prioridade', 'valor'];
+            const headers = jsonData[0].map((h: any) => String(h).trim());
+            const expectedHeaders = ['MEDICO', 'MODALIDADE', 'ESPECIALIDADE', 'CATEGORIA', 'PRIORIDADE', 'VALOR'];
             
             const missingHeaders = expectedHeaders.filter(h => !headers.includes(h));
             if (missingHeaders.length > 0) {
