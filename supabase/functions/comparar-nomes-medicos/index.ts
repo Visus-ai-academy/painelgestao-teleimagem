@@ -411,7 +411,8 @@ serve(async (req) => {
         const cadastrado = cadastrados.find(c => c.id === r.medico_id);
         if (cadastrado) {
           const comp = comparacoesMap.get(cadastrado.nome_normalizado)!;
-          comp.nome_repasse = r.medico_nome || null;
+          // SEMPRE mostrar o nome do repasse, mesmo que seja igual ao cadastro
+          comp.nome_repasse = r.medico_nome || cadastrado.nome;
           comp.quantidade_registros_repasse = r.quantidade_registros;
           
           // Verificar se nome é diferente
@@ -428,14 +429,18 @@ serve(async (req) => {
         if (cadastrado) {
           // Encontrou match por nome - adicionar ao médico cadastrado
           const comp = comparacoesMap.get(cadastrado.nome_normalizado)!;
+          // SEMPRE mostrar o nome original do repasse
           comp.nome_repasse = r.medico_nome;
           comp.quantidade_registros_repasse = (comp.quantidade_registros_repasse || 0) + r.quantidade_registros;
           
-          // Marcar como divergente pois não tem medico_id associado
-          if (comp.status === 'ok') {
-            comp.status = 'divergente_repasse';
-          } else if (comp.status === 'divergente_volumetria') {
-            comp.status = 'divergente_ambos';
+          // Marcar como divergente pois não tem medico_id associado ou nome diferente
+          const nomesDiferentes = r.medico_nome !== cadastrado.nome;
+          if (nomesDiferentes) {
+            if (comp.status === 'ok') {
+              comp.status = 'divergente_repasse';
+            } else if (comp.status === 'divergente_volumetria') {
+              comp.status = 'divergente_ambos';
+            }
           }
         } else {
           // Não encontrou match - criar nova entrada com sugestões
