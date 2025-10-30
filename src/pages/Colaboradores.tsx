@@ -1951,8 +1951,13 @@ export default function Colaboradores() {
                     </div>
                     <div>
                       <Label htmlFor="edit-status">Status</Label>
-                      <Select defaultValue={selectedColaborador.status}>
-                        <SelectTrigger>
+                      {/* Hidden input para capturar o valor selecionado de forma confiável */}
+                      <input id="edit-status-value" type="hidden" defaultValue={selectedColaborador.status} />
+                      <Select defaultValue={selectedColaborador.status} onValueChange={(v) => {
+                        const input = document.getElementById('edit-status-value') as HTMLInputElement | null;
+                        if (input) input.value = v;
+                      }}>
+                        <SelectTrigger id="edit-status">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
