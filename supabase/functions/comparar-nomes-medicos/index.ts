@@ -276,40 +276,58 @@ serve(async (req) => {
 
     console.log(`✅ Encontrados ${volumetria.length} médicos únicos na volumetria`);
 
-    // 3. Buscar médicos do repasse
+    // 3. Buscar médicos do repasse (incluindo nome original)
     console.log('💰 Buscando médicos do repasse...');
     const { data: repasseData, error: erroRepasse } = await supabase
       .from('medicos_valores_repasse')
-      .select('medico_id');
+      .select('medico_id, medico_nome_original');
 
     if (erroRepasse) throw erroRepasse;
 
-    // Agrupar por medico_id
-    const repasseMap = new Map<string, number>();
+    // Agrupar por medico_id OU medico_nome_original
+    const repasseMap = new Map<string, { medico_id: string | null; nome_original: string | null; qtd: number }>();
+    
     (repasseData || []).forEach(r => {
-      const key = r.medico_id || 'SEM_MEDICO';
-      repasseMap.set(key, (repasseMap.get(key) || 0) + 1);
+      const key = r.medico_id || r.medico_nome_original || 'SEM_MEDICO';
+      const existing = repasseMap.get(key);
+      
+      if (existing) {
+        existing.qtd++;
+      } else {
+        repasseMap.set(key, {
+          medico_id: r.medico_id,
+          nome_original: r.medico_nome_original,
+          qtd: 1
+        });
+      }
     });
 
-    // Buscar nomes dos médicos do repasse
-    const medicosIds = Array.from(repasseMap.keys()).filter(id => id !== 'SEM_MEDICO');
-    const { data: medicosRepasse } = await supabase
-      .from('medicos')
-      .select('id, nome')
-      .in('id', medicosIds);
+    // Buscar nomes dos médicos que têm ID
+    const medicosIds = Array.from(repasseMap.values())
+      .filter(r => r.medico_id && r.medico_id !== 'SEM_MEDICO')
+      .map(r => r.medico_id as string);
+    
+    const { data: medicosRepasse } = medicosIds.length > 0 
+      ? await supabase.from('medicos').select('id, nome').in('id', medicosIds)
+      : { data: [] };
 
     const medicosRepasseMap = new Map((medicosRepasse || []).map(m => [m.id, m.nome]));
 
-    const repasse: MedicoRepasse[] = Array.from(repasseMap.entries()).map(([id, qtd]) => {
-      const nome = medicosRepasseMap.get(id);
-      const nomeNorm = normalizar(nome || '');
-      const encontrado = id !== 'SEM_MEDICO' && cadastrados.some(c => c.id === id);
+    const repasse: MedicoRepasse[] = Array.from(repasseMap.entries()).map(([key, dados]) => {
+      // Se tem medico_id, usar o nome do cadastro
+      const nomeUsado = dados.medico_id 
+        ? medicosRepasseMap.get(dados.medico_id) || dados.nome_original
+        : dados.nome_original;
+      
+      const nomeNorm = normalizar(nomeUsado || '');
+      const encontrado = dados.medico_id && dados.medico_id !== 'SEM_MEDICO' && 
+                        cadastrados.some(c => c.id === dados.medico_id);
 
       return {
-        medico_id: id === 'SEM_MEDICO' ? null : id,
-        medico_nome: nome || null,
+        medico_id: dados.medico_id === 'SEM_MEDICO' ? null : dados.medico_id,
+        medico_nome: nomeUsado || null,
         nome_normalizado: nomeNorm,
-        quantidade_registros: qtd,
+        quantidade_registros: dados.qtd,
         encontrado_cadastro: encontrado
       };
     });
@@ -389,6 +407,7 @@ serve(async (req) => {
     // Adicionar dados do repasse
     repasse.forEach(r => {
       if (r.medico_id) {
+        // Repasse com médico_id - buscar no cadastro
         const cadastrado = cadastrados.find(c => c.id === r.medico_id);
         if (cadastrado) {
           const comp = comparacoesMap.get(cadastrado.nome_normalizado)!;
@@ -400,10 +419,62 @@ serve(async (req) => {
             comp.status = comp.status === 'divergente_volumetria' ? 'divergente_ambos' : 'divergente_repasse';
           }
         }
+      } else if (r.medico_nome) {
+        // Repasse SEM medico_id, mas COM nome - tentar fazer match por nome
+        const cadastrado = cadastrados.find(c => 
+          c.nome_normalizado === r.nome_normalizado || matchComAbreviacoes(r.medico_nome || '', c.nome)
+        );
+        
+        if (cadastrado) {
+          // Encontrou match por nome - adicionar ao médico cadastrado
+          const comp = comparacoesMap.get(cadastrado.nome_normalizado)!;
+          comp.nome_repasse = r.medico_nome;
+          comp.quantidade_registros_repasse = (comp.quantidade_registros_repasse || 0) + r.quantidade_registros;
+          
+          // Marcar como divergente pois não tem medico_id associado
+          if (comp.status === 'ok') {
+            comp.status = 'divergente_repasse';
+          } else if (comp.status === 'divergente_volumetria') {
+            comp.status = 'divergente_ambos';
+          }
+        } else {
+          // Não encontrou match - criar nova entrada com sugestões
+          const sugestoes = cadastrados
+            .map(c => {
+              const similaridade = calcularSimilaridade(r.nome_normalizado, c.nome_normalizado);
+              const temAbreviacao = matchComAbreviacoes(r.medico_nome || '', c.nome);
+              const score = temAbreviacao ? 0.95 : similaridade;
+              
+              return {
+                id: c.id,
+                nome: c.nome,
+                similaridade: score
+              };
+            })
+            .filter(s => s.similaridade > 0.7)
+            .sort((a, b) => b.similaridade - a.similaridade)
+            .slice(0, 3);
+          
+          comparacoesMap.set(r.medico_nome, {
+            nome_volumetria: null,
+            nome_cadastro: null,
+            medico_cadastro_id: null,
+            status_cadastro: null,
+            nome_repasse: r.medico_nome,
+            quantidade_exames_volumetria: 0,
+            quantidade_registros_repasse: r.quantidade_registros,
+            status: 'divergente_repasse',
+            sugestoes_cadastro: sugestoes
+          });
+        }
       } else {
-        // Repasse sem médico associado
-        const nomeRepasse = r.medico_nome || 'SEM MÉDICO';
-        if (!comparacoesMap.has(nomeRepasse)) {
+        // Repasse sem médico e sem nome - agrupar como "SEM MÉDICO"
+        const nomeRepasse = 'SEM MÉDICO';
+        const existing = comparacoesMap.get(nomeRepasse);
+        
+        if (existing) {
+          existing.quantidade_registros_repasse += r.quantidade_registros;
+        } else {
           comparacoesMap.set(nomeRepasse, {
             nome_volumetria: null,
             nome_cadastro: null,
