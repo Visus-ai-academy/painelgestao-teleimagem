@@ -108,18 +108,14 @@ export function RepasseUploadProgress({ uploadId, onComplete }: RepasseUploadPro
             </p>
             <p className="text-xs text-muted-foreground">Atualizados</p>
           </div>
-          {(() => {
-            const detalhes = status.detalhes_erro as any;
-            const ignorados = detalhes?.ignorados || 0;
-            return ignorados > 0 ? (
-              <div className="space-y-1">
-                <p className="text-2xl font-bold text-muted-foreground">
-                  {ignorados}
-                </p>
-                <p className="text-xs text-muted-foreground">Ignorados</p>
-              </div>
-            ) : null;
-          })()}
+          {status.registros_ignorados > 0 && (
+            <div className="space-y-1">
+              <p className="text-2xl font-bold text-yellow-600">
+                {status.registros_ignorados}
+              </p>
+              <p className="text-xs text-muted-foreground">Ignorados</p>
+            </div>
+          )}
         </div>
 
         {status.registros_erro > 0 && (
@@ -157,9 +153,16 @@ export function RepasseUploadProgress({ uploadId, onComplete }: RepasseUploadPro
             {(() => {
               const detalhes = status.detalhes_erro as any;
               return detalhes?.resumo ? (
-                <p className="text-xs text-muted-foreground font-mono">
-                  {detalhes.resumo}
-                </p>
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground font-mono">
+                    {detalhes.resumo}
+                  </p>
+                  {status.registros_ignorados > 0 && (
+                    <p className="text-xs text-yellow-600 bg-yellow-50 p-2 rounded border border-yellow-200">
+                      ℹ️ <strong>Registros Ignorados:</strong> Nomes não-médicos como "TESTE MEDICO", "Ana Caroline Blanco Carreiro", "Juliano Manzoli Marques Luiz" foram automaticamente excluídos.
+                    </p>
+                  )}
+                </div>
               ) : null;
             })()}
           </div>

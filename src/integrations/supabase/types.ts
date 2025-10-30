@@ -2985,6 +2985,7 @@ export type Database = {
           periodo_referencia: string | null
           registros_atualizados: number | null
           registros_erro: number | null
+          registros_ignorados: number | null
           registros_inseridos: number | null
           registros_processados: number | null
           status: string
@@ -3004,6 +3005,7 @@ export type Database = {
           periodo_referencia?: string | null
           registros_atualizados?: number | null
           registros_erro?: number | null
+          registros_ignorados?: number | null
           registros_inseridos?: number | null
           registros_processados?: number | null
           status?: string
@@ -3023,6 +3025,7 @@ export type Database = {
           periodo_referencia?: string | null
           registros_atualizados?: number | null
           registros_erro?: number | null
+          registros_ignorados?: number | null
           registros_inseridos?: number | null
           registros_processados?: number | null
           status?: string
