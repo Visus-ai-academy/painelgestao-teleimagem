@@ -16,7 +16,6 @@ import { toast } from "sonner";
 import { useMedicoData } from "@/hooks/useMedicoData";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ComparativoNomesMedicos } from "@/components/ComparativoNomesMedicos";
-import { MapeamentoNomesMedicos } from "@/components/MapeamentoNomesMedicos";
 import { 
   Users, 
   UserCheck, 
@@ -947,7 +946,6 @@ export default function Colaboradores() {
         <TabsList>
           <TabsTrigger value="gestao">Gestão de Colaboradores</TabsTrigger>
           <TabsTrigger value="comparativo">Comparativo de Nomes</TabsTrigger>
-          <TabsTrigger value="mapeamento">Mapeamento de Nomes</TabsTrigger>
         </TabsList>
 
         <TabsContent value="gestao" className="space-y-6">
@@ -2171,10 +2169,6 @@ export default function Colaboradores() {
 
         <TabsContent value="comparativo">
           <ComparativoNomesMedicos />
-        </TabsContent>
-
-        <TabsContent value="mapeamento">
-          <MapeamentoNomesMedicos />
         </TabsContent>
       </Tabs>
     </div>
