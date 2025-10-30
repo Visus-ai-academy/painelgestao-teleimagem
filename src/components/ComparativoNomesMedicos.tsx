@@ -1,381 +1,273 @@
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
-import { AlertCircle, CheckCircle, Search, FileText } from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton';
+import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Loader2, CheckCircle2, AlertCircle, ArrowRight } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+interface MedicoComparativo {
+  nome_volumetria: string | null;
+  nome_cadastro: string | null;
+  medico_cadastro_id: string | null;
+  nome_repasse: string | null;
+  quantidade_exames_volumetria: number;
+  quantidade_registros_repasse: number;
+  status: 'ok' | 'divergente_volumetria' | 'divergente_repasse' | 'divergente_ambos';
+  sugestoes_cadastro: Array<{ id: string; nome: string; similaridade: number }>;
+}
 
 interface ComparativoData {
-  medicos_cadastrados: Array<{
-    id: string;
-    nome: string;
-    crm: string | null;
-    nome_normalizado: string;
-  }>;
-  medicos_volumetria: Array<{
-    nome_original: string;
-    nome_normalizado: string;
-    quantidade_exames: number;
-    encontrado_cadastro: boolean;
-    sugestoes_match: string[];
-  }>;
-  medicos_repasse: Array<{
-    medico_id: string | null;
-    medico_nome: string | null;
-    nome_normalizado: string;
-    quantidade_registros: number;
-    encontrado_cadastro: boolean;
-  }>;
-  divergencias: Array<{
-    tipo: string;
-    origem: string;
-    nome_origem: string;
-    medico_id?: string;
-    sugestoes: string[];
-    detalhes: string;
-  }>;
+  comparacoes: MedicoComparativo[];
   estatisticas: {
     total_cadastrados: number;
-    total_volumetria: number;
-    total_repasse: number;
-    divergencias_encontradas: number;
-    sugestoes_normalizacao: number;
+    total_divergencias: number;
+    total_mapeados: number;
   };
 }
 
 export const ComparativoNomesMedicos = () => {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<ComparativoData | null>(null);
+  const [mapeandoId, setMapeandoId] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const executarComparativo = async () => {
     try {
       setLoading(true);
-      toast.info('Iniciando análise comparativa...');
-
+      
       const { data: resultado, error } = await supabase.functions.invoke('comparar-nomes-medicos');
 
       if (error) throw error;
 
       setData(resultado);
-      toast.success('Comparativo concluído!');
+      
+      toast({
+        title: "Comparativo concluído",
+        description: `${resultado.estatisticas.total_divergencias} divergências encontradas`,
+      });
     } catch (error: any) {
       console.error('Erro ao executar comparativo:', error);
-      toast.error(`Erro: ${error.message}`);
+      toast({
+        title: "Erro ao executar comparativo",
+        description: error.message,
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const getTipoBadge = (tipo: string) => {
-    switch (tipo) {
-      case 'volumetria_nao_cadastrado':
-        return <Badge variant="destructive">Não Cadastrado</Badge>;
-      case 'repasse_sem_medico':
-        return <Badge variant="destructive">Sem Médico</Badge>;
-      case 'possivel_match':
-        return <Badge className="bg-yellow-500">Possível Match</Badge>;
-      default:
-        return <Badge variant="secondary">{tipo}</Badge>;
+  const mapearNome = async (nomeOrigem: string, origem: 'volumetria' | 'repasse', medicoId: string) => {
+    try {
+      setMapeandoId(nomeOrigem);
+
+      const { error } = await supabase.functions.invoke('mapear-nome-medico', {
+        body: {
+          nome_origem: nomeOrigem,
+          origem,
+          medico_id: medicoId,
+        },
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Mapeamento criado",
+        description: `Nome "${nomeOrigem}" mapeado com sucesso`,
+      });
+
+      // Recarregar comparativo
+      await executarComparativo();
+    } catch (error: any) {
+      console.error('Erro ao mapear nome:', error);
+      toast({
+        title: "Erro ao mapear nome",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setMapeandoId(null);
     }
   };
 
+  const getStatusBadge = (status: string) => {
+    const badges = {
+      ok: <Badge className="bg-green-500"><CheckCircle2 className="w-3 h-3 mr-1" />OK</Badge>,
+      divergente_volumetria: <Badge variant="destructive"><AlertCircle className="w-3 h-3 mr-1" />Volumetria</Badge>,
+      divergente_repasse: <Badge variant="destructive"><AlertCircle className="w-3 h-3 mr-1" />Repasse</Badge>,
+      divergente_ambos: <Badge variant="destructive"><AlertCircle className="w-3 h-3 mr-1" />Ambos</Badge>,
+    };
+    return badges[status as keyof typeof badges] || <Badge>{status}</Badge>;
+  };
+
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Search className="h-5 w-5" />
-            Comparativo de Nomes de Médicos
-          </CardTitle>
-          <CardDescription>
-            Analisa e compara os nomes dos médicos entre Volumetria, Repasse e Cadastro para identificar divergências e sugerir normalizações.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          Comparativo de Nomes de Médicos
+        </CardTitle>
+        <CardDescription>
+          Compare e normalize os nomes de médicos entre Volumetria, Cadastro e Repasse
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex justify-between items-center">
           <Button onClick={executarComparativo} disabled={loading}>
-            {loading ? 'Analisando...' : 'Executar Comparativo'}
+            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Executar Comparativo
           </Button>
-        </CardContent>
-      </Card>
 
-      {loading && (
-        <Card>
-          <CardContent className="pt-6">
-            <div className="space-y-2">
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-3/4" />
-              <Skeleton className="h-4 w-1/2" />
+          {data && (
+            <div className="flex gap-4 text-sm">
+              <div className="flex items-center gap-2">
+                <Badge className="bg-green-500">{data.estatisticas.total_mapeados}</Badge>
+                <span className="text-muted-foreground">Mapeados</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="destructive">{data.estatisticas.total_divergencias}</Badge>
+                <span className="text-muted-foreground">Divergências</span>
+              </div>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          )}
+        </div>
 
-      {data && (
-        <>
-          {/* Estatísticas */}
-          <div className="grid gap-4 md:grid-cols-5">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Cadastrados</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{data.estatisticas.total_cadastrados}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Volumetria</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{data.estatisticas.total_volumetria}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Repasse</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{data.estatisticas.total_repasse}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Divergências</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-destructive">
-                  {data.estatisticas.divergencias_encontradas}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Sugestões</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-yellow-500">
-                  {data.estatisticas.sugestoes_normalizacao}
-                </div>
-              </CardContent>
-            </Card>
+        {loading && (
+          <div className="space-y-2">
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-40 w-full" />
           </div>
+        )}
 
-          <Tabs defaultValue="divergencias" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="divergencias">
-                Divergências ({data.divergencias.length})
-              </TabsTrigger>
-              <TabsTrigger value="volumetria">
-                Volumetria ({data.medicos_volumetria.length})
-              </TabsTrigger>
-              <TabsTrigger value="repasse">
-                Repasse ({data.medicos_repasse.length})
-              </TabsTrigger>
-              <TabsTrigger value="cadastrados">
-                Cadastrados ({data.medicos_cadastrados.length})
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="divergencias">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Divergências Encontradas</CardTitle>
-                  <CardDescription>
-                    Médicos que precisam de atenção para normalização
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {data.divergencias.length === 0 ? (
-                    <Alert>
-                      <CheckCircle className="h-4 w-4" />
-                      <AlertDescription>
-                        Nenhuma divergência encontrada! Todos os nomes estão consistentes.
-                      </AlertDescription>
-                    </Alert>
-                  ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Tipo</TableHead>
-                          <TableHead>Origem</TableHead>
-                          <TableHead>Nome</TableHead>
-                          <TableHead>Detalhes</TableHead>
-                          <TableHead>Sugestões</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {data.divergencias.map((div, idx) => (
-                          <TableRow key={idx}>
-                            <TableCell>{getTipoBadge(div.tipo)}</TableCell>
-                            <TableCell>
-                              <Badge variant="outline">{div.origem}</Badge>
-                            </TableCell>
-                            <TableCell className="font-medium">{div.nome_origem}</TableCell>
-                            <TableCell className="text-sm text-muted-foreground">
-                              {div.detalhes}
-                            </TableCell>
-                            <TableCell>
-                              {div.sugestoes.length > 0 ? (
-                                <div className="space-y-1">
-                                  {div.sugestoes.map((sug, sidx) => (
-                                    <div key={sidx} className="text-sm text-blue-600">
-                                      {sug}
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <span className="text-sm text-muted-foreground">-</span>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="volumetria">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Médicos na Volumetria</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Nome</TableHead>
-                        <TableHead>Qtd. Exames</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Sugestões</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {data.medicos_volumetria.map((med, idx) => (
-                        <TableRow key={idx}>
-                          <TableCell className="font-medium">{med.nome_original}</TableCell>
-                          <TableCell>{med.quantidade_exames}</TableCell>
-                          <TableCell>
-                            {med.encontrado_cadastro ? (
-                              <Badge variant="default" className="bg-green-500">
-                                <CheckCircle className="h-3 w-3 mr-1" />
-                                Cadastrado
-                              </Badge>
-                            ) : (
-                              <Badge variant="destructive">
-                                <AlertCircle className="h-3 w-3 mr-1" />
-                                Não Encontrado
-                              </Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {med.sugestoes_match.length > 0 ? (
-                              <div className="space-y-1">
-                                {med.sugestoes_match.map((sug, sidx) => (
-                                  <div key={sidx} className="text-sm text-blue-600">
-                                    {sug}
-                                  </div>
+        {data && (
+          <div className="border rounded-lg">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[100px]">Status</TableHead>
+                  <TableHead>Nome Volumetria</TableHead>
+                  <TableHead className="bg-primary/5">Nome Cadastro (Referência)</TableHead>
+                  <TableHead>Nome Repasse</TableHead>
+                  <TableHead className="w-[100px] text-center">Vol.</TableHead>
+                  <TableHead className="w-[100px] text-center">Rep.</TableHead>
+                  <TableHead className="w-[200px] text-center">Ação</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {data.comparacoes.map((comp, idx) => (
+                  <TableRow key={idx}>
+                    <TableCell>{getStatusBadge(comp.status)}</TableCell>
+                    <TableCell>
+                      {comp.nome_volumetria ? (
+                        <span className="font-medium">{comp.nome_volumetria}</span>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="bg-primary/5">
+                      {comp.nome_cadastro ? (
+                        <span className="font-bold">{comp.nome_cadastro}</span>
+                      ) : (
+                        <div className="space-y-2">
+                          <span className="text-muted-foreground text-sm">Não cadastrado</span>
+                          {comp.sugestoes_cadastro.length > 0 && (
+                            <Select
+                              onValueChange={(value) => {
+                                const origem = comp.nome_volumetria ? 'volumetria' : 'repasse';
+                                const nomeOrigem = comp.nome_volumetria || comp.nome_repasse || '';
+                                mapearNome(nomeOrigem, origem, value);
+                              }}
+                            >
+                              <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Selecione o médico..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {comp.sugestoes_cadastro.map((sug) => (
+                                  <SelectItem key={sug.id} value={sug.id}>
+                                    {sug.nome} ({Math.round(sug.similaridade * 100)}%)
+                                  </SelectItem>
                                 ))}
-                              </div>
-                            ) : (
-                              <span className="text-sm text-muted-foreground">-</span>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="repasse">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Médicos no Repasse</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Nome</TableHead>
-                        <TableHead>Qtd. Registros</TableHead>
-                        <TableHead>Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {data.medicos_repasse.map((med, idx) => (
-                        <TableRow key={idx}>
-                          <TableCell className="font-medium">
-                            {med.medico_nome || 'SEM MÉDICO ASSOCIADO'}
-                          </TableCell>
-                          <TableCell>{med.quantidade_registros}</TableCell>
-                          <TableCell>
-                            {med.medico_id ? (
-                              med.encontrado_cadastro ? (
-                                <Badge variant="default" className="bg-green-500">
-                                  <CheckCircle className="h-3 w-3 mr-1" />
-                                  Cadastrado
-                                </Badge>
+                              </SelectContent>
+                            </Select>
+                          )}
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {comp.nome_repasse ? (
+                        <span className="font-medium">{comp.nome_repasse}</span>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {comp.quantidade_exames_volumetria > 0 ? (
+                        <Badge variant="outline">{comp.quantidade_exames_volumetria}</Badge>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {comp.quantidade_registros_repasse > 0 ? (
+                        <Badge variant="outline">{comp.quantidade_registros_repasse}</Badge>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {comp.status !== 'ok' && comp.medico_cadastro_id && (
+                        <div className="flex flex-col gap-2">
+                          {comp.nome_volumetria && comp.nome_volumetria !== comp.nome_cadastro && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={mapeandoId === comp.nome_volumetria}
+                              onClick={() => mapearNome(comp.nome_volumetria!, 'volumetria', comp.medico_cadastro_id!)}
+                            >
+                              {mapeandoId === comp.nome_volumetria ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
                               ) : (
-                                <Badge variant="destructive">
-                                  <AlertCircle className="h-3 w-3 mr-1" />
-                                  Não Encontrado
-                                </Badge>
-                              )
-                            ) : (
-                              <Badge variant="destructive">
-                                <AlertCircle className="h-3 w-3 mr-1" />
-                                Sem Médico
-                              </Badge>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="cadastrados">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Médicos Cadastrados</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Nome</TableHead>
-                        <TableHead>CRM</TableHead>
-                        <TableHead>Nome Normalizado</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {data.medicos_cadastrados.map((med) => (
-                        <TableRow key={med.id}>
-                          <TableCell className="font-medium">{med.nome}</TableCell>
-                          <TableCell>{med.crm || '-'}</TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {med.nome_normalizado}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
-        </>
-      )}
-    </div>
+                                <>
+                                  Vol <ArrowRight className="h-3 w-3 mx-1" /> Cad
+                                </>
+                              )}
+                            </Button>
+                          )}
+                          {comp.nome_repasse && comp.nome_repasse !== comp.nome_cadastro && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={mapeandoId === comp.nome_repasse}
+                              onClick={() => mapearNome(comp.nome_repasse!, 'repasse', comp.medico_cadastro_id!)}
+                            >
+                              {mapeandoId === comp.nome_repasse ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <>
+                                  Rep <ArrowRight className="h-3 w-3 mx-1" /> Cad
+                                </>
+                              )}
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 };

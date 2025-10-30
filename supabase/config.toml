@@ -169,3 +169,6 @@ verify_jwt = true
 
 [functions.comparar-nomes-medicos]
 verify_jwt = true
+
+[functions.mapear-nome-medico]
+verify_jwt = true

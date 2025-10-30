@@ -6,17 +6,23 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+interface MedicoComparativo {
+  nome_volumetria: string | null;
+  nome_cadastro: string | null;
+  medico_cadastro_id: string | null;
+  nome_repasse: string | null;
+  quantidade_exames_volumetria: number;
+  quantidade_registros_repasse: number;
+  status: 'ok' | 'divergente_volumetria' | 'divergente_repasse' | 'divergente_ambos';
+  sugestoes_cadastro: Array<{ id: string; nome: string; similaridade: number }>;
+}
+
 interface ComparativoResult {
-  medicos_cadastrados: MedicoCadastrado[];
-  medicos_volumetria: MedicoVolumetria[];
-  medicos_repasse: MedicoRepasse[];
-  divergencias: Divergencia[];
+  comparacoes: MedicoComparativo[];
   estatisticas: {
     total_cadastrados: number;
-    total_volumetria: number;
-    total_repasse: number;
-    divergencias_encontradas: number;
-    sugestoes_normalizacao: number;
+    total_divergencias: number;
+    total_mapeados: number;
   };
 }
 
@@ -207,51 +213,113 @@ serve(async (req) => {
 
     console.log(`✅ Encontrados ${repasse.length} médicos no repasse`);
 
-    // 4. Identificar divergências
-    console.log('🔍 Identificando divergências...');
-    const divergencias: Divergencia[] = [];
+    // 4. Criar comparações unificadas
+    console.log('🔍 Criando comparações unificadas...');
+    const comparacoesMap = new Map<string, MedicoComparativo>();
 
-    // Médicos da volumetria não cadastrados
+    // Adicionar médicos cadastrados como base
+    cadastrados.forEach(c => {
+      comparacoesMap.set(c.nome_normalizado, {
+        nome_volumetria: null,
+        nome_cadastro: c.nome,
+        medico_cadastro_id: c.id,
+        nome_repasse: null,
+        quantidade_exames_volumetria: 0,
+        quantidade_registros_repasse: 0,
+        status: 'ok',
+        sugestoes_cadastro: []
+      });
+    });
+
+    // Adicionar dados da volumetria
     volumetria.forEach(v => {
-      if (!v.encontrado_cadastro) {
-        divergencias.push({
-          tipo: v.sugestoes_match.length > 0 ? 'possivel_match' : 'volumetria_nao_cadastrado',
-          origem: 'volumetria',
-          nome_origem: v.nome_original,
-          sugestoes: v.sugestoes_match,
-          detalhes: `${v.quantidade_exames} exames na volumetria`
+      const cadastrado = cadastrados.find(c => c.nome_normalizado === v.nome_normalizado);
+      
+      if (cadastrado) {
+        const comp = comparacoesMap.get(cadastrado.nome_normalizado)!;
+        comp.nome_volumetria = v.nome_original;
+        comp.quantidade_exames_volumetria = v.quantidade_exames;
+        
+        // Verificar se nome é diferente
+        if (v.nome_original !== cadastrado.nome) {
+          comp.status = comp.status === 'divergente_repasse' ? 'divergente_ambos' : 'divergente_volumetria';
+        }
+      } else {
+        // Médico não cadastrado - criar nova entrada com sugestões
+        const sugestoes = cadastrados
+          .map(c => ({
+            id: c.id,
+            nome: c.nome,
+            similaridade: calcularSimilaridade(v.nome_normalizado, c.nome_normalizado)
+          }))
+          .filter(s => s.similaridade > 0.7)
+          .sort((a, b) => b.similaridade - a.similaridade)
+          .slice(0, 3);
+
+        comparacoesMap.set(v.nome_original, {
+          nome_volumetria: v.nome_original,
+          nome_cadastro: null,
+          medico_cadastro_id: null,
+          nome_repasse: null,
+          quantidade_exames_volumetria: v.quantidade_exames,
+          quantidade_registros_repasse: 0,
+          status: 'divergente_volumetria',
+          sugestoes_cadastro: sugestoes
         });
       }
     });
 
-    // Repasses sem médico associado
+    // Adicionar dados do repasse
     repasse.forEach(r => {
-      if (!r.medico_id) {
-        divergencias.push({
-          tipo: 'repasse_sem_medico',
-          origem: 'repasse',
-          nome_origem: 'SEM MÉDICO ASSOCIADO',
-          sugestoes: [],
-          detalhes: `${r.quantidade_registros} registros de repasse sem médico`
-        });
+      if (r.medico_id) {
+        const cadastrado = cadastrados.find(c => c.id === r.medico_id);
+        if (cadastrado) {
+          const comp = comparacoesMap.get(cadastrado.nome_normalizado)!;
+          comp.nome_repasse = r.medico_nome || null;
+          comp.quantidade_registros_repasse = r.quantidade_registros;
+          
+          // Verificar se nome é diferente
+          if (r.medico_nome && r.medico_nome !== cadastrado.nome) {
+            comp.status = comp.status === 'divergente_volumetria' ? 'divergente_ambos' : 'divergente_repasse';
+          }
+        }
+      } else {
+        // Repasse sem médico associado
+        const nomeRepasse = r.medico_nome || 'SEM MÉDICO';
+        if (!comparacoesMap.has(nomeRepasse)) {
+          comparacoesMap.set(nomeRepasse, {
+            nome_volumetria: null,
+            nome_cadastro: null,
+            medico_cadastro_id: null,
+            nome_repasse: nomeRepasse,
+            quantidade_exames_volumetria: 0,
+            quantidade_registros_repasse: r.quantidade_registros,
+            status: 'divergente_repasse',
+            sugestoes_cadastro: []
+          });
+        }
       }
     });
+
+    const comparacoes = Array.from(comparacoesMap.values())
+      .sort((a, b) => {
+        // Priorizar divergências
+        if (a.status !== 'ok' && b.status === 'ok') return -1;
+        if (a.status === 'ok' && b.status !== 'ok') return 1;
+        // Depois por quantidade de exames
+        return b.quantidade_exames_volumetria - a.quantidade_exames_volumetria;
+      });
 
     const estatisticas = {
       total_cadastrados: cadastrados.length,
-      total_volumetria: volumetria.length,
-      total_repasse: repasse.length,
-      divergencias_encontradas: divergencias.length,
-      sugestoes_normalizacao: divergencias.filter(d => d.tipo === 'possivel_match').length
+      total_divergencias: comparacoes.filter(c => c.status !== 'ok').length,
+      total_mapeados: comparacoes.filter(c => c.status === 'ok' && (c.quantidade_exames_volumetria > 0 || c.quantidade_registros_repasse > 0)).length
     };
 
     console.log('✅ Comparativo concluído:', estatisticas);
 
     const resultado: ComparativoResult = {
-      medicos_cadastrados: cadastrados,
-      medicos_volumetria: volumetria,
-      medicos_repasse: repasse,
-      divergencias,
+      comparacoes,
       estatisticas
     };
 
