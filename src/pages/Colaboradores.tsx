@@ -20,6 +20,7 @@ import { DownloadTemplateNovosMedicos } from "@/components/DownloadTemplateNovos
 import { DownloadTemplateCadastroMedico } from "@/components/DownloadTemplateCadastroMedico";
 import { UploadRepasseMedico } from "@/components/UploadRepasseMedico";
 import { ValoresRepasseMedico } from "@/components/ValoresRepasseMedico";
+import * as XLSX from 'xlsx';
 import {
   Users, 
   UserCheck, 
@@ -493,6 +494,46 @@ export default function Colaboradores() {
   const handleFileUpload = async (file: File) => {
     try {
       console.log('📤 Enviando arquivo de médicos...', file.name);
+      
+      // Validar colunas do arquivo antes de enviar
+      const reader = new FileReader();
+      const validationPromise = new Promise<void>((resolve, reject) => {
+        reader.onload = async (e) => {
+          try {
+            const data = new Uint8Array(e.target?.result as ArrayBuffer);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
+            
+            if (jsonData.length === 0) {
+              reject(new Error('Arquivo vazio'));
+              return;
+            }
+            
+            const headers = jsonData[0].map((h: any) => String(h).toLowerCase().trim());
+            const expectedHeaders = [
+              'nome', 'especialidade', 'categoria', 'celular_pessoal', 'celular_coorporativo',
+              'cpf', 'data_nascimento', 'pis', 'cep', 'rua', 'numero', 'complemento',
+              'bairro', 'cidade', 'estado', 'pix', 'tipo_pix', 'banco', 'agencia', 'conta',
+              'tipo_conta', 'crm', 'uf_crm', 'rqe'
+            ];
+            
+            const missingHeaders = expectedHeaders.filter(h => !headers.includes(h));
+            if (missingHeaders.length > 0) {
+              reject(new Error(`Colunas obrigatórias faltando: ${missingHeaders.join(', ')}. Use o template fornecido.`));
+              return;
+            }
+            
+            resolve();
+          } catch (err) {
+            reject(err);
+          }
+        };
+        reader.onerror = () => reject(new Error('Erro ao ler arquivo'));
+      });
+      
+      reader.readAsArrayBuffer(file);
+      await validationPromise;
       
       const formData = new FormData();
       formData.append('file', file);

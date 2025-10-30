@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Upload } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import * as XLSX from 'xlsx';
 
 interface UploadRepasseMedicoProps {
   onUploadComplete?: () => void;
@@ -18,6 +19,41 @@ export const UploadRepasseMedico = ({ onUploadComplete }: UploadRepasseMedicoPro
     try {
       setIsUploading(true);
       console.log('🔄 Iniciando upload de repasse médico:', file.name);
+
+      // Validar colunas do arquivo antes de enviar
+      const reader = new FileReader();
+      const validationPromise = new Promise<void>((resolve, reject) => {
+        reader.onload = async (e) => {
+          try {
+            const data = new Uint8Array(e.target?.result as ArrayBuffer);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
+            
+            if (jsonData.length === 0) {
+              reject(new Error('Arquivo vazio'));
+              return;
+            }
+            
+            const headers = jsonData[0].map((h: any) => String(h).toLowerCase().trim());
+            const expectedHeaders = ['nome', 'cpf', 'modalidade', 'especialidade', 'categoria', 'prioridade', 'valor'];
+            
+            const missingHeaders = expectedHeaders.filter(h => !headers.includes(h));
+            if (missingHeaders.length > 0) {
+              reject(new Error(`Colunas obrigatórias faltando: ${missingHeaders.join(', ')}. Use o template fornecido.`));
+              return;
+            }
+            
+            resolve();
+          } catch (err) {
+            reject(err);
+          }
+        };
+        reader.onerror = () => reject(new Error('Erro ao ler arquivo'));
+      });
+      
+      reader.readAsArrayBuffer(file);
+      await validationPromise;
 
       const formData = new FormData();
       formData.append('file', file);
