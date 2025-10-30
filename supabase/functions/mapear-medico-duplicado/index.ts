@@ -39,24 +39,21 @@ serve(async (req) => {
     const registrosAtualizados = repasseData?.length || 0;
     console.log(`✅ ${registrosAtualizados} registros de repasse atualizados`);
 
-    // 2. Inativar o médico antigo (duplicado)
-    const { error: inativarError } = await supabase
+    // 2. Excluir o médico antigo (duplicado)
+    const { error: excluirError } = await supabase
       .from('medicos')
-      .update({ 
-        ativo: false,
-        updated_at: new Date().toISOString()
-      })
+      .delete()
       .eq('id', medico_id_antigo);
 
-    if (inativarError) throw inativarError;
+    if (excluirError) throw excluirError;
 
-    console.log(`✅ Médico duplicado inativado`);
+    console.log(`✅ Médico duplicado excluído`);
 
     return new Response(
       JSON.stringify({ 
         success: true,
         registros_repasse_atualizados: registrosAtualizados,
-        medico_duplicado_inativado: true
+        medico_duplicado_excluido: true
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

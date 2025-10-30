@@ -228,7 +228,7 @@ export default function Colaboradores() {
 
   // Função para mapear Dra. Larissa Assad duplicada
   const mapearLarissaDuplicada = async () => {
-    if (!confirm('⚠️ ATENÇÃO: Esta ação irá mapear os valores de repasse de "Dra. Larissa Assad" para "Dra. Larissa Assad Joao Moyses" e inativar o registro duplicado. Deseja continuar?')) {
+    if (!confirm('⚠️ ATENÇÃO: Esta ação irá mapear os valores de repasse de "Dra. Larissa Assad" para "Dra. Larissa Assad Joao Moyses" e EXCLUIR o registro duplicado. Deseja continuar?')) {
       return;
     }
 
