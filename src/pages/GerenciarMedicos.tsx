@@ -14,7 +14,7 @@ import { RoleProtectedRoute } from '@/components/RoleProtectedRoute';
 import { useMedicoData } from '@/hooks/useMedicoData';
 import { DuplicadosRepasseDialog } from '@/components/DuplicadosRepasseDialog';
 import { ComparativoNomesMedicos } from '@/components/ComparativoNomesMedicos';
-import { CorrigirAssociacaoRepasses } from '@/components/CorrigirAssociacaoRepasses';
+import { MapeamentoNomesMedicos } from '@/components/MapeamentoNomesMedicos';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Medico {
@@ -272,7 +272,7 @@ export default function GerenciarMedicos() {
           <TabsList>
             <TabsTrigger value="cadastro">Cadastro de Médicos</TabsTrigger>
             <TabsTrigger value="comparativo">Comparativo de Nomes</TabsTrigger>
-            <TabsTrigger value="corrigir-repasse">Corrigir Repasse</TabsTrigger>
+            <TabsTrigger value="mapeamento">Mapeamento de Nomes</TabsTrigger>
           </TabsList>
 
           <TabsContent value="cadastro" className="space-y-4">
@@ -560,8 +560,8 @@ export default function GerenciarMedicos() {
             <ComparativoNomesMedicos />
           </TabsContent>
 
-          <TabsContent value="corrigir-repasse">
-            <CorrigirAssociacaoRepasses />
+          <TabsContent value="mapeamento">
+            <MapeamentoNomesMedicos />
           </TabsContent>
         </Tabs>
 

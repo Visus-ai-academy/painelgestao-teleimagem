@@ -2081,6 +2081,62 @@ export type Database = {
         }
         Relationships: []
       }
+      mapeamento_nomes_medicos: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          created_by: string | null
+          criado_automaticamente: boolean
+          id: string
+          medico_id: string | null
+          medico_nome: string
+          nome_origem: string
+          nome_origem_normalizado: string
+          observacoes: string | null
+          tipo_origem: string
+          updated_at: string
+          verificado_manualmente: boolean
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          created_by?: string | null
+          criado_automaticamente?: boolean
+          id?: string
+          medico_id?: string | null
+          medico_nome: string
+          nome_origem: string
+          nome_origem_normalizado: string
+          observacoes?: string | null
+          tipo_origem: string
+          updated_at?: string
+          verificado_manualmente?: boolean
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          created_by?: string | null
+          criado_automaticamente?: boolean
+          id?: string
+          medico_id?: string | null
+          medico_nome?: string
+          nome_origem?: string
+          nome_origem_normalizado?: string
+          observacoes?: string | null
+          tipo_origem?: string
+          updated_at?: string
+          verificado_manualmente?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mapeamento_nomes_medicos_medico_id_fkey"
+            columns: ["medico_id"]
+            isOneToOne: false
+            referencedRelation: "medicos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       medicos: {
         Row: {
           acrescimo_sem_digitador: string | null
@@ -2172,6 +2228,7 @@ export type Database = {
           esta_no_escopo: boolean | null
           id: string
           medico_id: string | null
+          medico_nome_original: string | null
           modalidade: string
           prioridade: string
           updated_at: string | null
@@ -2189,6 +2246,7 @@ export type Database = {
           esta_no_escopo?: boolean | null
           id?: string
           medico_id?: string | null
+          medico_nome_original?: string | null
           modalidade: string
           prioridade: string
           updated_at?: string | null
@@ -2206,6 +2264,7 @@ export type Database = {
           esta_no_escopo?: boolean | null
           id?: string
           medico_id?: string | null
+          medico_nome_original?: string | null
           modalidade?: string
           prioridade?: string
           updated_at?: string | null
@@ -4809,6 +4868,7 @@ export type Database = {
       }
       normalizar_clientes_cedi: { Args: never; Returns: Json }
       normalizar_medico: { Args: { medico_nome: string }; Returns: string }
+      normalizar_nome_medico: { Args: { nome: string }; Returns: string }
       obter_status_ativacao_atual: {
         Args: { p_medico_id?: string }
         Returns: {

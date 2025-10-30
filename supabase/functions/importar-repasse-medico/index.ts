@@ -118,7 +118,7 @@ serve(async (req) => {
       let processados = 0, inseridos = 0, atualizados = 0, erros = 0;
       const detalhesErros: any[] = [];
 
-      // OTIMIZAÇÃO: Carregar médicos e clientes UMA VEZ no início
+      // OTIMIZAÇÃO: Carregar médicos, clientes E mapeamentos UMA VEZ no início
       const { data: medicosCache } = await supabase
         .from('medicos')
         .select('id, nome, crm')
@@ -129,11 +129,32 @@ serve(async (req) => {
         .select('id, nome, nome_fantasia')
         .eq('ativo', true);
 
+      // NOVO: Carregar mapeamentos de nomes
+      const { data: mapeamentosCache } = await supabase
+        .from('mapeamento_nomes_medicos')
+        .select('nome_origem_normalizado, medico_id')
+        .eq('ativo', true);
+
       // Criar maps para busca rápida em memória
       const medicoPorCRM = new Map(medicosCache?.map(m => [m.crm?.trim().toLowerCase(), m.id]) || []);
       const medicoPorNome = new Map(medicosCache?.map(m => [m.nome?.trim().toLowerCase(), m.id]) || []);
       const clientePorNomeFantasia = new Map(clientesCache?.map(c => [c.nome_fantasia?.trim().toLowerCase(), c.id]) || []);
       const clientePorNome = new Map(clientesCache?.map(c => [c.nome?.trim().toLowerCase(), c.id]) || []);
+      
+      // NOVO: Map de mapeamentos normalizados
+      const mapeamentoMedico = new Map(mapeamentosCache?.map(m => [m.nome_origem_normalizado, m.medico_id]) || []);
+
+      // Função auxiliar para normalizar nomes (mesma lógica do DB)
+      const normalizarNome = (nome: string): string => {
+        return nome
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .replace(/\bdr\.?\s*/gi, '')
+          .replace(/\bdra\.?\s*/gi, '');
+      };
 
       // Preparar listas para batch insert/update
       const toUpsert: any[] = [];
@@ -161,13 +182,24 @@ serve(async (req) => {
 
           const esta_no_escopo = Boolean(row.esta_no_escopo);
 
-          // Buscar médico em memória (muito mais rápido)
+          // NOVA LÓGICA DE BUSCA DE MÉDICO (em ordem de prioridade):
           let medico_id: string | null = null;
+          const nomeOriginal = row.medico_nome?.trim() || null;
+          
+          // 1. Tentar por CRM (mais confiável)
           if (row.medico_crm) {
             medico_id = medicoPorCRM.get(row.medico_crm.trim().toLowerCase()) || null;
           }
-          if (!medico_id && row.medico_nome) {
-            medico_id = medicoPorNome.get(row.medico_nome.trim().toLowerCase()) || null;
+          
+          // 2. Se não encontrou por CRM, tentar por mapeamento de nome
+          if (!medico_id && nomeOriginal) {
+            const nomeNormalizado = normalizarNome(nomeOriginal);
+            medico_id = mapeamentoMedico.get(nomeNormalizado) || null;
+          }
+          
+          // 3. Se não encontrou no mapeamento, tentar busca direta por nome
+          if (!medico_id && nomeOriginal) {
+            medico_id = medicoPorNome.get(nomeOriginal.trim().toLowerCase()) || null;
           }
 
           // Buscar cliente em memória
@@ -177,8 +209,10 @@ serve(async (req) => {
             cliente_id = clientePorNomeFantasia.get(term) || clientePorNome.get(term) || null;
           }
 
+          // IMPORTANTE: Sempre salvar o nome original do médico para referência futura
           const repasseData = {
             medico_id: medico_id || null,
+            medico_nome_original: nomeOriginal, // NOVO: guardar nome original
             modalidade: row.modalidade,
             especialidade: row.especialidade,
             categoria: row.categoria ?? null,
@@ -201,9 +235,10 @@ serve(async (req) => {
       // ESTRATÉGIA: Remover duplicados EXATOS (mesma chave + mesmo valor), manter duplicados com valores diferentes
       if (toUpsert.length > 0) {
         // Deduplic: agrupar por chave composta + valor e manter apenas 1 de cada grupo idêntico
+        // IMPORTANTE: Incluir medico_nome_original na chave de deduplicação
         const uniqueMap = new Map<string, any>();
         for (const item of toUpsert) {
-          const key = `${item.medico_id || 'null'}_${item.modalidade}_${item.especialidade}_${item.prioridade}_${item.categoria || 'null'}_${item.cliente_id || 'null'}_${item.valor}`;
+          const key = `${item.medico_id || 'null'}_${item.medico_nome_original || 'null'}_${item.modalidade}_${item.especialidade}_${item.prioridade}_${item.categoria || 'null'}_${item.cliente_id || 'null'}_${item.valor}`;
           if (!uniqueMap.has(key)) {
             uniqueMap.set(key, item);
           }
