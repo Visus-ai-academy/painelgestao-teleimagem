@@ -49,11 +49,18 @@ export const ComparativoNomesMedicos = () => {
 
       if (error) throw error;
 
+      console.log('Resultado completo:', resultado);
+
+      // Verificar se resultado tem os dados corretos
+      if (!resultado || !resultado.comparacoes) {
+        throw new Error('Dados do comparativo não foram retornados corretamente');
+      }
+
       setData(resultado);
       
       toast({
         title: "Comparativo concluído",
-        description: `${resultado.estatisticas.total_divergencias} divergências encontradas`,
+        description: `${resultado.estatisticas?.total_divergencias || 0} divergências encontradas`,
       });
     } catch (error: any) {
       console.error('Erro ao executar comparativo:', error);
