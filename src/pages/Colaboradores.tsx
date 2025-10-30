@@ -965,14 +965,16 @@ export default function Colaboradores() {
                 </p>
               </CardHeader>
               <CardContent className="space-y-3">
-                {/* Botão: Upload Médicos */}
-                <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
-                  <DialogTrigger asChild>
-                    <Button className="w-full flex items-center gap-2">
-                      <Upload className="h-4 w-4" />
-                      Upload Médicos
-                    </Button>
-                  </DialogTrigger>
+                {/* Primeira linha: Upload Médicos e Novo Cadastro lado a lado */}
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Botão: Upload Médicos */}
+                  <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
+                    <DialogTrigger asChild>
+                      <Button className="w-full flex items-center gap-2">
+                        <Upload className="h-4 w-4" />
+                        Upload Médicos
+                      </Button>
+                    </DialogTrigger>
                   <DialogContent className="max-w-2xl">
                     <DialogHeader>
                       <DialogTitle>Upload de Colaboradores</DialogTitle>
@@ -1275,7 +1277,7 @@ export default function Colaboradores() {
                                 type="number"
                                 value={newColaborador.salario}
                                 onChange={(e) => setNewColaborador({...newColaborador, salario: e.target.value})}
-                                placeholder="5000"
+                                 placeholder="5000"
                               />
                             </div>
                           )}
@@ -1295,8 +1297,9 @@ export default function Colaboradores() {
                     </div>
                   </DialogContent>
                 </Dialog>
+                </div>
 
-                {/* Botão: Upload Repasse Médico */}
+                {/* Segunda linha: Upload Repasse Médico (largura total) */}
                 <UploadRepasseMedico onUploadComplete={() => {
                   // Recarregar dados após upload
                   window.location.reload();
@@ -1510,344 +1513,9 @@ export default function Colaboradores() {
           </div>
           
           <Separator className="my-4" />
-            
-            <div className="flex gap-2 flex-wrap">
-              
-              <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" className="flex items-center gap-2">
-                    <Upload className="h-4 w-4" />
-                    Upload Médicos
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-2xl">
-                  <DialogHeader>
-                    <DialogTitle>Upload de Colaboradores</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <p className="text-sm text-gray-600">
-                        Faça upload de um arquivo CSV com os dados dos colaboradores
-                      </p>
-                      <Button
-                        variant="outline"
-                        onClick={downloadTemplate}
-                        className="flex items-center gap-2"
-                      >
-                        <Download className="h-4 w-4" />
-                        Baixar Template
-                      </Button>
-                    </div>
-                    <FileUpload
-                      title="Importar Colaboradores"
-                      description="Arraste e solte o arquivo CSV aqui ou clique para selecionar"
-                      acceptedTypes={['.csv', 'text/csv']}
-                      maxSizeInMB={5}
-                      expectedFormat={[
-                        'Nome, Email, Função, Departamento, Nível',
-                        'Telefone, CPF, Gestor, Salário',
-                        'Formato: CSV separado por vírgula'
-                      ]}
-                      onUpload={handleFileUpload}
-                      icon={<Upload className="h-5 w-5" />}
-                    />
-                  </div>
-                </DialogContent>
-              </Dialog>
-
-              <DownloadTemplateNovosMedicos />
-
-              <Dialog open={showNewColaboradorDialog} onOpenChange={setShowNewColaboradorDialog}>
-                <DialogTrigger asChild>
-                  <Button className="flex items-center gap-2">
-                    <UserPlus className="h-4 w-4" />
-                    Novo Cadastro de Médico
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
-                  <DialogHeader>
-                    <DialogTitle>Cadastrar Novo Médico</DialogTitle>
-                  </DialogHeader>
-                  <ScrollArea className="flex-1 pr-4 overflow-y-auto">
-                  <div className="space-y-6">
-                    {/* SEÇÃO 1: DADOS PESSOAIS */}
-                    <div className="space-y-4">
-                      <div className="pb-2 border-b">
-                        <h3 className="text-lg font-semibold text-primary">Dados Pessoais</h3>
-                        <p className="text-sm text-muted-foreground">Informações básicas do colaborador</p>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="col-span-2">
-                          <Label htmlFor="nome">Nome Completo *</Label>
-                          <Input
-                            id="nome"
-                            value={newColaborador.nome}
-                            onChange={(e) => setNewColaborador({...newColaborador, nome: e.target.value})}
-                            placeholder="Nome completo do colaborador"
-                          />
-                        </div>
-                        
-                        <div>
-                          <Label htmlFor="cpf">CPF *</Label>
-                          <Input
-                            id="cpf"
-                            value={newColaborador.cpf}
-                            onChange={(e) => setNewColaborador({...newColaborador, cpf: e.target.value})}
-                            placeholder="000.000.000-00"
-                          />
-                        </div>
-                        
-                        <div>
-                          <Label htmlFor="email">Email *</Label>
-                          <Input
-                            id="email"
-                            type="email"
-                            value={newColaborador.email}
-                            onChange={(e) => setNewColaborador({...newColaborador, email: e.target.value})}
-                            placeholder="email@exemplo.com"
-                          />
-                        </div>
-                        
-                        <div>
-                          <Label htmlFor="telefone">Telefone *</Label>
-                          <Input
-                            id="telefone"
-                            value={newColaborador.telefone}
-                            onChange={(e) => setNewColaborador({...newColaborador, telefone: e.target.value})}
-                            placeholder="(11) 99999-9999"
-                          />
-                        </div>
-                        
-                        
-                        {newColaborador.departamento === "Médico" && (
-                          <>
-                            <div>
-                              <Label htmlFor="crm">CRM *</Label>
-                              <Input
-                                id="crm"
-                                value={medicoData.crm || ''}
-                                onChange={(e) => setMedicoData({...medicoData, crm: e.target.value})}
-                                placeholder="12345-SP"
-                              />
-                            </div>
-                            
-                            <div>
-                              <Label htmlFor="especialidade_atuacao">Especialidade de Atuação *</Label>
-                              <Input
-                                id="especialidade_atuacao"
-                                value={medicoData.especialidade_atuacao || ''}
-                                onChange={(e) => setMedicoData({...medicoData, especialidade_atuacao: e.target.value})}
-                                placeholder="Especialidade"
-                              />
-                            </div>
-                            
-                            <div>
-                              <Label htmlFor="equipe">Equipe</Label>
-                              <Input
-                                id="equipe"
-                                value={medicoData.equipe || ''}
-                                onChange={(e) => setMedicoData({...medicoData, equipe: e.target.value})}
-                                placeholder="Equipe 1, Equipe 2, etc."
-                              />
-                            </div>
-                            
-                            <div>
-                              <Label htmlFor="socio">Sócio</Label>
-                              <Select value={medicoData.socio} onValueChange={(value) => setMedicoData({...medicoData, socio: value})}>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Selecione" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="SIM">SIM</SelectItem>
-                                  <SelectItem value="NÃO">NÃO</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            
-                            <div>
-                              <Label htmlFor="cnpj">CNPJ</Label>
-                              <Input
-                                id="cnpj"
-                                value={medicoData.cnpj || ''}
-                                onChange={(e) => setMedicoData({...medicoData, cnpj: e.target.value})}
-                                placeholder="00.000.000/0000-00"
-                              />
-                            </div>
-                            
-                            <div>
-                              <Label htmlFor="nome_empresa">Nome da Empresa</Label>
-                              <Input
-                                id="nome_empresa"
-                                value={medicoData.nome_empresa || ''}
-                                onChange={(e) => setMedicoData({...medicoData, nome_empresa: e.target.value})}
-                                placeholder="Nome da empresa"
-                              />
-                            </div>
-                            
-                            <div>
-                              <Label htmlFor="optante_simples">Optante Simples</Label>
-                              <Select value={medicoData.optante_simples} onValueChange={(value) => setMedicoData({...medicoData, optante_simples: value})}>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Selecione" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="SIM">SIM</SelectItem>
-                                  <SelectItem value="NÃO">NÃO</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            
-                            <div>
-                              <Label htmlFor="acrescimo_sem_digitador">Acréscimo sem Digitador</Label>
-                              <Select value={medicoData.acrescimo_sem_digitador} onValueChange={(value) => setMedicoData({...medicoData, acrescimo_sem_digitador: value})}>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Selecione" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="SIM">SIM</SelectItem>
-                                  <SelectItem value="NÃO">NÃO</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            
-                            <div>
-                              <Label htmlFor="adicional_valor_sem_digitador">Valor Adicional sem Digitador</Label>
-                              <Input
-                                id="adicional_valor_sem_digitador"
-                                type="number"
-                                step="0.01"
-                                value={medicoData.adicional_valor_sem_digitador || ''}
-                                onChange={(e) => setMedicoData({...medicoData, adicional_valor_sem_digitador: e.target.value})}
-                                placeholder="0.00"
-                              />
-                            </div>
-                          </>
-                        )}
-                        
-                         <div>
-                           <Label htmlFor="funcao">Função *</Label>
-                           <Select value={newColaborador.funcao} onValueChange={(value) => setNewColaborador({...newColaborador, funcao: value})}>
-                             <SelectTrigger>
-                               <SelectValue placeholder="Selecione a função" />
-                             </SelectTrigger>
-                             <SelectContent>
-                               {newColaborador.departamento === "Médico" ? (
-                                 <>
-                                   <SelectItem value="STAFF">STAFF</SelectItem>
-                                   <SelectItem value="FELLOW">FELLOW</SelectItem>
-                                 </>
-                               ) : (
-                                 <>
-                                   <SelectItem value="Técnico em Radiologia">Técnico em Radiologia</SelectItem>
-                                   <SelectItem value="Enfermeira">Enfermeira</SelectItem>
-                                   <SelectItem value="Administrador TI">Administrador TI</SelectItem>
-                                   <SelectItem value="Analista Financeiro">Analista Financeiro</SelectItem>
-                                   <SelectItem value="Recepcionista">Recepcionista</SelectItem>
-                                 </>
-                               )}
-                             </SelectContent>
-                           </Select>
-                         </div>
-                        
-                         <div>
-                           <Label htmlFor="departamento">Departamento *</Label>
-                           <Select 
-                             value={newColaborador.departamento} 
-                             onValueChange={(value) => {
-                               setNewColaborador({...newColaborador, departamento: value});
-                               // Se não for médico, limpar dados médicos
-                                if (value !== "Médico") {
-                                  setMedicoData({
-                                    categoria: "",
-                                    modalidades: [],
-                                    especialidades: [],
-                                    valoresCombinacoes: {},
-                                    crm: "",
-                                    rqe: "",
-                                    equipe: "",
-                                    especialidade_atuacao: "",
-                                    socio: "",
-                                    cnpj: "",
-                                    nome_empresa: "",
-                                    optante_simples: "",
-                                    acrescimo_sem_digitador: "",
-                                    adicional_valor_sem_digitador: ""
-                                  });
-                                }
-                             }}
-                           >
-                             <SelectTrigger className={newColaborador.departamento === "Médico" ? "border-primary" : ""}>
-                               <SelectValue placeholder="Selecione o departamento" />
-                             </SelectTrigger>
-                             <SelectContent>
-                               <SelectItem value="Comercial">Comercial</SelectItem>
-                               <SelectItem value="Operacional">Operacional</SelectItem>
-                               <SelectItem value="Adm. Financeiro">Adm. Financeiro</SelectItem>
-                               <SelectItem value="Médico">Médico</SelectItem>
-                             </SelectContent>
-                           </Select>
-                         </div>
-                        
-                        <div>
-                          <Label htmlFor="nivel">Nível</Label>
-                          <Select value={newColaborador.nivel} onValueChange={(value) => setNewColaborador({...newColaborador, nivel: value})}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecione o nível" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Júnior">Júnior</SelectItem>
-                              <SelectItem value="Pleno">Pleno</SelectItem>
-                              <SelectItem value="Sênior">Sênior</SelectItem>
-                              <SelectItem value="Especialista">Especialista</SelectItem>
-                              <SelectItem value="Coordenador">Coordenador</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        
-                        <div>
-                          <Label htmlFor="gestor">Gestor</Label>
-                          <Input
-                            id="gestor"
-                            value={newColaborador.gestor}
-                            onChange={(e) => setNewColaborador({...newColaborador, gestor: e.target.value})}
-                            placeholder="Nome do gestor"
-                          />
-                        </div>
-                        
-                        {newColaborador.departamento !== "Médico" && (
-                          <div>
-                            <Label htmlFor="salario">Salário</Label>
-                            <Input
-                              id="salario"
-                              type="number"
-                              value={newColaborador.salario}
-                              onChange={(e) => setNewColaborador({...newColaborador, salario: e.target.value})}
-                              placeholder="5000"
-                            />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                  </div>
-                  </ScrollArea>
-                  
-                  <div className="flex justify-end gap-2 pt-4 border-t">
-                    <Button variant="outline" onClick={() => setShowNewColaboradorDialog(false)}>
-                      Cancelar
-                    </Button>
-                    <Button onClick={handleNewColaborador}>
-                      Cadastrar Colaborador
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
-
-            </div>
-          </CardContent>
-        </Card>
-
+        </CardContent>
+      </Card>
+          
       {/* Lista de Colaboradores */}
       <Card>
         <CardHeader>
@@ -2653,7 +2321,7 @@ export default function Colaboradores() {
           </div>
         </DialogContent>
       </Dialog>
-        </TabsContent>
+      </TabsContent>
 
         <TabsContent value="comparativo">
           <ComparativoNomesMedicos />

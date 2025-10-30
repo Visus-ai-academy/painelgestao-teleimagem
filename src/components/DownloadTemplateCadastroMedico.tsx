@@ -23,8 +23,7 @@ export const DownloadTemplateCadastroMedico = () => {
   return (
     <Button
       onClick={handleDownload}
-      variant="outline"
-      className="gap-2"
+      className="gap-2 w-full"
     >
       <Download className="h-4 w-4" />
       Baixar Template - Cadastro Médico
