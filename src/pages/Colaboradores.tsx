@@ -14,6 +14,9 @@ import { FileUpload } from "@/components/FileUpload";
 import { useToast } from "@/hooks/use-toast";
 import { toast } from "sonner";
 import { useMedicoData } from "@/hooks/useMedicoData";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ComparativoNomesMedicos } from "@/components/ComparativoNomesMedicos";
+import { MapeamentoNomesMedicos } from "@/components/MapeamentoNomesMedicos";
 import { 
   Users, 
   UserCheck, 
@@ -939,6 +942,16 @@ export default function Colaboradores() {
         <h1 className="text-3xl font-bold text-gray-900">Gestão de Colaboradores</h1>
         <p className="text-gray-600 mt-1">Cadastro completo de colaboradores e controle de acesso</p>
       </div>
+
+      <Tabs defaultValue="gestao" className="w-full">
+        <TabsList>
+          <TabsTrigger value="gestao">Gestão de Colaboradores</TabsTrigger>
+          <TabsTrigger value="comparativo">Comparativo de Nomes</TabsTrigger>
+          <TabsTrigger value="mapeamento">Mapeamento de Nomes</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="gestao" className="space-y-6">
+          {/* Conteúdo original da página */}
 
       
 
@@ -2154,6 +2167,16 @@ export default function Colaboradores() {
           </div>
         </DialogContent>
       </Dialog>
+        </TabsContent>
+
+        <TabsContent value="comparativo">
+          <ComparativoNomesMedicos />
+        </TabsContent>
+
+        <TabsContent value="mapeamento">
+          <MapeamentoNomesMedicos />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
