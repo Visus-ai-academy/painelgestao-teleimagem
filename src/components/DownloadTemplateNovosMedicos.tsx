@@ -36,15 +36,16 @@ export const DownloadTemplateNovosMedicos = () => {
         return;
       }
 
-      // Criar dados para o Excel
+      // Criar dados para o Excel usando os nomes de colunas originais
       const dadosExcel = medicosSemRepasse.map(medico => ({
-        'Nome_Medico': medico.nome,
-        'Nome_Cliente': '',
-        'Modalidade': '',
-        'Especialidade': '',
-        'Categoria': '',
-        'Prioridade': '',
-        'Valor_Repasse': ''
+        'MEDICO': medico.nome,
+        'MODALIDADE': '',
+        'ESPECIALIDADE': '',
+        'CATEGORIA': '',
+        'PRIORIDADE': '',
+        'VALOR': '',
+        'CONTRATADO': '',
+        'CLIENTE': ''
       }));
 
       // Criar workbook e worksheet
@@ -53,13 +54,14 @@ export const DownloadTemplateNovosMedicos = () => {
 
       // Ajustar largura das colunas
       const colWidths = [
-        { wch: 30 }, // Nome_Medico
-        { wch: 30 }, // Nome_Cliente
-        { wch: 15 }, // Modalidade
-        { wch: 20 }, // Especialidade
-        { wch: 15 }, // Categoria
-        { wch: 15 }, // Prioridade
-        { wch: 15 }, // Valor_Repasse
+        { wch: 30 }, // MEDICO
+        { wch: 15 }, // MODALIDADE
+        { wch: 20 }, // ESPECIALIDADE
+        { wch: 15 }, // CATEGORIA
+        { wch: 15 }, // PRIORIDADE
+        { wch: 15 }, // VALOR
+        { wch: 15 }, // CONTRATADO
+        { wch: 30 }, // CLIENTE
       ];
       ws['!cols'] = colWidths;
 
