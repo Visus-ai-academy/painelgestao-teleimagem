@@ -172,3 +172,6 @@ verify_jwt = true
 
 [functions.mapear-nome-medico]
 verify_jwt = true
+
+[functions.limpar-repasse-para-reprocessar]
+verify_jwt = true

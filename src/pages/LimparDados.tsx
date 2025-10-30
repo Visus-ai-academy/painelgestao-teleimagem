@@ -4,6 +4,7 @@ import { LimparClientesContratosPrecos } from '@/components/LimparClientesContra
 import { LimparDadosFicticios } from '@/components/LimparDadosFicticios';
 import { LimparCacheVolumetria } from '@/components/LimparCacheVolumetria';
 import { LimparVolumetriaTruncate } from '@/components/LimparVolumetriaTruncate';
+import { LimparRepasseReprocessar } from '@/components/LimparRepasseReprocessar';
 
 export default function LimparDados() {
   return (
@@ -16,6 +17,7 @@ export default function LimparDados() {
       </div>
       
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-1">
+        <LimparRepasseReprocessar />
         <LimparVolumetriaTruncate />
         <LimparCacheVolumetria />
         <LimparDadosFicticios />
