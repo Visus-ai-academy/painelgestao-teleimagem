@@ -276,67 +276,74 @@ serve(async (req) => {
         const lineNum = start + i; // linha real considerando cabeçalho
 
         try {
-          if (!row || !row.modalidade || !row.especialidade || !row.prioridade || !row.valor) {
-            erros++;
-            if (detalhesErros.length < 50) detalhesErros.push({ linha: lineNum, erro: 'Campos obrigatórios faltando' });
+          // Validação: apenas MEDICO é obrigatório (outros campos podem estar vazios)
+          if (!row || !row.modalidade || !row.especialidade || !row.prioridade) {
+            // Se não tem os campos mínimos, pular linha silenciosamente (pode ser linha vazia)
             processados++;
-          } else {
-            // Normalizações leves
-            const modalidade = String(row.modalidade).trim();
-            const especialidade = String(row.especialidade).trim();
-            const prioridade = String(row.prioridade).trim();
-            const categoria = row.categoria ? String(row.categoria).trim() : null;
-            const valorNum = Number(row.valor);
-
-            let esta_no_escopo = false;
-            if (row.esta_no_escopo) {
-              const v = String(row.esta_no_escopo).toLowerCase();
-              esta_no_escopo = ['sim','yes','true','1','s','y'].includes(v);
-            }
-
-            const medico_id = await buscarMedicoId(row);
-            const cliente_id = await buscarClienteId(row);
-
-            const repasseData = {
-              medico_id: medico_id || null,
-              modalidade,
-              especialidade,
-              categoria,
-              prioridade,
-              valor: valorNum,
-              esta_no_escopo,
-              cliente_id: cliente_id || null
-            } as const;
-
-            // Verificar duplicata
-            let query = supabase
-              .from('medicos_valores_repasse')
-              .select('id')
-              .eq('modalidade', repasseData.modalidade)
-              .eq('especialidade', repasseData.especialidade)
-              .eq('prioridade', repasseData.prioridade);
-
-            if (medico_id) query = query.eq('medico_id', medico_id); else query = query.is('medico_id', null);
-            if (repasseData.categoria) query = query.eq('categoria', repasseData.categoria); else query = query.is('categoria', null);
-            if (cliente_id) query = query.eq('cliente_id', cliente_id); else query = query.is('cliente_id', null);
-
-            const { data: existente } = await query.maybeSingle();
-
-            if (existente) {
-              await supabase
-                .from('medicos_valores_repasse')
-                .update({ valor: repasseData.valor, esta_no_escopo })
-                .eq('id', existente.id);
-              atualizados++;
-            } else {
-              await supabase
-                .from('medicos_valores_repasse')
-                .insert(repasseData);
-              inseridos++;
-            }
-
-            processados++;
+            continue;
           }
+          
+          if (!row.valor || isNaN(Number(row.valor))) {
+            erros++;
+            if (detalhesErros.length < 50) detalhesErros.push({ linha: lineNum, erro: 'Valor inválido ou vazio' });
+            processados++;
+            continue;
+          }
+          // Normalizações leves
+          const modalidade = String(row.modalidade).trim();
+          const especialidade = String(row.especialidade).trim();
+          const prioridade = String(row.prioridade).trim();
+          const categoria = row.categoria ? String(row.categoria).trim() : null;
+          const valorNum = Number(row.valor);
+
+          let esta_no_escopo = false;
+          if (row.esta_no_escopo) {
+            const v = String(row.esta_no_escopo).toLowerCase();
+            esta_no_escopo = ['sim','yes','true','1','s','y'].includes(v);
+          }
+
+          const medico_id = await buscarMedicoId(row);
+          const cliente_id = await buscarClienteId(row);
+
+          const repasseData = {
+            medico_id: medico_id || null,
+            modalidade,
+            especialidade,
+            categoria,
+            prioridade,
+            valor: valorNum,
+            esta_no_escopo,
+            cliente_id: cliente_id || null
+          } as const;
+
+          // Verificar duplicata
+          let query = supabase
+            .from('medicos_valores_repasse')
+            .select('id')
+            .eq('modalidade', repasseData.modalidade)
+            .eq('especialidade', repasseData.especialidade)
+            .eq('prioridade', repasseData.prioridade);
+
+          if (medico_id) query = query.eq('medico_id', medico_id); else query = query.is('medico_id', null);
+          if (repasseData.categoria) query = query.eq('categoria', repasseData.categoria); else query = query.is('categoria', null);
+          if (cliente_id) query = query.eq('cliente_id', cliente_id); else query = query.is('cliente_id', null);
+
+          const { data: existente } = await query.maybeSingle();
+
+          if (existente) {
+            await supabase
+              .from('medicos_valores_repasse')
+              .update({ valor: repasseData.valor, esta_no_escopo })
+              .eq('id', existente.id);
+            atualizados++;
+          } else {
+            await supabase
+              .from('medicos_valores_repasse')
+              .insert(repasseData);
+            inseridos++;
+          }
+
+          processados++;
         } catch (error: any) {
           erros++;
           if (detalhesErros.length < 50) detalhesErros.push({ linha: lineNum, erro: error?.message || 'Erro desconhecido' });
