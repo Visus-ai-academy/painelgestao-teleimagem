@@ -175,3 +175,6 @@ verify_jwt = true
 
 [functions.limpar-repasse-para-reprocessar]
 verify_jwt = true
+
+[functions.inativar-medicos-lote]
+verify_jwt = true
