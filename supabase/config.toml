@@ -166,3 +166,6 @@ verify_jwt = true
 
 [functions.limpar-numeros-contrato]
 verify_jwt = true
+
+[functions.comparar-nomes-medicos]
+verify_jwt = true
