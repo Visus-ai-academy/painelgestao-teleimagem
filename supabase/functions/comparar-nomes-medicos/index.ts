@@ -73,6 +73,82 @@ const normalizar = (s: string | null): string => {
     .replace(/\bdra\.?\s*/gi, '');
 };
 
+// Extrai tokens de um nome (palavras individuais)
+const extrairTokens = (nome: string): string[] => {
+  return normalizar(nome)
+    .split(/\s+/)
+    .filter(t => t.length > 0);
+};
+
+// Verifica se um token é uma inicial (ex: "m", "m.")
+const ehInicial = (token: string): boolean => {
+  return token.length === 1 || (token.length === 2 && token.endsWith('.'));
+};
+
+// Extrai a letra de uma inicial
+const letraInicial = (token: string): string => {
+  return token.charAt(0);
+};
+
+// Verifica se dois nomes podem ser o mesmo considerando abreviações
+const matchComAbreviacoes = (nome1: string, nome2: string): boolean => {
+  const tokens1 = extrairTokens(nome1);
+  const tokens2 = extrairTokens(nome2);
+  
+  if (tokens1.length === 0 || tokens2.length === 0) return false;
+  
+  // Se os nomes são exatamente iguais após normalização
+  if (tokens1.join(' ') === tokens2.join(' ')) return true;
+  
+  // Verifica se todos os tokens de um nome correspondem aos do outro
+  // considerando que iniciais podem corresponder a nomes completos
+  const verificarMatch = (tokensA: string[], tokensB: string[]): boolean => {
+    let matchCount = 0;
+    const usedIndices = new Set<number>();
+    
+    for (const tokenA of tokensA) {
+      let encontrou = false;
+      
+      for (let i = 0; i < tokensB.length; i++) {
+        if (usedIndices.has(i)) continue;
+        
+        const tokenB = tokensB[i];
+        
+        // Match exato
+        if (tokenA === tokenB) {
+          matchCount++;
+          usedIndices.add(i);
+          encontrou = true;
+          break;
+        }
+        
+        // Se tokenA é inicial, verifica se tokenB começa com a mesma letra
+        if (ehInicial(tokenA) && tokenB.startsWith(letraInicial(tokenA))) {
+          matchCount++;
+          usedIndices.add(i);
+          encontrou = true;
+          break;
+        }
+        
+        // Se tokenB é inicial, verifica se tokenA começa com a mesma letra
+        if (ehInicial(tokenB) && tokenA.startsWith(letraInicial(tokenB))) {
+          matchCount++;
+          usedIndices.add(i);
+          encontrou = true;
+          break;
+        }
+      }
+      
+      if (!encontrou) return false;
+    }
+    
+    // Considera match se pelo menos 70% dos tokens correspondem
+    return matchCount >= Math.min(tokensA.length, tokensB.length) * 0.7;
+  };
+  
+  return verificarMatch(tokens1, tokens2) || verificarMatch(tokens2, tokens1);
+};
+
 // Calcular similaridade entre strings (Levenshtein simplificado)
 const calcularSimilaridade = (s1: string, s2: string): number => {
   const len1 = s1.length;
@@ -151,16 +227,30 @@ serve(async (req) => {
 
     const volumetria: MedicoVolumetria[] = Array.from(volumetriaMap.entries()).map(([nome, qtd]) => {
       const nomeNorm = normalizar(nome);
-      const encontrado = cadastrados.some(c => c.nome_normalizado === nomeNorm);
       
-      // Buscar sugestões de match (similaridade > 0.8)
+      // Busca por match exato ou com abreviações
+      const encontrado = cadastrados.some(c => 
+        c.nome_normalizado === nomeNorm || matchComAbreviacoes(nome, c.nome)
+      );
+      
+      // Buscar sugestões de match (similaridade > 0.75 ou match com abreviações)
       const sugestoes: string[] = [];
       if (!encontrado) {
         cadastrados.forEach(c => {
           const similaridade = calcularSimilaridade(nomeNorm, c.nome_normalizado);
-          if (similaridade > 0.8 && similaridade < 1) {
-            sugestoes.push(`${c.nome} (${Math.round(similaridade * 100)}%)`);
+          const temAbreviacao = matchComAbreviacoes(nome, c.nome);
+          
+          if (temAbreviacao || (similaridade > 0.75 && similaridade < 1)) {
+            const score = temAbreviacao ? 95 : Math.round(similaridade * 100);
+            sugestoes.push(`${c.nome} (${score}%)`);
           }
+        });
+        
+        // Ordenar por score
+        sugestoes.sort((a, b) => {
+          const scoreA = parseInt(a.match(/\((\d+)%\)/)?.[1] || '0');
+          const scoreB = parseInt(b.match(/\((\d+)%\)/)?.[1] || '0');
+          return scoreB - scoreA;
         });
       }
 
@@ -169,7 +259,7 @@ serve(async (req) => {
         nome_normalizado: nomeNorm,
         quantidade_exames: qtd,
         encontrado_cadastro: encontrado,
-        sugestoes_match: sugestoes
+        sugestoes_match: sugestoes.slice(0, 3) // Top 3 sugestões
       };
     });
 
@@ -236,25 +326,37 @@ serve(async (req) => {
 
     // Adicionar dados da volumetria
     volumetria.forEach(v => {
-      const cadastrado = cadastrados.find(c => c.nome_normalizado === v.nome_normalizado);
+      // Busca por match exato ou com abreviações
+      const cadastrado = cadastrados.find(c => 
+        c.nome_normalizado === v.nome_normalizado || matchComAbreviacoes(v.nome_original, c.nome)
+      );
       
       if (cadastrado) {
         const comp = comparacoesMap.get(cadastrado.nome_normalizado)!;
         comp.nome_volumetria = v.nome_original;
         comp.quantidade_exames_volumetria = v.quantidade_exames;
         
-        // Verificar se nome é diferente
-        if (v.nome_original !== cadastrado.nome) {
+        // Verificar se nome é diferente (mas não considerar divergente se for só abreviação)
+        const nomesDiferentes = v.nome_original !== cadastrado.nome;
+        const ehApenasAbreviacao = matchComAbreviacoes(v.nome_original, cadastrado.nome);
+        
+        if (nomesDiferentes && !ehApenasAbreviacao) {
           comp.status = comp.status === 'divergente_repasse' ? 'divergente_ambos' : 'divergente_volumetria';
         }
       } else {
         // Médico não cadastrado - criar nova entrada com sugestões
         const sugestoes = cadastrados
-          .map(c => ({
-            id: c.id,
-            nome: c.nome,
-            similaridade: calcularSimilaridade(v.nome_normalizado, c.nome_normalizado)
-          }))
+          .map(c => {
+            const similaridade = calcularSimilaridade(v.nome_normalizado, c.nome_normalizado);
+            const temAbreviacao = matchComAbreviacoes(v.nome_original, c.nome);
+            const score = temAbreviacao ? 0.95 : similaridade;
+            
+            return {
+              id: c.id,
+              nome: c.nome,
+              similaridade: score
+            };
+          })
           .filter(s => s.similaridade > 0.7)
           .sort((a, b) => b.similaridade - a.similaridade)
           .slice(0, 3);

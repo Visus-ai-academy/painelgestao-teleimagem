@@ -65,7 +65,7 @@ export const ComparativoNomesMedicos = () => {
       // Fallback: calcular o comparativo localmente se o formato não vier como esperado
       console.warn('Formato inesperado do comparativo. Calculando localmente...');
 
-      // Helpers
+      // Helpers para normalização e matching com abreviações
       const normalizar = (s?: string | null) => (s || '')
         .toLowerCase()
         .normalize('NFD')
@@ -74,6 +74,68 @@ export const ComparativoNomesMedicos = () => {
         .replace(/\bdra\.?\s*/gi, '')
         .replace(/\s+/g, ' ')
         .trim();
+
+      const extrairTokens = (nome: string): string[] => {
+        return normalizar(nome).split(/\s+/).filter(t => t.length > 0);
+      };
+
+      const ehInicial = (token: string): boolean => {
+        return token.length === 1 || (token.length === 2 && token.endsWith('.'));
+      };
+
+      const letraInicial = (token: string): string => {
+        return token.charAt(0);
+      };
+
+      const matchComAbreviacoes = (nome1: string, nome2: string): boolean => {
+        const tokens1 = extrairTokens(nome1);
+        const tokens2 = extrairTokens(nome2);
+        
+        if (tokens1.length === 0 || tokens2.length === 0) return false;
+        if (tokens1.join(' ') === tokens2.join(' ')) return true;
+        
+        const verificarMatch = (tokensA: string[], tokensB: string[]): boolean => {
+          let matchCount = 0;
+          const usedIndices = new Set<number>();
+          
+          for (const tokenA of tokensA) {
+            let encontrou = false;
+            
+            for (let i = 0; i < tokensB.length; i++) {
+              if (usedIndices.has(i)) continue;
+              
+              const tokenB = tokensB[i];
+              
+              if (tokenA === tokenB) {
+                matchCount++;
+                usedIndices.add(i);
+                encontrou = true;
+                break;
+              }
+              
+              if (ehInicial(tokenA) && tokenB.startsWith(letraInicial(tokenA))) {
+                matchCount++;
+                usedIndices.add(i);
+                encontrou = true;
+                break;
+              }
+              
+              if (ehInicial(tokenB) && tokenA.startsWith(letraInicial(tokenB))) {
+                matchCount++;
+                usedIndices.add(i);
+                encontrou = true;
+                break;
+              }
+            }
+            
+            if (!encontrou) return false;
+          }
+          
+          return matchCount >= Math.min(tokensA.length, tokensB.length) * 0.7;
+        };
+        
+        return verificarMatch(tokens1, tokens2) || verificarMatch(tokens2, tokens1);
+      };
 
       // 1) Médicos cadastrados
       const { data: medicosCad } = await supabase
@@ -135,14 +197,26 @@ export const ComparativoNomesMedicos = () => {
         });
       });
 
-      // Volumetria
+      // Volumetria com matching inteligente
       volumetria.forEach(v => {
-        const cad = cadastrados.find(c => c.nome_normalizado === v.nome_normalizado);
+        // Busca por match exato ou com abreviações
+        const cad = cadastrados.find(c => 
+          c.nome_normalizado === v.nome_normalizado || 
+          matchComAbreviacoes(v.nome_original, c.nome)
+        );
+        
         if (cad) {
           const comp = comparacoesMap.get(cad.nome_normalizado);
           comp.nome_volumetria = v.nome_original;
           comp.quantidade_exames_volumetria = v.quantidade_exames;
-          if (v.nome_original !== cad.nome) comp.status = comp.status === 'divergente_repasse' ? 'divergente_ambos' : 'divergente_volumetria';
+          
+          // Não marcar como divergente se for apenas abreviação
+          const nomesDiferentes = v.nome_original !== cad.nome;
+          const ehApenasAbreviacao = matchComAbreviacoes(v.nome_original, cad.nome);
+          
+          if (nomesDiferentes && !ehApenasAbreviacao) {
+            comp.status = comp.status === 'divergente_repasse' ? 'divergente_ambos' : 'divergente_volumetria';
+          }
         } else {
           comparacoesMap.set(v.nome_original, {
             nome_volumetria: v.nome_original,
