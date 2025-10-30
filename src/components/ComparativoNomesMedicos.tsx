@@ -402,7 +402,6 @@ export const ComparativoNomesMedicos = () => {
                   <TableHead className="bg-primary/5">Nome Cadastro (Referência)</TableHead>
                   <TableHead className="w-[120px]">Status Cadastro</TableHead>
                   <TableHead>Nome Repasse</TableHead>
-                  <TableHead className="w-[100px] text-center">Vol.</TableHead>
                   <TableHead className="w-[100px] text-center">Rep.</TableHead>
                   <TableHead className="w-[200px] text-center">Ação</TableHead>
                 </TableRow>
@@ -459,13 +458,6 @@ export const ComparativoNomesMedicos = () => {
                     <TableCell>
                       {comp.nome_repasse ? (
                         <span className="font-medium">{comp.nome_repasse}</span>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {comp.quantidade_exames_volumetria > 0 ? (
-                        <Badge variant="outline">{comp.quantidade_exames_volumetria}</Badge>
                       ) : (
                         <span className="text-muted-foreground">-</span>
                       )}
