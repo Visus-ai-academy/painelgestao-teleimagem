@@ -58,7 +58,7 @@ export const UploadRepasseMedico = ({ onUploadComplete }: UploadRepasseMedicoPro
       const formData = new FormData();
       formData.append('file', file);
 
-      const { data, error } = await supabase.functions.invoke('importar-repasse-medico', {
+      const { data, error } = await supabase.functions.invoke('processar-repasse-medico', {
         body: formData
       });
 
