@@ -19,6 +19,57 @@ interface RepasseRow {
   cliente_nome?: string;
 }
 
+// Helpers: normalização de cabeçalhos e parsing seguro
+const normalize = (s: any): string => String(s ?? '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
+const toKey = (s: string) => normalize(s).replace(/[^a-z0-9]+/g, '_');
+
+const KEY_SYNONYMS: Record<string, string> = {
+  // médico
+  medico: 'medico_nome', medico_nome: 'medico_nome', nome_medico: 'medico_nome', nome: 'medico_nome', dr: 'medico_nome', dra: 'medico_nome',
+  // crm
+  crm: 'medico_crm', medico_crm: 'medico_crm',
+  // modal/espec/cat/prio
+  modalidade: 'modalidade', mod: 'modalidade', tipo: 'modalidade',
+  especialidade: 'especialidade', esp: 'especialidade',
+  categoria: 'categoria', cat: 'categoria',
+  prioridade: 'prioridade', prio: 'prioridade',
+  // valor
+  valor: 'valor', preco: 'valor', preco_repasse: 'valor', valor_repasse: 'valor',
+  // cliente
+  cliente: 'cliente_nome', cliente_nome: 'cliente_nome', nome_cliente: 'cliente_nome',
+  // escopo
+  esta_no_escopo: 'esta_no_escopo', escopo: 'esta_no_escopo', no_escopo: 'esta_no_escopo'
+};
+
+const parseDecimal = (v: any): number | null => {
+  if (v === null || v === undefined) return null;
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  const s = String(v).trim();
+  if (!s) return null;
+  const only = s.replace(/[^0-9.,-]/g, '');
+  const hasComma = only.includes(',');
+  const normalized = hasComma ? only.replace(/\./g, '').replace(',', '.') : only;
+  const n = Number(normalized);
+  return Number.isFinite(n) ? n : null;
+};
+
+const mapRowToCanonical = (row: Record<string, any>): RepasseRow => {
+  const out: any = {};
+  for (const [k, v] of Object.entries(row || {})) {
+    const nk = KEY_SYNONYMS[toKey(k)];
+    if (nk) out[nk] = v;
+  }
+  // Conversões
+  if (out.valor !== undefined) {
+    const n = parseDecimal(out.valor);
+    if (n !== null) out.valor = n;
+  }
+  ['medico_nome','medico_crm','modalidade','especialidade','categoria','prioridade','cliente_nome'].forEach(f => {
+    if (out[f]) out[f] = String(out[f]).trim();
+  });
+  return out as RepasseRow;
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -263,12 +314,14 @@ serve(async (req) => {
     for (let start = headerRowIndex + 1; start <= fullRange.e.r; start += ROWS_PER_CHUNK) {
       const end = Math.min(start + ROWS_PER_CHUNK - 1, fullRange.e.r);
 
-      const rows = XLSX.utils.sheet_to_json(worksheet, {
+      const rowsRaw = XLSX.utils.sheet_to_json(worksheet, {
         raw: true,
         blankrows: false,
         header: headers.length > 0 ? headers : undefined,
         range: { s: { r: start, c: fullRange.s.c }, e: { r: end, c: fullRange.e.c } }
-      }) as RepasseRow[];
+      }) as Record<string, any>[];
+
+      const rows = rowsRaw.map(mapRowToCanonical) as RepasseRow[];
 
       // Processar a cada BATCH_SIZE registros para reduzir picos de memória
       for (let i = 0; i < rows.length; i++) {
@@ -282,8 +335,8 @@ serve(async (req) => {
             processados++;
             continue;
           }
-          
-          if (!row.valor || isNaN(Number(row.valor))) {
+          const valorNum = parseDecimal((row as any).valor);
+          if (valorNum === null) {
             erros++;
             if (detalhesErros.length < 50) detalhesErros.push({ linha: lineNum, erro: 'Valor inválido ou vazio' });
             processados++;
