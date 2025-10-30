@@ -32,9 +32,14 @@ export function RepasseUploadProgress({ uploadId, onComplete }: RepasseUploadPro
       if (data) {
         setStatus(data);
         
+        // Log do resumo se disponível
+        const detalhes = data.detalhes_erro as any;
+        if (detalhes?.resumo) {
+          console.log('📊 Resumo processamento:', detalhes.resumo);
+        }
+        
         // Calcular progresso
         if (data.registros_processados && data.registros_processados > 0) {
-          const detalhes = data.detalhes_erro as any;
           const totalEstimado = detalhes?.total_linhas || data.registros_processados;
           const percentual = Math.min(100, Math.round((data.registros_processados / totalEstimado) * 100));
           setProgress(percentual);
@@ -84,7 +89,7 @@ export function RepasseUploadProgress({ uploadId, onComplete }: RepasseUploadPro
           <Progress value={progress} className="h-2" />
         </div>
 
-        <div className="grid grid-cols-3 gap-4 text-center">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
           <div className="space-y-1">
             <p className="text-2xl font-bold text-primary">
               {status.registros_processados || 0}
@@ -103,6 +108,18 @@ export function RepasseUploadProgress({ uploadId, onComplete }: RepasseUploadPro
             </p>
             <p className="text-xs text-muted-foreground">Atualizados</p>
           </div>
+          {(() => {
+            const detalhes = status.detalhes_erro as any;
+            const ignorados = detalhes?.ignorados || 0;
+            return ignorados > 0 ? (
+              <div className="space-y-1">
+                <p className="text-2xl font-bold text-muted-foreground">
+                  {ignorados}
+                </p>
+                <p className="text-xs text-muted-foreground">Ignorados</p>
+              </div>
+            ) : null;
+          })()}
         </div>
 
         {status.registros_erro > 0 && (
@@ -133,10 +150,18 @@ export function RepasseUploadProgress({ uploadId, onComplete }: RepasseUploadPro
         )}
 
         {isComplete && (
-          <div className="mt-4 p-3 bg-success/10 rounded-lg">
+          <div className="mt-4 p-3 bg-success/10 rounded-lg space-y-2">
             <p className="text-sm font-medium text-success">
               ✓ Processamento concluído com sucesso!
             </p>
+            {(() => {
+              const detalhes = status.detalhes_erro as any;
+              return detalhes?.resumo ? (
+                <p className="text-xs text-muted-foreground font-mono">
+                  {detalhes.resumo}
+                </p>
+              ) : null;
+            })()}
           </div>
         )}
       </CardContent>

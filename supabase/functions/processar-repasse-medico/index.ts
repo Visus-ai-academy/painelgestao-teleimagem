@@ -100,6 +100,7 @@ serve(async (req) => {
     let inseridos = 0;
     let atualizados = 0;
     let erros = 0;
+    let ignorados = 0;
     const detalhesErros: any[] = [];
 
     // Configurações de processamento
@@ -210,13 +211,13 @@ serve(async (req) => {
     };
 
     // Funções auxiliares de busca "sob demanda"
-    const buscarMedicoId = async (row: RepasseRow): Promise<string | null> => {
+    const buscarMedicoId = async (row: RepasseRow): Promise<{ id: string | null; ignorado: boolean }> => {
       try {
         // Ignorar nomes da lista de exclusão
         if (row.medico_nome) {
           const nomeNormalizado = normalizar(row.medico_nome);
           if (nomesIgnorados.includes(nomeNormalizado)) {
-            return null;
+            return { id: null, ignorado: true };
           }
         }
         
@@ -226,7 +227,7 @@ serve(async (req) => {
         if (row.medico_crm) {
           const crm = row.medico_crm.trim();
           const medicoComCRM = medicos.find(m => m.crm === crm);
-          if (medicoComCRM) return medicoComCRM.id;
+          if (medicoComCRM) return { id: medicoComCRM.id, ignorado: false };
         }
         
         // 2. Busca por nome com normalização e suporte a abreviações
@@ -236,16 +237,16 @@ serve(async (req) => {
           
           // 2.1. Match exato normalizado
           const matchExato = medicos.find(m => m.nome_normalizado === nomeNormalizado);
-          if (matchExato) return matchExato.id;
+          if (matchExato) return { id: matchExato.id, ignorado: false };
           
           // 2.2. Match com abreviações
           const matchAbreviacao = medicos.find(m => matchComAbreviacoes(nomeOriginal, m.nome));
-          if (matchAbreviacao) return matchAbreviacao.id;
+          if (matchAbreviacao) return { id: matchAbreviacao.id, ignorado: false };
         }
       } catch (error) {
         console.error('Erro ao buscar médico:', error);
       }
-      return null;
+      return { id: null, ignorado: false };
     };
 
     const buscarClienteId = async (row: RepasseRow): Promise<string | null> => {
@@ -309,7 +310,16 @@ serve(async (req) => {
               esta_no_escopo = ['sim','yes','true','1','s','y'].includes(v);
             }
 
-            const medico_id = await buscarMedicoId(row);
+            const medicoResult = await buscarMedicoId(row);
+            
+            // Se foi ignorado (nome na lista de exclusão), pular este registro
+            if (medicoResult.ignorado) {
+              ignorados++;
+              processados++;
+              continue;
+            }
+            
+            const medico_id = medicoResult.id;
             const cliente_id = await buscarClienteId(row);
 
             const repasseData = {
@@ -389,6 +399,13 @@ serve(async (req) => {
     }
 
     // Atualizar registro final
+    const detalhesFinais = {
+      erros: detalhesErros,
+      total_linhas: totalLinhas,
+      ignorados,
+      resumo: `${inseridos} inseridos + ${atualizados} atualizados + ${erros} erros + ${ignorados} ignorados = ${inseridos + atualizados + erros + ignorados} de ${totalLinhas}`
+    };
+    
     await supabase
       .from('processamento_uploads')
       .update({
@@ -397,7 +414,7 @@ serve(async (req) => {
         registros_inseridos: inseridos,
         registros_atualizados: atualizados,
         registros_erro: erros,
-        detalhes_erro: detalhesErros.length > 0 ? { erros: detalhesErros, total_linhas: totalLinhas } : { total_linhas: totalLinhas }
+        detalhes_erro: detalhesFinais
       })
       .eq('id', uploadId);
 
@@ -405,14 +422,16 @@ serve(async (req) => {
       sucesso: true,
       upload_id: uploadId,
       arquivo: file.name,
+      total_arquivo: totalLinhas,
       processados,
       inseridos,
       atualizados,
       erros,
+      ignorados,
       detalhes_erros: detalhesErros.slice(0, 10)
     };
 
-    console.log(`✅ Concluído: ${inseridos} inseridos, ${atualizados} atualizados, ${erros} erros`);
+    console.log(`✅ Concluído: ${inseridos} inseridos, ${atualizados} atualizados, ${erros} erros, ${ignorados} ignorados (total arquivo: ${totalLinhas})`);
 
     return new Response(JSON.stringify(resultado), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
