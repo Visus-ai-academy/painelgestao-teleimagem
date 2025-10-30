@@ -943,8 +943,9 @@ export default function Colaboradores() {
       const isSocio = ["sim","s","true","1","yes"].includes(socioStr);
       const matchSocio = filtroSocio === "todos" || (filtroSocio === "sim" ? isSocio : !isSocio);
       
-      // Filtro por equipe - aceita valores vazios quando "todas" está selecionado
+      // Filtro por equipe - incluir opção "SEM EQUIPE" para médicos sem equipe
       const matchEquipe = filtroEquipe === "todas" || 
+                          (filtroEquipe === "sem_equipe" && !(colaborador as any).equipe) ||
                           ((colaborador as any).equipe && (colaborador as any).equipe === filtroEquipe);
       
       return matchNome && matchFuncao && matchEspecialidade && matchStatusAtivo && matchSocio && matchEquipe;
@@ -1550,7 +1551,10 @@ export default function Colaboradores() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="todas">Todas</SelectItem>
-                    {Array.from(new Set(colaboradores.map(c => c.equipe).filter(Boolean))).sort().map(equipe => (
+                    {colaboradores.some(c => !(c as any).equipe) && (
+                      <SelectItem value="sem_equipe">SEM EQUIPE</SelectItem>
+                    )}
+                    {Array.from(new Set(colaboradores.map(c => (c as any).equipe).filter(Boolean))).sort().map(equipe => (
                       <SelectItem key={equipe} value={equipe!}>{equipe}</SelectItem>
                     ))}
                   </SelectContent>
