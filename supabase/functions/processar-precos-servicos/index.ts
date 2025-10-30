@@ -119,10 +119,6 @@ serve(async (req) => {
         case 'CEDI_RJ':
         case 'CEDI_RO':
         case 'CEDI_UNIMED': s = 'CEDIDIAG'; break
-        // Proteger CEMVALENCA de transformações indesejadas
-        case 'P-CEMVALENCA': s = 'CEMVALENCA'; break
-        case 'P-CEMVALENCA_PL': s = 'CEMVALENCA_PL'; break
-        case 'P-CEMVALENCA_RX': s = 'CEMVALENCA_RX'; break
         default: break
       }
       // Remover prefixos e sufixos comuns
