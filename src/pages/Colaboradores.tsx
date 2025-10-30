@@ -967,12 +967,12 @@ export default function Colaboradores() {
               <CardContent className="space-y-3">
                 {/* Primeira linha: Upload Médicos e Novo Cadastro lado a lado */}
                 <div className="grid grid-cols-2 gap-3">
-                  {/* Botão: Upload Médicos */}
+                  {/* Botão: Cadastro de Médico via upload */}
                   <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
                     <DialogTrigger asChild>
                       <Button className="w-full flex items-center gap-2">
                         <Upload className="h-4 w-4" />
-                        Upload Médicos
+                        Cadastro de Médico via upload
                       </Button>
                     </DialogTrigger>
                   <DialogContent className="max-w-2xl">
@@ -1010,12 +1010,12 @@ export default function Colaboradores() {
                   </DialogContent>
                 </Dialog>
 
-                {/* Botão: Novo Cadastro de Médico */}
+                {/* Botão: Cadastro Manual de Médico */}
                 <Dialog open={showNewColaboradorDialog} onOpenChange={setShowNewColaboradorDialog}>
                   <DialogTrigger asChild>
                     <Button className="w-full flex items-center gap-2">
                       <UserPlus className="h-4 w-4" />
-                      Novo Cadastro de Médico
+                      Cadastro Manual de Médico
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
