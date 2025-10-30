@@ -34,13 +34,14 @@ serve(async (req) => {
     const { error: erroMapeamento } = await supabase
       .from('mapeamento_nomes_medicos')
       .upsert({
-        nome_original: nome_origem,
-        nome_normalizado: medico.nome,
+        nome_origem: nome_origem,
+        nome_origem_normalizado: medico.nome,
+        medico_nome: medico.nome,
         medico_id: medico_id,
-        origem: origem,
+        tipo_origem: origem,
         ativo: true
       }, {
-        onConflict: 'nome_original,origem'
+        onConflict: 'nome_origem,tipo_origem'
       });
 
     if (erroMapeamento) throw erroMapeamento;

@@ -176,7 +176,32 @@ export default function PagamentosMedicos() {
 
       if (repasseError) throw repasseError;
 
+      // Buscar mapeamentos de nomes para normalização
+      const { data: mapeamentos, error: mapeamentosError } = await supabase
+        .from('mapeamento_nomes_medicos')
+        .select('*')
+        .eq('ativo', true);
+
+      if (mapeamentosError) throw mapeamentosError;
+
+      // Criar mapas de nomes normalizados por origem
+      const mapeamentoVolumetria = new Map<string, string>();
+      const mapeamentoRepasse = new Map<string, string>();
+      
+      (mapeamentos || []).forEach(map => {
+        const nomeNorm = normalizeStr(map.nome_origem);
+        const medicoNomeNormalizado = map.medico_nome || map.nome_origem_normalizado;
+        if (!medicoNomeNormalizado) return;
+        
+        if (map.tipo_origem === 'volumetria') {
+          mapeamentoVolumetria.set(nomeNorm, medicoNomeNormalizado);
+        } else if (map.tipo_origem === 'repasse') {
+          mapeamentoRepasse.set(nomeNorm, medicoNomeNormalizado);
+        }
+      });
+
       console.log(`Encontrados ${valoresRepasse?.length || 0} registros de valores de repasse`);
+      console.log(`Mapeamentos volumetria: ${mapeamentoVolumetria.size}, repasse: ${mapeamentoRepasse.size}`);
 
       // Agrupar por médico
       const resumosPorMedico = new Map<string, ResumoMedico>();
@@ -189,7 +214,13 @@ export default function PagamentosMedicos() {
 
       // Função de busca com pontuação para escolher o melhor valor de repasse
       const buscarValorRepasse = (reg: any) => {
-        const medicoNorm = normalizeStr(reg.MEDICO);
+        const medicoNomeOriginal = reg.MEDICO;
+        const medicoNorm = normalizeStr(medicoNomeOriginal);
+        
+        // Tentar obter nome normalizado do mapeamento de volumetria
+        const medicoNormalizado = mapeamentoVolumetria.get(medicoNorm) || medicoNomeOriginal;
+        const medicoNormFinal = normalizeStr(medicoNormalizado);
+        
         const modalidadeNorm = normalizeStr(reg.MODALIDADE);
         const especialidadeNorm = normalizeStr(reg.ESPECIALIDADE);
         const categoriaNorm = normalizeCategoria(reg.CATEGORIA);
@@ -197,11 +228,22 @@ export default function PagamentosMedicos() {
         const clienteNorm = normalizeStr(reg.EMPRESA);
         const clienteFantasiaNorm = normalizeStr(reg.Cliente_Nome_Fantasia || reg.cliente_nome_fantasia);
 
-        const candidatosBase = (valoresRepasse || []).filter(vr => 
-          normalizeStr(vr.medicos?.nome) === medicoNorm &&
-          normalizeStr(vr.modalidade) === modalidadeNorm &&
-          normalizeStr(vr.especialidade) === especialidadeNorm
-        );
+        // Buscar valores de repasse considerando o nome normalizado
+        const candidatosBase = (valoresRepasse || []).filter(vr => {
+          const medicoRepasseNome = vr.medicos?.nome || vr.medico_nome_original;
+          if (!medicoRepasseNome) return false;
+          
+          const medicoRepasseNorm = normalizeStr(medicoRepasseNome);
+          // Verificar se tem mapeamento do repasse
+          const medicoRepasseNormalizado = mapeamentoRepasse.get(medicoRepasseNorm) || medicoRepasseNome;
+          const medicoRepasseNormFinal = normalizeStr(medicoRepasseNormalizado);
+          
+          return (
+            (medicoRepasseNormFinal === medicoNormFinal || medicoRepasseNorm === medicoNorm) &&
+            normalizeStr(vr.modalidade) === modalidadeNorm &&
+            normalizeStr(vr.especialidade) === especialidadeNorm
+          );
+        });
 
         let melhor: any = null;
         let melhorScore = -1;

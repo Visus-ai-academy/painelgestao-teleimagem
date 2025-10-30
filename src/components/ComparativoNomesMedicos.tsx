@@ -150,6 +150,13 @@ export const ComparativoNomesMedicos = () => {
 
         {data && data.comparacoes && data.comparacoes.length > 0 && (
           <div className="border rounded-lg">
+            <div className="mb-4 p-4 bg-muted/50 rounded-lg">
+              <p className="text-sm text-muted-foreground">
+                <strong>Como funciona:</strong> O sistema identifica automaticamente divergências entre os nomes usados 
+                na Volumetria/Repasse e o cadastro de médicos. Use os botões "Mapear" para normalizar os nomes divergentes. 
+                Uma vez mapeados, os demonstrativos de pagamento médico utilizarão automaticamente os nomes normalizados.
+              </p>
+            </div>
             <Table>
               <TableHeader>
                 <TableRow>
