@@ -148,13 +148,26 @@ export const ComparativoNomesMedicos = () => {
         nome_normalizado: normalizar(m.nome as string),
       }));
 
+      // Nomes a serem ignorados (não são médicos)
+      const nomesIgnorados = [
+        'teste medico',
+        'ana caroline blanco carreiro',
+        'juliano manzoli marques luiz'
+      ];
+
       // 2) Volumetria (médicos únicos e contagem)
       const { data: volu } = await supabase
         .from('volumetria_mobilemed')
         .select('MEDICO');
       const volumetriaMap = new Map<string, number>();
       (volu || []).forEach(v => {
-        if (v.MEDICO) volumetriaMap.set(v.MEDICO, (volumetriaMap.get(v.MEDICO) || 0) + 1);
+        if (v.MEDICO) {
+          const normalizado = normalizar(v.MEDICO);
+          // Ignorar nomes da lista de exclusão
+          if (nomesIgnorados.includes(normalizado)) return;
+          
+          volumetriaMap.set(v.MEDICO, (volumetriaMap.get(v.MEDICO) || 0) + 1);
+        }
       });
       const volumetria = Array.from(volumetriaMap.entries()).map(([nome, qtd]) => ({
         nome_original: nome,
