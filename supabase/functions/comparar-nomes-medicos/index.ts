@@ -128,16 +128,16 @@ serve(async (req) => {
     console.log('📊 Buscando médicos da volumetria...');
     const { data: volumetriaData, error: erroVolumetria } = await supabase
       .from('volumetria_mobilemed')
-      .select('medico');
+      .select('MEDICO');
 
     if (erroVolumetria) throw erroVolumetria;
 
     // Agrupar e contar por médico
     const volumetriaMap = new Map<string, number>();
     (volumetriaData || []).forEach(v => {
-      if (v.medico) {
-        const normalizado = normalizar(v.medico);
-        volumetriaMap.set(v.medico, (volumetriaMap.get(v.medico) || 0) + 1);
+      if (v.MEDICO) {
+        const normalizado = normalizar(v.MEDICO);
+        volumetriaMap.set(v.MEDICO, (volumetriaMap.get(v.MEDICO) || 0) + 1);
       }
     });
 
