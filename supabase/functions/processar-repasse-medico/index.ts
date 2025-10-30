@@ -106,29 +106,130 @@ serve(async (req) => {
     const ROWS_PER_CHUNK = 100; // Linhas lidas da planilha por vez
     const BATCH_SIZE = 3;       // Registros processados (DB) por vez
 
+    // Funções de normalização de nomes (suporte a abreviações)
+    const normalizar = (s: string | null): string => {
+      if (!s) return '';
+      return s
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .replace(/\bdr\.?\s*/gi, '')
+        .replace(/\bdra\.?\s*/gi, '');
+    };
+
+    const extrairTokens = (nome: string): string[] => {
+      return normalizar(nome)
+        .split(/\s+/)
+        .filter(t => t.length > 0);
+    };
+
+    const ehInicial = (token: string): boolean => {
+      return token.length === 1 || (token.length === 2 && token.endsWith('.'));
+    };
+
+    const letraInicial = (token: string): string => {
+      return token.charAt(0);
+    };
+
+    const matchComAbreviacoes = (nome1: string, nome2: string): boolean => {
+      const tokens1 = extrairTokens(nome1);
+      const tokens2 = extrairTokens(nome2);
+      
+      if (tokens1.length === 0 || tokens2.length === 0) return false;
+      if (tokens1.join(' ') === tokens2.join(' ')) return true;
+      
+      const verificarMatch = (tokensA: string[], tokensB: string[]): boolean => {
+        let matchCount = 0;
+        const usedIndices = new Set<number>();
+        
+        for (const tokenA of tokensA) {
+          let encontrou = false;
+          
+          for (let i = 0; i < tokensB.length; i++) {
+            if (usedIndices.has(i)) continue;
+            
+            const tokenB = tokensB[i];
+            
+            if (tokenA === tokenB) {
+              matchCount++;
+              usedIndices.add(i);
+              encontrou = true;
+              break;
+            }
+            
+            if (ehInicial(tokenA) && tokenB.startsWith(letraInicial(tokenA))) {
+              matchCount++;
+              usedIndices.add(i);
+              encontrou = true;
+              break;
+            }
+            
+            if (ehInicial(tokenB) && tokenA.startsWith(letraInicial(tokenB))) {
+              matchCount++;
+              usedIndices.add(i);
+              encontrou = true;
+              break;
+            }
+          }
+          
+          if (!encontrou) return false;
+        }
+        
+        return matchCount >= Math.min(tokensA.length, tokensB.length) * 0.7;
+      };
+      
+      return verificarMatch(tokens1, tokens2) || verificarMatch(tokens2, tokens1);
+    };
+
+    // Cache de médicos cadastrados (carregado uma vez)
+    let medicosCadastrados: Array<{ id: string; nome: string; crm: string | null; nome_normalizado: string }> | null = null;
+
+    const carregarMedicos = async () => {
+      if (medicosCadastrados) return medicosCadastrados;
+      
+      const { data } = await supabase
+        .from('medicos')
+        .select('id, nome, crm')
+        .eq('ativo', true);
+      
+      medicosCadastrados = (data || []).map(m => ({
+        ...m,
+        nome_normalizado: normalizar(m.nome)
+      }));
+      
+      return medicosCadastrados;
+    };
+
     // Funções auxiliares de busca "sob demanda"
     const buscarMedicoId = async (row: RepasseRow): Promise<string | null> => {
       try {
+        const medicos = await carregarMedicos();
+        
+        // 1. Busca por CRM (prioritária e exata)
         if (row.medico_crm) {
-          const { data } = await supabase
-            .from('medicos')
-            .select('id')
-            .eq('crm', row.medico_crm.trim())
-            .eq('ativo', true)
-            .maybeSingle();
-          return data?.id ?? null;
+          const crm = row.medico_crm.trim();
+          const medicoComCRM = medicos.find(m => m.crm === crm);
+          if (medicoComCRM) return medicoComCRM.id;
         }
+        
+        // 2. Busca por nome com normalização e suporte a abreviações
         if (row.medico_nome) {
-          const name = row.medico_nome.trim();
-          const { data } = await supabase
-            .from('medicos')
-            .select('id')
-            .ilike('nome', name) // busca exata case-insensitive; evite % para não pegar múltiplos
-            .eq('ativo', true)
-            .maybeSingle();
-          return data?.id ?? null;
+          const nomeOriginal = row.medico_nome.trim();
+          const nomeNormalizado = normalizar(nomeOriginal);
+          
+          // 2.1. Match exato normalizado
+          const matchExato = medicos.find(m => m.nome_normalizado === nomeNormalizado);
+          if (matchExato) return matchExato.id;
+          
+          // 2.2. Match com abreviações
+          const matchAbreviacao = medicos.find(m => matchComAbreviacoes(nomeOriginal, m.nome));
+          if (matchAbreviacao) return matchAbreviacao.id;
         }
-      } catch (_) {}
+      } catch (error) {
+        console.error('Erro ao buscar médico:', error);
+      }
       return null;
     };
 
