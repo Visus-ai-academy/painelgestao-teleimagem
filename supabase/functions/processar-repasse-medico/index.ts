@@ -414,6 +414,7 @@ serve(async (req) => {
         registros_inseridos: inseridos,
         registros_atualizados: atualizados,
         registros_erro: erros,
+        registros_ignorados: ignorados,
         detalhes_erro: detalhesFinais
       })
       .eq('id', uploadId);
