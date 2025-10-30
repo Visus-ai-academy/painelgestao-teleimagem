@@ -148,7 +148,7 @@ export const ComparativoNomesMedicos = () => {
           </div>
         )}
 
-        {data && (
+        {data && data.comparacoes && data.comparacoes.length > 0 && (
           <div className="border rounded-lg">
             <Table>
               <TableHeader>
