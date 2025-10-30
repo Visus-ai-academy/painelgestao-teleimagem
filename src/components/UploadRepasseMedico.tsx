@@ -65,8 +65,7 @@ export const UploadRepasseMedico = ({ onUploadComplete }: UploadRepasseMedicoPro
       <Button
         onClick={handleButtonClick}
         disabled={isUploading}
-        variant="outline"
-        className="gap-2"
+        className="w-full gap-2"
       >
         {isUploading ? (
           <>

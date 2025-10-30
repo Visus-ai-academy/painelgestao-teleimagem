@@ -19,6 +19,7 @@ import { ComparativoNomesMedicos } from "@/components/ComparativoNomesMedicos";
 import { DownloadTemplateNovosMedicos } from "@/components/DownloadTemplateNovosMedicos";
 import { DownloadTemplateCadastroMedico } from "@/components/DownloadTemplateCadastroMedico";
 import { UploadRepasseMedico } from "@/components/UploadRepasseMedico";
+import { ValoresRepasseMedico } from "@/components/ValoresRepasseMedico";
 import {
   Users, 
   UserCheck, 
@@ -967,7 +968,7 @@ export default function Colaboradores() {
                 {/* Botão: Upload Médicos */}
                 <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
                   <DialogTrigger asChild>
-                    <Button variant="outline" className="w-full flex items-center gap-2">
+                    <Button className="w-full flex items-center gap-2">
                       <Upload className="h-4 w-4" />
                       Upload Médicos
                     </Button>
@@ -2188,6 +2189,11 @@ export default function Colaboradores() {
                   </div>
                 )}
 
+                {/* Valores de Repasse */}
+                {selectedColaborador.departamento === "Medicina" && (
+                  <ValoresRepasseMedico medicoId={selectedColaborador.id} />
+                )}
+
                 {/* Permissões */}
                 {selectedColaborador.permissoes && selectedColaborador.permissoes.length > 0 && (
                   <div>
@@ -2491,6 +2497,11 @@ export default function Colaboradores() {
                       )}
                     </div>
                   </div>
+                )}
+
+                {/* Valores de Repasse */}
+                {selectedColaborador.departamento === "Medicina" && (
+                  <ValoresRepasseMedico medicoId={selectedColaborador.id} />
                 )}
 
                 {/* Documentos (somente visualização) */}
