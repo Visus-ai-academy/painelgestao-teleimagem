@@ -514,20 +514,7 @@ export default function Colaboradores() {
             const expectedHeaders = [
               'Nome_Médico',
               'CRM',
-              'CPF',
-              'Status_Ativo_Médico',
-              'Sócio?',
-              'Função',
-              'Especialidadede Atuação',
-              'Equipe',
-              'Acrescimo sem digitador',
-              'Adicional de Valor sem utilizar digitador',
-              'Nome_empresa',
-              'CNPJ',
-              'Telefone',
-              'E-MAIL',
-              'Optante pelo simples',
-              'Contas a Pagar'
+              'CPF'
             ];
             
             const missingHeaders = expectedHeaders.filter(h => !headers.includes(h));
