@@ -153,7 +153,6 @@ export default function Colaboradores() {
   
   const [resumoEquipes, setResumoEquipes] = useState<ResumoEquipe[]>([]);
   const [cleaningData, setCleaningData] = useState(false);
-  const [inativandoLote, setInativandoLote] = useState(false);
   // Mapeamento de médicos com repasse (medicos_valores_repasse)
   const [medicosComRepasse, setMedicosComRepasse] = useState<Set<string>>(new Set());
 
@@ -223,166 +222,6 @@ export default function Colaboradores() {
       });
     } finally {
       setCleaningData(false);
-    }
-  };
-
-  // Função para mapear Dra. Larissa Assad duplicada
-  const mapearLarissaDuplicada = async () => {
-    if (!confirm('⚠️ ATENÇÃO: Esta ação irá mapear os valores de repasse de "Dra. Larissa Assad" para "Dra. Larissa Assad Joao Moyses" e EXCLUIR o registro duplicado. Deseja continuar?')) {
-      return;
-    }
-
-    try {
-      console.log('🔄 Mapeando Dra. Larissa Assad duplicada...');
-      
-      const { data, error } = await supabase.functions.invoke('mapear-medico-duplicado', {
-        body: { 
-          medico_id_antigo: '89540a23-a082-40c1-a3c1-4076eff0815d', // Dra. Larissa Assad
-          medico_id_correto: '43e90613-f131-4c9e-b4cf-6e93bd26c23f'  // Dra. Larissa Assad Joao Moyses
-        }
-      });
-      
-      if (error) throw error;
-      
-      toast({
-        title: "✅ Mapeamento concluído!",
-        description: `${data.registros_repasse_atualizados} registros de repasse transferidos para o cadastro correto`,
-      });
-      
-      // Recarregar lista
-      const { data: medicosData } = await supabase
-        .from('medicos')
-        .select('*')
-        .order('nome');
-      
-      if (medicosData) {
-        const lista: Colaborador[] = medicosData.map((medico: any) => ({
-          id: medico.id,
-          nome: medico.nome || '',
-          email: medico.email || '',
-          funcao: medico.funcao || 'Médico',
-          departamento: 'Medicina',
-          nivel: '',
-          status: medico.ativo ? 'Ativo' : 'Inativo',
-          dataAdmissao: '',
-          telefone: medico.telefone || '',
-          cpf: medico.cpf || '',
-          permissoes: [],
-          gestor: '',
-          salario: 0,
-          crm: medico.crm,
-          categoria: medico.categoria,
-          modalidades: medico.modalidades || [],
-          especialidades: medico.especialidades || [],
-          equipe: medico.equipe || '',
-          especialidade_atuacao: medico.especialidade_atuacao || medico.especialidade || (Array.isArray(medico.especialidades) ? medico.especialidades[0] : ''),
-          socio: medico.socio || '',
-          cnpj: medico.cnpj || '',
-          nome_empresa: medico.nome_empresa || '',
-          optante_simples: medico.optante_simples || '',
-          acrescimo_sem_digitador: medico.acrescimo_sem_digitador || '',
-          adicional_valor_sem_digitador: medico.adicional_valor_sem_digitador || 0
-        } as any));
-        setColaboradores(lista);
-      }
-      
-    } catch (error: any) {
-      console.error('Erro:', error);
-      toast({
-        title: "❌ Erro no mapeamento",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
-  // Função para inativar médicos em lote
-  const inativarMedicosLote = async () => {
-    const medicosParaInativar = [
-      'Dr. Alvaro Dias Simoes',
-      'Dr. Andre Campanha Minikowski',
-      'Dr. Carlos Henrique Viana Filho',
-      'Dr. Gustavo Corrêa de Almeida Teixeira',
-      'Dr. Jeferson Luis Castellano',
-      'Dr. Murilo Bambini Mandola',
-      'Dr. Murilo Rebechi',
-      'Dr. Paulo Monteiro Saldanha Altenfelder Santos',
-      'Dr. Rafael José de Oliveira',
-      'Dr. Rafael Lopes Srebro',
-      'Dr. Tiago Fernando Battazza Iasbech',
-      'Dra. Ananda Peixoto de Araujo',
-      'Dra. Carol Saito Leopoldo e Silva',
-      'Dra. Lourdes Judith Medeiros Max',
-      'Dra. Marina Guareschi Berigo',
-      'Dra. Marina Lumi Sato',
-      'Dra. Rosacelia Coelho Brito'
-    ];
-
-    if (!confirm(`⚠️ ATENÇÃO: Esta ação irá inativar ${medicosParaInativar.length} médicos sem repasse. Deseja continuar?`)) {
-      return;
-    }
-
-    try {
-      setInativandoLote(true);
-      console.log('🔄 Inativando médicos em lote...');
-      
-      const { data, error } = await supabase.functions.invoke('inativar-medicos-lote', {
-        body: { medicos_nomes: medicosParaInativar }
-      });
-      
-      if (error) throw error;
-      
-      toast({
-        title: "✅ Inativação concluída!",
-        description: `${data.medicos_inativados} médicos foram inativados`,
-      });
-      
-      // Recarregar lista
-      const { data: medicosData } = await supabase
-        .from('medicos')
-        .select('*')
-        .order('nome');
-      
-      if (medicosData) {
-        const lista: Colaborador[] = medicosData.map((medico: any) => ({
-          id: medico.id,
-          nome: medico.nome || '',
-          email: medico.email || '',
-          funcao: medico.funcao || 'Médico',
-          departamento: 'Medicina',
-          nivel: '',
-          status: medico.ativo ? 'Ativo' : 'Inativo',
-          dataAdmissao: '',
-          telefone: medico.telefone || '',
-          cpf: medico.cpf || '',
-          permissoes: [],
-          gestor: '',
-          salario: 0,
-          crm: medico.crm,
-          categoria: medico.categoria,
-          modalidades: medico.modalidades || [],
-          especialidades: medico.especialidades || [],
-          equipe: medico.equipe || '',
-          especialidade_atuacao: medico.especialidade_atuacao || medico.especialidade || (Array.isArray(medico.especialidades) ? medico.especialidades[0] : ''),
-          socio: medico.socio || '',
-          cnpj: medico.cnpj || '',
-          nome_empresa: medico.nome_empresa || '',
-          optante_simples: medico.optante_simples || '',
-          acrescimo_sem_digitador: medico.acrescimo_sem_digitador || '',
-          adicional_valor_sem_digitador: medico.adicional_valor_sem_digitador || 0
-        } as any));
-        setColaboradores(lista);
-      }
-      
-    } catch (error: any) {
-      console.error('Erro:', error);
-      toast({
-        title: "❌ Erro na inativação",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setInativandoLote(false);
     }
   };
 
@@ -1301,34 +1140,6 @@ export default function Colaboradores() {
           <Separator className="my-4" />
             
             <div className="flex gap-2">
-              
-              <Button 
-                variant="outline" 
-                onClick={mapearLarissaDuplicada}
-                className="flex items-center gap-2"
-              >
-                <Settings className="h-4 w-4" />
-                Mapear Larissa Duplicada
-              </Button>
-              
-              <Button 
-                variant="outline" 
-                onClick={inativarMedicosLote}
-                disabled={inativandoLote}
-                className="flex items-center gap-2"
-              >
-                {inativandoLote ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                    Inativando...
-                  </>
-                ) : (
-                  <>
-                    <Settings className="h-4 w-4" />
-                    Inativar 17 Médicos Específicos
-                  </>
-                )}
-              </Button>
               
               <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
                 <DialogTrigger asChild>
