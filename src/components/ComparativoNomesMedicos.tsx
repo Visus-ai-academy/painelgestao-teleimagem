@@ -19,6 +19,7 @@ interface MedicoComparativo {
   nome_volumetria: string | null;
   nome_cadastro: string | null;
   medico_cadastro_id: string | null;
+  status_cadastro: boolean | null;
   nome_repasse: string | null;
   quantidade_exames_volumetria: number;
   quantidade_registros_repasse: number;
@@ -77,11 +78,11 @@ export const ComparativoNomesMedicos = () => {
       // 1) Médicos cadastrados
       const { data: medicosCad } = await supabase
         .from('medicos')
-        .select('id, nome')
-        .eq('ativo', true);
+        .select('id, nome, ativo');
       const cadastrados = (medicosCad || []).map(m => ({
         id: m.id as string,
         nome: m.nome as string,
+        ativo: m.ativo as boolean,
         nome_normalizado: normalizar(m.nome as string),
       }));
 
@@ -125,6 +126,7 @@ export const ComparativoNomesMedicos = () => {
           nome_volumetria: null,
           nome_cadastro: c.nome,
           medico_cadastro_id: c.id,
+          status_cadastro: c.ativo,
           nome_repasse: null,
           quantidade_exames_volumetria: 0,
           quantidade_registros_repasse: 0,
@@ -146,6 +148,7 @@ export const ComparativoNomesMedicos = () => {
             nome_volumetria: v.nome_original,
             nome_cadastro: null,
             medico_cadastro_id: null,
+            status_cadastro: null,
             nome_repasse: null,
             quantidade_exames_volumetria: v.quantidade_exames,
             quantidade_registros_repasse: 0,
@@ -173,6 +176,7 @@ export const ComparativoNomesMedicos = () => {
               nome_volumetria: null,
               nome_cadastro: null,
               medico_cadastro_id: null,
+              status_cadastro: null,
               nome_repasse: nomeRepasse,
               quantidade_exames_volumetria: 0,
               quantidade_registros_repasse: qtd,
@@ -309,6 +313,7 @@ export const ComparativoNomesMedicos = () => {
                   <TableHead className="w-[100px]">Status</TableHead>
                   <TableHead>Nome Volumetria</TableHead>
                   <TableHead className="bg-primary/5">Nome Cadastro (Referência)</TableHead>
+                  <TableHead className="w-[120px]">Status Cadastro</TableHead>
                   <TableHead>Nome Repasse</TableHead>
                   <TableHead className="w-[100px] text-center">Vol.</TableHead>
                   <TableHead className="w-[100px] text-center">Rep.</TableHead>
@@ -353,6 +358,15 @@ export const ComparativoNomesMedicos = () => {
                             </Select>
                           )}
                         </div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {comp.status_cadastro === null ? (
+                        <Badge variant="outline">Não cadastrado</Badge>
+                      ) : comp.status_cadastro ? (
+                        <Badge variant="default" className="bg-green-500">Ativo</Badge>
+                      ) : (
+                        <Badge variant="destructive">Inativo</Badge>
                       )}
                     </TableCell>
                     <TableCell>

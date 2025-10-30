@@ -10,6 +10,7 @@ interface MedicoComparativo {
   nome_volumetria: string | null;
   nome_cadastro: string | null;
   medico_cadastro_id: string | null;
+  status_cadastro: boolean | null; // true = Ativo, false = Inativo
   nome_repasse: string | null;
   quantidade_exames_volumetria: number;
   quantidade_registros_repasse: number;
@@ -30,6 +31,7 @@ interface MedicoCadastrado {
   id: string;
   nome: string;
   crm: string | null;
+  ativo: boolean;
   nome_normalizado: string;
 }
 
@@ -112,12 +114,11 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // 1. Buscar todos os médicos cadastrados
+    // 1. Buscar todos os médicos cadastrados (incluindo inativos)
     console.log('📋 Buscando médicos cadastrados...');
     const { data: medicosCadastrados, error: erroCadastrados } = await supabase
       .from('medicos')
-      .select('id, nome, crm')
-      .eq('ativo', true);
+      .select('id, nome, crm, ativo');
 
     if (erroCadastrados) throw erroCadastrados;
 
@@ -125,6 +126,7 @@ serve(async (req) => {
       id: m.id,
       nome: m.nome,
       crm: m.crm,
+      ativo: m.ativo,
       nome_normalizado: normalizar(m.nome)
     }));
 
@@ -223,6 +225,7 @@ serve(async (req) => {
         nome_volumetria: null,
         nome_cadastro: c.nome,
         medico_cadastro_id: c.id,
+        status_cadastro: c.ativo,
         nome_repasse: null,
         quantidade_exames_volumetria: 0,
         quantidade_registros_repasse: 0,
@@ -260,6 +263,7 @@ serve(async (req) => {
           nome_volumetria: v.nome_original,
           nome_cadastro: null,
           medico_cadastro_id: null,
+          status_cadastro: null,
           nome_repasse: null,
           quantidade_exames_volumetria: v.quantidade_exames,
           quantidade_registros_repasse: 0,
@@ -291,6 +295,7 @@ serve(async (req) => {
             nome_volumetria: null,
             nome_cadastro: null,
             medico_cadastro_id: null,
+            status_cadastro: null,
             nome_repasse: nomeRepasse,
             quantidade_exames_volumetria: 0,
             quantidade_registros_repasse: r.quantidade_registros,
