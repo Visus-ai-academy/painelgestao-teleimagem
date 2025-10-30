@@ -119,6 +119,13 @@ serve(async (req) => {
         .replace(/\bdra\.?\s*/gi, '');
     };
 
+    // Nomes a serem ignorados (não são médicos)
+    const nomesIgnorados = [
+      'teste medico',
+      'ana caroline blanco carreiro',
+      'juliano manzoli marques luiz'
+    ];
+
     const extrairTokens = (nome: string): string[] => {
       return normalizar(nome)
         .split(/\s+/)
@@ -205,6 +212,14 @@ serve(async (req) => {
     // Funções auxiliares de busca "sob demanda"
     const buscarMedicoId = async (row: RepasseRow): Promise<string | null> => {
       try {
+        // Ignorar nomes da lista de exclusão
+        if (row.medico_nome) {
+          const nomeNormalizado = normalizar(row.medico_nome);
+          if (nomesIgnorados.includes(nomeNormalizado)) {
+            return null;
+          }
+        }
+        
         const medicos = await carregarMedicos();
         
         // 1. Busca por CRM (prioritária e exata)

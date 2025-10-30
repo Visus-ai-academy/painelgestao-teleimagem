@@ -216,13 +216,20 @@ serve(async (req) => {
 
     if (erroVolumetria) throw erroVolumetria;
 
-    // Agrupar e contar por médico (ignorando TESTE MEDICO)
+    // Nomes a serem ignorados (não são médicos)
+    const nomesIgnorados = [
+      'teste medico',
+      'ana caroline blanco carreiro',
+      'juliano manzoli marques luiz'
+    ];
+
+    // Agrupar e contar por médico (ignorando nomes da lista)
     const volumetriaMap = new Map<string, number>();
     (volumetriaData || []).forEach(v => {
       if (v.MEDICO) {
         const normalizado = normalizar(v.MEDICO);
-        // Ignorar médicos de teste
-        if (normalizado === 'teste medico' || v.MEDICO.toUpperCase().includes('TESTE MEDICO')) {
+        // Ignorar nomes da lista de exclusão
+        if (nomesIgnorados.includes(normalizado)) {
           return;
         }
         volumetriaMap.set(v.MEDICO, (volumetriaMap.get(v.MEDICO) || 0) + 1);
