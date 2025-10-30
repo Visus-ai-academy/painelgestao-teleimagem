@@ -289,6 +289,17 @@ serve(async (req) => {
             processados++;
             continue;
           }
+
+          // Log de diagnóstico (primeiras 3 linhas)
+          if (processados < 3) {
+            console.log(`📋 Linha ${lineNum}:`, {
+              modalidade: row.modalidade,
+              especialidade: row.especialidade,
+              prioridade: row.prioridade,
+              valor: row.valor,
+              medico_nome: row.medico_nome
+            });
+          }
           // Normalizações leves
           const modalidade = String(row.modalidade).trim();
           const especialidade = String(row.especialidade).trim();
