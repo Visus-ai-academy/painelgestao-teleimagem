@@ -51,23 +51,162 @@ export const ComparativoNomesMedicos = () => {
 
       console.log('Resultado completo:', resultado);
 
-      // Verificar se resultado tem os dados corretos
-      if (!resultado || !resultado.comparacoes) {
-        throw new Error('Dados do comparativo não foram retornados corretamente');
+      // Se o formato esperado vier correto, usar direto
+      if (resultado && resultado.comparacoes && resultado.estatisticas) {
+        setData(resultado);
+        toast({
+          title: "Comparativo concluído",
+          description: `${resultado.estatisticas?.total_divergencias || 0} divergências encontradas`,
+        });
+        return;
       }
 
-      setData(resultado);
-      
+      // Fallback: calcular o comparativo localmente se o formato não vier como esperado
+      console.warn('Formato inesperado do comparativo. Calculando localmente...');
+
+      // Helpers
+      const normalizar = (s?: string | null) => (s || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/\p{Diacritic}+/gu, '')
+        .replace(/\bdr\.?\s*/gi, '')
+        .replace(/\bdra\.?\s*/gi, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      // 1) Médicos cadastrados
+      const { data: medicosCad } = await supabase
+        .from('medicos')
+        .select('id, nome')
+        .eq('ativo', true);
+      const cadastrados = (medicosCad || []).map(m => ({
+        id: m.id as string,
+        nome: m.nome as string,
+        nome_normalizado: normalizar(m.nome as string),
+      }));
+
+      // 2) Volumetria (médicos únicos e contagem)
+      const { data: volu } = await supabase
+        .from('volumetria_mobilemed')
+        .select('MEDICO');
+      const volumetriaMap = new Map<string, number>();
+      (volu || []).forEach(v => {
+        if (v.MEDICO) volumetriaMap.set(v.MEDICO, (volumetriaMap.get(v.MEDICO) || 0) + 1);
+      });
+      const volumetria = Array.from(volumetriaMap.entries()).map(([nome, qtd]) => ({
+        nome_original: nome,
+        nome_normalizado: normalizar(nome),
+        quantidade_exames: qtd,
+      }));
+
+      // 3) Repasse (contagem por medico_id)
+      const { data: rep } = await supabase
+        .from('medicos_valores_repasse')
+        .select('medico_id');
+      const repasseMap = new Map<string, number>();
+      (rep || []).forEach(r => {
+        const key = r.medico_id || 'SEM_MEDICO';
+        repasseMap.set(key, (repasseMap.get(key) || 0) + 1);
+      });
+
+      // Nomes dos médicos com repasse
+      const ids = Array.from(repasseMap.keys()).filter(k => k !== 'SEM_MEDICO');
+      let medicosRepasseMap = new Map<string, string>();
+      if (ids.length > 0) {
+        const { data: medRep } = await supabase.from('medicos').select('id, nome').in('id', ids);
+        medicosRepasseMap = new Map((medRep || []).map(m => [m.id as string, m.nome as string]));
+      }
+
+      // 4) Montar comparações
+      const comparacoesMap = new Map<string, any>();
+      // Base cadastrados
+      cadastrados.forEach(c => {
+        comparacoesMap.set(c.nome_normalizado, {
+          nome_volumetria: null,
+          nome_cadastro: c.nome,
+          medico_cadastro_id: c.id,
+          nome_repasse: null,
+          quantidade_exames_volumetria: 0,
+          quantidade_registros_repasse: 0,
+          status: 'ok',
+          sugestoes_cadastro: [] as any[],
+        });
+      });
+
+      // Volumetria
+      volumetria.forEach(v => {
+        const cad = cadastrados.find(c => c.nome_normalizado === v.nome_normalizado);
+        if (cad) {
+          const comp = comparacoesMap.get(cad.nome_normalizado);
+          comp.nome_volumetria = v.nome_original;
+          comp.quantidade_exames_volumetria = v.quantidade_exames;
+          if (v.nome_original !== cad.nome) comp.status = comp.status === 'divergente_repasse' ? 'divergente_ambos' : 'divergente_volumetria';
+        } else {
+          comparacoesMap.set(v.nome_original, {
+            nome_volumetria: v.nome_original,
+            nome_cadastro: null,
+            medico_cadastro_id: null,
+            nome_repasse: null,
+            quantidade_exames_volumetria: v.quantidade_exames,
+            quantidade_registros_repasse: 0,
+            status: 'divergente_volumetria',
+            sugestoes_cadastro: [],
+          });
+        }
+      });
+
+      // Repasse
+      repasseMap.forEach((qtd, key) => {
+        if (key !== 'SEM_MEDICO') {
+          const nome = medicosRepasseMap.get(key) || null;
+          const cad = cadastrados.find(c => c.id === key);
+          if (cad) {
+            const comp = comparacoesMap.get(cad.nome_normalizado);
+            comp.nome_repasse = nome;
+            comp.quantidade_registros_repasse = qtd;
+            if (nome && nome !== cad.nome) comp.status = comp.status === 'divergente_volumetria' ? 'divergente_ambos' : 'divergente_repasse';
+          }
+        } else {
+          const nomeRepasse = 'SEM MÉDICO';
+          if (!comparacoesMap.has(nomeRepasse)) {
+            comparacoesMap.set(nomeRepasse, {
+              nome_volumetria: null,
+              nome_cadastro: null,
+              medico_cadastro_id: null,
+              nome_repasse: nomeRepasse,
+              quantidade_exames_volumetria: 0,
+              quantidade_registros_repasse: qtd,
+              status: 'divergente_repasse',
+              sugestoes_cadastro: [],
+            });
+          }
+        }
+      });
+
+      const comparacoes = Array.from(comparacoesMap.values()).sort((a, b) => {
+        if (a.status !== 'ok' && b.status === 'ok') return -1;
+        if (a.status === 'ok' && b.status !== 'ok') return 1;
+        return b.quantidade_exames_volumetria - a.quantidade_exames_volumetria;
+      });
+
+      const estatisticas = {
+        total_cadastrados: cadastrados.length,
+        total_divergencias: comparacoes.filter(c => c.status !== 'ok').length,
+        total_mapeados: comparacoes.filter(c => c.status === 'ok' && (c.quantidade_exames_volumetria > 0 || c.quantidade_registros_repasse > 0)).length,
+      };
+
+      const resultadoLocal = { comparacoes, estatisticas };
+      setData(resultadoLocal);
       toast({
-        title: "Comparativo concluído",
-        description: `${resultado.estatisticas?.total_divergencias || 0} divergências encontradas`,
+        title: 'Comparativo concluído (local)',
+        description: `${estatisticas.total_divergencias} divergências encontradas`,
       });
     } catch (error: any) {
       console.error('Erro ao executar comparativo:', error);
       toast({
-        title: "Erro ao executar comparativo",
+        title: 'Erro ao executar comparativo',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
