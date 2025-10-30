@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { useMedicoData } from "@/hooks/useMedicoData";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ComparativoNomesMedicos } from "@/components/ComparativoNomesMedicos";
+import { DownloadTemplateNovosMedicos } from "@/components/DownloadTemplateNovosMedicos";
 import { 
   Users, 
   UserCheck, 
@@ -1139,7 +1140,7 @@ export default function Colaboradores() {
           
           <Separator className="my-4" />
             
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               
               <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
                 <DialogTrigger asChild>
@@ -1182,6 +1183,8 @@ export default function Colaboradores() {
                   </div>
                 </DialogContent>
               </Dialog>
+
+              <DownloadTemplateNovosMedicos />
 
               <Dialog open={showNewColaboradorDialog} onOpenChange={setShowNewColaboradorDialog}>
                 <DialogTrigger asChild>
