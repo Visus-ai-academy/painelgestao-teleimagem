@@ -13,6 +13,8 @@ import { useToast } from '@/hooks/use-toast';
 import { RoleProtectedRoute } from '@/components/RoleProtectedRoute';
 import { useMedicoData } from '@/hooks/useMedicoData';
 import { DuplicadosRepasseDialog } from '@/components/DuplicadosRepasseDialog';
+import { ComparativoNomesMedicos } from '@/components/ComparativoNomesMedicos';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Medico {
   id: string;
@@ -263,6 +265,16 @@ export default function GerenciarMedicos() {
               Cadastre e gerencie os médicos do sistema
             </p>
           </div>
+        </div>
+
+        <Tabs defaultValue="cadastro" className="w-full">
+          <TabsList>
+            <TabsTrigger value="cadastro">Cadastro de Médicos</TabsTrigger>
+            <TabsTrigger value="comparativo">Comparativo de Nomes</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="cadastro" className="space-y-4">
+            <div className="flex justify-end">
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button onClick={() => {
@@ -539,8 +551,13 @@ export default function GerenciarMedicos() {
               </Table>
             )}
           </CardContent>
-          </Card>
-        </div>
+        </Card>
+          </TabsContent>
+
+          <TabsContent value="comparativo">
+            <ComparativoNomesMedicos />
+          </TabsContent>
+        </Tabs>
 
         {selectedMedicoForDuplicados && (
           <DuplicadosRepasseDialog
@@ -550,6 +567,7 @@ export default function GerenciarMedicos() {
             onOpenChange={setDuplicadosDialogOpen}
           />
         )}
-      </RoleProtectedRoute>
-    );
-  }
+      </div>
+    </RoleProtectedRoute>
+  );
+}
