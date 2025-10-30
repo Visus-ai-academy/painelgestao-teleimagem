@@ -1016,37 +1016,34 @@ export default function Colaboradores() {
                         Cadastro de Médico via upload
                       </Button>
                     </DialogTrigger>
-                  <DialogContent className="max-w-2xl">
+                  <DialogContent className="max-w-md">
                     <DialogHeader>
-                      <DialogTitle>Upload de Colaboradores</DialogTitle>
+                      <DialogTitle>Cadastro de Médico via Upload</DialogTitle>
                     </DialogHeader>
                     <div className="space-y-4">
-                      <div className="flex justify-between items-center">
-                        <p className="text-sm text-gray-600">
-                          Faça upload de um arquivo CSV com os dados dos colaboradores
-                        </p>
+                      <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center">
+                        <Upload className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                        <input
+                          type="file"
+                          id="upload-medicos-input"
+                          accept=".xlsx,.xls"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              await handleFileUpload(file);
+                              setShowUploadDialog(false);
+                            }
+                          }}
+                          className="hidden"
+                        />
                         <Button
-                          variant="outline"
-                          onClick={downloadTemplate}
-                          className="flex items-center gap-2"
+                          onClick={() => document.getElementById('upload-medicos-input')?.click()}
+                          className="w-full"
                         >
-                          <Download className="h-4 w-4" />
-                          Baixar Template
+                          <Upload className="h-4 w-4 mr-2" />
+                          Selecionar Arquivo
                         </Button>
                       </div>
-                      <FileUpload
-                        title="Importar Colaboradores"
-                        description="Arraste e solte o arquivo CSV aqui ou clique para selecionar"
-                        acceptedTypes={['.csv', 'text/csv']}
-                        maxSizeInMB={5}
-                        expectedFormat={[
-                          'Nome, Email, Função, Departamento, Nível',
-                          'Telefone, CPF, Gestor, Salário',
-                          'Formato: CSV separado por vírgula'
-                        ]}
-                        onUpload={handleFileUpload}
-                        icon={<Upload className="h-5 w-5" />}
-                      />
                     </div>
                   </DialogContent>
                 </Dialog>
