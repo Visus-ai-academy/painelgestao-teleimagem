@@ -121,8 +121,7 @@ serve(async (req) => {
       // OTIMIZAÇÃO: Carregar médicos, clientes E mapeamentos UMA VEZ no início
       const { data: medicosCache } = await supabase
         .from('medicos')
-        .select('id, nome, crm')
-        .eq('ativo', true);
+        .select('id, nome, crm');
       
       const { data: clientesCache } = await supabase
         .from('clientes')
