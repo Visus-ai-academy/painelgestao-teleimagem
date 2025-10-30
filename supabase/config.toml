@@ -178,3 +178,6 @@ verify_jwt = true
 
 [functions.inativar-medicos-lote]
 verify_jwt = true
+
+[functions.mapear-medico-duplicado]
+verify_jwt = true

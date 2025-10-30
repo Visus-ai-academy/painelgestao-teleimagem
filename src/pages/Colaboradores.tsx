@@ -226,6 +226,76 @@ export default function Colaboradores() {
     }
   };
 
+  // Função para mapear Dra. Larissa Assad duplicada
+  const mapearLarissaDuplicada = async () => {
+    if (!confirm('⚠️ ATENÇÃO: Esta ação irá mapear os valores de repasse de "Dra. Larissa Assad" para "Dra. Larissa Assad Joao Moyses" e inativar o registro duplicado. Deseja continuar?')) {
+      return;
+    }
+
+    try {
+      console.log('🔄 Mapeando Dra. Larissa Assad duplicada...');
+      
+      const { data, error } = await supabase.functions.invoke('mapear-medico-duplicado', {
+        body: { 
+          medico_id_antigo: '89540a23-a082-40c1-a3c1-4076eff0815d', // Dra. Larissa Assad
+          medico_id_correto: '43e90613-f131-4c9e-b4cf-6e93bd26c23f'  // Dra. Larissa Assad Joao Moyses
+        }
+      });
+      
+      if (error) throw error;
+      
+      toast({
+        title: "✅ Mapeamento concluído!",
+        description: `${data.registros_repasse_atualizados} registros de repasse transferidos para o cadastro correto`,
+      });
+      
+      // Recarregar lista
+      const { data: medicosData } = await supabase
+        .from('medicos')
+        .select('*')
+        .order('nome');
+      
+      if (medicosData) {
+        const lista: Colaborador[] = medicosData.map((medico: any) => ({
+          id: medico.id,
+          nome: medico.nome || '',
+          email: medico.email || '',
+          funcao: medico.funcao || 'Médico',
+          departamento: 'Medicina',
+          nivel: '',
+          status: medico.ativo ? 'Ativo' : 'Inativo',
+          dataAdmissao: '',
+          telefone: medico.telefone || '',
+          cpf: medico.cpf || '',
+          permissoes: [],
+          gestor: '',
+          salario: 0,
+          crm: medico.crm,
+          categoria: medico.categoria,
+          modalidades: medico.modalidades || [],
+          especialidades: medico.especialidades || [],
+          equipe: medico.equipe || '',
+          especialidade_atuacao: medico.especialidade_atuacao || medico.especialidade || (Array.isArray(medico.especialidades) ? medico.especialidades[0] : ''),
+          socio: medico.socio || '',
+          cnpj: medico.cnpj || '',
+          nome_empresa: medico.nome_empresa || '',
+          optante_simples: medico.optante_simples || '',
+          acrescimo_sem_digitador: medico.acrescimo_sem_digitador || '',
+          adicional_valor_sem_digitador: medico.adicional_valor_sem_digitador || 0
+        } as any));
+        setColaboradores(lista);
+      }
+      
+    } catch (error: any) {
+      console.error('Erro:', error);
+      toast({
+        title: "❌ Erro no mapeamento",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   // Função para inativar médicos em lote
   const inativarMedicosLote = async () => {
     const medicosParaInativar = [
@@ -1234,6 +1304,15 @@ export default function Colaboradores() {
               
               <Button 
                 variant="outline" 
+                onClick={mapearLarissaDuplicada}
+                className="flex items-center gap-2"
+              >
+                <Settings className="h-4 w-4" />
+                Mapear Larissa Duplicada
+              </Button>
+              
+              <Button 
+                variant="outline" 
                 onClick={inativarMedicosLote}
                 disabled={inativandoLote}
                 className="flex items-center gap-2"
@@ -1246,7 +1325,7 @@ export default function Colaboradores() {
                 ) : (
                   <>
                     <Settings className="h-4 w-4" />
-                    Inativar Médicos sem Repasse
+                    Inativar 17 Médicos Específicos
                   </>
                 )}
               </Button>
