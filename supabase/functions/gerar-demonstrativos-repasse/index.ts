@@ -42,14 +42,15 @@ serve(async (req) => {
 
     for (const medico of medicos || []) {
       try {
-        // 2. Buscar volumetria do período para o médico
-        const { data: volumetria, error: volError } = await supabase
-          .from('volumetria')
-          .select('*')
-          .eq('periodo_referencia', periodo)
-          .eq('medico_nome', medico.nome);
+        // 2. Buscar exames do período para o médico
+        const { data: exames, error: examesError } = await supabase
+          .from('exames')
+          .select('*, clientes:cliente_id(nome)')
+          .eq('medico_id', medico.id)
+          .gte('data_exame', `${periodo}-01`)
+          .lt('data_exame', `${periodo}-32`);
 
-        if (volError) throw volError;
+        if (examesError) throw examesError;
 
         // 3. Buscar valores de repasse
         const { data: repasses, error: repasseError } = await supabase
@@ -72,36 +73,35 @@ serve(async (req) => {
         const detalhesExames: any[] = [];
         let valorTotalExames = 0;
 
-        // Agrupar volumetria por arranjo (modalidade, especialidade, categoria, prioridade, cliente)
-        const volumetriaAgrupada = new Map<string, any>();
+        // Agrupar exames por arranjo (modalidade, especialidade, categoria, cliente)
+        const examesAgrupados = new Map<string, any>();
 
-        for (const vol of volumetria || []) {
-          const chave = `${vol.modalidade}|${vol.especialidade}|${vol.categoria}|${vol.prioridade}|${vol.cliente_nome}`;
+        for (const exame of exames || []) {
+          const clienteNome = exame.clientes?.nome || 'Cliente não identificado';
+          const chave = `${exame.modalidade}|${exame.especialidade}|${exame.categoria}|${clienteNome}`;
           
-          if (!volumetriaAgrupada.has(chave)) {
-            volumetriaAgrupada.set(chave, {
-              modalidade: vol.modalidade,
-              especialidade: vol.especialidade,
-              categoria: vol.categoria,
-              prioridade: vol.prioridade,
-              cliente: vol.cliente_nome,
+          if (!examesAgrupados.has(chave)) {
+            examesAgrupados.set(chave, {
+              modalidade: exame.modalidade,
+              especialidade: exame.especialidade,
+              categoria: exame.categoria,
+              cliente: clienteNome,
               quantidade: 0,
               valor_unitario: 0,
               valor_total: 0
             });
           }
 
-          const grupo = volumetriaAgrupada.get(chave)!;
-          grupo.quantidade += 1;
+          const grupo = examesAgrupados.get(chave)!;
+          grupo.quantidade += exame.quantidade || 1;
         }
 
         // Buscar valor de repasse para cada grupo
-        for (const [chave, grupo] of volumetriaAgrupada.entries()) {
+        for (const [chave, grupo] of examesAgrupados.entries()) {
           const valorRepasse = (repasses || []).find(r =>
             r.modalidade === grupo.modalidade &&
             r.especialidade === grupo.especialidade &&
             (r.categoria === grupo.categoria || !r.categoria) &&
-            (r.prioridade === grupo.prioridade || !r.prioridade) &&
             (r.cliente_nome === grupo.cliente || !r.cliente_nome)
           );
 
@@ -115,12 +115,14 @@ serve(async (req) => {
         // Calcular total de adicionais
         const valorAdicionais = (adicionais || []).reduce((sum, a) => sum + (Number(a.valor_adicional) || 0), 0);
 
+        const totalExames = (exames || []).reduce((sum, e) => sum + (e.quantidade || 1), 0);
+
         const demonstrativo = {
           medico_id: medico.id,
           medico_nome: medico.nome,
           medico_crm: medico.crm || '',
           medico_cpf: medico.cpf || '',
-          total_laudos: volumetria?.length || 0,
+          total_laudos: totalExames,
           valor_exames: valorTotalExames,
           valor_adicionais: valorAdicionais,
           valor_total: valorTotalExames + valorAdicionais,

@@ -7,7 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Save, Calendar, DollarSign, ChevronDown, X } from "lucide-react";
+import { Save, Calendar, DollarSign, ChevronDown, X, Plus, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -77,8 +77,8 @@ export function AdicionaisMedicos({ periodoSelecionado, periodoBloqueado }: Adic
             descricao: a.descricao || ''
           }));
 
-        // Garantir pelo menos 5 slots vazios
-        while (adicionaisMedico.length < 5) {
+        // Se não houver adicionais, adicionar um slot vazio
+        if (adicionaisMedico.length === 0) {
           adicionaisMedico.push({
             id: undefined,
             data: undefined,
@@ -92,7 +92,7 @@ export function AdicionaisMedicos({ periodoSelecionado, periodoBloqueado }: Adic
           medico_nome: medico.nome,
           medico_cpf: medico.cpf || '',
           medico_email: medico.email || '',
-          adicionais: adicionaisMedico.slice(0, 5) // Máximo 5 adicionais
+          adicionais: adicionaisMedico
         };
       });
 
@@ -154,6 +154,29 @@ export function AdicionaisMedicos({ periodoSelecionado, periodoBloqueado }: Adic
     
     // Salva como string do número puro para cálculos
     handleAdicionalChange(medicoIndex, adicionalIndex, 'valor', numero.toString());
+  };
+
+  const adicionarNovoAdicional = (medicoIndex: number) => {
+    setMedicosAdicionais(prev => {
+      const novos = [...prev];
+      novos[medicoIndex].adicionais.push({
+        id: undefined,
+        data: undefined,
+        valor: '',
+        descricao: ''
+      });
+      return novos;
+    });
+  };
+
+  const removerAdicional = (medicoIndex: number, adicionalIndex: number) => {
+    setMedicosAdicionais(prev => {
+      const novos = [...prev];
+      if (novos[medicoIndex].adicionais.length > 1) {
+        novos[medicoIndex].adicionais.splice(adicionalIndex, 1);
+      }
+      return novos;
+    });
   };
 
   const handleSalvar = async (medicoId: string) => {
@@ -332,7 +355,7 @@ export function AdicionaisMedicos({ periodoSelecionado, periodoBloqueado }: Adic
                           </div>
                         </div>
 
-                        <div className="col-span-6">
+                        <div className="col-span-5">
                           <Input
                             placeholder="Descrição (opcional)"
                             value={adicional.descricao}
@@ -340,8 +363,33 @@ export function AdicionaisMedicos({ periodoSelecionado, periodoBloqueado }: Adic
                             disabled={periodoBloqueado}
                           />
                         </div>
+
+                        <div className="col-span-1 flex justify-end">
+                          {medico.adicionais.length > 1 && !periodoBloqueado && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => removerAdicional(medicoIndex, adicionalIndex)}
+                              className="h-10 w-10"
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     ))}
+
+                    {!periodoBloqueado && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => adicionarNovoAdicional(medicoIndex)}
+                        className="w-full mt-2"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Adicionar Valor
+                      </Button>
+                    )}
                   </div>
 
                   {!periodoBloqueado && (
