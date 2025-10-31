@@ -473,7 +473,12 @@ export default function PagamentosMedicos() {
 
                 <Button
                   onClick={handleGerarRelatorios}
-                  disabled={gerandoRelatorios || medicosSelecionados.size === 0 || periodoBloqueado}
+                  disabled={
+                    gerandoRelatorios || 
+                    periodoBloqueado || 
+                    stats.demonstrativosGerados === 0 ||
+                    medicosSelecionados.size === 0
+                  }
                   size="lg"
                   className="w-full"
                 >
@@ -483,7 +488,12 @@ export default function PagamentosMedicos() {
 
                 <Button
                   onClick={handleEnviarEmails}
-                  disabled={enviandoEmails || medicosSelecionados.size === 0 || periodoBloqueado}
+                  disabled={
+                    enviandoEmails || 
+                    periodoBloqueado || 
+                    stats.relatoriosGerados === 0 ||
+                    medicosSelecionados.size === 0
+                  }
                   size="lg"
                   variant="secondary"
                   className="w-full"
@@ -494,7 +504,12 @@ export default function PagamentosMedicos() {
 
                 <Button
                   onClick={handleGerarContasOmie}
-                  disabled={gerandoContasOmie || medicosSelecionados.size === 0 || periodoBloqueado}
+                  disabled={
+                    gerandoContasOmie || 
+                    periodoBloqueado || 
+                    stats.emailsEnviados === 0 ||
+                    medicosSelecionados.size === 0
+                  }
                   size="lg"
                   variant="secondary"
                   className="w-full"

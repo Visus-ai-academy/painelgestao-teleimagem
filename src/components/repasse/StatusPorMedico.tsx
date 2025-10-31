@@ -69,9 +69,6 @@ export function StatusPorMedico({
     return <Badge variant="secondary">Pendente</Badge>;
   };
 
-  const todosSelecionados = medicos.length > 0 && medicos.every(m => medicosSelecionados.has(m.medicoId));
-  const algunsSelecionados = medicos.some(m => medicosSelecionados.has(m.medicoId)) && !todosSelecionados;
-
   return (
     <Card>
       <CardHeader>
@@ -98,24 +95,6 @@ export function StatusPorMedico({
         </div>
       </CardHeader>
       <CardContent>
-        <div className="mb-4 flex items-center gap-2 border-b pb-3">
-          <Checkbox
-            checked={todosSelecionados}
-            onCheckedChange={(checked) => onTodosMedicosToggle(checked === true)}
-            ref={(el) => {
-              if (el) {
-                (el as any).indeterminate = algunsSelecionados;
-              }
-            }}
-          />
-          <span className="text-sm font-medium">
-            {medicosSelecionados.size > 0 
-              ? `${medicosSelecionados.size} médico(s) selecionado(s)`
-              : "Selecionar todos"
-            }
-          </span>
-        </div>
-
         <ScrollArea className="h-[600px]">
           <div className="space-y-3">
             {medicos.map((medico) => (
