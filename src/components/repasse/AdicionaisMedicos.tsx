@@ -39,6 +39,7 @@ export function AdicionaisMedicos({ periodoSelecionado, periodoBloqueado }: Adic
   const [loading, setLoading] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [medicosAdicionais, setMedicosAdicionais] = useState<MedicoAdicionais[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
 
   // Carregar médicos ativos e seus adicionais
   useEffect(() => {
@@ -232,6 +233,17 @@ export function AdicionaisMedicos({ periodoSelecionado, periodoBloqueado }: Adic
     }
   };
 
+  const medicosFiltrados = useMemo(() => {
+    if (!searchTerm.trim()) return medicosAdicionais;
+    
+    const searchLower = searchTerm.toLowerCase().trim();
+    return medicosAdicionais.filter(medico =>
+      medico.medico_nome.toLowerCase().includes(searchLower) ||
+      medico.medico_cpf.toLowerCase().includes(searchLower) ||
+      medico.medico_email.toLowerCase().includes(searchLower)
+    );
+  }, [medicosAdicionais, searchTerm]);
+
   const totalAdicionaisPorMedico = useMemo(() => {
     return medicosAdicionais.reduce((acc, medico) => {
       const total = medico.adicionais.reduce((sum, a) => {
@@ -264,7 +276,7 @@ export function AdicionaisMedicos({ periodoSelecionado, periodoBloqueado }: Adic
               Valores Adicionais - {periodoSelecionado}
             </CardTitle>
             <CardDescription>
-              Adicione até 5 valores extras por médico (bonificações, horas extras, etc.)
+              Adicione os valores extras por médico (bonificações, períodos extras, etc.)
             </CardDescription>
           </div>
           {periodoBloqueado && (
@@ -273,141 +285,154 @@ export function AdicionaisMedicos({ periodoSelecionado, periodoBloqueado }: Adic
         </div>
       </CardHeader>
       <CardContent>
+        <div className="mb-4">
+          <Input
+            placeholder="Buscar médico por nome, CPF ou email..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="max-w-md"
+          />
+        </div>
+        
         <Accordion type="single" collapsible className="w-full">
-          {medicosAdicionais.map((medico, medicoIndex) => (
-            <AccordionItem key={medico.medico_id} value={medico.medico_id}>
-              <AccordionTrigger className="hover:no-underline">
-                <div className="flex items-center justify-between w-full pr-4">
-                  <div className="text-left">
-                    <div className="font-semibold text-base">{medico.medico_nome}</div>
-                    <div className="text-sm text-muted-foreground">
-                      CPF: {medico.medico_cpf}
-                    </div>
-                  </div>
-                  {totalAdicionaisPorMedico[medico.medico_id] > 0 && (
-                    <Badge variant="secondary" className="ml-4">
-                      R$ {totalAdicionaisPorMedico[medico.medico_id].toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </Badge>
-                  )}
-                </div>
-              </AccordionTrigger>
-              <AccordionContent>
-                <div className="pt-4 space-y-4">
-                  <div className="text-sm text-muted-foreground mb-3">
-                    Email: {medico.medico_email}
-                  </div>
-                  
-                  <Separator />
-                  
-                  <div className="space-y-3 pt-2">
-                    {medico.adicionais.map((adicional, adicionalIndex) => (
-                      <div key={adicionalIndex} className="grid grid-cols-12 gap-2 items-start">
-                        <div className="col-span-3 relative">
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="outline"
-                                className={cn(
-                                  "w-full justify-start text-left font-normal pr-8",
-                                  !adicional.data && "text-muted-foreground"
-                                )}
-                                disabled={periodoBloqueado}
-                              >
-                                <Calendar className="mr-2 h-4 w-4" />
-                                {adicional.data ? format(adicional.data, "dd/MM/yyyy", { locale: ptBR }) : "Data"}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <CalendarComponent
-                                mode="single"
-                                selected={adicional.data}
-                                onSelect={(date) => handleAdicionalChange(medicoIndex, adicionalIndex, 'data', date)}
-                                initialFocus
-                                className="pointer-events-auto"
-                              />
-                            </PopoverContent>
-                          </Popover>
-                          {adicional.data && !periodoBloqueado && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6"
-                              onClick={() => limparData(medicoIndex, adicionalIndex)}
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
-                          )}
-                        </div>
-
-                        <div className="col-span-3">
-                          <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                              R$
-                            </span>
-                            <Input
-                              type="text"
-                              placeholder="0,00"
-                              value={adicional.valor ? formatarValorMonetario(adicional.valor) : ''}
-                              onChange={(e) => handleValorChange(medicoIndex, adicionalIndex, e.target.value)}
-                              disabled={periodoBloqueado}
-                              className="pl-10 text-right"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="col-span-5">
-                          <Input
-                            placeholder="Descrição (opcional)"
-                            value={adicional.descricao}
-                            onChange={(e) => handleAdicionalChange(medicoIndex, adicionalIndex, 'descricao', e.target.value)}
-                            disabled={periodoBloqueado}
-                          />
-                        </div>
-
-                        <div className="col-span-1 flex justify-end">
-                          {medico.adicionais.length > 1 && !periodoBloqueado && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => removerAdicional(medicoIndex, adicionalIndex)}
-                              className="h-10 w-10"
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          )}
-                        </div>
+          {medicosFiltrados.map((medico, medicoIndex) => {
+            // Encontrar o índice original do médico no array completo
+            const medicoIndexOriginal = medicosAdicionais.findIndex(m => m.medico_id === medico.medico_id);
+            return (
+              <AccordionItem key={medico.medico_id} value={medico.medico_id}>
+                <AccordionTrigger className="hover:no-underline">
+                  <div className="flex items-center justify-between w-full pr-4">
+                    <div className="text-left">
+                      <div className="font-semibold text-base">{medico.medico_nome}</div>
+                      <div className="text-sm text-muted-foreground">
+                        CPF: {medico.medico_cpf}
                       </div>
-                    ))}
-
-                    {!periodoBloqueado && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => adicionarNovoAdicional(medicoIndex)}
-                        className="w-full mt-2"
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Adicionar Valor
-                      </Button>
+                    </div>
+                    {totalAdicionaisPorMedico[medico.medico_id] > 0 && (
+                      <Badge variant="secondary" className="ml-4">
+                        R$ {totalAdicionaisPorMedico[medico.medico_id].toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </Badge>
                     )}
                   </div>
-
-                  {!periodoBloqueado && (
-                    <div className="flex justify-end pt-4 border-t mt-4">
-                      <Button
-                        onClick={() => handleSalvar(medico.medico_id)}
-                        disabled={salvando}
-                        size="default"
-                      >
-                        <Save className="mr-2 h-4 w-4" />
-                        {salvando ? "Salvando..." : "Salvar"}
-                      </Button>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="pt-4 space-y-4">
+                    <div className="text-sm text-muted-foreground mb-3">
+                      Email: {medico.medico_email}
                     </div>
-                  )}
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-          ))}
+                    
+                    <Separator />
+                    
+                    <div className="space-y-3 pt-2">
+                      {medico.adicionais.map((adicional, adicionalIndex) => (
+                        <div key={adicionalIndex} className="grid grid-cols-12 gap-2 items-start">
+                          <div className="col-span-3 relative">
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  className={cn(
+                                    "w-full justify-start text-left font-normal pr-8",
+                                    !adicional.data && "text-muted-foreground"
+                                  )}
+                                  disabled={periodoBloqueado}
+                                >
+                                  <Calendar className="mr-2 h-4 w-4" />
+                                  {adicional.data ? format(adicional.data, "dd/MM/yyyy", { locale: ptBR }) : "Data"}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <CalendarComponent
+                                  mode="single"
+                                  selected={adicional.data}
+                                  onSelect={(date) => handleAdicionalChange(medicoIndexOriginal, adicionalIndex, 'data', date)}
+                                  initialFocus
+                                  className="pointer-events-auto"
+                                />
+                              </PopoverContent>
+                            </Popover>
+                            {adicional.data && !periodoBloqueado && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6"
+                                onClick={() => limparData(medicoIndexOriginal, adicionalIndex)}
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            )}
+                          </div>
+
+                          <div className="col-span-3">
+                            <div className="relative">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                                R$
+                              </span>
+                              <Input
+                                type="text"
+                                placeholder="0,00"
+                                value={adicional.valor ? formatarValorMonetario(adicional.valor) : ''}
+                                onChange={(e) => handleValorChange(medicoIndexOriginal, adicionalIndex, e.target.value)}
+                                disabled={periodoBloqueado}
+                                className="pl-10 text-right"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="col-span-5">
+                            <Input
+                              placeholder="Descrição (opcional)"
+                              value={adicional.descricao}
+                              onChange={(e) => handleAdicionalChange(medicoIndexOriginal, adicionalIndex, 'descricao', e.target.value)}
+                              disabled={periodoBloqueado}
+                            />
+                          </div>
+
+                          <div className="col-span-1 flex justify-end">
+                            {medico.adicionais.length > 1 && !periodoBloqueado && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => removerAdicional(medicoIndexOriginal, adicionalIndex)}
+                                className="h-10 w-10"
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+
+                      {!periodoBloqueado && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => adicionarNovoAdicional(medicoIndexOriginal)}
+                          className="w-full mt-2"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Adicionar Valor
+                        </Button>
+                      )}
+                    </div>
+
+                    {!periodoBloqueado && (
+                      <div className="flex justify-end pt-4 border-t mt-4">
+                        <Button
+                          onClick={() => handleSalvar(medico.medico_id)}
+                          disabled={salvando}
+                          size="default"
+                        >
+                          <Save className="mr-2 h-4 w-4" />
+                          {salvando ? "Salvando..." : "Salvar"}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            );
+          })}
         </Accordion>
       </CardContent>
     </Card>
