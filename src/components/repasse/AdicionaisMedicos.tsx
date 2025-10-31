@@ -7,7 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Save, Calendar, DollarSign, ChevronDown } from "lucide-react";
+import { Save, Calendar, DollarSign, ChevronDown, X } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -118,6 +118,42 @@ export function AdicionaisMedicos({ periodoSelecionado, periodoBloqueado }: Adic
       };
       return novos;
     });
+  };
+
+  const limparData = (medicoIndex: number, adicionalIndex: number) => {
+    handleAdicionalChange(medicoIndex, adicionalIndex, 'data', undefined);
+  };
+
+  const formatarValorMonetario = (valor: string): string => {
+    // Remove tudo que não é número
+    const apenasNumeros = valor.replace(/\D/g, '');
+    
+    if (!apenasNumeros) return '';
+    
+    // Converte para número e divide por 100 para ter os centavos
+    const numero = parseFloat(apenasNumeros) / 100;
+    
+    // Formata como moeda brasileira
+    return numero.toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  };
+
+  const handleValorChange = (medicoIndex: number, adicionalIndex: number, valor: string) => {
+    // Remove tudo que não é número
+    const apenasNumeros = valor.replace(/\D/g, '');
+    
+    if (!apenasNumeros) {
+      handleAdicionalChange(medicoIndex, adicionalIndex, 'valor', '');
+      return;
+    }
+    
+    // Converte para número com centavos
+    const numero = parseFloat(apenasNumeros) / 100;
+    
+    // Salva como string do número puro para cálculos
+    handleAdicionalChange(medicoIndex, adicionalIndex, 'valor', numero.toString());
   };
 
   const handleSalvar = async (medicoId: string) => {
@@ -243,13 +279,13 @@ export function AdicionaisMedicos({ periodoSelecionado, periodoBloqueado }: Adic
                   <div className="space-y-3 pt-2">
                     {medico.adicionais.map((adicional, adicionalIndex) => (
                       <div key={adicionalIndex} className="grid grid-cols-12 gap-2 items-start">
-                        <div className="col-span-3">
+                        <div className="col-span-3 relative">
                           <Popover>
                             <PopoverTrigger asChild>
                               <Button
                                 variant="outline"
                                 className={cn(
-                                  "w-full justify-start text-left font-normal",
+                                  "w-full justify-start text-left font-normal pr-8",
                                   !adicional.data && "text-muted-foreground"
                                 )}
                                 disabled={periodoBloqueado}
@@ -268,17 +304,32 @@ export function AdicionaisMedicos({ periodoSelecionado, periodoBloqueado }: Adic
                               />
                             </PopoverContent>
                           </Popover>
+                          {adicional.data && !periodoBloqueado && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6"
+                              onClick={() => limparData(medicoIndex, adicionalIndex)}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          )}
                         </div>
 
                         <div className="col-span-3">
-                          <Input
-                            type="number"
-                            step="0.01"
-                            placeholder="Valor (R$)"
-                            value={adicional.valor}
-                            onChange={(e) => handleAdicionalChange(medicoIndex, adicionalIndex, 'valor', e.target.value)}
-                            disabled={periodoBloqueado}
-                          />
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                              R$
+                            </span>
+                            <Input
+                              type="text"
+                              placeholder="0,00"
+                              value={adicional.valor ? formatarValorMonetario(adicional.valor) : ''}
+                              onChange={(e) => handleValorChange(medicoIndex, adicionalIndex, e.target.value)}
+                              disabled={periodoBloqueado}
+                              className="pl-10 text-right"
+                            />
+                          </div>
                         </div>
 
                         <div className="col-span-6">
