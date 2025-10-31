@@ -2215,6 +2215,50 @@ export type Database = {
         }
         Relationships: []
       }
+      medicos_valores_adicionais: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          data_adicional: string
+          descricao: string | null
+          id: string
+          medico_id: string
+          periodo: string
+          updated_at: string
+          valor_adicional: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          data_adicional: string
+          descricao?: string | null
+          id?: string
+          medico_id: string
+          periodo: string
+          updated_at?: string
+          valor_adicional?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          data_adicional?: string
+          descricao?: string | null
+          id?: string
+          medico_id?: string
+          periodo?: string
+          updated_at?: string
+          valor_adicional?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "medicos_valores_adicionais_medico_id_fkey"
+            columns: ["medico_id"]
+            isOneToOne: false
+            referencedRelation: "medicos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       medicos_valores_repasse: {
         Row: {
           ativo: boolean | null
@@ -3387,6 +3431,83 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      relatorios_repasse_status: {
+        Row: {
+          created_at: string
+          data_envio_email: string | null
+          data_geracao_conta_omie: string | null
+          data_geracao_relatorio: string | null
+          data_processamento: string | null
+          demonstrativo_gerado: boolean | null
+          detalhes_relatorio: Json | null
+          email_destino: string | null
+          email_enviado: boolean | null
+          erro: string | null
+          erro_email: string | null
+          id: string
+          link_relatorio: string | null
+          medico_id: string
+          medico_nome: string
+          omie_codigo_conta: string | null
+          omie_conta_gerada: boolean | null
+          periodo: string
+          relatorio_gerado: boolean | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          data_envio_email?: string | null
+          data_geracao_conta_omie?: string | null
+          data_geracao_relatorio?: string | null
+          data_processamento?: string | null
+          demonstrativo_gerado?: boolean | null
+          detalhes_relatorio?: Json | null
+          email_destino?: string | null
+          email_enviado?: boolean | null
+          erro?: string | null
+          erro_email?: string | null
+          id?: string
+          link_relatorio?: string | null
+          medico_id: string
+          medico_nome: string
+          omie_codigo_conta?: string | null
+          omie_conta_gerada?: boolean | null
+          periodo: string
+          relatorio_gerado?: boolean | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          data_envio_email?: string | null
+          data_geracao_conta_omie?: string | null
+          data_geracao_relatorio?: string | null
+          data_processamento?: string | null
+          demonstrativo_gerado?: boolean | null
+          detalhes_relatorio?: Json | null
+          email_destino?: string | null
+          email_enviado?: boolean | null
+          erro?: string | null
+          erro_email?: string | null
+          id?: string
+          link_relatorio?: string | null
+          medico_id?: string
+          medico_nome?: string
+          omie_codigo_conta?: string | null
+          omie_conta_gerada?: boolean | null
+          periodo?: string
+          relatorio_gerado?: boolean | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "relatorios_repasse_status_medico_id_fkey"
+            columns: ["medico_id"]
+            isOneToOne: false
+            referencedRelation: "medicos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       security_alerts: {
         Row: {
