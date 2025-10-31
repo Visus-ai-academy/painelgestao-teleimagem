@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { AdicionaisMedicos } from "@/components/repasse/AdicionaisMedicos";
 import { StatusPorMedico } from "@/components/repasse/StatusPorMedico";
+import { ListaDemonstrativos } from "@/components/repasse/ListaDemonstrativos";
 import { ControlePeriodoFaturamento } from "@/components/ControlePeriodoFaturamento";
 
 export default function PagamentosMedicos() {
@@ -114,7 +115,8 @@ export default function PagamentosMedicos() {
           linkRelatorio: status?.link_relatorio,
           emailDestino: medico.email,
           erro: status?.erro,
-          erroEmail: status?.erro_email
+          erroEmail: status?.erro_email,
+          detalhesRelatorio: status?.detalhes_relatorio
         };
       });
 
@@ -337,6 +339,30 @@ export default function PagamentosMedicos() {
     };
   }, [statusPorMedico]);
 
+  // Demonstrativos para listagem
+  const demonstrativosParaListar = useMemo(() => {
+    return statusPorMedico
+      .filter(m => m.demonstrativoGerado)
+      .map(m => {
+        // Buscar detalhes do relatórios_repasse_status
+        const detalhes = m.detalhesRelatorio || {};
+        
+        return {
+          medicoId: m.medicoId,
+          medicoNome: m.medicoNome,
+          medicoCRM: m.medicoCRM,
+          medicoCPF: m.medicoCPF,
+          totalLaudos: detalhes.total_laudos || 0,
+          valorExames: detalhes.valor_exames || 0,
+          valorAdicionais: detalhes.valor_adicionais || 0,
+          valorTotal: detalhes.valor_total || 0,
+          detalhesExames: detalhes.detalhes_exames || [],
+          adicionais: detalhes.adicionais || [],
+          erro: m.erro
+        };
+      });
+  }, [statusPorMedico]);
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -539,19 +565,21 @@ export default function PagamentosMedicos() {
 
         {/* ABA 3: DEMONSTRATIVOS */}
         <TabsContent value="demonstrativos" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Demonstrativos de Repasse</CardTitle>
-              <CardDescription>
-                Visualize os demonstrativos detalhados por médico
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">
-                Funcionalidade de visualização de demonstrativos em desenvolvimento.
-              </p>
-            </CardContent>
-          </Card>
+          <ControlePeriodoFaturamento
+            periodoSelecionado={periodoSelecionado}
+            setPeriodoSelecionado={setPeriodoSelecionado}
+            mostrarApenasDisponiveis={mostrarApenasDisponiveis}
+            setMostrarApenasDisponiveis={setMostrarApenasDisponiveis}
+            onPeriodoChange={(periodo) => {
+              setPeriodoSelecionado(periodo);
+              carregarDados();
+            }}
+          />
+
+          <ListaDemonstrativos
+            demonstrativos={demonstrativosParaListar}
+            periodo={periodoSelecionado}
+          />
         </TabsContent>
 
         {/* ABA 4: RELATÓRIOS */}
