@@ -361,6 +361,7 @@ serve(async (req) => {
               especialidade: row.especialidade,
               prioridade: row.prioridade,
               valor: row.valor,
+              valorParsed: valorNum,
               medico_nome: row.medico_nome
             });
           }
@@ -369,7 +370,6 @@ serve(async (req) => {
           const especialidade = String(row.especialidade).trim();
           const prioridade = String(row.prioridade).trim();
           const categoria = row.categoria ? String(row.categoria).trim() : null;
-          const valorNum = Number(row.valor);
 
           let esta_no_escopo = false;
           if (row.esta_no_escopo) {

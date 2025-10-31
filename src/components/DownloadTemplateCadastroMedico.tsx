@@ -26,28 +26,8 @@ export const DownloadTemplateCadastroMedico = () => {
         'Contas a Pagar'
       ];
       
-      // Criar exemplo de linha
-      const exampleRow = [
-        'Dr. João Silva',
-        '123456',
-        '123.456.789-00',
-        'Ativo',
-        'Sim',
-        'Médico',
-        'Cardiologia',
-        'Equipe A',
-        '100',
-        '50',
-        'Clínica Exemplo LTDA',
-        '12.345.678/0001-90',
-        '(11) 99999-9999',
-        'joao.silva@exemplo.com',
-        'Sim',
-        'Conta Exemplo'
-      ];
-      
-      // Criar workbook e worksheet
-      const ws = XLSX.utils.aoa_to_sheet([headers, exampleRow]);
+      // Criar workbook e worksheet (sem linha de exemplo)
+      const ws = XLSX.utils.aoa_to_sheet([headers]);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Médicos');
       
