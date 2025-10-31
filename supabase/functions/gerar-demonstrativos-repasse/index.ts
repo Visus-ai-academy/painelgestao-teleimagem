@@ -38,27 +38,35 @@ serve(async (req) => {
 
     if (medicosError) throw medicosError;
 
+    console.log(`[Repasse] ${medicos?.length || 0} médicos ativos encontrados`);
+
     const demonstrativos = [];
 
     for (const medico of medicos || []) {
       try {
-        // 2. Buscar exames do período para o médico
+        console.log(`[Repasse] Processando médico: ${medico.nome}`);
+
+        // 2. Buscar exames do período para o médico na volumetria_mobilemed
         const { data: exames, error: examesError } = await supabase
-          .from('exames')
-          .select('*, clientes:cliente_id(nome)')
-          .eq('medico_id', medico.id)
-          .gte('data_exame', `${periodo}-01`)
-          .lt('data_exame', `${periodo}-32`);
+          .from('volumetria_mobilemed')
+          .select('*')
+          .eq('MEDICO', medico.nome)
+          .eq('periodo_referencia', periodo);
 
         if (examesError) throw examesError;
 
+        console.log(`[Repasse] ${exames?.length || 0} exames encontrados para ${medico.nome}`);
+
         // 3. Buscar valores de repasse
         const { data: repasses, error: repasseError } = await supabase
-          .from('repasse_medico')
+          .from('medicos_valores_repasse')
           .select('*')
-          .eq('medico_id', medico.id);
+          .eq('medico_id', medico.id)
+          .eq('ativo', true);
 
         if (repasseError) throw repasseError;
+
+        console.log(`[Repasse] ${repasses?.length || 0} configurações de repasse para ${medico.nome}`);
 
         // 4. Buscar valores adicionais
         const { data: adicionais, error: adicionaisError } = await supabase
@@ -77,14 +85,21 @@ serve(async (req) => {
         const examesAgrupados = new Map<string, any>();
 
         for (const exame of exames || []) {
-          const clienteNome = exame.clientes?.nome || 'Cliente não identificado';
-          const chave = `${exame.modalidade}|${exame.especialidade}|${exame.categoria}|${clienteNome}`;
+          const clienteNome = exame.EMPRESA || 'Cliente não identificado';
+          const modalidade = exame.MODALIDADE || '';
+          const especialidade = exame.ESPECIALIDADE || '';
+          const categoria = exame.CATEGORIA || '';
+          const prioridade = exame.PRIORIDADE || '';
+          const quantidade = exame.VALORES || 1;
+
+          const chave = `${modalidade}|${especialidade}|${categoria}|${prioridade}|${clienteNome}`;
           
           if (!examesAgrupados.has(chave)) {
             examesAgrupados.set(chave, {
-              modalidade: exame.modalidade,
-              especialidade: exame.especialidade,
-              categoria: exame.categoria,
+              modalidade,
+              especialidade,
+              categoria,
+              prioridade,
               cliente: clienteNome,
               quantidade: 0,
               valor_unitario: 0,
@@ -93,17 +108,43 @@ serve(async (req) => {
           }
 
           const grupo = examesAgrupados.get(chave)!;
-          grupo.quantidade += exame.quantidade || 1;
+          grupo.quantidade += quantidade;
         }
+
+        console.log(`[Repasse] ${examesAgrupados.size} grupos de exames para ${medico.nome}`);
 
         // Buscar valor de repasse para cada grupo
         for (const [chave, grupo] of examesAgrupados.entries()) {
-          const valorRepasse = (repasses || []).find(r =>
+          // Buscar valor mais específico possível (com cliente e categoria)
+          let valorRepasse = (repasses || []).find(r =>
             r.modalidade === grupo.modalidade &&
             r.especialidade === grupo.especialidade &&
-            (r.categoria === grupo.categoria || !r.categoria) &&
-            (r.cliente_nome === grupo.cliente || !r.cliente_nome)
+            r.categoria === grupo.categoria &&
+            r.prioridade === grupo.prioridade &&
+            r.cliente_id != null
           );
+
+          // Se não encontrar com cliente, buscar sem cliente mas com categoria
+          if (!valorRepasse) {
+            valorRepasse = (repasses || []).find(r =>
+              r.modalidade === grupo.modalidade &&
+              r.especialidade === grupo.especialidade &&
+              r.categoria === grupo.categoria &&
+              r.prioridade === grupo.prioridade &&
+              r.cliente_id == null
+            );
+          }
+
+          // Se não encontrar com categoria, buscar sem categoria
+          if (!valorRepasse) {
+            valorRepasse = (repasses || []).find(r =>
+              r.modalidade === grupo.modalidade &&
+              r.especialidade === grupo.especialidade &&
+              r.prioridade === grupo.prioridade &&
+              !r.categoria &&
+              r.cliente_id == null
+            );
+          }
 
           grupo.valor_unitario = valorRepasse?.valor || 0;
           grupo.valor_total = grupo.quantidade * grupo.valor_unitario;
@@ -112,10 +153,14 @@ serve(async (req) => {
           detalhesExames.push(grupo);
         }
 
+        console.log(`[Repasse] Valor total exames: R$ ${valorTotalExames}`);
+
         // Calcular total de adicionais
         const valorAdicionais = (adicionais || []).reduce((sum, a) => sum + (Number(a.valor_adicional) || 0), 0);
 
-        const totalExames = (exames || []).reduce((sum, e) => sum + (e.quantidade || 1), 0);
+        const totalExames = (exames || []).reduce((sum, e) => sum + (e.VALORES || 1), 0);
+
+        console.log(`[Repasse] Total laudos: ${totalExames}, Adicionais: R$ ${valorAdicionais}`);
 
         const demonstrativo = {
           medico_id: medico.id,
