@@ -4,9 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Save, Plus, Trash2, Calendar, DollarSign } from "lucide-react";
+import { Save, Calendar, DollarSign, ChevronDown } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -210,79 +211,90 @@ export function AdicionaisMedicos({ periodoSelecionado, periodoBloqueado }: Adic
           )}
         </div>
       </CardHeader>
-      <CardContent className="space-y-6">
-        {medicosAdicionais.map((medico, medicoIndex) => (
-          <div key={medico.medico_id} className="border rounded-lg p-4 space-y-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <h3 className="font-semibold text-lg">{medico.medico_nome}</h3>
-                <p className="text-sm text-muted-foreground">
-                  CPF: {medico.medico_cpf} | {medico.medico_email}
-                </p>
-              </div>
-              {totalAdicionaisPorMedico[medico.medico_id] > 0 && (
-                <Badge variant="secondary" className="text-lg font-semibold">
-                  Total: R$ {totalAdicionaisPorMedico[medico.medico_id].toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </Badge>
-              )}
-            </div>
-
-            <Separator />
-
-            <div className="grid gap-3">
-              {medico.adicionais.map((adicional, adicionalIndex) => (
-                <div key={adicionalIndex} className="grid grid-cols-12 gap-2 items-start">
-                  <div className="col-span-3">
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            "w-full justify-start text-left font-normal",
-                            !adicional.data && "text-muted-foreground"
-                          )}
-                          disabled={periodoBloqueado}
-                        >
-                          <Calendar className="mr-2 h-4 w-4" />
-                          {adicional.data ? format(adicional.data, "dd/MM/yyyy", { locale: ptBR }) : "Data"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <CalendarComponent
-                          mode="single"
-                          selected={adicional.data}
-                          onSelect={(date) => handleAdicionalChange(medicoIndex, adicionalIndex, 'data', date)}
-                          initialFocus
-                          className="pointer-events-auto"
-                        />
-                      </PopoverContent>
-                    </Popover>
+      <CardContent>
+        <Accordion type="single" collapsible className="w-full">
+          {medicosAdicionais.map((medico, medicoIndex) => (
+            <AccordionItem key={medico.medico_id} value={medico.medico_id}>
+              <AccordionTrigger className="hover:no-underline">
+                <div className="flex items-center justify-between w-full pr-4">
+                  <div className="text-left">
+                    <div className="font-semibold text-base">{medico.medico_nome}</div>
+                    <div className="text-sm text-muted-foreground">
+                      CPF: {medico.medico_cpf}
+                    </div>
                   </div>
-
-                  <div className="col-span-3">
-                    <Input
-                      type="number"
-                      step="0.01"
-                      placeholder="Valor (R$)"
-                      value={adicional.valor}
-                      onChange={(e) => handleAdicionalChange(medicoIndex, adicionalIndex, 'valor', e.target.value)}
-                      disabled={periodoBloqueado}
-                    />
+                  {totalAdicionaisPorMedico[medico.medico_id] > 0 && (
+                    <Badge variant="secondary" className="ml-4">
+                      R$ {totalAdicionaisPorMedico[medico.medico_id].toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </Badge>
+                  )}
+                </div>
+              </AccordionTrigger>
+              <AccordionContent>
+                <div className="pt-4 space-y-4">
+                  <div className="text-sm text-muted-foreground mb-3">
+                    Email: {medico.medico_email}
                   </div>
+                  
+                  <Separator />
+                  
+                  <div className="space-y-3 pt-2">
+                    {medico.adicionais.map((adicional, adicionalIndex) => (
+                      <div key={adicionalIndex} className="grid grid-cols-12 gap-2 items-start">
+                        <div className="col-span-3">
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className={cn(
+                                  "w-full justify-start text-left font-normal",
+                                  !adicional.data && "text-muted-foreground"
+                                )}
+                                disabled={periodoBloqueado}
+                              >
+                                <Calendar className="mr-2 h-4 w-4" />
+                                {adicional.data ? format(adicional.data, "dd/MM/yyyy", { locale: ptBR }) : "Data"}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <CalendarComponent
+                                mode="single"
+                                selected={adicional.data}
+                                onSelect={(date) => handleAdicionalChange(medicoIndex, adicionalIndex, 'data', date)}
+                                initialFocus
+                                className="pointer-events-auto"
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
 
-                  <div className="col-span-6">
-                    <Input
-                      placeholder="Descrição (opcional)"
-                      value={adicional.descricao}
-                      onChange={(e) => handleAdicionalChange(medicoIndex, adicionalIndex, 'descricao', e.target.value)}
-                      disabled={periodoBloqueado}
-                    />
+                        <div className="col-span-3">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="Valor (R$)"
+                            value={adicional.valor}
+                            onChange={(e) => handleAdicionalChange(medicoIndex, adicionalIndex, 'valor', e.target.value)}
+                            disabled={periodoBloqueado}
+                          />
+                        </div>
+
+                        <div className="col-span-6">
+                          <Input
+                            placeholder="Descrição (opcional)"
+                            value={adicional.descricao}
+                            onChange={(e) => handleAdicionalChange(medicoIndex, adicionalIndex, 'descricao', e.target.value)}
+                            disabled={periodoBloqueado}
+                          />
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        ))}
+              </AccordionContent>
+            </AccordionItem>
+          ))}
+        </Accordion>
 
         {!periodoBloqueado && (
           <div className="flex justify-end pt-4">
