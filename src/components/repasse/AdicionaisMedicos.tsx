@@ -120,29 +120,31 @@ export function AdicionaisMedicos({ periodoSelecionado, periodoBloqueado }: Adic
     });
   };
 
-  const handleSalvar = async () => {
+  const handleSalvar = async (medicoId: string) => {
     try {
       setSalvando(true);
 
-      // Preparar dados para salvar
-      const dadosParaSalvar = medicosAdicionais.flatMap(medico =>
-        medico.adicionais
-          .filter(a => a.data && a.valor && parseFloat(a.valor) > 0)
-          .map(a => ({
-            id: a.id,
-            medico_id: medico.medico_id,
-            periodo: periodoSelecionado,
-            data_adicional: format(a.data!, 'yyyy-MM-dd'),
-            valor_adicional: parseFloat(a.valor),
-            descricao: a.descricao || null
-          }))
-      );
+      const medico = medicosAdicionais.find(m => m.medico_id === medicoId);
+      if (!medico) return;
 
-      // Deletar adicionais antigos do período
+      // Preparar dados para salvar do médico específico
+      const dadosParaSalvar = medico.adicionais
+        .filter(a => a.data && a.valor && parseFloat(a.valor) > 0)
+        .map(a => ({
+          id: a.id,
+          medico_id: medico.medico_id,
+          periodo: periodoSelecionado,
+          data_adicional: format(a.data!, 'yyyy-MM-dd'),
+          valor_adicional: parseFloat(a.valor),
+          descricao: a.descricao || null
+        }));
+
+      // Deletar adicionais antigos do período para este médico
       await supabase
         .from('medicos_valores_adicionais')
         .delete()
-        .eq('periodo', periodoSelecionado);
+        .eq('periodo', periodoSelecionado)
+        .eq('medico_id', medicoId);
 
       // Inserir novos adicionais
       if (dadosParaSalvar.length > 0) {
@@ -155,7 +157,7 @@ export function AdicionaisMedicos({ periodoSelecionado, periodoBloqueado }: Adic
 
       toast({
         title: "Adicionais salvos",
-        description: `${dadosParaSalvar.length} adicionais foram salvos com sucesso.`
+        description: `${dadosParaSalvar.length} adicionais salvos para ${medico.medico_nome}.`
       });
 
       await carregarDados();
@@ -290,24 +292,24 @@ export function AdicionaisMedicos({ periodoSelecionado, periodoBloqueado }: Adic
                       </div>
                     ))}
                   </div>
+
+                  {!periodoBloqueado && (
+                    <div className="flex justify-end pt-4 border-t mt-4">
+                      <Button
+                        onClick={() => handleSalvar(medico.medico_id)}
+                        disabled={salvando}
+                        size="default"
+                      >
+                        <Save className="mr-2 h-4 w-4" />
+                        {salvando ? "Salvando..." : "Salvar"}
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </AccordionContent>
             </AccordionItem>
           ))}
         </Accordion>
-
-        {!periodoBloqueado && (
-          <div className="flex justify-end pt-4">
-            <Button
-              onClick={handleSalvar}
-              disabled={salvando}
-              size="lg"
-            >
-              <Save className="mr-2 h-4 w-4" />
-              {salvando ? "Salvando..." : "Salvar Adicionais"}
-            </Button>
-          </div>
-        )}
       </CardContent>
     </Card>
   );
