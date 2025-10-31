@@ -113,42 +113,79 @@ serve(async (req) => {
 
         console.log(`[Repasse] ${examesAgrupados.size} grupos de exames para ${medico.nome}`);
 
+        // Normalização de texto para comparação robusta
+        const norm = (s: any) => (s ?? '').toString().trim().toUpperCase();
+
+        // Mapear clientes do período para obter IDs por nome
+        const clienteNomes = Array.from(examesAgrupados.values()).map((g: any) => g.cliente).filter(Boolean);
+        const uniqueClienteNomes = Array.from(new Set(clienteNomes));
+        const clienteMap = new Map<string, string>();
+        if (uniqueClienteNomes.length) {
+          const { data: clientes, error: clientesError } = await supabase
+            .from('clientes')
+            .select('id, nome')
+            .in('nome', uniqueClienteNomes);
+          if (clientesError) {
+            console.warn('[Repasse] Erro ao buscar clientes:', clientesError.message);
+          } else {
+            for (const c of clientes || []) {
+              clienteMap.set(c.nome, c.id);
+            }
+          }
+        }
+
         // Buscar valor de repasse para cada grupo
         for (const [chave, grupo] of examesAgrupados.entries()) {
-          // Buscar valor mais específico possível (com cliente e categoria)
-          let valorRepasse = (repasses || []).find(r =>
-            r.modalidade === grupo.modalidade &&
-            r.especialidade === grupo.especialidade &&
-            r.categoria === grupo.categoria &&
-            r.prioridade === grupo.prioridade &&
-            r.cliente_id != null
+          const clienteId = clienteMap.get(grupo.cliente);
+
+          // Tentar casar na seguinte ordem:
+          // 1) Com cliente específico + categoria
+          let valorRepasse = (repasses || []).find((r: any) =>
+            norm(r.modalidade) === norm(grupo.modalidade) &&
+            norm(r.especialidade) === norm(grupo.especialidade) &&
+            norm(r.categoria) === norm(grupo.categoria) &&
+            norm(r.prioridade) === norm(grupo.prioridade) &&
+            (!!clienteId && r.cliente_id === clienteId)
           );
 
-          // Se não encontrar com cliente, buscar sem cliente mas com categoria
+          // 2) Sem cliente, com categoria
           if (!valorRepasse) {
-            valorRepasse = (repasses || []).find(r =>
-              r.modalidade === grupo.modalidade &&
-              r.especialidade === grupo.especialidade &&
-              r.categoria === grupo.categoria &&
-              r.prioridade === grupo.prioridade &&
-              r.cliente_id == null
+            valorRepasse = (repasses || []).find((r: any) =>
+              norm(r.modalidade) === norm(grupo.modalidade) &&
+              norm(r.especialidade) === norm(grupo.especialidade) &&
+              norm(r.categoria) === norm(grupo.categoria) &&
+              norm(r.prioridade) === norm(grupo.prioridade) &&
+              (r.cliente_id == null)
             );
           }
 
-          // Se não encontrar com categoria, buscar sem categoria
+          // 3) Sem cliente e sem categoria
           if (!valorRepasse) {
-            valorRepasse = (repasses || []).find(r =>
-              r.modalidade === grupo.modalidade &&
-              r.especialidade === grupo.especialidade &&
-              r.prioridade === grupo.prioridade &&
-              !r.categoria &&
-              r.cliente_id == null
+            valorRepasse = (repasses || []).find((r: any) =>
+              norm(r.modalidade) === norm(grupo.modalidade) &&
+              norm(r.especialidade) === norm(grupo.especialidade) &&
+              norm(r.prioridade) === norm(grupo.prioridade) &&
+              (!r.categoria || norm(r.categoria) === '') &&
+              (r.cliente_id == null)
             );
           }
 
-          grupo.valor_unitario = valorRepasse?.valor || 0;
-          grupo.valor_total = grupo.quantidade * grupo.valor_unitario;
+          // 4) Fallback extra: sem cliente, com match apenas de modalidade + especialidade
+          if (!valorRepasse) {
+            valorRepasse = (repasses || []).find((r: any) =>
+              norm(r.modalidade) === norm(grupo.modalidade) &&
+              norm(r.especialidade) === norm(grupo.especialidade) &&
+              (r.cliente_id == null)
+            );
+          }
+
+          grupo.valor_unitario = Number(valorRepasse?.valor) || 0;
+          grupo.valor_total = (Number(grupo.quantidade) || 0) * grupo.valor_unitario;
           valorTotalExames += grupo.valor_total;
+
+          if (!valorRepasse) {
+            console.warn('[Repasse] Sem valor de repasse encontrado para grupo:', grupo);
+          }
 
           detalhesExames.push(grupo);
         }
