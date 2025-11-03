@@ -69,6 +69,25 @@ serve(async (req) => {
       return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor);
     };
 
+    // Função para adicionar rodapé
+    const addFooter = (currentPage: any, pageNum: number, totalPages: number) => {
+      const footerY = 30;
+      currentPage.drawText('Relatório gerado automaticamente pelo sistema visus.a.i. © 2025 - Todos os direitos reservados', {
+        x: 50,
+        y: footerY,
+        size: 8,
+        font,
+        color: rgb(0.5, 0.5, 0.5)
+      });
+      currentPage.drawText(`Página ${pageNum} de ${totalPages}`, {
+        x: width - 100,
+        y: footerY,
+        size: 8,
+        font,
+        color: rgb(0.5, 0.5, 0.5)
+      });
+    };
+
     // Cabeçalho
     page.drawText('RELATÓRIO DE REPASSE MÉDICO', { x: margin, y: yPosition, size: 18, font: fontBold });
     yPosition -= lineHeight * 2;
@@ -267,6 +286,27 @@ serve(async (req) => {
         yPosition -= lineHeight * 1.5;
       }
     }
+
+    // Adicionar rodapés em todas as páginas
+    const pages = pdfDoc.getPages();
+    const totalPages = pages.length;
+    pages.forEach((pg, index) => {
+      const pgWidth = pg.getWidth();
+      pg.drawText('Relatório gerado automaticamente pelo sistema visus.a.i. © 2025 - Todos os direitos reservados', {
+        x: 50,
+        y: 30,
+        size: 8,
+        font,
+        color: rgb(0.5, 0.5, 0.5)
+      });
+      pg.drawText(`Página ${index + 1} de ${totalPages}`, {
+        x: pgWidth - 100,
+        y: 30,
+        size: 8,
+        font,
+        color: rgb(0.5, 0.5, 0.5)
+      });
+    });
 
     const pdfBytes = await pdfDoc.save();
     const filePath = `${medico_id}_${periodo}.pdf`;
