@@ -501,8 +501,7 @@ export default function PagamentosMedicos() {
                   onClick={handleGerarRelatorios}
                   disabled={
                     gerandoRelatorios || 
-                    periodoBloqueado || 
-                    medicosSelecionados.size === 0
+                    periodoBloqueado
                   }
                   size="lg"
                   className="w-full"
