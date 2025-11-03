@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { Progress } from "@/components/ui/progress";
 import { AdicionaisMedicos } from "@/components/repasse/AdicionaisMedicos";
 import { StatusPorMedico } from "@/components/repasse/StatusPorMedico";
 import { ListaDemonstrativos } from "@/components/repasse/ListaDemonstrativos";
@@ -42,6 +43,11 @@ export default function PagamentosMedicos() {
   const [gerandoRelatorios, setGerandoRelatorios] = useState(false);
   const [enviandoEmails, setEnviandoEmails] = useState(false);
   const [gerandoContasOmie, setGerandoContasOmie] = useState(false);
+  
+  // Estados para progresso
+  const [progressoRelatorios, setProgressoRelatorios] = useState({ current: 0, total: 0 });
+  const [processandoRelatorios, setProcessandoRelatorios] = useState<Set<string>>(new Set());
+  const [processandoEmails, setProcessandoEmails] = useState<Set<string>>(new Set());
   
   // Filtros e seleção
   const [filtroMedico, setFiltroMedico] = useState("");
@@ -199,14 +205,21 @@ export default function PagamentosMedicos() {
 
     try {
       setGerandoRelatorios(true);
+      setProgressoRelatorios({ current: 0, total: medicosParaProcessar.length });
 
-      for (const medicoId of medicosParaProcessar) {
+      for (let i = 0; i < medicosParaProcessar.length; i++) {
+        const medicoId = medicosParaProcessar[i];
+        
+        setProgressoRelatorios({ current: i, total: medicosParaProcessar.length });
+        
         await supabase.functions.invoke('gerar-relatorio-repasse', {
           body: { 
             medico_id: medicoId,
             periodo: periodoSelecionado 
           }
         });
+        
+        setProgressoRelatorios({ current: i + 1, total: medicosParaProcessar.length });
       }
 
       toast({
@@ -224,6 +237,7 @@ export default function PagamentosMedicos() {
       });
     } finally {
       setGerandoRelatorios(false);
+      setProgressoRelatorios({ current: 0, total: 0 });
     }
   };
 
@@ -278,6 +292,8 @@ export default function PagamentosMedicos() {
 
   const handleGerarRelatorioIndividual = async (medicoId: string) => {
     try {
+      setProcessandoRelatorios(prev => new Set(prev).add(medicoId));
+      
       await supabase.functions.invoke('gerar-relatorio-repasse', {
         body: { 
           medico_id: medicoId,
@@ -288,11 +304,19 @@ export default function PagamentosMedicos() {
       await carregarDados();
     } catch (error) {
       console.error('Erro:', error);
+    } finally {
+      setProcessandoRelatorios(prev => {
+        const novo = new Set(prev);
+        novo.delete(medicoId);
+        return novo;
+      });
     }
   };
 
   const handleEnviarEmailIndividual = async (medicoId: string) => {
     try {
+      setProcessandoEmails(prev => new Set(prev).add(medicoId));
+      
       await supabase.functions.invoke('enviar-email-repasse', {
         body: {
           medico_id: medicoId,
@@ -303,6 +327,12 @@ export default function PagamentosMedicos() {
       await carregarDados();
     } catch (error) {
       console.error('Erro:', error);
+    } finally {
+      setProcessandoEmails(prev => {
+        const novo = new Set(prev);
+        novo.delete(medicoId);
+        return novo;
+      });
     }
   };
 
@@ -568,12 +598,37 @@ export default function PagamentosMedicos() {
             </CardContent>
           </Card>
 
+          {/* Barra de Progresso */}
+          {gerandoRelatorios && progressoRelatorios.total > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Gerando Relatórios</CardTitle>
+                <CardDescription>
+                  Progresso: {progressoRelatorios.current} de {progressoRelatorios.total} relatórios
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <Progress 
+                    value={(progressoRelatorios.current / progressoRelatorios.total) * 100} 
+                    className="w-full h-3"
+                  />
+                  <p className="text-sm text-muted-foreground text-center">
+                    {Math.round((progressoRelatorios.current / progressoRelatorios.total) * 100)}% concluído
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Status por Médico */}
           <StatusPorMedico
             medicos={medicosFiltrados}
             onGerarRelatorio={handleGerarRelatorioIndividual}
             onEnviarEmail={handleEnviarEmailIndividual}
             onVisualizarRelatorio={handleVisualizarRelatorio}
+            processandoRelatorios={processandoRelatorios}
+            processandoEmails={processandoEmails}
             filtro={filtroMedico}
             onFiltroChange={setFiltroMedico}
             ordemAlfabetica={ordemAlfabetica}
