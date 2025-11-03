@@ -163,21 +163,42 @@ export default function PagamentosMedicos() {
   };
 
   const handleGerarRelatorios = async () => {
-    const selecionados = Array.from(medicosSelecionados);
+    let medicosParaProcessar = Array.from(medicosSelecionados);
     
-    if (selecionados.length === 0) {
-      toast({
-        title: "Atenção",
-        description: "Selecione pelo menos um médico.",
-        variant: "destructive"
-      });
-      return;
+    // Se nenhum médico selecionado, buscar todos com demonstrativos gerados
+    if (medicosParaProcessar.length === 0) {
+      const { data: medicosComDemonstrativo, error } = await supabase
+        .from('relatorios_repasse_status')
+        .select('medico_id')
+        .eq('periodo', periodoSelecionado)
+        .eq('demonstrativo_gerado', true);
+      
+      if (error) {
+        console.error('Erro ao buscar médicos com demonstrativos:', error);
+        toast({
+          title: "Erro",
+          description: "Erro ao buscar médicos com demonstrativos.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      if (!medicosComDemonstrativo || medicosComDemonstrativo.length === 0) {
+        toast({
+          title: "Atenção",
+          description: "Nenhum médico possui demonstrativo gerado neste período.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      medicosParaProcessar = medicosComDemonstrativo.map(m => m.medico_id);
     }
 
     try {
       setGerandoRelatorios(true);
 
-      for (const medicoId of selecionados) {
+      for (const medicoId of medicosParaProcessar) {
         await supabase.functions.invoke('gerar-relatorio-repasse', {
           body: { 
             medico_id: medicoId,
@@ -188,7 +209,7 @@ export default function PagamentosMedicos() {
 
       toast({
         title: "Relatórios gerados",
-        description: `${selecionados.length} relatórios foram gerados com sucesso.`
+        description: `${medicosParaProcessar.length} relatórios foram gerados com sucesso.`
       });
 
       await carregarDados();
