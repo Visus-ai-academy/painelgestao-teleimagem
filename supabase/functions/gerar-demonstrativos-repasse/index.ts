@@ -59,29 +59,30 @@ serve(async (req) => {
         if (!exames || exames.length === 0) {
           console.log(`[Repasse] Nenhum exame encontrado para ${medico.nome} no período ${periodo}`);
           
-          await supabase
-            .from('relatorios_repasse_status')
-            .upsert({
+        await supabase
+          .from('relatorios_repasse_status')
+          .upsert({
+            medico_id: medico.id,
+            medico_nome: medico.nome,
+            periodo: periodo,
+            demonstrativo_gerado: true,
+            email_destino: medico.email,
+            detalhes_relatorio: {
               medico_id: medico.id,
               medico_nome: medico.nome,
-              periodo: periodo,
-              demonstrativo_gerado: true,
-              email_destino: medico.email,
-              detalhes_relatorio: {
-                medico_id: medico.id,
-                medico_nome: medico.nome,
-                medico_crm: medico.crm || '',
-                medico_cpf: medico.cpf || '',
-                total_laudos: 0,
-                valor_exames: 0,
-                valor_adicionais: 0,
-                valor_total: 0,
-                detalhes_exames: [],
-                adicionais: []
-              }
-            }, {
-              onConflict: 'medico_id,periodo'
-            });
+              medico_crm: medico.crm || '',
+              medico_cpf: medico.cpf || '',
+              total_laudos: 0,
+              valor_exames: 0,
+              valor_adicionais: 0,
+              valor_total: 0,
+              detalhes_exames: [],
+              adicionais: []
+            },
+            erro: null
+          }, {
+            onConflict: 'medico_id,periodo'
+          });
           
           continue;
         }
@@ -250,18 +251,19 @@ serve(async (req) => {
         demonstrativos.push(demonstrativo);
 
         // 6. Atualizar status
-        await supabase
-          .from('relatorios_repasse_status')
-          .upsert({
-            medico_id: medico.id,
-            medico_nome: medico.nome,
-            periodo: periodo,
-            demonstrativo_gerado: true,
-            email_destino: medico.email,
-            detalhes_relatorio: demonstrativo
-          }, {
-            onConflict: 'medico_id,periodo'
-          });
+      await supabase
+        .from('relatorios_repasse_status')
+        .upsert({
+          medico_id: medico.id,
+          medico_nome: medico.nome,
+          periodo: periodo,
+          demonstrativo_gerado: true,
+          email_destino: medico.email,
+          detalhes_relatorio: demonstrativo,
+          erro: null
+        }, {
+          onConflict: 'medico_id,periodo'
+        });
 
       } catch (error) {
         console.error(`[Repasse] Erro ao processar médico ${medico.nome}:`, error);
