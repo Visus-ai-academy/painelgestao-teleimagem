@@ -607,13 +607,82 @@ export default function PagamentosMedicos() {
             <CardHeader>
               <CardTitle>Relatórios Gerados</CardTitle>
               <CardDescription>
-                Consulte e faça download dos relatórios de repasse
+                Consulte e faça download dos relatórios de repasse do período {periodoSelecionado}
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">
-                Funcionalidade de consulta de relatórios em desenvolvimento.
-              </p>
+              {loading ? (
+                <div className="flex justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Search className="h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Buscar médico..."
+                      value={filtroMedico}
+                      onChange={(e) => setFiltroMedico(e.target.value)}
+                      className="max-w-sm"
+                    />
+                  </div>
+
+                  {statusPorMedico.filter(s => s.relatorio_gerado).length === 0 ? (
+                    <p className="text-muted-foreground text-center py-8">
+                      Nenhum relatório gerado neste período.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {statusPorMedico
+                        .filter(s => s.relatorio_gerado)
+                        .filter(s => {
+                          const medico = medicos.find(m => m.id === s.medico_id);
+                          return medico?.nome.toLowerCase().includes(filtroMedico.toLowerCase());
+                        })
+                        .sort((a, b) => {
+                          const medicoA = medicos.find(m => m.id === a.medico_id);
+                          const medicoB = medicos.find(m => m.id === b.medico_id);
+                          return (medicoA?.nome || '').localeCompare(medicoB?.nome || '');
+                        })
+                        .map((status) => {
+                          const medico = medicos.find(m => m.id === status.medico_id);
+                          if (!medico) return null;
+
+                          return (
+                            <div
+                              key={status.medico_id}
+                              className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors"
+                            >
+                              <div className="flex-1">
+                                <h4 className="font-medium">{medico.nome}</h4>
+                                <p className="text-sm text-muted-foreground">
+                                  CRM: {medico.crm}
+                                </p>
+                                {status.data_geracao_relatorio && (
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    Gerado em: {new Date(status.data_geracao_relatorio).toLocaleDateString('pt-BR')} às {new Date(status.data_geracao_relatorio).toLocaleTimeString('pt-BR')}
+                                  </p>
+                                )}
+                              </div>
+                              <div className="flex gap-2">
+                                {status.link_relatorio && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => window.open(status.link_relatorio, '_blank')}
+                                  >
+                                    <Download className="mr-2 h-4 w-4" />
+                                    Download
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
