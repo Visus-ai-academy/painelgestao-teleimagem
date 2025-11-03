@@ -188,16 +188,23 @@ serve(async (req) => {
     const normalize = (s: any) => (s || '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
     const mapPrioridade = (p: any) => {
       const v = normalize(p);
-      if (v === 'URGENTE' || v === 'URGENCIA' || v === 'URGÊNCIA') return 'URGÊNCIA';
-      if (v === 'PLANTAO' || v === 'PLANTÃO') return 'PLANTÃO';
-      if (v === 'NORMAL' || v === 'ROTINA') return 'ROTINA';
+      if (v === 'URGENTE' || v === 'URGENCIA' || v === 'EMERGENCIA') return 'URGENCIA';
+      if (v === 'PLANTAO') return 'PLANTAO';
+      if (v === 'NORMAL' || v === 'ROTINA' || v === 'ELETIVO' || v === 'ELETIVA') return 'ROTINA';
+      return v;
+    };
+    const mapCategoria = (c: any) => {
+      const v = normalize(c);
+      // Padronizar variações para SC
+      if (v === 'S/C' || v === 'S C' || v === 'SEM CATEGORIA' || v === 'SEM' || v === 'NAO INFORMADO' || v === 'NAO_CLASSIFICADO' || v === 'NAO CLASSIFICADO' || v === 'N/A') return 'SC';
       return v;
     };
 
     const { data: repasses, error: repasseError } = await supabase
       .from('medicos_valores_repasse')
       .select('modalidade, especialidade, categoria, prioridade, valor, cliente_id, esta_no_escopo, data_inicio_vigencia, data_fim_vigencia, ativo')
-      .eq('medico_id', medico_id);
+      .eq('medico_id', medico_id)
+      .eq('ativo', true);
     if (repasseError) {
       console.error('[Repasse] Erro ao buscar valores de repasse:', repasseError);
     }
@@ -224,7 +231,7 @@ serve(async (req) => {
     const getValorRepasse = (ex: any) => {
       const mod = normalize(ex.MODALIDADE);
       const esp = normalize(ex.ESPECIALIDADE);
-      const cat = normalize(ex.CATEGORIA);
+      const cat = mapCategoria(ex.CATEGORIA);
       const pri = mapPrioridade(ex.PRIORIDADE);
       const cliId = findClienteId(ex);
 
@@ -240,9 +247,10 @@ serve(async (req) => {
         if (!inVigencia(r)) return false;
         if (normalize(r.modalidade) !== mod) return false;
         if (normalize(r.especialidade) !== esp) return false;
-        const rc = normalize(r.categoria);
-        if (rc && rc !== cat) return false;
-        if (normalize(r.prioridade) !== pri) return false;
+        const rc = mapCategoria(r.categoria);
+        if (rc !== cat) return false;
+        const rp = mapPrioridade(r.prioridade);
+        if (rp !== pri) return false;
         return true;
       };
 
