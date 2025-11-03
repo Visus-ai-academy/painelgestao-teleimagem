@@ -90,8 +90,11 @@ serve(async (req) => {
       });
     };
 
-    // Cabeçalho
-    page.drawText('RELATÓRIO DE REPASSE MÉDICO', { x: margin, y: yPosition, size: 18, font: fontBold });
+    // Cabeçalho - título centralizado
+    const titulo = 'RELATÓRIO DE REPASSE MÉDICO';
+    const tituloWidth = fontBold.widthOfTextAtSize(titulo, 18);
+    const tituloX = (width - tituloWidth) / 2;
+    page.drawText(titulo, { x: tituloX, y: yPosition, size: 18, font: fontBold });
     yPosition -= lineHeight * 2;
 
     // Informações do médico
@@ -285,6 +288,7 @@ serve(async (req) => {
       yPosition -= 20;
 
       // Dados da tabela
+      let idx = 0;
       for (const exame of exames) {
         // Verificar se precisa de nova página
         if (yPosition < 60) {
@@ -325,6 +329,19 @@ serve(async (req) => {
         }
 
         xPos = tableMargin;
+        const valorRep = getValorRepasse(exame);
+        if (idx < 5) {
+          try {
+            console.log('[Repasse] Valor repasse debug:', JSON.stringify({
+              modalidade: exame.MODALIDADE,
+              especialidade: exame.ESPECIALIDADE,
+              categoria: exame.CATEGORIA,
+              prioridade: exame.PRIORIDADE,
+              cliente: (exame.Cliente_Nome_Fantasia || exame.cliente_nome_fantasia || exame.EMPRESA),
+              valor: valorRep
+            }));
+          } catch {}
+        }
         const rowData = [
           exame.DATA_REALIZACAO ? new Date(exame.DATA_REALIZACAO).toLocaleDateString('pt-BR') : '-',
           (exame.NOME_PACIENTE || '-').substring(0, 16),
@@ -337,8 +354,9 @@ serve(async (req) => {
           (exame.ACCESSION_NUMBER ? String(exame.ACCESSION_NUMBER) : '-').substring(0, 20),
           (exame.Cliente_Nome_Fantasia || exame.cliente_nome_fantasia || exame.EMPRESA || '-').substring(0, 10),
           '1',
-          formatMoeda(getValorRepasse(exame))
+          formatMoeda(valorRep)
         ];
+        idx++;
 
         for (let i = 0; i < rowData.length; i++) {
           page.drawText(rowData[i], { 
