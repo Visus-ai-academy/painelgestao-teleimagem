@@ -162,19 +162,26 @@ serve(async (req) => {
     periodEnd.setMonth(periodEnd.getMonth() + 1);
     periodEnd.setDate(0);
 
-    const normalize = (s: any) => (s || '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
+    const normalize = (s: any) => (s ?? '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
     const mapPrioridade = (p: any) => {
       const v = normalize(p);
-      if (v === 'URGENTE' || v === 'URGENCIA' || v === 'URGÊNCIA') return 'URGÊNCIA';
-      if (v === 'PLANTAO' || v === 'PLANTÃO') return 'PLANTÃO';
-      if (v === 'NORMAL' || v === 'ROTINA') return 'ROTINA';
+      if (['URGENTE','URGENCIA','URGÊNCIA','EMERGENCIA','EMERGÊNCIA'].includes(v)) return 'URGENCIA';
+      if (['PLANTAO','PLANTÃO'].includes(v)) return 'PLANTAO';
+      if (['NORMAL','ROTINA','ELETIVO','ELETIVA'].includes(v)) return 'ROTINA';
+      return v;
+    };
+    const mapCategoria = (c: any) => {
+      const v = normalize(c);
+      if (v === 'S/C' || v === 'S C' || v === 'SEM CATEGORIA' || v === 'SEM' || v === 'NAO INFORMADO' || v === 'NAO_CLASSIFICADO' || v === 'NAO CLASSIFICADO' || v === 'NA' || v === 'N/A' || v === '') return 'SC';
+      if (v === 'MASTOIDE' || v === 'MASTOIDEOS') return 'MASTOIDE';
       return v;
     };
 
     const { data: repasses, error: repasseError } = await supabase
       .from('medicos_valores_repasse')
       .select('modalidade, especialidade, categoria, prioridade, valor, cliente_id, esta_no_escopo, data_inicio_vigencia, data_fim_vigencia, ativo')
-      .eq('medico_id', medico_id);
+      .eq('medico_id', medico_id)
+      .eq('ativo', true);
     if (repasseError) {
       console.error('[Repasse] Erro ao buscar valores de repasse:', repasseError);
     }
@@ -201,7 +208,7 @@ serve(async (req) => {
     const getValorRepasse = (ex: any) => {
       const mod = normalize(ex.MODALIDADE);
       const esp = normalize(ex.ESPECIALIDADE);
-      const cat = normalize(ex.CATEGORIA);
+      const cat = mapCategoria(ex.CATEGORIA);
       const pri = mapPrioridade(ex.PRIORIDADE);
       const cliId = findClienteId(ex);
 
@@ -213,23 +220,51 @@ serve(async (req) => {
         return true;
       };
 
-      const matches = (r: any) => {
-        if (!inVigencia(r)) return false;
-        if (normalize(r.modalidade) !== mod) return false;
-        if (normalize(r.especialidade) !== esp) return false;
-        const rc = normalize(r.categoria);
-        if (rc && rc !== cat) return false;
-        if (normalize(r.prioridade) !== pri) return false;
-        return true;
+      // Normalizar repasses e filtrar por vigência
+      const reps = (repasses || []).filter((r: any) => inVigencia(r)).map((r: any) => ({
+        ...r,
+        _mod: normalize(r.modalidade),
+        _esp: normalize(r.especialidade),
+        _cat: mapCategoria(r.categoria),
+        _pri: mapPrioridade(r.prioridade),
+        _escopo: r.esta_no_escopo,
+      }));
+
+      const isEscopoTrue = (v: any) => {
+        const n = normalize(v);
+        return v === true || v === null || v === undefined || n === '' || n === 'SIM' || n === 'TRUE';
       };
 
-      let found = (repasses || []).find((r: any) => r.cliente_id && cliId && r.cliente_id === cliId && matches(r));
-      if (found) return Number(found.valor) || 0;
+      // Candidatos que batem requisitos mínimos
+      const candidates = reps.filter((r: any) => {
+        if (r._mod !== mod) return false;
+        if (r._esp && r._esp !== esp) return false; // wildcard quando vazio
+        if (r._cat && r._cat !== cat) return false; // wildcard quando vazio
+        if (r._pri && r._pri !== pri) return false; // wildcard quando vazio
+        if (!r.cliente_id && !isEscopoTrue(r._escopo)) return false; // genérico só se no escopo
+        return true;
+      });
 
-      found = (repasses || []).find((r: any) => !r.cliente_id && (r.esta_no_escopo === true || r.esta_no_escopo === null) && matches(r));
-      if (found) return Number(found.valor) || 0;
+      if (candidates.length === 0) return 0;
 
-      return 0;
+      // Pontuar por especificidade e recência
+      const scored = candidates.map((r: any) => {
+        let score = 0;
+        if (r.cliente_id && cliId && r.cliente_id === cliId) score += 8;
+        if (r._cat) score += 4;
+        if (r._pri) score += 2;
+        if (r._esp) score += 1;
+        const ini = r.data_inicio_vigencia ? new Date(r.data_inicio_vigencia).getTime() : 0;
+        return { r, score, ini };
+      });
+
+      scored.sort((a: any, b: any) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return b.ini - a.ini;
+      });
+
+      const chosen = scored[0]?.r;
+      return chosen ? Number(chosen.valor) || 0 : 0;
     };
 
     // QUADRO 2 - DETALHAMENTO DOS EXAMES (formato paisagem)
