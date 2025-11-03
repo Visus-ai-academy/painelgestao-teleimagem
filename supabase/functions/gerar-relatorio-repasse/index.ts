@@ -98,25 +98,25 @@ serve(async (req) => {
 
     checkNewPage();
 
-    // Buscar laudos individuais para o Quadro 2
-    const { data: laudos, error: laudosError } = await supabase
-      .from('laudos')
+    // Buscar exames individuais para o Quadro 2
+    const { data: exames, error: examesError } = await supabase
+      .from('exames')
       .select(`
         *,
         clientes:cliente_id(nome),
         medicos:medico_id(nome)
       `)
       .eq('medico_id', medico_id)
-      .gte('data_laudo', `${periodo}-01`)
-      .lte('data_laudo', `${periodo}-31`)
-      .order('data_laudo', { ascending: true });
+      .gte('data_exame', `${periodo}-01`)
+      .lte('data_exame', `${periodo}-31`)
+      .order('data_exame', { ascending: true });
 
-    if (laudosError) {
-      console.error('[Repasse] Erro ao buscar laudos:', laudosError);
+    if (examesError) {
+      console.error('[Repasse] Erro ao buscar exames:', examesError);
     }
 
     // QUADRO 2 - DETALHAMENTO DOS EXAMES (formato paisagem)
-    if (laudos && laudos.length > 0) {
+    if (exames && exames.length > 0) {
       // Nova página em formato paisagem (A4 rotacionado)
       page = pdfDoc.addPage([841.89, 595.28]); // Largura x Altura invertidas
       const pageWidth = 841.89;
@@ -156,7 +156,7 @@ serve(async (req) => {
       yPosition -= 20;
 
       // Dados da tabela
-      for (const laudo of laudos) {
+      for (const exame of exames) {
         // Verificar se precisa de nova página
         if (yPosition < 60) {
           page = pdfDoc.addPage([841.89, 595.28]);
@@ -185,7 +185,7 @@ serve(async (req) => {
         }
 
         // Linha zebrada
-        if (laudos.indexOf(laudo) % 2 === 0) {
+        if (exames.indexOf(exame) % 2 === 0) {
           page.drawRectangle({
             x: tableMargin,
             y: yPosition - 12,
@@ -197,18 +197,18 @@ serve(async (req) => {
 
         xPos = tableMargin;
         const rowData = [
-          laudo.data_laudo ? new Date(laudo.data_laudo).toLocaleDateString('pt-BR') : '-',
-          (laudo.paciente_nome || '-').substring(0, 16),
-          (laudo.medicos?.nome || '-').substring(0, 16),
-          (laudo.descricao_exame || '-').substring(0, 20),
-          (laudo.modalidade || '-').substring(0, 6),
-          (laudo.especialidade || '-').substring(0, 13),
-          (laudo.categoria || '-').substring(0, 6),
-          (laudo.prioridade || '-').substring(0, 6),
-          (laudo.accession_number || '-').substring(0, 13),
-          (laudo.clientes?.nome || '-').substring(0, 10),
-          '1',
-          formatMoeda(laudo.valor_laudo || 0)
+          exame.data_exame ? new Date(exame.data_exame).toLocaleDateString('pt-BR') : '-',
+          (exame.paciente_nome || '-').substring(0, 16),
+          (exame.medicos?.nome || '-').substring(0, 16),
+          (exame.especialidade || '-').substring(0, 20),
+          (exame.modalidade || '-').substring(0, 6),
+          (exame.especialidade || '-').substring(0, 13),
+          (exame.categoria || '-').substring(0, 6),
+          '-',
+          '-',
+          (exame.clientes?.nome || '-').substring(0, 10),
+          (exame.quantidade || 1).toString(),
+          formatMoeda(exame.valor_total || 0)
         ];
 
         for (let i = 0; i < rowData.length; i++) {
