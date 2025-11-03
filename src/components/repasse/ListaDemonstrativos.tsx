@@ -141,7 +141,7 @@ export function ListaDemonstrativos({ demonstrativos, periodo }: ListaDemonstrat
                             const arranjosMap = new Map<string, any>();
                             
                             demo.detalhesExames.forEach((exame: any) => {
-                              const chave = `${exame.modalidade}|${exame.especialidade}|${exame.categoria || 'Sem Categoria'}`;
+                              const chave = `${exame.modalidade}|${exame.especialidade}|${exame.categoria || 'Sem Categoria'}|${exame.prioridade || 'Sem Prioridade'}`;
                               
                               if (arranjosMap.has(chave)) {
                                 const existente = arranjosMap.get(chave);
@@ -152,6 +152,7 @@ export function ListaDemonstrativos({ demonstrativos, periodo }: ListaDemonstrat
                                   modalidade: exame.modalidade,
                                   especialidade: exame.especialidade,
                                   categoria: exame.categoria || 'Sem Categoria',
+                                  prioridade: exame.prioridade || 'Sem Prioridade',
                                   quantidade: exame.quantidade || 0,
                                   valor_total: exame.valor_total || 0
                                 });
@@ -162,7 +163,7 @@ export function ListaDemonstrativos({ demonstrativos, periodo }: ListaDemonstrat
                             
                             return arranjos.map((arranjo: any, idx: number) => (
                               <div key={idx} className="bg-muted/50 p-3 rounded">
-                                <div className="grid grid-cols-3 gap-4 text-sm">
+                                <div className="grid grid-cols-4 gap-4 text-sm">
                                   <div>
                                     <span className="text-xs text-muted-foreground block">Modalidade</span>
                                     <span className="font-medium">{arranjo.modalidade}</span>
@@ -174,6 +175,10 @@ export function ListaDemonstrativos({ demonstrativos, periodo }: ListaDemonstrat
                                   <div>
                                     <span className="text-xs text-muted-foreground block">Categoria</span>
                                     <span className="font-medium">{arranjo.categoria}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-xs text-muted-foreground block">Prioridade</span>
+                                    <span className="font-medium">{arranjo.prioridade}</span>
                                   </div>
                                 </div>
                                 <div className="flex justify-between mt-3 pt-3 border-t">
