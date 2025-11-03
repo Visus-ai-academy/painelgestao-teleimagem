@@ -502,7 +502,6 @@ export default function PagamentosMedicos() {
                   disabled={
                     gerandoRelatorios || 
                     periodoBloqueado || 
-                    stats.demonstrativosGerados === 0 ||
                     medicosSelecionados.size === 0
                   }
                   size="lg"
