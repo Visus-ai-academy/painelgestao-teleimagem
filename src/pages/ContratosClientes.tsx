@@ -642,6 +642,19 @@ export default function ContratosClientes() {
     }
     
     try {
+      // Buscar dados atuais do contrato para fazer merge correto
+      const { data: contratoAtual, error: fetchError } = await supabase
+        .from('contratos_clientes')
+        .select('configuracoes_franquia, configuracoes_integracao')
+        .eq('id', contratoEditando.id)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Fazer merge mantendo campos existentes
+      const configFranquiaAtual = (contratoAtual?.configuracoes_franquia as Record<string, any>) || {};
+      const configIntegracaoAtual = (contratoAtual?.configuracoes_integracao as Record<string, any>) || {};
+
       // Atualizar contrato no banco
       const { error } = await supabase
         .from('contratos_clientes')
@@ -652,9 +665,11 @@ export default function ContratosClientes() {
           desconto_percentual: Number(editDesconto || 0),
           acrescimo_percentual: Number(editAcrescimo || 0),
           configuracoes_franquia: {
+            ...configFranquiaAtual,
             valor_franquia: Number(editFranqValor || 0),
           },
           configuracoes_integracao: {
+            ...configIntegracaoAtual,
             valor_integracao: Number(editIntegraValor || 0),
             valor_portal_laudos: Number(editPortalValor || 0),
           },
