@@ -655,6 +655,8 @@ export default function ContratosClientes() {
       const configFranquiaAtual = (contratoAtual?.configuracoes_franquia as Record<string, any>) || {};
       const configIntegracaoAtual = (contratoAtual?.configuracoes_integracao as Record<string, any>) || {};
 
+      const aplicarFranquiaCalc = Number(editFranqValor || 0) > 0;
+
       // Atualizar contrato no banco
       const { error } = await supabase
         .from('contratos_clientes')
@@ -666,6 +668,7 @@ export default function ContratosClientes() {
           acrescimo_percentual: Number(editAcrescimo || 0),
           configuracoes_franquia: {
             ...configFranquiaAtual,
+            tem_franquia: aplicarFranquiaCalc,
             valor_franquia: Number(editFranqValor || 0),
           },
           configuracoes_integracao: {
@@ -677,6 +680,37 @@ export default function ContratosClientes() {
         .eq('id', contratoEditando.id);
 
       if (error) throw error;
+
+      // Sincronizar parâmetros de faturamento (aplicar_franquia e valor)
+      try {
+        const { data: paramAtual } = await supabase
+          .from('parametros_faturamento')
+          .select('id')
+          .eq('cliente_id', contratoEditando.clienteId)
+          .maybeSingle();
+
+        if (paramAtual?.id) {
+          await supabase
+            .from('parametros_faturamento')
+            .update({
+              aplicar_franquia: aplicarFranquiaCalc,
+              valor_franquia: Number(editFranqValor || 0),
+            })
+            .eq('id', paramAtual.id);
+        } else {
+          await supabase
+            .from('parametros_faturamento')
+            .insert({
+              cliente_id: contratoEditando.clienteId,
+              aplicar_franquia: aplicarFranquiaCalc,
+              valor_franquia: Number(editFranqValor || 0),
+              status: 'A',
+            });
+        }
+      } catch (syncErr) {
+        console.warn('Aviso: não foi possível sincronizar parâmetros de faturamento:', syncErr);
+      }
+
 
       toast({
         title: "Contrato atualizado",
