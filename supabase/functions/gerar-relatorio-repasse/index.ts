@@ -117,25 +117,30 @@ serve(async (req) => {
 
     checkNewPage();
 
-    // Buscar exames individuais para o Quadro 2
-    // Calcular o último dia do mês corretamente
-    const [year, month] = periodo.split('-').map(Number);
-    const lastDay = new Date(year, month, 0).getDate(); // Dia 0 do próximo mês = último dia do mês atual
-    
+    // Buscar exames individuais para o Quadro 2 usando o período de referência da volumetria
+    const medicoNome = (detalhes.medico_nome || '').toString();
     const { data: exames, error: examesError } = await supabase
-      .from('exames')
+      .from('volumetria_mobilemed')
       .select(`
-        *,
-        clientes:cliente_id(nome),
-        medicos:medico_id(nome)
+        DATA_REALIZACAO,
+        NOME_PACIENTE,
+        MEDICO,
+        ESPECIALIDADE,
+        MODALIDADE,
+        CATEGORIA,
+        PRIORIDADE,
+        ACCESSION_NUMBER,
+        unidade_origem,
+        cliente_nome_fantasia,
+        VALORES,
+        periodo_referencia
       `)
-      .eq('medico_id', medico_id)
-      .gte('data_exame', `${periodo}-01`)
-      .lte('data_exame', `${periodo}-${String(lastDay).padStart(2, '0')}`)
-      .order('data_exame', { ascending: true });
+      .eq('periodo_referencia', periodo)
+      .eq('MEDICO', medicoNome)
+      .order('DATA_REALIZACAO', { ascending: true });
 
     if (examesError) {
-      console.error('[Repasse] Erro ao buscar exames:', examesError);
+      console.error('[Repasse] Erro ao buscar exames (volumetria_mobilemed):', examesError);
     }
 
     // QUADRO 2 - DETALHAMENTO DOS EXAMES (formato paisagem)
@@ -220,18 +225,18 @@ serve(async (req) => {
 
         xPos = tableMargin;
         const rowData = [
-          exame.data_exame ? new Date(exame.data_exame).toLocaleDateString('pt-BR') : '-',
-          (exame.paciente_nome || '-').substring(0, 16),
-          (exame.medicos?.nome || '-').substring(0, 16),
-          (exame.especialidade || '-').substring(0, 20),
-          (exame.modalidade || '-').substring(0, 6),
-          (exame.especialidade || '-').substring(0, 13),
-          (exame.categoria || '-').substring(0, 6),
-          '-',
-          '-',
-          (exame.clientes?.nome || '-').substring(0, 10),
-          (exame.quantidade || 1).toString(),
-          formatMoeda(exame.valor_total || 0)
+          exame.DATA_REALIZACAO ? new Date(exame.DATA_REALIZACAO).toLocaleDateString('pt-BR') : '-',
+          (exame.NOME_PACIENTE || '-').substring(0, 16),
+          (exame.MEDICO || '-').substring(0, 16),
+          (exame.ESPECIALIDADE || '-').substring(0, 20),
+          (exame.MODALIDADE || '-').substring(0, 6),
+          (exame.ESPECIALIDADE || '-').substring(0, 13),
+          (exame.CATEGORIA || '-').substring(0, 6),
+          (exame.PRIORIDADE || '-').substring(0, 10),
+          (exame.ACCESSION_NUMBER ? String(exame.ACCESSION_NUMBER) : '-').substring(0, 20),
+          (exame.unidade_origem || exame.cliente_nome_fantasia || '-').substring(0, 10),
+          '1',
+          formatMoeda(exame.VALORES || 0)
         ];
 
         for (let i = 0; i < rowData.length; i++) {
