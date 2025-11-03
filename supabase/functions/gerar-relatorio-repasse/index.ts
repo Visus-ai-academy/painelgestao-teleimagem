@@ -118,6 +118,10 @@ serve(async (req) => {
     checkNewPage();
 
     // Buscar exames individuais para o Quadro 2
+    // Calcular o último dia do mês corretamente
+    const [year, month] = periodo.split('-').map(Number);
+    const lastDay = new Date(year, month, 0).getDate(); // Dia 0 do próximo mês = último dia do mês atual
+    
     const { data: exames, error: examesError } = await supabase
       .from('exames')
       .select(`
@@ -127,7 +131,7 @@ serve(async (req) => {
       `)
       .eq('medico_id', medico_id)
       .gte('data_exame', `${periodo}-01`)
-      .lte('data_exame', `${periodo}-31`)
+      .lte('data_exame', `${periodo}-${String(lastDay).padStart(2, '0')}`)
       .order('data_exame', { ascending: true });
 
     if (examesError) {
