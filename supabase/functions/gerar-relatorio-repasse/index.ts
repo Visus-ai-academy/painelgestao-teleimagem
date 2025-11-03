@@ -98,27 +98,158 @@ serve(async (req) => {
 
     checkNewPage();
 
-    // Detalhes dos exames por arranjo
-    if (detalhes.detalhes_exames && detalhes.detalhes_exames.length > 0) {
-      page.drawText('DETALHES POR ARRANJO', { x: margin, y: yPosition, size: 14, font: fontBold });
-      yPosition -= lineHeight * 1.5;
+    // Buscar laudos individuais para o Quadro 2
+    const { data: laudos, error: laudosError } = await supabase
+      .from('laudos')
+      .select(`
+        *,
+        clientes:cliente_id(nome),
+        medicos:medico_id(nome)
+      `)
+      .eq('medico_id', medico_id)
+      .gte('data_laudo', `${periodo}-01`)
+      .lte('data_laudo', `${periodo}-31`)
+      .order('data_laudo', { ascending: true });
 
-      for (const exame of detalhes.detalhes_exames) {
-        checkNewPage();
-        
-        page.drawText(`• Modalidade: ${exame.modalidade || 'N/A'}`, { x: margin, y: yPosition, size: 10, font: fontBold });
-        yPosition -= lineHeight;
-        page.drawText(`  Especialidade: ${exame.especialidade || 'N/A'}`, { x: margin + 10, y: yPosition, size: 9, font });
-        yPosition -= lineHeight;
-        page.drawText(`  Categoria: ${exame.categoria || 'N/A'}  |  Prioridade: ${exame.prioridade || 'N/A'}`, { x: margin + 10, y: yPosition, size: 9, font });
-        yPosition -= lineHeight;
-        page.drawText(`  Cliente: ${exame.cliente || 'N/A'}`, { x: margin + 10, y: yPosition, size: 9, font });
-        yPosition -= lineHeight;
-        page.drawText(`  Quantidade: ${exame.quantidade || 0}  |  Valor Unit.: ${formatMoeda(exame.valor_unitario || 0)}  |  Total: ${formatMoeda(exame.valor_total || 0)}`, { x: margin + 10, y: yPosition, size: 9, font: fontBold });
-        yPosition -= lineHeight * 1.5;
-      }
+    if (laudosError) {
+      console.error('[Repasse] Erro ao buscar laudos:', laudosError);
     }
 
+    // QUADRO 2 - DETALHAMENTO DOS EXAMES (formato paisagem)
+    if (laudos && laudos.length > 0) {
+      // Nova página em formato paisagem (A4 rotacionado)
+      page = pdfDoc.addPage([841.89, 595.28]); // Largura x Altura invertidas
+      const pageWidth = 841.89;
+      const pageHeight = 595.28;
+      yPosition = pageHeight - 40;
+      const tableMargin = 30;
+
+      // Título do Quadro 2
+      page.drawText('QUADRO 2 - DETALHAMENTO DOS EXAMES', { x: tableMargin, y: yPosition, size: 12, font: fontBold });
+      yPosition -= 25;
+
+      // Cabeçalho da tabela
+      const colWidths = [55, 85, 85, 100, 35, 70, 40, 40, 70, 55, 30, 60]; // Larguras das colunas
+      const headers = ['Data', 'Paciente', 'Médico', 'Exame', 'Modal.', 'Espec.', 'Categ.', 'Prior.', 'Accession', 'Origem', 'Qtd', 'Valor Total'];
+      
+      let xPos = tableMargin;
+      
+      // Desenhar cabeçalho
+      page.drawRectangle({
+        x: tableMargin,
+        y: yPosition - 15,
+        width: pageWidth - (tableMargin * 2),
+        height: 18,
+        color: rgb(0.9, 0.9, 0.9),
+      });
+
+      for (let i = 0; i < headers.length; i++) {
+        page.drawText(headers[i], { 
+          x: xPos + 2, 
+          y: yPosition - 12, 
+          size: 8, 
+          font: fontBold 
+        });
+        xPos += colWidths[i];
+      }
+
+      yPosition -= 20;
+
+      // Dados da tabela
+      for (const laudo of laudos) {
+        // Verificar se precisa de nova página
+        if (yPosition < 60) {
+          page = pdfDoc.addPage([841.89, 595.28]);
+          yPosition = pageHeight - 40;
+          
+          // Redesenhar cabeçalho
+          page.drawRectangle({
+            x: tableMargin,
+            y: yPosition - 15,
+            width: pageWidth - (tableMargin * 2),
+            height: 18,
+            color: rgb(0.9, 0.9, 0.9),
+          });
+
+          xPos = tableMargin;
+          for (let i = 0; i < headers.length; i++) {
+            page.drawText(headers[i], { 
+              x: xPos + 2, 
+              y: yPosition - 12, 
+              size: 8, 
+              font: fontBold 
+            });
+            xPos += colWidths[i];
+          }
+          yPosition -= 20;
+        }
+
+        // Linha zebrada
+        if (laudos.indexOf(laudo) % 2 === 0) {
+          page.drawRectangle({
+            x: tableMargin,
+            y: yPosition - 12,
+            width: pageWidth - (tableMargin * 2),
+            height: 15,
+            color: rgb(0.97, 0.97, 0.97),
+          });
+        }
+
+        xPos = tableMargin;
+        const rowData = [
+          laudo.data_laudo ? new Date(laudo.data_laudo).toLocaleDateString('pt-BR') : '-',
+          (laudo.paciente_nome || '-').substring(0, 16),
+          (laudo.medicos?.nome || '-').substring(0, 16),
+          (laudo.descricao_exame || '-').substring(0, 20),
+          (laudo.modalidade || '-').substring(0, 6),
+          (laudo.especialidade || '-').substring(0, 13),
+          (laudo.categoria || '-').substring(0, 6),
+          (laudo.prioridade || '-').substring(0, 6),
+          (laudo.accession_number || '-').substring(0, 13),
+          (laudo.clientes?.nome || '-').substring(0, 10),
+          '1',
+          formatMoeda(laudo.valor_laudo || 0)
+        ];
+
+        for (let i = 0; i < rowData.length; i++) {
+          page.drawText(rowData[i], { 
+            x: xPos + 2, 
+            y: yPosition - 10, 
+            size: 7, 
+            font 
+          });
+          xPos += colWidths[i];
+        }
+
+        yPosition -= 15;
+      }
+
+      // Total geral no final da tabela
+      yPosition -= 5;
+      page.drawRectangle({
+        x: tableMargin,
+        y: yPosition - 15,
+        width: pageWidth - (tableMargin * 2),
+        height: 18,
+        color: rgb(0.85, 0.85, 0.85),
+      });
+
+      page.drawText('TOTAL GERAL:', { 
+        x: pageWidth - 200, 
+        y: yPosition - 11, 
+        size: 9, 
+        font: fontBold 
+      });
+      page.drawText(formatMoeda(detalhes.valor_total || 0), { 
+        x: pageWidth - 110, 
+        y: yPosition - 11, 
+        size: 9, 
+        font: fontBold,
+        color: rgb(0, 0.4, 0)
+      });
+    }
+
+    // Voltar para página portrait para valores adicionais
     checkNewPage();
 
     // Valores adicionais
