@@ -119,6 +119,10 @@ serve(async (req) => {
 
     // Buscar exames individuais para o Quadro 2 usando o período de referência da volumetria
     const medicoNome = (detalhes.medico_nome || '').toString();
+    
+    console.log('[Repasse] Buscando exames para médico:', medicoNome, 'período:', periodo);
+    
+    // Limitar a 1000 exames para evitar timeout
     const { data: exames, error: examesError } = await supabase
       .from('volumetria_mobilemed')
       .select(`
@@ -132,19 +136,23 @@ serve(async (req) => {
         ACCESSION_NUMBER,
         unidade_origem,
         cliente_nome_fantasia,
-        VALORES,
-        periodo_referencia
+        VALORES
       `)
       .eq('periodo_referencia', periodo)
       .eq('MEDICO', medicoNome)
-      .order('DATA_REALIZACAO', { ascending: true });
+      .order('DATA_REALIZACAO', { ascending: true })
+      .limit(1000);
 
     if (examesError) {
       console.error('[Repasse] Erro ao buscar exames (volumetria_mobilemed):', examesError);
     }
+    
+    console.log('[Repasse] Total de exames encontrados:', exames?.length || 0);
 
     // QUADRO 2 - DETALHAMENTO DOS EXAMES (formato paisagem)
     if (exames && exames.length > 0) {
+      console.log('[Repasse] Gerando Quadro 2 com', exames.length, 'exames');
+      
       // Nova página em formato paisagem (A4 rotacionado)
       page = pdfDoc.addPage([841.89, 595.28]); // Largura x Altura invertidas
       const pageWidth = 841.89;
@@ -154,6 +162,19 @@ serve(async (req) => {
 
       // Título do Quadro 2
       page.drawText('QUADRO 2 - DETALHAMENTO DOS EXAMES', { x: tableMargin, y: yPosition, size: 12, font: fontBold });
+      
+      // Aviso se houver limite de exames
+      if (exames.length === 1000) {
+        yPosition -= 15;
+        page.drawText('* Mostrando os primeiros 1000 exames do período', { 
+          x: tableMargin, 
+          y: yPosition, 
+          size: 8, 
+          font, 
+          color: rgb(0.6, 0.6, 0.6) 
+        });
+      }
+      
       yPosition -= 25;
 
       // Cabeçalho da tabela
