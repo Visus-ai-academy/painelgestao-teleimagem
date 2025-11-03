@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { PDFDocument, StandardFonts, rgb } from "https://esm.sh/pdf-lib@1.17.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -42,9 +43,34 @@ serve(async (req) => {
       throw new Error('Demonstrativo não encontrado. Gere o demonstrativo primeiro.');
     }
 
-    // Aqui seria a lógica de geração do PDF do relatório
-    // Por enquanto, vamos simular o link do relatório
-    const linkRelatorio = `https://storage.supabase.co/v1/object/public/relatorios-repasse/${medico_id}_${periodo}.pdf`;
+    // Gerar um PDF simples com informações básicas do relatório
+    const pdfDoc = await PDFDocument.create();
+    const page = pdfDoc.addPage([595.28, 841.89]); // A4
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const { width, height } = page.getSize();
+
+    const titulo = 'Relatório de Repasse Médico';
+    page.drawText(titulo, { x: 50, y: height - 80, size: 18, font, color: rgb(0, 0, 0) });
+    page.drawText(`Período: ${periodo}`, { x: 50, y: height - 110, size: 12, font });
+    page.drawText(`Médico ID: ${medico_id}`, { x: 50, y: height - 130, size: 12, font });
+    page.drawText(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, { x: 50, y: height - 150, size: 10, font });
+
+    const pdfBytes = await pdfDoc.save();
+    const filePath = `${medico_id}_${periodo}.pdf`;
+
+    // Upload do PDF ao Storage (bucket: relatorios-repasse)
+    const pdfBlob = new Blob([pdfBytes], { type: 'application/pdf' });
+    const { error: uploadError } = await supabase
+      .storage
+      .from('relatorios-repasse')
+      .upload(filePath, pdfBlob, { contentType: 'application/pdf', upsert: true });
+
+    if (uploadError) {
+      throw new Error(`Falha ao salvar PDF no storage: ${uploadError.message}`);
+    }
+
+    // Montar link público correto usando SUPABASE_URL
+    const linkRelatorio = `${Deno.env.get('SUPABASE_URL')}/storage/v1/object/public/relatorios-repasse/${filePath}`;
 
     // Atualizar status
     await supabase

@@ -113,6 +113,7 @@ export default function PagamentosMedicos() {
           emailEnviado: status?.email_enviado || false,
           omieContaGerada: status?.omie_conta_gerada || false,
           linkRelatorio: status?.link_relatorio,
+          dataGeracaoRelatorio: status?.data_geracao_relatorio,
           emailDestino: medico.email,
           erro: status?.erro,
           erroEmail: status?.erro_email,
@@ -627,58 +628,43 @@ export default function PagamentosMedicos() {
                     />
                   </div>
 
-                  {statusPorMedico.filter(s => s.relatorio_gerado).length === 0 ? (
+                  {statusPorMedico.filter(s => s.relatorioGerado).length === 0 ? (
                     <p className="text-muted-foreground text-center py-8">
                       Nenhum relatório gerado neste período.
                     </p>
                   ) : (
                     <div className="space-y-2">
                       {statusPorMedico
-                        .filter(s => s.relatorio_gerado)
-                        .filter(s => {
-                          const medico = medicos.find(m => m.id === s.medico_id);
-                          return medico?.nome.toLowerCase().includes(filtroMedico.toLowerCase());
-                        })
-                        .sort((a, b) => {
-                          const medicoA = medicos.find(m => m.id === a.medico_id);
-                          const medicoB = medicos.find(m => m.id === b.medico_id);
-                          return (medicoA?.nome || '').localeCompare(medicoB?.nome || '');
-                        })
-                        .map((status) => {
-                          const medico = medicos.find(m => m.id === status.medico_id);
-                          if (!medico) return null;
-
-                          return (
-                            <div
-                              key={status.medico_id}
-                              className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors"
-                            >
-                              <div className="flex-1">
-                                <h4 className="font-medium">{medico.nome}</h4>
-                                <p className="text-sm text-muted-foreground">
-                                  CRM: {medico.crm}
+                        .filter(s => s.relatorioGerado)
+                        .filter(s => s.medicoNome.toLowerCase().includes(filtroMedico.toLowerCase()))
+                        .sort((a, b) => (a.medicoNome || '').localeCompare(b.medicoNome || ''))
+                        .map((status) => (
+                          <div
+                            key={status.medicoId}
+                            className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors"
+                          >
+                            <div className="flex-1">
+                              <h4 className="font-medium">{status.medicoNome}</h4>
+                              {status.dataGeracaoRelatorio && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Gerado em: {new Date(status.dataGeracaoRelatorio).toLocaleDateString('pt-BR')} às {new Date(status.dataGeracaoRelatorio).toLocaleTimeString('pt-BR')}
                                 </p>
-                                {status.data_geracao_relatorio && (
-                                  <p className="text-xs text-muted-foreground mt-1">
-                                    Gerado em: {new Date(status.data_geracao_relatorio).toLocaleDateString('pt-BR')} às {new Date(status.data_geracao_relatorio).toLocaleTimeString('pt-BR')}
-                                  </p>
-                                )}
-                              </div>
-                              <div className="flex gap-2">
-                                {status.link_relatorio && (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => window.open(status.link_relatorio, '_blank')}
-                                  >
-                                    <Download className="mr-2 h-4 w-4" />
-                                    Download
-                                  </Button>
-                                )}
-                              </div>
+                              )}
                             </div>
-                          );
-                        })}
+                            <div className="flex gap-2">
+                              {status.linkRelatorio && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => window.open(status.linkRelatorio, '_blank')}
+                                >
+                                  <Download className="mr-2 h-4 w-4" />
+                                  Download
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
                     </div>
                   )}
                 </div>
