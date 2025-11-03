@@ -47,7 +47,9 @@ serve(async (req) => {
 
     // Gerar PDF com informações completas do demonstrativo
     const pdfDoc = await PDFDocument.create();
-    let page = pdfDoc.addPage([595.28, 841.89]); // A4
+    
+    // PÁGINA 1 EM FORMATO PAISAGEM
+    let page = pdfDoc.addPage([841.89, 595.28]); // A4 Paisagem
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
     const { width, height } = page.getSize();
@@ -59,7 +61,7 @@ serve(async (req) => {
     // Função auxiliar para adicionar nova página se necessário
     const checkNewPage = () => {
       if (yPosition < 100) {
-        page = pdfDoc.addPage([595.28, 841.89]);
+        page = pdfDoc.addPage([841.89, 595.28]); // Paisagem
         yPosition = height - 60;
       }
     };
@@ -134,7 +136,8 @@ serve(async (req) => {
         CATEGORIA,
         PRIORIDADE,
         ACCESSION_NUMBER,
-        unidade_origem,
+        EMPRESA,
+        Cliente_Nome_Fantasia,
         cliente_nome_fantasia,
         VALORES
       `)
@@ -255,9 +258,9 @@ serve(async (req) => {
           (exame.CATEGORIA || '-').substring(0, 6),
           (exame.PRIORIDADE || '-').substring(0, 10),
           (exame.ACCESSION_NUMBER ? String(exame.ACCESSION_NUMBER) : '-').substring(0, 20),
-          (exame.unidade_origem || exame.cliente_nome_fantasia || '-').substring(0, 10),
+          (exame.Cliente_Nome_Fantasia || exame.cliente_nome_fantasia || exame.EMPRESA || '-').substring(0, 10),
           '1',
-          formatMoeda(exame.VALORES || 0)
+          formatMoeda(Number(exame.VALORES) || 0)
         ];
 
         for (let i = 0; i < rowData.length; i++) {
