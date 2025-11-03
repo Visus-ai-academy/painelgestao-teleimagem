@@ -134,38 +134,61 @@ export function ListaDemonstrativos({ demonstrativos, periodo }: ListaDemonstrat
                   <div className="border-t pt-3 space-y-3">
                     {demo.detalhesExames && demo.detalhesExames.length > 0 && (
                       <div>
-                        <h5 className="font-semibold text-sm mb-2">Detalhes dos Exames</h5>
+                        <h5 className="font-semibold text-sm mb-2">Detalhes por Arranjo</h5>
                         <div className="space-y-2">
-                          {demo.detalhesExames.map((exame: any, idx: number) => (
-                            <div key={idx} className="bg-muted/50 p-2 rounded text-xs">
-                              <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                  <span className="font-medium">Modalidade:</span> {exame.modalidade}
+                          {(() => {
+                            // Agrupar por arranjo (modalidade/especialidade/categoria)
+                            const arranjosMap = new Map<string, any>();
+                            
+                            demo.detalhesExames.forEach((exame: any) => {
+                              const chave = `${exame.modalidade}|${exame.especialidade}|${exame.categoria || 'Sem Categoria'}`;
+                              
+                              if (arranjosMap.has(chave)) {
+                                const existente = arranjosMap.get(chave);
+                                existente.quantidade += exame.quantidade || 0;
+                                existente.valor_total += exame.valor_total || 0;
+                              } else {
+                                arranjosMap.set(chave, {
+                                  modalidade: exame.modalidade,
+                                  especialidade: exame.especialidade,
+                                  categoria: exame.categoria || 'Sem Categoria',
+                                  quantidade: exame.quantidade || 0,
+                                  valor_total: exame.valor_total || 0
+                                });
+                              }
+                            });
+                            
+                            const arranjos = Array.from(arranjosMap.values());
+                            
+                            return arranjos.map((arranjo: any, idx: number) => (
+                              <div key={idx} className="bg-muted/50 p-3 rounded">
+                                <div className="grid grid-cols-3 gap-4 text-sm">
+                                  <div>
+                                    <span className="text-xs text-muted-foreground block">Modalidade</span>
+                                    <span className="font-medium">{arranjo.modalidade}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-xs text-muted-foreground block">Especialidade</span>
+                                    <span className="font-medium">{arranjo.especialidade}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-xs text-muted-foreground block">Categoria</span>
+                                    <span className="font-medium">{arranjo.categoria}</span>
+                                  </div>
                                 </div>
-                                <div>
-                                  <span className="font-medium">Especialidade:</span> {exame.especialidade}
-                                </div>
-                                <div>
-                                  <span className="font-medium">Categoria:</span> {exame.categoria || '-'}
-                                </div>
-                                <div>
-                                  <span className="font-medium">Prioridade:</span> {exame.prioridade || '-'}
-                                </div>
-                                <div>
-                                  <span className="font-medium">Cliente:</span> {exame.cliente || '-'}
-                                </div>
-                                <div>
-                                  <span className="font-medium">Quantidade:</span> {exame.quantidade}
-                                </div>
-                                <div>
-                                  <span className="font-medium">Valor Unit.:</span> {formatarMoeda(exame.valor_unitario)}
-                                </div>
-                                <div>
-                                  <span className="font-medium">Valor Total:</span> {formatarMoeda(exame.valor_total)}
+                                <div className="flex justify-between mt-3 pt-3 border-t">
+                                  <div>
+                                    <span className="text-xs text-muted-foreground">Quantidade: </span>
+                                    <span className="font-semibold">{arranjo.quantidade}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-xs text-muted-foreground">Valor Total: </span>
+                                    <span className="font-semibold text-primary">{formatarMoeda(arranjo.valor_total)}</span>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          ))}
+                            ));
+                          })()}
                         </div>
                       </div>
                     )}

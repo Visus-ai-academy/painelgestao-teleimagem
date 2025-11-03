@@ -17,6 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { AdicionaisMedicos } from "@/components/repasse/AdicionaisMedicos";
 import { StatusPorMedico } from "@/components/repasse/StatusPorMedico";
 import { ListaDemonstrativos } from "@/components/repasse/ListaDemonstrativos";
+import { ResumoGeralRepasse } from "@/components/repasse/ResumoGeralRepasse";
 import { ControlePeriodoFaturamento } from "@/components/ControlePeriodoFaturamento";
 
 export default function PagamentosMedicos() {
@@ -594,6 +595,11 @@ export default function PagamentosMedicos() {
               setPeriodoSelecionado(periodo);
               carregarDados();
             }}
+          />
+
+          <ResumoGeralRepasse
+            demonstrativos={demonstrativosParaListar}
+            periodo={periodoSelecionado}
           />
 
           <ListaDemonstrativos
