@@ -152,6 +152,83 @@ serve(async (req) => {
     
     console.log('[Repasse] Total de exames encontrados:', exames?.length || 0);
 
+    // Pré-carregar repasses do médico e clientes para calcular valor por exame
+    const periodoStr = periodo.toString();
+    const periodStart = new Date(`${periodoStr}-01T00:00:00`);
+    const periodEnd = new Date(periodStart);
+    periodEnd.setMonth(periodEnd.getMonth() + 1);
+    periodEnd.setDate(0);
+
+    const normalize = (s: any) => (s || '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
+    const mapPrioridade = (p: any) => {
+      const v = normalize(p);
+      if (v === 'URGENTE' || v === 'URGENCIA' || v === 'URGÊNCIA') return 'URGÊNCIA';
+      if (v === 'PLANTAO' || v === 'PLANTÃO') return 'PLANTÃO';
+      if (v === 'NORMAL' || v === 'ROTINA') return 'ROTINA';
+      return v;
+    };
+
+    const { data: repasses, error: repasseError } = await supabase
+      .from('medicos_valores_repasse')
+      .select('modalidade, especialidade, categoria, prioridade, valor, cliente_id, esta_no_escopo, data_inicio_vigencia, data_fim_vigencia, ativo')
+      .eq('medico_id', medico_id);
+    if (repasseError) {
+      console.error('[Repasse] Erro ao buscar valores de repasse:', repasseError);
+    }
+    console.log('[Repasse] Registros de repasse carregados:', repasses?.length || 0);
+
+    const { data: clientes, error: clientesError } = await supabase
+      .from('clientes')
+      .select('id, nome, nome_fantasia, nome_mobilemed');
+    if (clientesError) {
+      console.error('[Repasse] Erro ao buscar clientes:', clientesError);
+    }
+
+    const findClienteId = (ex: any) => {
+      const candidates = [ex.Cliente_Nome_Fantasia, ex.cliente_nome_fantasia, ex.EMPRESA];
+      const first = candidates.find((c) => c);
+      const target = normalize(first);
+      if (!target) return null;
+      const found = (clientes || []).find((c: any) => {
+        return [c.nome_fantasia, c.nome, c.nome_mobilemed].some((v: any) => normalize(v) === target);
+      });
+      return found?.id || null;
+    };
+
+    const getValorRepasse = (ex: any) => {
+      const mod = normalize(ex.MODALIDADE);
+      const esp = normalize(ex.ESPECIALIDADE);
+      const cat = normalize(ex.CATEGORIA);
+      const pri = mapPrioridade(ex.PRIORIDADE);
+      const cliId = findClienteId(ex);
+
+      const inVigencia = (r: any) => {
+        const ini = r.data_inicio_vigencia ? new Date(r.data_inicio_vigencia) : null;
+        const fim = r.data_fim_vigencia ? new Date(r.data_fim_vigencia) : null;
+        if (ini && ini > periodEnd) return false;
+        if (fim && fim < periodStart) return false;
+        return true;
+      };
+
+      const matches = (r: any) => {
+        if (!inVigencia(r)) return false;
+        if (normalize(r.modalidade) !== mod) return false;
+        if (normalize(r.especialidade) !== esp) return false;
+        const rc = normalize(r.categoria);
+        if (rc && rc !== cat) return false;
+        if (normalize(r.prioridade) !== pri) return false;
+        return true;
+      };
+
+      let found = (repasses || []).find((r: any) => r.cliente_id && cliId && r.cliente_id === cliId && matches(r));
+      if (found) return Number(found.valor) || 0;
+
+      found = (repasses || []).find((r: any) => !r.cliente_id && (r.esta_no_escopo === true || r.esta_no_escopo === null) && matches(r));
+      if (found) return Number(found.valor) || 0;
+
+      return 0;
+    };
+
     // QUADRO 2 - DETALHAMENTO DOS EXAMES (formato paisagem)
     if (exames && exames.length > 0) {
       console.log('[Repasse] Gerando Quadro 2 com', exames.length, 'exames');
@@ -260,7 +337,7 @@ serve(async (req) => {
           (exame.ACCESSION_NUMBER ? String(exame.ACCESSION_NUMBER) : '-').substring(0, 20),
           (exame.Cliente_Nome_Fantasia || exame.cliente_nome_fantasia || exame.EMPRESA || '-').substring(0, 10),
           '1',
-          formatMoeda(Number(exame.VALORES) || 0)
+          formatMoeda(getValorRepasse(exame))
         ];
 
         for (let i = 0; i < rowData.length; i++) {
