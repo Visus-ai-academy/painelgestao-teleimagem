@@ -22,6 +22,7 @@ import { ListaDemonstrativos } from "@/components/repasse/ListaDemonstrativos";
 import { ResumoGeralRepasse } from "@/components/repasse/ResumoGeralRepasse";
 import { ControlePeriodoFaturamento } from "@/components/ControlePeriodoFaturamento";
 import { RelatorioExamesSemMedico } from "@/components/RelatorioExamesSemMedico";
+import { CorrigirAssociacaoRepasses } from "@/components/CorrigirAssociacaoRepasses";
 import * as XLSX from 'xlsx';
 
 export default function PagamentosMedicos() {
@@ -720,6 +721,9 @@ export default function PagamentosMedicos() {
 
         {/* ABA 4: RELATÓRIOS */}
         <TabsContent value="relatorios" className="space-y-6">
+          {/* Ferramentas de Correção */}
+          <CorrigirAssociacaoRepasses />
+          
           {/* Relatório de Exames sem Médico */}
           <RelatorioExamesSemMedico />
 
