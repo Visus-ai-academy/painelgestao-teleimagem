@@ -26,8 +26,8 @@ serve(async (req) => {
     let query = supabase
       .from('volumetria_mobilemed')
       .select('id, "ESTUDO_DESCRICAO", "MODALIDADE", "ESPECIALIDADE"')
-      .eq('"ESPECIALIDADE"', 'MAMA')
-      .eq('"MODALIDADE"', 'MG');
+      .eq('ESPECIALIDADE', 'MAMA')
+      .eq('MODALIDADE', 'MG');
     
     if (arquivo_fonte) {
       query = query.eq('arquivo_fonte', arquivo_fonte);
@@ -36,7 +36,7 @@ serve(async (req) => {
     const { data: registrosMG, error: selectError } = await query;
     
     if (selectError) {
-      console.error('❌ Erro ao buscar registros:', selectError);
+      console.error('❌ Erro ao buscar registros:', JSON.stringify(selectError));
       throw selectError;
     }
     
@@ -64,13 +64,12 @@ serve(async (req) => {
     const { error: updateError } = await supabase
       .from('volumetria_mobilemed')
       .update({
-        '"ESPECIALIDADE"': 'MAMO',
-        updated_at: new Date().toISOString()
+        ESPECIALIDADE: 'MAMO',
       })
       .in('id', idsParaCorrigir);
     
     if (updateError) {
-      console.error('❌ Erro ao atualizar registros:', updateError);
+      console.error('❌ Erro ao atualizar registros:', JSON.stringify(updateError));
       throw updateError;
     }
     
@@ -121,7 +120,7 @@ serve(async (req) => {
     );
     
   } catch (error) {
-    console.error('❌ Erro na correção MAMA → MAMO:', error);
+    console.error('❌ Erro na correção MAMA → MAMO:', JSON.stringify(error));
     
     return new Response(
       JSON.stringify({
