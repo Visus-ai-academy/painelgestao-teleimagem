@@ -29,8 +29,8 @@ export function ListaDemonstrativos({ demonstrativos, periodo }: ListaDemonstrat
   const [filtro, setFiltro] = useState("");
   const [expandido, setExpandido] = useState<Set<string>>(new Set());
   const [expandidosEspecialidade, setExpandidosEspecialidade] = useState<Set<string>>(new Set());
+  const [expandidosModalidade, setExpandidosModalidade] = useState<Set<string>>(new Set());
   const [expandidosPrioridade, setExpandidosPrioridade] = useState<Set<string>>(new Set());
-  const [expandidosCategoria, setExpandidosCategoria] = useState<Set<string>>(new Set());
 
   const demonstrativosFiltrados = demonstrativos.filter(d =>
     d.medicoNome.toLowerCase().includes(filtro.toLowerCase())
@@ -60,8 +60,8 @@ export function ListaDemonstrativos({ demonstrativos, periodo }: ListaDemonstrat
     });
   };
 
-  const togglePrioridade = (chave: string) => {
-    setExpandidosPrioridade(prev => {
+  const toggleModalidade = (chave: string) => {
+    setExpandidosModalidade(prev => {
       const novo = new Set(prev);
       if (novo.has(chave)) {
         novo.delete(chave);
@@ -72,8 +72,8 @@ export function ListaDemonstrativos({ demonstrativos, periodo }: ListaDemonstrat
     });
   };
 
-  const toggleCategoria = (chave: string) => {
-    setExpandidosCategoria(prev => {
+  const togglePrioridade = (chave: string) => {
+    setExpandidosPrioridade(prev => {
       const novo = new Set(prev);
       if (novo.has(chave)) {
         novo.delete(chave);
@@ -176,57 +176,57 @@ export function ListaDemonstrativos({ demonstrativos, periodo }: ListaDemonstrat
                         <h5 className="font-semibold text-sm mb-2">Detalhes por Arranjo</h5>
                         <div className="space-y-2">
                           {(() => {
-                            // Agrupar por ESPECIALIDADE -> PRIORIDADE -> CATEGORIA -> MODALIDADE
+                            // Agrupar por ESPECIALIDADE -> MODALIDADE -> PRIORIDADE -> CATEGORIA
                             const especialidadesMap = new Map<string, any>();
                             
                             demo.detalhesExames.forEach((exame: any) => {
                               const especialidade = exame.especialidade || 'Sem Especialidade';
+                              const modalidade = exame.modalidade || 'Sem Modalidade';
                               const prioridade = exame.prioridade || 'Sem Prioridade';
                               const categoria = exame.categoria || 'Sem Categoria';
-                              const modalidade = exame.modalidade || 'Sem Modalidade';
                               
                               if (!especialidadesMap.has(especialidade)) {
                                 especialidadesMap.set(especialidade, {
                                   especialidade,
                                   quantidade: 0,
                                   valor_total: 0,
-                                  prioridades: new Map()
+                                  modalidades: new Map()
                                 });
                               }
 
                               const esp = especialidadesMap.get(especialidade);
-                              esp.quantidade += exame.quantidade || 0;
-                              esp.valor_total += exame.valor_total || 0;
+                              esp.quantidade += Number(exame.quantidade) || 0;
+                              esp.valor_total += Number(exame.valor_total) || 0;
 
-                              if (!esp.prioridades.has(prioridade)) {
-                                esp.prioridades.set(prioridade, {
+                              if (!esp.modalidades.has(modalidade)) {
+                                esp.modalidades.set(modalidade, {
+                                  modalidade,
+                                  prioridades: new Map()
+                                });
+                              }
+
+                              const mod = esp.modalidades.get(modalidade);
+
+                              if (!mod.prioridades.has(prioridade)) {
+                                mod.prioridades.set(prioridade, {
                                   prioridade,
                                   categorias: new Map()
                                 });
                               }
 
-                              const prior = esp.prioridades.get(prioridade);
+                              const prior = mod.prioridades.get(prioridade);
 
                               if (!prior.categorias.has(categoria)) {
                                 prior.categorias.set(categoria, {
                                   categoria,
-                                  modalidades: new Map()
-                                });
-                              }
-
-                              const cat = prior.categorias.get(categoria);
-
-                              if (!cat.modalidades.has(modalidade)) {
-                                cat.modalidades.set(modalidade, {
-                                  modalidade,
                                   quantidade: 0,
                                   valor_total: 0
                                 });
                               }
 
-                              const mod = cat.modalidades.get(modalidade);
-                              mod.quantidade += exame.quantidade || 0;
-                              mod.valor_total += exame.valor_total || 0;
+                              const cat = prior.categorias.get(categoria);
+                              cat.quantidade += Number(exame.quantidade) || 0;
+                              cat.valor_total += Number(exame.valor_total) || 0;
                             });
                             
                             const especialidades = Array.from(especialidadesMap.values());
@@ -263,107 +263,107 @@ export function ListaDemonstrativos({ demonstrativos, periodo }: ListaDemonstrat
                                     </div>
                                   </div>
 
-                                  {/* Prioridades - Nível 2 */}
+                                  {/* Modalidades - Nível 2 */}
                                   {expandidosEspecialidade.has(espChave) && (
                                     <div className="border-t">
-                                      {Array.from(esp.prioridades.values()).map((prior: any) => {
-                                        const priorChave = `${espChave}|${prior.prioridade}`;
-                                        const priorQtd = Array.from(prior.categorias.values()).reduce(
-                                          (sum: number, cat: any) => {
-                                            const catQtd = Array.from(cat.modalidades.values()).reduce((s: number, m: any) => s + (Number(m.quantidade) || 0), 0) as number;
-                                            return sum + catQtd;
+                                      {Array.from(esp.modalidades.values()).map((mod: any) => {
+                                        const modChave = `${espChave}|${mod.modalidade}`;
+                                        const modQtd = Array.from(mod.prioridades.values()).reduce(
+                                          (sum: number, prior: any) => {
+                                            const priorQtd = Array.from(prior.categorias.values()).reduce((s: number, cat: any) => s + (Number(cat.quantidade) || 0), 0) as number;
+                                            return sum + priorQtd;
                                           }, 0
                                         );
-                                        const priorValor = Array.from(prior.categorias.values()).reduce(
-                                          (sum: number, cat: any) => {
-                                            const catValor = Array.from(cat.modalidades.values()).reduce((s: number, m: any) => s + (Number(m.valor_total) || 0), 0) as number;
-                                            return sum + catValor;
+                                        const modValor = Array.from(mod.prioridades.values()).reduce(
+                                          (sum: number, prior: any) => {
+                                            const priorValor = Array.from(prior.categorias.values()).reduce((s: number, cat: any) => s + (Number(cat.valor_total) || 0), 0) as number;
+                                            return sum + priorValor;
                                           }, 0
                                         );
 
                                         return (
-                                          <div key={priorChave}>
+                                          <div key={modChave}>
                                             <div
                                               className="flex items-center justify-between p-2 pl-6 bg-background hover:bg-muted/30 transition-colors cursor-pointer"
-                                              onClick={() => togglePrioridade(priorChave)}
+                                              onClick={() => toggleModalidade(modChave)}
                                             >
                                               <div className="flex items-center gap-2 flex-1">
-                                                {expandidosPrioridade.has(priorChave) ? (
+                                                {expandidosModalidade.has(modChave) ? (
                                                   <ChevronDown className="h-3 w-3" />
                                                 ) : (
                                                   <ChevronRight className="h-3 w-3" />
                                                 )}
                                                 <div>
-                                                  <span className="text-xs text-muted-foreground">Prioridade: </span>
-                                                  <span className="font-medium text-sm">{prior.prioridade}</span>
+                                                  <span className="text-xs text-muted-foreground">Modalidade: </span>
+                                                  <span className="font-medium text-sm">{mod.modalidade}</span>
                                                 </div>
                                               </div>
                                               <div className="flex gap-4 text-xs">
                                                 <div>
                                                   <span className="text-muted-foreground">Qtd: </span>
-                                                  <span className="font-medium">{Number(priorQtd)}</span>
+                                                  <span className="font-medium">{Number(modQtd)}</span>
                                                 </div>
                                                 <div className="min-w-[80px] text-right">
-                                                  <span className="font-medium text-primary">{formatarMoeda(Number(priorValor))}</span>
+                                                  <span className="font-medium text-primary">{formatarMoeda(Number(modValor))}</span>
                                                 </div>
                                               </div>
                                             </div>
 
-                                            {/* Categorias - Nível 3 */}
-                                            {expandidosPrioridade.has(priorChave) && (
+                                            {/* Prioridades - Nível 3 */}
+                                            {expandidosModalidade.has(modChave) && (
                                               <div className="border-t">
-                                                {Array.from(prior.categorias.values()).map((cat: any) => {
-                                                  const catChave = `${priorChave}|${cat.categoria}`;
-                                                  const catQtd = Array.from(cat.modalidades.values()).reduce((s: number, m: any) => s + (m.quantidade || 0), 0);
-                                                  const catValor = Array.from(cat.modalidades.values()).reduce((s: number, m: any) => s + (m.valor_total || 0), 0);
+                                                {Array.from(mod.prioridades.values()).map((prior: any) => {
+                                                  const priorChave = `${modChave}|${prior.prioridade}`;
+                                                  const priorQtd = Array.from(prior.categorias.values()).reduce((s: number, cat: any) => s + (Number(cat.quantidade) || 0), 0);
+                                                  const priorValor = Array.from(prior.categorias.values()).reduce((s: number, cat: any) => s + (Number(cat.valor_total) || 0), 0);
 
                                                   return (
-                                                    <div key={catChave}>
+                                                    <div key={priorChave}>
                                                       <div
                                                         className="flex items-center justify-between p-2 pl-10 bg-background hover:bg-muted/20 transition-colors cursor-pointer"
-                                                        onClick={() => toggleCategoria(catChave)}
+                                                        onClick={() => togglePrioridade(priorChave)}
                                                       >
                                                         <div className="flex items-center gap-2 flex-1">
-                                                          {expandidosCategoria.has(catChave) ? (
+                                                          {expandidosPrioridade.has(priorChave) ? (
                                                             <ChevronDown className="h-3 w-3" />
                                                           ) : (
                                                             <ChevronRight className="h-3 w-3" />
                                                           )}
                                                           <div>
-                                                            <span className="text-xs text-muted-foreground">Categoria: </span>
-                                                            <span className="font-medium text-sm">{cat.categoria}</span>
+                                                            <span className="text-xs text-muted-foreground">Prioridade: </span>
+                                                            <span className="font-medium text-sm">{prior.prioridade}</span>
                                                           </div>
                                                         </div>
                                                         <div className="flex gap-4 text-xs">
                                                           <div>
                                                             <span className="text-muted-foreground">Qtd: </span>
-                                                            <span className="font-medium">{Number(catQtd)}</span>
+                                                            <span className="font-medium">{Number(priorQtd)}</span>
                                                           </div>
                                                           <div className="min-w-[80px] text-right">
-                                                            <span className="font-medium text-primary">{formatarMoeda(Number(catValor))}</span>
+                                                            <span className="font-medium text-primary">{formatarMoeda(Number(priorValor))}</span>
                                                           </div>
                                                         </div>
                                                       </div>
 
-                                                      {/* Modalidades - Nível 4 */}
-                                                      {expandidosCategoria.has(catChave) && (
+                                                      {/* Categorias - Nível 4 */}
+                                                      {expandidosPrioridade.has(priorChave) && (
                                                         <div className="bg-muted/10">
-                                                          {Array.from(cat.modalidades.values()).map((mod: any) => (
+                                                          {Array.from(prior.categorias.values()).map((cat: any) => (
                                                             <div
-                                                              key={mod.modalidade}
+                                                              key={cat.categoria}
                                                               className="flex items-center justify-between p-2 pl-14 text-xs"
                                                             >
                                                               <div>
-                                                                <span className="text-muted-foreground">Modalidade: </span>
-                                                                <span className="font-medium">{mod.modalidade}</span>
+                                                                <span className="text-muted-foreground">Categoria: </span>
+                                                                <span className="font-medium">{cat.categoria}</span>
                                                               </div>
                                                               <div className="flex gap-4">
                                                                 <div>
                                                                   <span className="text-muted-foreground">Qtd: </span>
-                                                                  <span className="font-medium">{mod.quantidade}</span>
+                                                                  <span className="font-medium">{Number(cat.quantidade)}</span>
                                                                 </div>
                                                                 <div className="min-w-[80px] text-right">
-                                                                  <span className="font-medium text-primary">{formatarMoeda(mod.valor_total)}</span>
+                                                                  <span className="font-medium text-primary">{formatarMoeda(Number(cat.valor_total))}</span>
                                                                 </div>
                                                               </div>
                                                             </div>
