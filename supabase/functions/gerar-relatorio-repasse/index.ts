@@ -90,12 +90,26 @@ serve(async (req) => {
       });
     };
 
+    // Cabeçalho - Nome da empresa
+    const empresaNome = 'TELEiMAGEM';
+    const empresaNomeWidth = fontBold.widthOfTextAtSize(empresaNome, 18);
+    const empresaNomeX = (width - empresaNomeWidth) / 2;
+    page.drawText(empresaNome, { x: empresaNomeX, y: yPosition, size: 18, font: fontBold });
+    yPosition -= lineHeight * 1.5;
+    
+    // Slogan
+    const slogan = 'EXCELÊNCIA EM TELERRADIOLOGIA';
+    const sloganWidth = font.widthOfTextAtSize(slogan, 10);
+    const sloganX = (width - sloganWidth) / 2;
+    page.drawText(slogan, { x: sloganX, y: yPosition, size: 10, font });
+    yPosition -= lineHeight * 2;
+    
     // Cabeçalho - título centralizado
     const titulo = 'RELATÓRIO DE REPASSE MÉDICO';
-    const tituloWidth = fontBold.widthOfTextAtSize(titulo, 18);
+    const tituloWidth = fontBold.widthOfTextAtSize(titulo, 14);
     const tituloX = (width - tituloWidth) / 2;
-    page.drawText(titulo, { x: tituloX, y: yPosition, size: 18, font: fontBold });
-    yPosition -= lineHeight * 4; // Espaçamento maior após título
+    page.drawText(titulo, { x: tituloX, y: yPosition, size: 14, font: fontBold });
+    yPosition -= lineHeight * 3; // Espaçamento maior após título
 
     // Informações do médico
     page.drawText(`Médico: ${detalhes.medico_nome || 'N/A'}`, { x: margin, y: yPosition, size: 12, font });
@@ -110,17 +124,27 @@ serve(async (req) => {
     // Resumo financeiro com retângulo azul
     const resumoStartY = yPosition;
     page.drawText('RESUMO FINANCEIRO', { x: margin, y: yPosition, size: 14, font: fontBold });
-    yPosition -= lineHeight * 1.5;
+    yPosition -= lineHeight * 2.5; // Mais espaçamento
 
     const resumoContentStartY = yPosition;
     page.drawText(`Total de Laudos: ${detalhes.total_laudos || 0}`, { x: margin + 10, y: yPosition, size: 11, font });
-    yPosition -= lineHeight;
+    yPosition -= lineHeight * 1.5; // Mais espaçamento entre linhas
     page.drawText(`Valor dos Exames: ${formatMoeda(detalhes.valor_exames || 0)}`, { x: margin + 10, y: yPosition, size: 11, font });
-    yPosition -= lineHeight;
+    yPosition -= lineHeight * 1.5;
     page.drawText(`Valores Adicionais: ${formatMoeda(detalhes.valor_adicionais || 0)}`, { x: margin + 10, y: yPosition, size: 11, font });
     yPosition -= lineHeight * 2;
+    
+    // VALOR TOTAL em negrito azul escuro DENTRO DO RETÂNGULO
+    page.drawText(`VALOR TOTAL: ${formatMoeda(detalhes.valor_total || 0)}`, { 
+      x: margin + 10, 
+      y: yPosition, 
+      size: 12, 
+      font: fontBold, 
+      color: rgb(0, 0.2, 0.6) 
+    });
+    yPosition -= lineHeight * 1.5;
 
-    // Desenhar retângulo azul ao redor do resumo
+    // Desenhar retângulo azul ao redor do resumo (incluindo VALOR TOTAL)
     const boxHeight = resumoContentStartY - yPosition + lineHeight;
     page.drawRectangle({
       x: margin,
@@ -131,16 +155,6 @@ serve(async (req) => {
       borderWidth: 2,
     });
 
-    yPosition -= lineHeight;
-    
-    // VALOR TOTAL em negrito azul escuro com espaçamento
-    page.drawText(`VALOR TOTAL: ${formatMoeda(detalhes.valor_total || 0)}`, { 
-      x: margin, 
-      y: yPosition, 
-      size: 12, 
-      font: fontBold, 
-      color: rgb(0, 0.2, 0.6) 
-    });
     yPosition -= lineHeight * 2;
 
     checkNewPage();
