@@ -43,21 +43,19 @@ serve(async (req) => {
     const exemplosAplicados: any[] = [];
 
     // Regras de aplicação automática de especialidade baseado na modalidade
+    // IMPORTANTE: Consulte cadastro_exames para modalidade/especialidade/categoria específicas
     const regrasEspecialidade: Record<string, string> = {
       'RX': 'RX',
       'CT': 'CT',
       'MR': 'RM',
       'US': 'US',
-      'MM': 'MAMA',
       'DR': 'RX',
       'CR': 'RX',
       'DX': 'RX',
       'RF': 'RX',
       'RM': 'RM',
       'TC': 'CT',
-      'ECO': 'US',
-      'MAMOGRAFIA': 'MAMA',
-      'TOMOSSINTESE': 'MAMA'
+      'ECO': 'US'
     };
 
     // Processar em lotes de 100 registros

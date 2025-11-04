@@ -169,12 +169,6 @@ Deno.serve(async (req) => {
         .eq('arquivo_fonte', arquivoAtual)
         .eq('ESPECIALIDADE', 'D.O')
       
-      // MAMO → MAMA
-      await supabase.from('volumetria_mobilemed')
-        .update({ ESPECIALIDADE: 'MAMA' })
-        .eq('arquivo_fonte', arquivoAtual)
-        .eq('ESPECIALIDADE', 'MAMO')
-      
       // TOMOGRAFIA → MEDICINA INTERNA
       await supabase.from('volumetria_mobilemed')
         .update({ ESPECIALIDADE: 'MEDICINA INTERNA' })

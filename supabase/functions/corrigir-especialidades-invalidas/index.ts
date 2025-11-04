@@ -28,7 +28,6 @@ serve(async (req) => {
       'TÓRAX': 'MEDICINA INTERNA',
       'CORPO': 'MEDICINA INTERNA',
       'D.O': 'MUSCULO ESQUELETICO',
-      'MAMO': 'MAMA',
       'TOMOGRAFIA': 'MEDICINA INTERNA',
       'CARDIO COM SCORE': 'CARDIO'
     };
