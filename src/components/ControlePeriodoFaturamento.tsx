@@ -86,11 +86,11 @@ export function ControlePeriodoFaturamento({
 
   // Memoizar os períodos para evitar recálculos constantes
   const periodos = useMemo(() => {
-    // SEMPRE incluir jun/25 como período base disponível
-    const periodoBase = new Date(2025, 5, 1); // jun/25 (mês 5 = junho)
+    // SEMPRE incluir set/25 como período base disponível
+    const periodoBase = new Date(2025, 8, 1); // set/25 (mês 8 = setembro)
     const hoje = new Date();
-    // Garantir que sempre inclua junho/2025, independentemente da data atual
-    const limiteInicial = new Date(2025, 5, 1); // Sempre começar em jun/25
+    // Garantir que sempre inclua setembro/2025, independentemente da data atual
+    const limiteInicial = new Date(2025, 8, 1); // Sempre começar em set/25
     const limiteFinal = new Date(hoje.getFullYear(), hoje.getMonth() + 6, 1);
     
     const periodos = [];
