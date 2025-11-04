@@ -10,7 +10,8 @@ import {
   DollarSign,
   Download,
   Search,
-  Lock
+  Lock,
+  FileSpreadsheet
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,6 +21,7 @@ import { StatusPorMedico } from "@/components/repasse/StatusPorMedico";
 import { ListaDemonstrativos } from "@/components/repasse/ListaDemonstrativos";
 import { ResumoGeralRepasse } from "@/components/repasse/ResumoGeralRepasse";
 import { ControlePeriodoFaturamento } from "@/components/ControlePeriodoFaturamento";
+import * as XLSX from 'xlsx';
 
 export default function PagamentosMedicos() {
   const { toast } = useToast();
@@ -363,6 +365,46 @@ export default function PagamentosMedicos() {
     }
   };
 
+  const handleExportarExcel = () => {
+    try {
+      // Preparar dados para exportação
+      const dadosExportacao = demonstrativosParaListar.map(demo => ({
+        'Nome do Médico': demo.medicoNome,
+        'Quantidade de Exames': demo.totalLaudos,
+        'Valor Total': demo.valorTotal
+      }));
+
+      // Criar workbook e worksheet
+      const ws = XLSX.utils.json_to_sheet(dadosExportacao);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Demonstrativos');
+
+      // Ajustar largura das colunas
+      const colWidths = [
+        { wch: 40 }, // Nome do Médico
+        { wch: 20 }, // Quantidade de Exames
+        { wch: 15 }  // Valor Total
+      ];
+      ws['!cols'] = colWidths;
+
+      // Gerar arquivo e fazer download
+      const nomeArquivo = `demonstrativos_repasse_${periodoSelecionado}.xlsx`;
+      XLSX.writeFile(wb, nomeArquivo);
+
+      toast({
+        title: "Excel exportado",
+        description: `Arquivo ${nomeArquivo} foi baixado com sucesso.`
+      });
+    } catch (error) {
+      console.error('Erro ao exportar Excel:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível exportar o arquivo Excel.",
+        variant: "destructive"
+      });
+    }
+  };
+
   // Médicos filtrados e ordenados
   const medicosFiltrados = useMemo(() => {
     let filtrados = [...statusPorMedico];
@@ -651,6 +693,18 @@ export default function PagamentosMedicos() {
               carregarDados();
             }}
           />
+
+          <div className="flex justify-end">
+            <Button
+              onClick={handleExportarExcel}
+              disabled={demonstrativosParaListar.length === 0}
+              variant="outline"
+              size="lg"
+            >
+              <FileSpreadsheet className="mr-2 h-5 w-5" />
+              Exportar Excel
+            </Button>
+          </div>
 
           <ResumoGeralRepasse
             demonstrativos={demonstrativosParaListar}
