@@ -59,14 +59,19 @@ serve(async (req) => {
     const exemplosCorrecoes: any[] = [];
     
     // Corrigir MAMA → MAMO para modalidade MG (MAMOGRAFIA e TOMOSSINTESE)
-    const idsParaCorrigir = registrosMG.map(r => r.id);
-    
-    const { error: updateError } = await supabase
+    let updateQuery = supabase
       .from('volumetria_mobilemed')
       .update({
         ESPECIALIDADE: 'MAMO',
       })
-      .in('id', idsParaCorrigir);
+      .eq('ESPECIALIDADE', 'MAMA')
+      .eq('MODALIDADE', 'MG');
+
+    if (arquivo_fonte) {
+      updateQuery = updateQuery.eq('arquivo_fonte', arquivo_fonte);
+    }
+    
+    const { error: updateError } = await updateQuery;
     
     if (updateError) {
       console.error('❌ Erro ao atualizar registros:', JSON.stringify(updateError));
