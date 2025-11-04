@@ -181,3 +181,33 @@ verify_jwt = true
 
 [functions.mapear-medico-duplicado]
 verify_jwt = true
+
+[functions.corrigir-especialidade-geral]
+verify_jwt = true
+
+[functions.corrigir-associacao-repasses]
+verify_jwt = true
+
+[functions.aplicar-mapeamentos-repasses]
+verify_jwt = true
+
+[functions.gerar-demonstrativos-repasse]
+verify_jwt = true
+
+[functions.importar-repasse-medico]
+verify_jwt = true
+
+[functions.corrigir-dados-problematicos]
+verify_jwt = true
+
+[functions.aplicar-regras-sistema-completo]
+verify_jwt = true
+
+[functions.corrigir-todos-dados-existentes]
+verify_jwt = true
+
+[functions.corrigir-volumetria-fora-padrao]
+verify_jwt = true
+
+[functions.processar-medicos]
+verify_jwt = true
