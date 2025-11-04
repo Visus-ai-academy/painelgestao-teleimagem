@@ -17,14 +17,23 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    console.log('🔧 INICIANDO CORREÇÃO DO VOLUMETRIA_FORA_PADRAO');
+    // Buscar arquivo_fonte do body (opcional)
+    const body = await req.json().catch(() => ({}));
+    const { arquivo_fonte } = body;
 
-    // 1. Buscar registros sem categoria/especialidade
-    const { data: registrosSemCategoria, error: errorBusca } = await supabase
+    console.log(`🔧 INICIANDO CORREÇÃO - Arquivo: ${arquivo_fonte || 'TODOS'}`);
+
+    // 1. Buscar registros sem categoria/especialidade/modalidade ou com valores incorretos
+    let query = supabase
       .from('volumetria_mobilemed')
-      .select('id, "ESTUDO_DESCRICAO", "CATEGORIA", "ESPECIALIDADE"')
-      .eq('arquivo_fonte', 'volumetria_fora_padrao')
-      .or('"CATEGORIA".is.null,"CATEGORIA".eq.,"ESPECIALIDADE".is.null,"ESPECIALIDADE".eq.');
+      .select('id, "ESTUDO_DESCRICAO", "CATEGORIA", "ESPECIALIDADE", "MODALIDADE", arquivo_fonte');
+    
+    // Filtrar por arquivo_fonte se fornecido
+    if (arquivo_fonte) {
+      query = query.eq('arquivo_fonte', arquivo_fonte);
+    }
+
+    const { data: registrosSemCategoria, error: errorBusca } = await query;
 
     if (errorBusca) {
       throw new Error(`Erro ao buscar registros: ${errorBusca.message}`);
@@ -43,17 +52,18 @@ serve(async (req) => {
       });
     }
 
-    // 2. Buscar mapeamentos no cadastro de exames
+    // 2. Buscar mapeamentos no cadastro de exames (incluindo modalidade)
     const { data: cadastroExames } = await supabase
       .from('cadastro_exames')
-      .select('nome, categoria, especialidade')
+      .select('nome, categoria, especialidade, modalidade')
       .eq('ativo', true);
 
     const mapeamentoCadastro = new Map();
     cadastroExames?.forEach(exame => {
       mapeamentoCadastro.set(exame.nome.toUpperCase(), {
         categoria: exame.categoria || 'SC',
-        especialidade: exame.especialidade || 'GERAL'
+        especialidade: exame.especialidade || 'GERAL',
+        modalidade: exame.modalidade || null
       });
     });
 
@@ -67,61 +77,51 @@ serve(async (req) => {
       const lote = registrosSemCategoria.slice(i, i + tamanhoLote);
       
       for (const registro of lote) {
-        let categoria = registro.CATEGORIA;
-        let especialidade = registro.ESPECIALIDADE;
-
-        // Aplicar mapeamento se disponível
+        // Buscar mapeamento no cadastro de exames
         const mapeamento = mapeamentoCadastro.get(registro.ESTUDO_DESCRICAO?.toUpperCase());
+        
         if (mapeamento) {
-          categoria = categoria || mapeamento.categoria;
-          especialidade = especialidade || mapeamento.especialidade;
-        }
-
-        // Garantir valores padrão
-        categoria = categoria || 'SC';
-        especialidade = especialidade || 'GERAL';
-
-        // Atualizar registro
-        const { error: errorUpdate } = await supabase
-          .from('volumetria_mobilemed')
-          .update({
-            "CATEGORIA": categoria,
-            "ESPECIALIDADE": especialidade,
+          // Sempre aplicar os valores do cadastro (sobrescrever se necessário)
+          const updateData: any = {
+            "CATEGORIA": mapeamento.categoria,
+            "ESPECIALIDADE": mapeamento.especialidade,
             updated_at: new Date().toISOString()
-          })
-          .eq('id', registro.id);
+          };
 
-        if (!errorUpdate) {
-          registrosCorrigidos++;
-          console.log(`✅ Corrigido: ${registro.ESTUDO_DESCRICAO} -> Cat: ${categoria}, Esp: ${especialidade}`);
+          // Adicionar modalidade se disponível no cadastro
+          if (mapeamento.modalidade) {
+            updateData["MODALIDADE"] = mapeamento.modalidade;
+          }
+
+          // Atualizar registro
+          const { error: errorUpdate } = await supabase
+            .from('volumetria_mobilemed')
+            .update(updateData)
+            .eq('id', registro.id);
+
+          if (!errorUpdate) {
+            registrosCorrigidos++;
+            const modalidadeLog = mapeamento.modalidade ? `, Mod: ${mapeamento.modalidade}` : '';
+            console.log(`✅ Corrigido: ${registro.ESTUDO_DESCRICAO} -> Cat: ${mapeamento.categoria}, Esp: ${mapeamento.especialidade}${modalidadeLog}`);
+          } else {
+            console.error(`❌ Erro ao corrigir ${registro.id}:`, errorUpdate);
+          }
         } else {
-          console.error(`❌ Erro ao corrigir ${registro.id}:`, errorUpdate);
+          console.log(`⚠️ Sem mapeamento para: ${registro.ESTUDO_DESCRICAO}`);
         }
       }
     }
 
-    // 4. Verificação final
-    const { data: verificacaoFinal } = await supabase
-      .from('volumetria_mobilemed')
-      .select(`
-        arquivo_fonte,
-        COUNT(*) as total,
-        COUNT(CASE WHEN "CATEGORIA" IS NOT NULL AND "CATEGORIA" != '' THEN 1 END) as com_categoria,
-        COUNT(CASE WHEN "ESPECIALIDADE" IS NOT NULL AND "ESPECIALIDADE" != '' THEN 1 END) as com_especialidade
-      `)
-      .eq('arquivo_fonte', 'volumetria_fora_padrao');
-
     const resultado = {
       sucesso: true,
-      arquivo_fonte: 'volumetria_fora_padrao',
+      arquivo_fonte: arquivo_fonte || 'TODOS',
       registros_encontrados: registrosSemCategoria.length,
       registros_corrigidos: registrosCorrigidos,
       mapeamentos_utilizados: cadastroExames?.length || 0,
-      verificacao_final: verificacaoFinal?.[0] || null,
       data_processamento: new Date().toISOString(),
       detalhes: {
-        categoria_aplicada: 'SC (padrão) ou mapeamento do cadastro',
-        especialidade_aplicada: 'GERAL (padrão) ou mapeamento do cadastro'
+        observacao: 'Correções aplicadas consultando cadastro_exames',
+        campos_corrigidos: 'MODALIDADE, ESPECIALIDADE, CATEGORIA'
       }
     };
 
