@@ -12,20 +12,51 @@ interface PeriodoFaturamento {
 }
 
 /**
- * Converte o período de faturamento em data_referencia e periodo_referencia
- * Ex: {ano: 2025, mes: 6} -> data_referencia: '2025-06-01', periodo_referencia: '2025-06'
+ * Calcula o período de referência baseado na DATA_LAUDO aplicando a regra do dia 8 ao dia 7
+ * Regra: Se DATA_LAUDO está entre dia 8 de um mês e dia 7 do mês seguinte, 
+ * o periodo_referencia é o mês que começa no dia 8
+ * 
+ * Exemplos:
+ * - DATA_LAUDO = 08/09/2025 → periodo_referencia = '2025-09' (set/2025)
+ * - DATA_LAUDO = 07/10/2025 → periodo_referencia = '2025-09' (set/2025)
+ * - DATA_LAUDO = 08/10/2025 → periodo_referencia = '2025-10' (out/2025)
+ * - DATA_LAUDO = 07/09/2025 → periodo_referencia = '2025-08' (ago/2025)
  */
-function gerarDataReferencia(periodo: PeriodoFaturamento): { data_referencia: string; periodo_referencia: string } {
-  const data_referencia = `${periodo.ano}-${String(periodo.mes).padStart(2, '0')}-01`;
-  const periodo_referencia = `${periodo.ano}-${String(periodo.mes).padStart(2, '0')}`;
+function calcularPeriodoReferencia(dataLaudo: string): { data_referencia: string; periodo_referencia: string } {
+  const data = new Date(dataLaudo + 'T00:00:00');
+  const dia = data.getDate();
+  const mes = data.getMonth() + 1; // JavaScript months are 0-indexed
+  const ano = data.getFullYear();
+  
+  let mesReferencia: number;
+  let anoReferencia: number;
+  
+  // Se o dia é >= 8, o período de referência é o mês atual
+  // Se o dia é < 8, o período de referência é o mês anterior
+  if (dia >= 8) {
+    mesReferencia = mes;
+    anoReferencia = ano;
+  } else {
+    // Dia 1-7: pertence ao período do mês anterior
+    if (mes === 1) {
+      mesReferencia = 12;
+      anoReferencia = ano - 1;
+    } else {
+      mesReferencia = mes - 1;
+      anoReferencia = ano;
+    }
+  }
+  
+  const periodo_referencia = `${anoReferencia}-${String(mesReferencia).padStart(2, '0')}`;
+  const data_referencia = `${anoReferencia}-${String(mesReferencia).padStart(2, '0')}-01`;
   
   return { data_referencia, periodo_referencia };
 }
 
 /**
  * Aplica a Regra v024 - Definição Data Referência
- * Define data_referencia e periodo_referencia baseados no período de processamento,
- * independente das datas originais de realização/laudo dos exames
+ * Calcula automaticamente o período de referência com base na DATA_LAUDO de cada exame,
+ * aplicando a regra do dia 8 ao dia 7
  */
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -40,65 +71,39 @@ serve(async (req) => {
     );
 
     const { 
-      periodo_faturamento, 
       arquivo_fonte, 
       lote_upload,
       aplicar_todos = false 
     } = await req.json();
 
-    console.log('🔧 Iniciando aplicação da Regra v024 - Definição Data Referência');
-    console.log('📅 Período:', periodo_faturamento);
+    console.log('🔧 Iniciando aplicação da Regra v024 - Definição Data Referência (dia 8 ao dia 7)');
     console.log('📁 Arquivo fonte:', arquivo_fonte);
     console.log('📦 Lote upload:', lote_upload);
     console.log('🌐 Aplicar todos:', aplicar_todos);
 
-    if (!periodo_faturamento || !periodo_faturamento.ano || !periodo_faturamento.mes) {
-      return new Response(
-        JSON.stringify({ 
-          sucesso: false, 
-          erro: 'Período de faturamento é obrigatório (ano e mês)' 
-        }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 400 
-        }
-      );
-    }
-
-    // Gerar data_referencia e periodo_referencia corretos
-    const { data_referencia, periodo_referencia } = gerarDataReferencia(periodo_faturamento);
-    
-    console.log(`📈 Definindo data_referencia: ${data_referencia}`);
-    console.log(`📊 Definindo periodo_referencia: ${periodo_referencia}`);
-
-    // Construir query baseada nos parâmetros
-    let query = supabase
+    // Buscar registros que precisam ter o período calculado
+    let selectQuery = supabase
       .from('volumetria_mobilemed')
-      .update({
-        data_referencia,
-        periodo_referencia,
-        updated_at: 'now()'
-      });
+      .select('id, "DATA_LAUDO"');
 
     // Aplicar filtros conforme necessário
     if (!aplicar_todos) {
       if (arquivo_fonte) {
-        query = query.eq('arquivo_fonte', arquivo_fonte);
+        selectQuery = selectQuery.eq('arquivo_fonte', arquivo_fonte);
       }
       if (lote_upload) {
-        query = query.eq('lote_upload', lote_upload);
+        selectQuery = selectQuery.eq('lote_upload', lote_upload);
       }
     }
 
-    // Executar atualização
-    const { data, error, count } = await query.select();
+    const { data: registros, error: selectError } = await selectQuery;
 
-    if (error) {
-      console.error('❌ Erro ao aplicar data_referencia:', error);
+    if (selectError) {
+      console.error('❌ Erro ao buscar registros:', selectError);
       return new Response(
         JSON.stringify({ 
           sucesso: false, 
-          erro: `Erro ao atualizar registros: ${error.message}` 
+          erro: `Erro ao buscar registros: ${selectError.message}` 
         }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -107,20 +112,68 @@ serve(async (req) => {
       );
     }
 
-    const registros_atualizados = data?.length || 0;
+    if (!registros || registros.length === 0) {
+      console.log('⚠️ Nenhum registro encontrado para processar');
+      return new Response(
+        JSON.stringify({ 
+          sucesso: true,
+          registros_atualizados: 0,
+          mensagem: 'Nenhum registro encontrado para processar'
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    console.log(`📊 ${registros.length} registros encontrados para processar`);
+
+    // Processar em lotes de 100 registros
+    const BATCH_SIZE = 100;
+    let totalAtualizados = 0;
+    const periodoStats: Record<string, number> = {};
+
+    for (let i = 0; i < registros.length; i += BATCH_SIZE) {
+      const batch = registros.slice(i, i + BATCH_SIZE);
+      
+      for (const registro of batch) {
+        if (!registro.DATA_LAUDO) {
+          console.warn(`⚠️ Registro ${registro.id} sem DATA_LAUDO, pulando...`);
+          continue;
+        }
+
+        const { data_referencia, periodo_referencia } = calcularPeriodoReferencia(registro.DATA_LAUDO);
+
+        const { error: updateError } = await supabase
+          .from('volumetria_mobilemed')
+          .update({
+            data_referencia,
+            periodo_referencia
+          })
+          .eq('id', registro.id);
+
+        if (updateError) {
+          console.error(`❌ Erro ao atualizar registro ${registro.id}:`, updateError);
+        } else {
+          totalAtualizados++;
+          periodoStats[periodo_referencia] = (periodoStats[periodo_referencia] || 0) + 1;
+        }
+      }
+
+      console.log(`⏳ Processados ${Math.min(i + BATCH_SIZE, registros.length)} de ${registros.length} registros...`);
+    }
 
     // Log da operação para auditoria
     await supabase
       .from('audit_logs')
       .insert({
         table_name: 'volumetria_mobilemed',
-        operation: 'REGRA_V024_DATA_REFERENCIA',
+        operation: 'REGRA_V024_DATA_REFERENCIA_AUTOMATICA',
         record_id: `${arquivo_fonte || 'ALL'}_${lote_upload || 'ALL'}`,
         new_data: {
-          data_referencia,
-          periodo_referencia,
-          registros_atualizados,
-          periodo_faturamento,
+          registros_processados: registros.length,
+          registros_atualizados: totalAtualizados,
+          periodos_calculados: periodoStats,
           arquivo_fonte,
           lote_upload,
           aplicar_todos
@@ -129,15 +182,15 @@ serve(async (req) => {
         severity: 'info'
       });
 
-    console.log(`✅ Regra v024 aplicada com sucesso: ${registros_atualizados} registros atualizados`);
+    console.log(`✅ Regra v024 aplicada com sucesso: ${totalAtualizados} registros atualizados`);
+    console.log('📊 Distribuição por período:', periodoStats);
 
     const resultado = {
       sucesso: true,
-      data_referencia,
-      periodo_referencia,
-      registros_atualizados,
-      periodo_aplicado: `${periodo_faturamento.mes}/${periodo_faturamento.ano}`,
-      mensagem: `Regra v024 aplicada: ${registros_atualizados} registros atualizados com período ${periodo_referencia}`
+      registros_processados: registros.length,
+      registros_atualizados: totalAtualizados,
+      periodos_calculados: periodoStats,
+      mensagem: `Regra v024 aplicada: ${totalAtualizados} registros atualizados automaticamente com base na DATA_LAUDO`
     };
 
     return new Response(
