@@ -111,14 +111,15 @@ serve(async (req) => {
           const { data: examesCadastro } = await supabase
             .from('cadastro_exames')
             .select('especialidade')
-            .eq('nome', registro.ESTUDO_DESCRICAO)
             .eq('ativo', true)
-            .not('especialidade', 'is', null)
+            .ilike('nome', registro.ESTUDO_DESCRICAO)
             .limit(1);
 
-          const novaEspecialidade = examesCadastro?.[0]?.especialidade || 'GERAL';
-          if (novaEspecialidade !== registro.ESPECIALIDADE) {
-            updates.ESPECIALIDADE = novaEspecialidade;
+          // Não usar 'GERAL' como fallback - deixar vazio para correção posterior
+          if (examesCadastro?.[0]?.especialidade) {
+            const novaEspecialidade = examesCadastro[0].especialidade;
+            if (novaEspecialidade !== registro.ESPECIALIDADE) {
+              updates.ESPECIALIDADE = novaEspecialidade;
             precisaAtualizar = true;
           }
         }

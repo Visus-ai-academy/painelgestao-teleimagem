@@ -62,7 +62,7 @@ serve(async (req) => {
     cadastroExames?.forEach(exame => {
       mapeamentoCadastro.set(exame.nome.toUpperCase(), {
         categoria: exame.categoria || 'SC',
-        especialidade: exame.especialidade || 'GERAL',
+        especialidade: exame.especialidade || null, // Não usar GERAL como fallback
         modalidade: exame.modalidade || null
       });
     });

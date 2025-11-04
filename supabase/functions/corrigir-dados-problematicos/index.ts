@@ -46,23 +46,46 @@ serve(async (req) => {
       console.log(`✅ ${corrigidosOncoMedInt} registros corrigidos: "ONCO MEDICINA INTERNA" → "MEDICINA INTERNA"`);
     }
 
-    // 2. Corrigir especialidade "CT" → "GERAL" (CT não é especialidade, é modalidade)
-    console.log('🔄 Corrigindo ESPECIALIDADE "CT" → "GERAL"');
-    const { data: ctCorrigidos, error: errorCt } = await supabase
+    // 2. Corrigir especialidade "CT" usando cadastro_exames (CT não é especialidade, é modalidade)
+    console.log('🔄 Corrigindo ESPECIALIDADE "CT" baseado no cadastro_exames');
+    
+    // Buscar registros com CT
+    const { data: registrosCt, error: errorSelectCt } = await supabase
       .from('volumetria_mobilemed')
-      .update({ 
-        "ESPECIALIDADE": 'GERAL',
-        updated_at: new Date().toISOString()
-      })
-      .eq('ESPECIALIDADE', 'CT')
-      .select('id');
+      .select('id, "ESTUDO_DESCRICAO"')
+      .eq('ESPECIALIDADE', 'CT');
 
-    if (errorCt) {
-      console.error('❌ Erro ao corrigir especialidade CT:', errorCt);
-    } else {
-      const corrigidosCt = ctCorrigidos?.length || 0;
-      correcoes.especialidades += corrigidosCt;
-      console.log(`✅ ${corrigidosCt} registros corrigidos: ESPECIALIDADE "CT" → "GERAL"`);
+    if (!errorSelectCt && registrosCt && registrosCt.length > 0) {
+      console.log(`📊 Encontrados ${registrosCt.length} registros com ESPECIALIDADE = "CT"`);
+      
+      // Buscar cadastro de exames
+      const { data: cadastroExames } = await supabase
+        .from('cadastro_exames')
+        .select('nome, especialidade')
+        .eq('ativo', true);
+
+      const mapaExames = new Map();
+      cadastroExames?.forEach(ex => mapaExames.set(ex.nome.toUpperCase().trim(), ex.especialidade));
+
+      let ctCorrigidos = 0;
+      for (const reg of registrosCt) {
+        if (reg.ESTUDO_DESCRICAO) {
+          const especialidadeCorreta = mapaExames.get(reg.ESTUDO_DESCRICAO.toUpperCase().trim());
+          if (especialidadeCorreta) {
+            await supabase
+              .from('volumetria_mobilemed')
+              .update({ 
+                "ESPECIALIDADE": especialidadeCorreta,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', reg.id);
+            ctCorrigidos++;
+          }
+        }
+      }
+      
+      correcoes.especialidades += ctCorrigidos;
+      console.log(`✅ ${ctCorrigidos} registros corrigidos: ESPECIALIDADE "CT" → especialidade do cadastro`);
     }
 
     // 3. Verificar e corrigir especialidade "Colunas" se existir

@@ -100,7 +100,7 @@ serve(async (req) => {
           telefone: String(row['telefone'] || '').trim() || null,
           socio: String(row['socio'] || '').trim() || null,
           funcao: String(row['funcao'] || '').trim() || null,
-          especialidade: espAtu || 'GERAL',
+          especialidade: espAtu || null, // Não usar GERAL como fallback para médicos
           especialidade_atuacao: espAtu || null,
           equipe: String(row['equipe'] || '').trim() || null,
           acrescimo_sem_digitador: String(row['acrescimo_sem_digitador'] || '').trim() || null,

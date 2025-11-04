@@ -185,11 +185,7 @@ serve(async (req) => {
             needsUpdate = true;
             correcoesEspecialidades++;
           }
-          if (registro.ESPECIALIDADE === 'GERAL') {
-            updates.ESPECIALIDADE = 'MEDICINA INTERNA';
-            needsUpdate = true;
-            correcoesEspecialidades++;
-          }
+          // GERAL não deve mais existir - será corrigido via cadastro_exames abaixo
 
           // 3. APLICAR CATEGORIAS E ESPECIALIDADES DO CADASTRO_EXAMES
           if (registro.ESTUDO_DESCRICAO) {
