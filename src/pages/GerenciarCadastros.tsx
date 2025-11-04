@@ -44,7 +44,6 @@ export default function GerenciarCadastros() {
   const [refreshStatusPanel, setRefreshStatusPanel] = useState(0);
   const [repasseUploadId, setRepasseUploadId] = useState<string | null>(null);
   const [duplicadosPrecos, setDuplicadosPrecos] = useState<any[]>([]);
-  const [isCorrigindoMamaMamo, setIsCorrigindoMamaMamo] = useState(false);
   const [clearOptions, setClearOptions] = useState({
     cadastro_exames: false,
     quebra_exames: false,
@@ -542,48 +541,6 @@ export default function GerenciarCadastros() {
     });
   };
 
-  // Handler para correção MAMA → MAMO retroativa
-  const handleCorrigirMamaMamo = async () => {
-    if (!isAdmin) {
-      toast({
-        title: "Acesso Negado",
-        description: "Apenas administradores podem executar esta correção",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsCorrigindoMamaMamo(true);
-    try {
-      console.log('🔄 Iniciando correção MAMA → MAMO para exames de mamografia...');
-      
-      const { data, error } = await supabase.functions.invoke('corrigir-mama-mamo-retroativo', {
-        body: {} // Corrigir todos os registros, sem filtro de arquivo_fonte
-      });
-
-      if (error) {
-        console.error('❌ Erro na correção:', error);
-        throw error;
-      }
-
-      console.log('✅ Correção concluída:', data);
-
-      toast({
-        title: "Correção MAMA → MAMO Concluída!",
-        description: `${data.total_corrigidos} registros corrigidos com sucesso. ${data.mensagem}`,
-      });
-
-    } catch (error: any) {
-      console.error('💥 Erro geral na correção:', error);
-      toast({
-        title: "Erro na Correção",
-        description: error.message || "Erro ao executar correção MAMA → MAMO",
-        variant: "destructive",
-      });
-    } finally {
-      setIsCorrigindoMamaMamo(false);
-    }
-  };
 
   return (
     <div className="space-y-8">
@@ -1059,50 +1016,6 @@ export default function GerenciarCadastros() {
                   title="Status dos Uploads de Especialidades"
                 />
               </div>
-
-              {/* Card de Correção MAMA → MAMO */}
-              <Card className="mt-6 border-orange-200 bg-orange-50/50">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-orange-700">
-                    <RefreshCw className="h-5 w-5" />
-                    Correção Retroativa: MAMA → MAMO
-                  </CardTitle>
-                  <CardDescription className="text-orange-600">
-                    Corrige registros históricos de exames de mamografia (modalidade MG) que foram incorretamente marcados com especialidade "MAMA".
-                    Apenas exames de "RM MAMAS" (modalidade MR) devem ter especialidade "MAMA". 
-                    Exames de "MAMOGRAFIA" e "TOMOSSINTESE" (modalidade MG) devem ter especialidade "MAMO".
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    <div className="text-sm text-muted-foreground space-y-1">
-                      <p><strong>O que será corrigido:</strong></p>
-                      <ul className="list-disc list-inside ml-4 space-y-1">
-                        <li>Exames com modalidade "MG" e especialidade "MAMA" → serão alterados para "MAMO"</li>
-                        <li>Exames com modalidade "MR" (RM MAMAS) mantêm especialidade "MAMA" (correto)</li>
-                      </ul>
-                    </div>
-                    <Button
-                      onClick={handleCorrigirMamaMamo}
-                      disabled={isCorrigindoMamaMamo || !isAdmin}
-                      className="w-full sm:w-auto"
-                      variant="default"
-                    >
-                      {isCorrigindoMamaMamo ? (
-                        <>
-                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                          Corrigindo...
-                        </>
-                      ) : (
-                        <>
-                          <RefreshCw className="h-4 w-4 mr-2" />
-                          Executar Correção
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
               
               <div className="mt-8">
                 <CadastroDataTable
