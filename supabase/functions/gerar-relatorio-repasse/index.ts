@@ -199,7 +199,19 @@ serve(async (req) => {
       if (v === 'S/C' || v === 'S C' || v === 'SEM CATEGORIA' || v === 'SEM' || v === 'NAO INFORMADO' || v === 'NAO_CLASSIFICADO' || v === 'NAO CLASSIFICADO' || v === 'N/A') return 'SC';
       return v;
     };
-
+    // Padronizar modalidades para equivalência EXATA entre fontes (sem curingas)
+    const mapModalidade = (m: any) => {
+      const v = normalize(m);
+      // Tomografia
+      if (v === 'TC' || v === 'CT') return 'TC';
+      // Ressonância Magnética
+      if (v === 'RM' || v === 'MR' || v === 'RNM') return 'RM';
+      // Raio-X / Radiografia
+      if (v === 'RX' || v === 'CR' || v === 'RAIOX' || v === 'RAIO X') return 'RX';
+      // Ultrassom
+      if (v === 'US' || v === 'USG' || v === 'ULTRASSOM' || v === 'ULTRASSONOGRAFIA') return 'US';
+      return v;
+    };
     const { data: repasses, error: repasseError } = await supabase
       .from('medicos_valores_repasse')
       .select('modalidade, especialidade, categoria, prioridade, valor, cliente_id, esta_no_escopo, data_inicio_vigencia, data_fim_vigencia, ativo')
@@ -229,7 +241,7 @@ serve(async (req) => {
     };
 
     const getValorRepasse = (ex: any) => {
-      const mod = normalize(ex.MODALIDADE);
+      const mod = mapModalidade(ex.MODALIDADE);
       const esp = normalize(ex.ESPECIALIDADE);
       const cat = mapCategoria(ex.CATEGORIA);
       const pri = mapPrioridade(ex.PRIORIDADE);
@@ -245,7 +257,7 @@ serve(async (req) => {
 
       const matches = (r: any) => {
         if (!inVigencia(r)) return false;
-        if (normalize(r.modalidade) !== mod) return false;
+        if (mapModalidade(r.modalidade) !== mod) return false;
         if (normalize(r.especialidade) !== esp) return false;
         const rc = mapCategoria(r.categoria);
         if (rc !== cat) return false;
@@ -253,7 +265,6 @@ serve(async (req) => {
         if (rp !== pri) return false;
         return true;
       };
-
       let found = (repasses || []).find((r: any) => r.cliente_id && cliId && r.cliente_id === cliId && matches(r));
       if (found) return Number(found.valor) || 0;
 
