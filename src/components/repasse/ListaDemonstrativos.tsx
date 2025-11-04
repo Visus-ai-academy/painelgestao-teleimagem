@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, FileText, AlertCircle } from "lucide-react";
+import { Search, FileText, AlertCircle, ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
 
 interface DemonstrativoItem {
@@ -28,6 +28,9 @@ interface ListaDemonstrativosProps {
 export function ListaDemonstrativos({ demonstrativos, periodo }: ListaDemonstrativosProps) {
   const [filtro, setFiltro] = useState("");
   const [expandido, setExpandido] = useState<Set<string>>(new Set());
+  const [expandidosEspecialidade, setExpandidosEspecialidade] = useState<Set<string>>(new Set());
+  const [expandidosPrioridade, setExpandidosPrioridade] = useState<Set<string>>(new Set());
+  const [expandidosCategoria, setExpandidosCategoria] = useState<Set<string>>(new Set());
 
   const demonstrativosFiltrados = demonstrativos.filter(d =>
     d.medicoNome.toLowerCase().includes(filtro.toLowerCase())
@@ -40,6 +43,42 @@ export function ListaDemonstrativos({ demonstrativos, periodo }: ListaDemonstrat
         novo.delete(medicoId);
       } else {
         novo.add(medicoId);
+      }
+      return novo;
+    });
+  };
+
+  const toggleEspecialidade = (chave: string) => {
+    setExpandidosEspecialidade(prev => {
+      const novo = new Set(prev);
+      if (novo.has(chave)) {
+        novo.delete(chave);
+      } else {
+        novo.add(chave);
+      }
+      return novo;
+    });
+  };
+
+  const togglePrioridade = (chave: string) => {
+    setExpandidosPrioridade(prev => {
+      const novo = new Set(prev);
+      if (novo.has(chave)) {
+        novo.delete(chave);
+      } else {
+        novo.add(chave);
+      }
+      return novo;
+    });
+  };
+
+  const toggleCategoria = (chave: string) => {
+    setExpandidosCategoria(prev => {
+      const novo = new Set(prev);
+      if (novo.has(chave)) {
+        novo.delete(chave);
+      } else {
+        novo.add(chave);
       }
       return novo;
     });
@@ -137,62 +176,213 @@ export function ListaDemonstrativos({ demonstrativos, periodo }: ListaDemonstrat
                         <h5 className="font-semibold text-sm mb-2">Detalhes por Arranjo</h5>
                         <div className="space-y-2">
                           {(() => {
-                            // Agrupar por arranjo (modalidade/especialidade/categoria)
-                            const arranjosMap = new Map<string, any>();
+                            // Agrupar por ESPECIALIDADE -> PRIORIDADE -> CATEGORIA -> MODALIDADE
+                            const especialidadesMap = new Map<string, any>();
                             
                             demo.detalhesExames.forEach((exame: any) => {
-                              const chave = `${exame.modalidade}|${exame.especialidade}|${exame.categoria || 'Sem Categoria'}|${exame.prioridade || 'Sem Prioridade'}`;
+                              const especialidade = exame.especialidade || 'Sem Especialidade';
+                              const prioridade = exame.prioridade || 'Sem Prioridade';
+                              const categoria = exame.categoria || 'Sem Categoria';
+                              const modalidade = exame.modalidade || 'Sem Modalidade';
                               
-                              if (arranjosMap.has(chave)) {
-                                const existente = arranjosMap.get(chave);
-                                existente.quantidade += exame.quantidade || 0;
-                                existente.valor_total += exame.valor_total || 0;
-                              } else {
-                                arranjosMap.set(chave, {
-                                  modalidade: exame.modalidade,
-                                  especialidade: exame.especialidade,
-                                  categoria: exame.categoria || 'Sem Categoria',
-                                  prioridade: exame.prioridade || 'Sem Prioridade',
-                                  quantidade: exame.quantidade || 0,
-                                  valor_total: exame.valor_total || 0
+                              if (!especialidadesMap.has(especialidade)) {
+                                especialidadesMap.set(especialidade, {
+                                  especialidade,
+                                  quantidade: 0,
+                                  valor_total: 0,
+                                  prioridades: new Map()
                                 });
                               }
+
+                              const esp = especialidadesMap.get(especialidade);
+                              esp.quantidade += exame.quantidade || 0;
+                              esp.valor_total += exame.valor_total || 0;
+
+                              if (!esp.prioridades.has(prioridade)) {
+                                esp.prioridades.set(prioridade, {
+                                  prioridade,
+                                  categorias: new Map()
+                                });
+                              }
+
+                              const prior = esp.prioridades.get(prioridade);
+
+                              if (!prior.categorias.has(categoria)) {
+                                prior.categorias.set(categoria, {
+                                  categoria,
+                                  modalidades: new Map()
+                                });
+                              }
+
+                              const cat = prior.categorias.get(categoria);
+
+                              if (!cat.modalidades.has(modalidade)) {
+                                cat.modalidades.set(modalidade, {
+                                  modalidade,
+                                  quantidade: 0,
+                                  valor_total: 0
+                                });
+                              }
+
+                              const mod = cat.modalidades.get(modalidade);
+                              mod.quantidade += exame.quantidade || 0;
+                              mod.valor_total += exame.valor_total || 0;
                             });
                             
-                            const arranjos = Array.from(arranjosMap.values());
+                            const especialidades = Array.from(especialidadesMap.values());
                             
-                            return arranjos.map((arranjo: any, idx: number) => (
-                              <div key={idx} className="bg-muted/50 p-3 rounded">
-                                <div className="grid grid-cols-4 gap-4 text-sm">
-                                  <div>
-                                    <span className="text-xs text-muted-foreground block">Modalidade</span>
-                                    <span className="font-medium">{arranjo.modalidade}</span>
+                            return especialidades.map((esp: any) => {
+                              const espChave = `${demo.medicoId}|${esp.especialidade}`;
+                              
+                              return (
+                                <div key={espChave} className="border rounded overflow-hidden">
+                                  {/* Especialidade - Nível 1 */}
+                                  <div 
+                                    className="flex items-center justify-between p-2 bg-muted/50 hover:bg-muted transition-colors cursor-pointer"
+                                    onClick={() => toggleEspecialidade(espChave)}
+                                  >
+                                    <div className="flex items-center gap-2 flex-1">
+                                      {expandidosEspecialidade.has(espChave) ? (
+                                        <ChevronDown className="h-3 w-3" />
+                                      ) : (
+                                        <ChevronRight className="h-3 w-3" />
+                                      )}
+                                      <div>
+                                        <span className="text-xs text-muted-foreground">Especialidade: </span>
+                                        <span className="font-semibold text-sm">{esp.especialidade}</span>
+                                      </div>
+                                    </div>
+                                    <div className="flex gap-4 text-xs">
+                                      <div>
+                                        <span className="text-muted-foreground">Qtd: </span>
+                                        <span className="font-semibold">{esp.quantidade}</span>
+                                      </div>
+                                      <div className="min-w-[80px] text-right">
+                                        <span className="font-semibold text-primary">{formatarMoeda(esp.valor_total)}</span>
+                                      </div>
+                                    </div>
                                   </div>
-                                  <div>
-                                    <span className="text-xs text-muted-foreground block">Especialidade</span>
-                                    <span className="font-medium">{arranjo.especialidade}</span>
-                                  </div>
-                                  <div>
-                                    <span className="text-xs text-muted-foreground block">Categoria</span>
-                                    <span className="font-medium">{arranjo.categoria}</span>
-                                  </div>
-                                  <div>
-                                    <span className="text-xs text-muted-foreground block">Prioridade</span>
-                                    <span className="font-medium">{arranjo.prioridade}</span>
-                                  </div>
+
+                                  {/* Prioridades - Nível 2 */}
+                                  {expandidosEspecialidade.has(espChave) && (
+                                    <div className="border-t">
+                                      {Array.from(esp.prioridades.values()).map((prior: any) => {
+                                        const priorChave = `${espChave}|${prior.prioridade}`;
+                                        const priorQtd = Array.from(prior.categorias.values()).reduce(
+                                          (sum: number, cat: any) => {
+                                            const catQtd = Array.from(cat.modalidades.values()).reduce((s: number, m: any) => s + (Number(m.quantidade) || 0), 0) as number;
+                                            return sum + catQtd;
+                                          }, 0
+                                        );
+                                        const priorValor = Array.from(prior.categorias.values()).reduce(
+                                          (sum: number, cat: any) => {
+                                            const catValor = Array.from(cat.modalidades.values()).reduce((s: number, m: any) => s + (Number(m.valor_total) || 0), 0) as number;
+                                            return sum + catValor;
+                                          }, 0
+                                        );
+
+                                        return (
+                                          <div key={priorChave}>
+                                            <div
+                                              className="flex items-center justify-between p-2 pl-6 bg-background hover:bg-muted/30 transition-colors cursor-pointer"
+                                              onClick={() => togglePrioridade(priorChave)}
+                                            >
+                                              <div className="flex items-center gap-2 flex-1">
+                                                {expandidosPrioridade.has(priorChave) ? (
+                                                  <ChevronDown className="h-3 w-3" />
+                                                ) : (
+                                                  <ChevronRight className="h-3 w-3" />
+                                                )}
+                                                <div>
+                                                  <span className="text-xs text-muted-foreground">Prioridade: </span>
+                                                  <span className="font-medium text-sm">{prior.prioridade}</span>
+                                                </div>
+                                              </div>
+                                              <div className="flex gap-4 text-xs">
+                                                <div>
+                                                  <span className="text-muted-foreground">Qtd: </span>
+                                                  <span className="font-medium">{Number(priorQtd)}</span>
+                                                </div>
+                                                <div className="min-w-[80px] text-right">
+                                                  <span className="font-medium text-primary">{formatarMoeda(Number(priorValor))}</span>
+                                                </div>
+                                              </div>
+                                            </div>
+
+                                            {/* Categorias - Nível 3 */}
+                                            {expandidosPrioridade.has(priorChave) && (
+                                              <div className="border-t">
+                                                {Array.from(prior.categorias.values()).map((cat: any) => {
+                                                  const catChave = `${priorChave}|${cat.categoria}`;
+                                                  const catQtd = Array.from(cat.modalidades.values()).reduce((s: number, m: any) => s + (m.quantidade || 0), 0);
+                                                  const catValor = Array.from(cat.modalidades.values()).reduce((s: number, m: any) => s + (m.valor_total || 0), 0);
+
+                                                  return (
+                                                    <div key={catChave}>
+                                                      <div
+                                                        className="flex items-center justify-between p-2 pl-10 bg-background hover:bg-muted/20 transition-colors cursor-pointer"
+                                                        onClick={() => toggleCategoria(catChave)}
+                                                      >
+                                                        <div className="flex items-center gap-2 flex-1">
+                                                          {expandidosCategoria.has(catChave) ? (
+                                                            <ChevronDown className="h-3 w-3" />
+                                                          ) : (
+                                                            <ChevronRight className="h-3 w-3" />
+                                                          )}
+                                                          <div>
+                                                            <span className="text-xs text-muted-foreground">Categoria: </span>
+                                                            <span className="font-medium text-sm">{cat.categoria}</span>
+                                                          </div>
+                                                        </div>
+                                                        <div className="flex gap-4 text-xs">
+                                                          <div>
+                                                            <span className="text-muted-foreground">Qtd: </span>
+                                                            <span className="font-medium">{Number(catQtd)}</span>
+                                                          </div>
+                                                          <div className="min-w-[80px] text-right">
+                                                            <span className="font-medium text-primary">{formatarMoeda(Number(catValor))}</span>
+                                                          </div>
+                                                        </div>
+                                                      </div>
+
+                                                      {/* Modalidades - Nível 4 */}
+                                                      {expandidosCategoria.has(catChave) && (
+                                                        <div className="bg-muted/10">
+                                                          {Array.from(cat.modalidades.values()).map((mod: any) => (
+                                                            <div
+                                                              key={mod.modalidade}
+                                                              className="flex items-center justify-between p-2 pl-14 text-xs"
+                                                            >
+                                                              <div>
+                                                                <span className="text-muted-foreground">Modalidade: </span>
+                                                                <span className="font-medium">{mod.modalidade}</span>
+                                                              </div>
+                                                              <div className="flex gap-4">
+                                                                <div>
+                                                                  <span className="text-muted-foreground">Qtd: </span>
+                                                                  <span className="font-medium">{mod.quantidade}</span>
+                                                                </div>
+                                                                <div className="min-w-[80px] text-right">
+                                                                  <span className="font-medium text-primary">{formatarMoeda(mod.valor_total)}</span>
+                                                                </div>
+                                                              </div>
+                                                            </div>
+                                                          ))}
+                                                        </div>
+                                                      )}
+                                                    </div>
+                                                  );
+                                                })}
+                                              </div>
+                                            )}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
                                 </div>
-                                <div className="flex justify-between mt-3 pt-3 border-t">
-                                  <div>
-                                    <span className="text-xs text-muted-foreground">Quantidade: </span>
-                                    <span className="font-semibold">{arranjo.quantidade}</span>
-                                  </div>
-                                  <div>
-                                    <span className="text-xs text-muted-foreground">Valor Total: </span>
-                                    <span className="font-semibold text-primary">{formatarMoeda(arranjo.valor_total)}</span>
-                                  </div>
-                                </div>
-                              </div>
-                            ));
+                              );
+                            });
                           })()}
                         </div>
                       </div>

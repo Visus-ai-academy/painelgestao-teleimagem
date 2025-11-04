@@ -169,6 +169,7 @@ serve(async (req) => {
       .from('volumetria_mobilemed')
       .select(`
         DATA_REALIZACAO,
+        DATA_LAUDO,
         NOME_PACIENTE,
         MEDICO,
         ESPECIALIDADE,
@@ -312,8 +313,8 @@ serve(async (req) => {
       yPosition -= 25;
 
       // Cabeçalho da tabela
-      const colWidths = [55, 85, 85, 100, 35, 70, 40, 40, 70, 55, 30, 60]; // Larguras das colunas
-      const headers = ['Data', 'Paciente', 'Médico', 'Exame', 'Modal.', 'Espec.', 'Categ.', 'Prior.', 'Accession', 'Origem', 'Qtd', 'Valor Total'];
+      const colWidths = [55, 55, 75, 75, 90, 35, 65, 40, 40, 65, 50, 30, 55]; // Larguras das colunas
+      const headers = ['Data', 'Data Laudo', 'Paciente', 'Médico', 'Exame', 'Modal.', 'Espec.', 'Categ.', 'Prior.', 'Accession', 'Origem', 'Qtd', 'Valor Total'];
       
       let xPos = tableMargin;
       
@@ -395,15 +396,16 @@ serve(async (req) => {
         }
         const rowData = [
           exame.DATA_REALIZACAO ? new Date(exame.DATA_REALIZACAO).toLocaleDateString('pt-BR') : '-',
-          (exame.NOME_PACIENTE || '-').substring(0, 16),
-          (exame.MEDICO || '-').substring(0, 16),
-          (exame.ESPECIALIDADE || '-').substring(0, 20),
+          exame.DATA_LAUDO ? new Date(exame.DATA_LAUDO).toLocaleDateString('pt-BR') : '-',
+          (exame.NOME_PACIENTE || '-').substring(0, 14),
+          (exame.MEDICO || '-').substring(0, 14),
+          (exame.ESPECIALIDADE || '-').substring(0, 18),
           (exame.MODALIDADE || '-').substring(0, 6),
-          (exame.ESPECIALIDADE || '-').substring(0, 13),
+          (exame.ESPECIALIDADE || '-').substring(0, 12),
           (exame.CATEGORIA || '-').substring(0, 6),
           (exame.PRIORIDADE || '-').substring(0, 10),
-          (exame.ACCESSION_NUMBER ? String(exame.ACCESSION_NUMBER) : '-').substring(0, 20),
-          (exame.Cliente_Nome_Fantasia || exame.cliente_nome_fantasia || exame.EMPRESA || '-').substring(0, 10),
+          (exame.ACCESSION_NUMBER ? String(exame.ACCESSION_NUMBER) : '-').substring(0, 18),
+          (exame.Cliente_Nome_Fantasia || exame.cliente_nome_fantasia || exame.EMPRESA || '-').substring(0, 9),
           '1',
           formatMoeda(valorRep)
         ];
