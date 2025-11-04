@@ -185,36 +185,12 @@ serve(async (req) => {
     periodEnd.setMonth(periodEnd.getMonth() + 1);
     periodEnd.setDate(0);
 
-    const normalize = (s: any) => (s || '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
-    const mapPrioridade = (p: any) => {
-      const v = normalize(p);
-      if (v === 'URGENTE' || v === 'URGENCIA' || v === 'EMERGENCIA') return 'URGENCIA';
-      if (v === 'PLANTAO') return 'PLANTAO';
-      if (v === 'NORMAL' || v === 'ROTINA' || v === 'ELETIVO' || v === 'ELETIVA') return 'ROTINA';
-      return v;
-    };
-    const mapCategoria = (c: any) => {
-      const v = normalize(c);
-      // Padronizar variações para SC
-      if (v === 'S/C' || v === 'S C' || v === 'SEM CATEGORIA' || v === 'SEM' || v === 'NAO INFORMADO' || v === 'NAO_CLASSIFICADO' || v === 'NAO CLASSIFICADO' || v === 'N/A') return 'SC';
-      return v;
-    };
-    // Padronizar modalidades para equivalência EXATA entre fontes (sem curingas)
-    const mapModalidade = (m: any) => {
-      const v = normalize(m);
-      // Tomografia
-      if (v === 'TC' || v === 'CT') return 'TC';
-      // Ressonância Magnética
-      if (v === 'RM' || v === 'MR' || v === 'RNM') return 'RM';
-      // Raio-X / Radiografia
-      if (v === 'RX' || v === 'CR' || v === 'RAIOX' || v === 'RAIO X') return 'RX';
-      // Ultrassom
-      if (v === 'US' || v === 'USG' || v === 'ULTRASSOM' || v === 'ULTRASSONOGRAFIA') return 'US';
-      return v;
-    };
+    // ✅ Usar EXATAMENTE a mesma normalização do demonstrativo
+    const norm = (s: any) => (s ?? '').toString().trim().toUpperCase();
+    // ✅ Buscar valores de repasse (mesma query do demonstrativo)
     const { data: repasses, error: repasseError } = await supabase
       .from('medicos_valores_repasse')
-      .select('modalidade, especialidade, categoria, prioridade, valor, cliente_id, esta_no_escopo, data_inicio_vigencia, data_fim_vigencia, ativo')
+      .select('*')
       .eq('medico_id', medico_id)
       .eq('ativo', true);
     if (repasseError) {
@@ -222,56 +198,75 @@ serve(async (req) => {
     }
     console.log('[Repasse] Registros de repasse carregados:', repasses?.length || 0);
 
-    const { data: clientes, error: clientesError } = await supabase
-      .from('clientes')
-      .select('id, nome, nome_fantasia, nome_mobilemed');
-    if (clientesError) {
-      console.error('[Repasse] Erro ao buscar clientes:', clientesError);
+    // ✅ Mapear clientes para obter IDs (mesma lógica do demonstrativo)
+    const clienteNomes = Array.from(new Set(
+      exames.map(e => e.EMPRESA || e.Cliente_Nome_Fantasia || e.cliente_nome_fantasia).filter(Boolean)
+    ));
+    const clienteMap = new Map<string, string>();
+    if (clienteNomes.length > 0) {
+      const { data: clientes, error: clientesError } = await supabase
+        .from('clientes')
+        .select('id, nome')
+        .in('nome', clienteNomes);
+      if (clientesError) {
+        console.error('[Repasse] Erro ao buscar clientes:', clientesError);
+      } else {
+        for (const c of clientes || []) {
+          clienteMap.set(c.nome, c.id);
+        }
+      }
     }
 
-    const findClienteId = (ex: any) => {
-      const candidates = [ex.Cliente_Nome_Fantasia, ex.cliente_nome_fantasia, ex.EMPRESA];
-      const first = candidates.find((c) => c);
-      const target = normalize(first);
-      if (!target) return null;
-      const found = (clientes || []).find((c: any) => {
-        return [c.nome_fantasia, c.nome, c.nome_mobilemed].some((v: any) => normalize(v) === target);
-      });
-      return found?.id || null;
-    };
-
+    // ✅ Função de match IDÊNTICA ao demonstrativo (4 níveis de fallback)
     const getValorRepasse = (ex: any) => {
-      const mod = mapModalidade(ex.MODALIDADE);
-      const esp = normalize(ex.ESPECIALIDADE);
-      const cat = mapCategoria(ex.CATEGORIA);
-      const pri = mapPrioridade(ex.PRIORIDADE);
-      const cliId = findClienteId(ex);
+      const clienteNome = ex.EMPRESA || ex.Cliente_Nome_Fantasia || ex.cliente_nome_fantasia || '';
+      const clienteId = clienteMap.get(clienteNome);
+      const modalidade = ex.MODALIDADE || '';
+      const especialidade = ex.ESPECIALIDADE || '';
+      const categoria = ex.CATEGORIA || '';
+      const prioridade = ex.PRIORIDADE || '';
 
-      const inVigencia = (r: any) => {
-        const ini = r.data_inicio_vigencia ? new Date(r.data_inicio_vigencia) : null;
-        const fim = r.data_fim_vigencia ? new Date(r.data_fim_vigencia) : null;
-        if (ini && ini > periodEnd) return false;
-        if (fim && fim < periodStart) return false;
-        return true;
-      };
+      // 1) Com cliente específico + categoria
+      let valorRepasse = (repasses || []).find((r: any) =>
+        norm(r.modalidade) === norm(modalidade) &&
+        norm(r.especialidade) === norm(especialidade) &&
+        norm(r.categoria) === norm(categoria) &&
+        norm(r.prioridade) === norm(prioridade) &&
+        (!!clienteId && r.cliente_id === clienteId)
+      );
 
-      const matches = (r: any) => {
-        if (!inVigencia(r)) return false;
-        if (mapModalidade(r.modalidade) !== mod) return false;
-        if (normalize(r.especialidade) !== esp) return false;
-        const rc = mapCategoria(r.categoria);
-        if (rc !== cat) return false;
-        const rp = mapPrioridade(r.prioridade);
-        if (rp !== pri) return false;
-        return true;
-      };
-      let found = (repasses || []).find((r: any) => r.cliente_id && cliId && r.cliente_id === cliId && matches(r));
-      if (found) return Number(found.valor) || 0;
+      // 2) Sem cliente, com categoria
+      if (!valorRepasse) {
+        valorRepasse = (repasses || []).find((r: any) =>
+          norm(r.modalidade) === norm(modalidade) &&
+          norm(r.especialidade) === norm(especialidade) &&
+          norm(r.categoria) === norm(categoria) &&
+          norm(r.prioridade) === norm(prioridade) &&
+          (r.cliente_id == null)
+        );
+      }
 
-      found = (repasses || []).find((r: any) => !r.cliente_id && (r.esta_no_escopo === true || r.esta_no_escopo === null) && matches(r));
-      if (found) return Number(found.valor) || 0;
+      // 3) Sem cliente e sem categoria
+      if (!valorRepasse) {
+        valorRepasse = (repasses || []).find((r: any) =>
+          norm(r.modalidade) === norm(modalidade) &&
+          norm(r.especialidade) === norm(especialidade) &&
+          norm(r.prioridade) === norm(prioridade) &&
+          (!r.categoria || norm(r.categoria) === '') &&
+          (r.cliente_id == null)
+        );
+      }
 
-      return 0;
+      // 4) Fallback: apenas modalidade + especialidade
+      if (!valorRepasse) {
+        valorRepasse = (repasses || []).find((r: any) =>
+          norm(r.modalidade) === norm(modalidade) &&
+          norm(r.especialidade) === norm(especialidade) &&
+          (r.cliente_id == null)
+        );
+      }
+
+      return Number(valorRepasse?.valor) || 0;
     };
 
     // QUADRO 2 - DETALHAMENTO DOS EXAMES (formato paisagem)
