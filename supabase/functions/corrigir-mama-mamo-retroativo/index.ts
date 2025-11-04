@@ -64,7 +64,7 @@ serve(async (req) => {
     const { error: updateError } = await supabase
       .from('volumetria_mobilemed')
       .update({
-        'ESPECIALIDADE': 'MAMO',
+        ESPECIALIDADE: 'MAMO',
         updated_at: new Date().toISOString()
       })
       .in('id', idsParaCorrigir);
