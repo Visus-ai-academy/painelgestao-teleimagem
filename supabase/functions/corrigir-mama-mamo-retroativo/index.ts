@@ -17,9 +17,15 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { arquivo_fonte } = await req.json();
+    let arquivo_fonte: string | undefined = undefined;
+    try {
+      const body = await req.json().catch(() => ({}));
+      arquivo_fonte = body?.arquivo_fonte;
+    } catch (_e) {
+      arquivo_fonte = undefined;
+    }
     
-    console.log(`🔄 Iniciando correção MAMA → MAMO para exames de mamografia (modalidade MG)`);
+    console.log(`🔄 Iniciando correção MAMA → MAMO para exames de mamografia (modalidade MG)`, { arquivo_fonte });
     
     // Buscar registros com especialidade MAMA na modalidade MG
     // Esses são os exames de MAMOGRAFIA e TOMOSSINTESE que precisam virar MAMO
