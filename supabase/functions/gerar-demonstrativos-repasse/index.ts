@@ -30,15 +30,14 @@ serve(async (req) => {
 
     console.log('[Repasse] Gerando demonstrativos para período:', periodo);
 
-    // 1. Buscar médicos ativos
+    // 1. Buscar todos os médicos (ativos e inativos que laudaram no período)
     const { data: medicos, error: medicosError } = await supabase
       .from('medicos')
-      .select('id, nome, crm, cpf, email')
-      .eq('ativo', true);
+      .select('id, nome, crm, cpf, email, ativo');
 
     if (medicosError) throw medicosError;
 
-    console.log(`[Repasse] ${medicos?.length || 0} médicos ativos encontrados`);
+    console.log(`[Repasse] ${medicos?.length || 0} médicos encontrados (ativos e inativos)`);
 
     const demonstrativos = [];
 

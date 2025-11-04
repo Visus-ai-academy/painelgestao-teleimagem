@@ -21,6 +21,7 @@ import { StatusPorMedico } from "@/components/repasse/StatusPorMedico";
 import { ListaDemonstrativos } from "@/components/repasse/ListaDemonstrativos";
 import { ResumoGeralRepasse } from "@/components/repasse/ResumoGeralRepasse";
 import { ControlePeriodoFaturamento } from "@/components/ControlePeriodoFaturamento";
+import { RelatorioExamesSemMedico } from "@/components/RelatorioExamesSemMedico";
 import * as XLSX from 'xlsx';
 
 export default function PagamentosMedicos() {
@@ -719,6 +720,9 @@ export default function PagamentosMedicos() {
 
         {/* ABA 4: RELATÓRIOS */}
         <TabsContent value="relatorios" className="space-y-6">
+          {/* Relatório de Exames sem Médico */}
+          <RelatorioExamesSemMedico />
+
           <Card>
             <CardHeader>
               <CardTitle>Relatórios Gerados</CardTitle>
