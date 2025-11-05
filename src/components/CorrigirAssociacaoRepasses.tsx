@@ -67,13 +67,13 @@ export const CorrigirAssociacaoRepasses = () => {
     }
   };
 
-  const corrigirEspecialidadeGeral = async () => {
+  const corrigirEspecialidadesInvalidas = async () => {
     try {
       setLoadingEspecialidade(true);
       setResultadoEspecialidade(null);
-      toast.info('Corrigindo registros com especialidade GERAL...');
+      toast.info('Corrigindo especialidades inválidas (GERAL e RX)...');
 
-      const { data, error } = await supabase.functions.invoke('corrigir-especialidade-geral');
+      const { data, error } = await supabase.functions.invoke('corrigir-especialidades-invalidas-completo');
 
       if (error) throw error;
 
@@ -82,10 +82,10 @@ export const CorrigirAssociacaoRepasses = () => {
       if (data.total_corrigidos > 0) {
         toast.success(`${data.total_corrigidos} registros corrigidos!`);
       } else {
-        toast.info('Nenhum registro com GERAL encontrado');
+        toast.info('Nenhum registro com especialidades inválidas encontrado');
       }
     } catch (error: any) {
-      console.error('Erro ao corrigir especialidade GERAL:', error);
+      console.error('Erro ao corrigir especialidades inválidas:', error);
       toast.error(`Erro: ${error.message}`);
     } finally {
       setLoadingEspecialidade(false);
@@ -94,34 +94,34 @@ export const CorrigirAssociacaoRepasses = () => {
 
   return (
     <div className="space-y-4">
-      {/* Card de Especialidade GERAL */}
+      {/* Card de Especialidades Inválidas */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <AlertCircle className="h-5 w-5" />
-            Corrigir Especialidade "GERAL"
+            Corrigir Especialidades Inválidas
           </CardTitle>
           <CardDescription>
-            Corrige registros com ESPECIALIDADE = "GERAL" usando o cadastro de exames
+            Corrige registros com ESPECIALIDADE = "GERAL" ou "RX" usando o cadastro de exames
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <Alert>
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              Esta ferramenta busca todos os registros com especialidade "GERAL" e atualiza com a especialidade 
-              correta baseada no cadastro de exames (campo ESTUDO_DESCRICAO).
+              Esta ferramenta busca todos os registros com especialidades inválidas ("GERAL" e "RX") e atualiza com a especialidade 
+              correta baseada no cadastro de exames. "RX" é uma modalidade, não especialidade.
             </AlertDescription>
           </Alert>
 
-          <Button onClick={corrigirEspecialidadeGeral} disabled={loadingEspecialidade}>
+          <Button onClick={corrigirEspecialidadesInvalidas} disabled={loadingEspecialidade}>
             {loadingEspecialidade ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Corrigindo...
               </>
             ) : (
-              'Executar Correção de GERAL'
+              'Executar Correção de Especialidades'
             )}
           </Button>
 
@@ -134,10 +134,14 @@ export const CorrigirAssociacaoRepasses = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="space-y-1">
-                    <p className="text-sm text-muted-foreground">Processados</p>
-                    <p className="text-2xl font-bold">{resultadoEspecialidade.total_processados}</p>
+                    <p className="text-sm text-muted-foreground">GERAL Processados</p>
+                    <p className="text-2xl font-bold">{resultadoEspecialidade.registros_geral_processados || 0}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm text-muted-foreground">RX Processados</p>
+                    <p className="text-2xl font-bold">{resultadoEspecialidade.registros_rx_processados || 0}</p>
                   </div>
                   <div className="space-y-1">
                     <p className="text-sm text-muted-foreground">Corrigidos</p>
@@ -149,18 +153,18 @@ export const CorrigirAssociacaoRepasses = () => {
                   </div>
                 </div>
 
-                {resultadoEspecialidade.detalhes_amostra && resultadoEspecialidade.detalhes_amostra.length > 0 && (
+                {resultadoEspecialidade.detalhes && resultadoEspecialidade.detalhes.length > 0 && (
                   <div className="space-y-2">
-                    <h4 className="text-sm font-medium">Amostra de Correções (primeiros 10):</h4>
-                    <div className="space-y-1 text-sm max-h-48 overflow-y-auto">
-                      {resultadoEspecialidade.detalhes_amostra.map((det: any, idx: number) => (
+                    <h4 className="text-sm font-medium">Detalhes das Correções:</h4>
+                    <div className="space-y-1 text-sm max-h-64 overflow-y-auto">
+                      {resultadoEspecialidade.detalhes.map((det: any, idx: number) => (
                         <div key={idx} className="flex items-center gap-2 p-2 bg-muted rounded">
                           <CheckCircle className="h-3 w-3 text-green-500 flex-shrink-0" />
                           <span className="flex-1 font-mono text-xs">{det.estudo}</span>
                           <span className="text-xs">
-                            <span className="text-destructive">{det.especialidade_antiga}</span>
+                            <span className="text-destructive">{det.de}</span>
                             {' → '}
-                            <span className="text-green-600">{det.especialidade_nova}</span>
+                            <span className="text-green-600">{det.para}</span>
                           </span>
                         </div>
                       ))}

@@ -211,3 +211,6 @@ verify_jwt = true
 
 [functions.processar-medicos]
 verify_jwt = true
+
+[functions.corrigir-especialidades-invalidas-completo]
+verify_jwt = false
