@@ -112,6 +112,13 @@ serve(async (req) => {
         const detalhesExames: any[] = [];
         let valorTotalExames = 0;
 
+        // Normalização de texto para comparação robusta
+        const norm = (s: any) => (s ?? '').toString().trim().toUpperCase();
+        const normNoAccent = (s: any) => (s ?? '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
+ 
+        // Cache para mapear especialidade correta via cadastro_exames pela descrição do estudo
+        const especialidadeCache = new Map<string, string>();
+
         // Agrupar exames por arranjo (modalidade, especialidade, categoria, cliente)
         const examesAgrupados = new Map<string, any>();
 
@@ -171,13 +178,6 @@ serve(async (req) => {
         }
 
         console.log(`[Repasse] ${examesAgrupados.size} grupos de exames para ${medico.nome}`);
- 
-        // Normalização de texto para comparação robusta
-        const norm = (s: any) => (s ?? '').toString().trim().toUpperCase();
-        const normNoAccent = (s: any) => (s ?? '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
- 
-        // Cache para mapear especialidade correta via cadastro_exames pela descrição do estudo
-        const especialidadeCache = new Map<string, string>();
  
         // Mapear clientes do período para obter IDs por nome
         const clienteNomes = Array.from(examesAgrupados.values()).map((g: any) => g.cliente).filter(Boolean);
