@@ -2835,7 +2835,6 @@ export type Database = {
           tipo_preco: string
           updated_at: string
           valor_base: number
-          valor_urgencia: number
           volume_final: number | null
           volume_inicial: number | null
           volume_total: number | null
@@ -2864,7 +2863,6 @@ export type Database = {
           tipo_preco?: string
           updated_at?: string
           valor_base?: number
-          valor_urgencia?: number
           volume_final?: number | null
           volume_inicial?: number | null
           volume_total?: number | null
@@ -2893,7 +2891,6 @@ export type Database = {
           tipo_preco?: string
           updated_at?: string
           valor_base?: number
-          valor_urgencia?: number
           volume_final?: number | null
           volume_inicial?: number | null
           volume_total?: number | null
