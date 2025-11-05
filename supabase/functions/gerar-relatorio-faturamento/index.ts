@@ -59,9 +59,14 @@ serve(async (req: Request) => {
       .maybeSingle();
 
     // Buscar dados detalhados da volumetria para o QUADRO 2
-    const { data: volumetria, error: volError } = await supabase
+    // Use the same Map approach as demonstrativo generation to avoid duplicates
+    const volumetriaMap = new Map();
+    
+    // Initial search by EMPRESA and nome_fantasia
+    const { data: volumetriaEmpresa, error: volError1 } = await supabase
       .from('volumetria_mobilemed')
       .select(`
+        id,
         "DATA_REALIZACAO",
         "DATA_LAUDO",
         "NOME_PACIENTE",
@@ -78,9 +83,102 @@ serve(async (req: Request) => {
         tipo_faturamento
       `)
       .eq('periodo_referencia', periodo)
-      .or(`EMPRESA.eq.${cliente.nome},Cliente_Nome_Fantasia.eq.${cliente.nome_fantasia}`)
-      .order('DATA_REALIZACAO', { ascending: false });
+      .eq('EMPRESA', cliente.nome);
 
+    const { data: volumetriaFantasia, error: volError2 } = await supabase
+      .from('volumetria_mobilemed')
+      .select(`
+        id,
+        "DATA_REALIZACAO",
+        "DATA_LAUDO",
+        "NOME_PACIENTE",
+        "MEDICO",
+        "ESTUDO_DESCRICAO",
+        "MODALIDADE",
+        "ESPECIALIDADE",
+        "CATEGORIA",
+        "PRIORIDADE",
+        "ACCESSION_NUMBER",
+        "EMPRESA",
+        "Cliente_Nome_Fantasia",
+        "VALORES",
+        tipo_faturamento
+      `)
+      .eq('periodo_referencia', periodo)
+      .eq('Cliente_Nome_Fantasia', cliente.nome_fantasia);
+
+    [...(volumetriaEmpresa || []), ...(volumetriaFantasia || [])].forEach(item => {
+      const key = item.id ? item.id.toString() : `fallback_${item.EMPRESA}_${item.VALORES}_${Math.random()}`;
+      volumetriaMap.set(key, item);
+    });
+
+    // Pattern-based search for grouped clients (CEDIDIAG, PRN, etc.)
+    const nomeFantasia = cliente.nome_fantasia || cliente.nome;
+    let padroesBusca: string[] = [];
+    
+    if (nomeFantasia === 'PRN') {
+      padroesBusca = ['PRN%'];
+    } else if (['CEDIDIAG', 'CEDI-RJ', 'CEDI-RO'].includes(nomeFantasia)) {
+      padroesBusca = ['CEDI%'];
+    } else if (nomeFantasia.includes('AKCPALMAS') || nomeFantasia.includes('AKC')) {
+      padroesBusca = ['AKC%', 'AKCPALMAS%'];
+    }
+    
+    if (padroesBusca.length > 0) {
+      for (const padrao of padroesBusca) {
+        const { data: volEmp } = await supabase
+          .from('volumetria_mobilemed')
+          .select(`
+            id,
+            "DATA_REALIZACAO",
+            "DATA_LAUDO",
+            "NOME_PACIENTE",
+            "MEDICO",
+            "ESTUDO_DESCRICAO",
+            "MODALIDADE",
+            "ESPECIALIDADE",
+            "CATEGORIA",
+            "PRIORIDADE",
+            "ACCESSION_NUMBER",
+            "EMPRESA",
+            "Cliente_Nome_Fantasia",
+            "VALORES",
+            tipo_faturamento
+          `)
+          .eq('periodo_referencia', periodo)
+          .ilike('EMPRESA', padrao);
+        
+        const { data: volFant } = await supabase
+          .from('volumetria_mobilemed')
+          .select(`
+            id,
+            "DATA_REALIZACAO",
+            "DATA_LAUDO",
+            "NOME_PACIENTE",
+            "MEDICO",
+            "ESTUDO_DESCRICAO",
+            "MODALIDADE",
+            "ESPECIALIDADE",
+            "CATEGORIA",
+            "PRIORIDADE",
+            "ACCESSION_NUMBER",
+            "EMPRESA",
+            "Cliente_Nome_Fantasia",
+            "VALORES",
+            tipo_faturamento
+          `)
+          .eq('periodo_referencia', periodo)
+          .ilike('Cliente_Nome_Fantasia', padrao);
+        
+        [...(volEmp || []), ...(volFant || [])].forEach(item => {
+          const key = item.id ? item.id.toString() : `pattern_${item.EMPRESA}_${item.VALORES}_${Math.random()}`;
+          volumetriaMap.set(key, item);
+        });
+      }
+      console.log(`📊 ${nomeFantasia}: Pattern search completado com ${volumetriaMap.size} registros únicos`);
+    }
+
+    let volumetria = Array.from(volumetriaMap.values());
     console.log('📊 Volumetria encontrada:', volumetria?.length || 0, 'registros (antes dos filtros)');
 
     // Apply client-specific billing rules for NC-FT clients
@@ -95,7 +193,7 @@ serve(async (req: Request) => {
     console.log(`🔍 Após remover NC-NF/EXCLUSAO: ${volumetriaFiltrada.length} registros`);
     
     // CEDIDIAG: Only MEDICINA INTERNA, exclude specific doctors
-    if (nomeClienteUpper.includes('CEDIDIAG') && volumetriaFiltrada.length > 0) {
+    if (nomeClienteUpper === 'CEDIDIAG' && volumetriaFiltrada.length > 0) {
       const antesFiltro = volumetriaFiltrada.length;
       volumetriaFiltrada = volumetriaFiltrada.filter(vol => {
         const especialidade = (vol.ESPECIALIDADE || '').toString().toUpperCase();
