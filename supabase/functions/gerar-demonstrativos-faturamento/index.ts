@@ -89,6 +89,7 @@ serve(async (req) => {
     }
 
     const demonstrativos: DemonstrativoCliente[] = [];
+    const clientesProcessados = new Set<string>(); // Track by nome_fantasia to avoid duplicates
 
     for (const cliente of clientes) {
       const parametros = cliente.parametros_faturamento?.[0];
@@ -101,6 +102,14 @@ serve(async (req) => {
         console.log(`⚠️ Cliente ${cliente.nome} pulado - Tipo faturamento: ${tipoFaturamento} (não gera demonstrativo)`);
         continue;
       }
+
+      // Group clients by nome_fantasia to avoid duplicate demonstrativos
+      const nomeFantasia = cliente.nome_fantasia || cliente.nome;
+      if (clientesProcessados.has(nomeFantasia)) {
+        console.log(`⚠️ Cliente ${cliente.nome} pulado - Já processado como ${nomeFantasia}`);
+        continue;
+      }
+      clientesProcessados.add(nomeFantasia);
 
       // Buscar volumetria usando multiple search strategies
       const aliasSet = new Set<string>([
