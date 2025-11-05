@@ -232,22 +232,56 @@ export default function FaturamentoComparativo() {
       const clienteNome = clientes.find(c => c.id === clienteSelecionado)?.nome || '';
       
       // Buscar dados do demonstrativo calculado (dados processados para faturamento)
-      const { data: demonstrativo, error: demoError } = await supabase
+      // 1) Tenta por cliente_id (mais confiável)
+      let { data: demonstrativo, error: demoError } = await supabase
         .from('demonstrativos_faturamento_calculados')
         .select('detalhes_exames')
-        .eq('cliente_nome', clienteNome)
+        .eq('cliente_id', clienteSelecionado)
         .eq('periodo_referencia', periodoSelecionado)
-        .single();
+        .maybeSingle();
 
-      if (demoError && demoError.code !== 'PGRST116') {
+      // 2) Se não encontrou, tenta por cliente_nome (retrocompatibilidade)
+      if ((!demonstrativo || !demonstrativo.detalhes_exames) && !demoError) {
+        const alt = await supabase
+          .from('demonstrativos_faturamento_calculados')
+          .select('detalhes_exames')
+          .eq('cliente_nome', clienteNome)
+          .eq('periodo_referencia', periodoSelecionado)
+          .maybeSingle();
+        demonstrativo = alt.data as any;
+        demoError = alt.error as any;
+      }
+
+      // 3) Se ainda não existir, gera o demonstrativo on-demand via Edge Function e salva no banco
+      if ((!demonstrativo || !demonstrativo.detalhes_exames) && !demoError) {
+        const { data: genData, error: genError } = await supabase.functions.invoke('gerar-demonstrativos-faturamento', {
+          body: { periodo: periodoSelecionado, clientes: [clienteSelecionado] }
+        });
+
+        if (genError) {
+          throw genError;
+        }
+
+        // Reconsulta após geração
+        const recheck = await supabase
+          .from('demonstrativos_faturamento_calculados')
+          .select('detalhes_exames')
+          .eq('cliente_id', clienteSelecionado)
+          .eq('periodo_referencia', periodoSelecionado)
+          .maybeSingle();
+        demonstrativo = recheck.data as any;
+        demoError = recheck.error as any;
+      }
+
+      if (demoError && (demoError as any).code !== 'PGRST116') {
         throw demoError;
       }
 
       if (!demonstrativo || !demonstrativo.detalhes_exames) {
         toast({
-          title: "Demonstrativo não encontrado",
-          description: `É necessário gerar o demonstrativo de faturamento para ${clienteNome} no período ${periodoSelecionado} antes de fazer o comparativo.`,
-          variant: "destructive",
+          title: 'Demonstrativo não encontrado',
+          description: `Gere o demonstrativo de faturamento para ${clienteNome} em ${periodoSelecionado} e tente novamente.`,
+          variant: 'destructive',
         });
         setIsProcessing(false);
         return;
