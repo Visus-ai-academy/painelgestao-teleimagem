@@ -50,6 +50,7 @@ import { DemonstrativoFaturamentoCompleto } from "@/components/DemonstrativoFatu
 import { ControleFechamentoFaturamento } from '@/components/ControleFechamentoFaturamento';
 import { ExamesValoresZerados } from "@/components/ExamesValorezrados";
 import { DiagnosticoPrecosFaturamento } from "@/components/DiagnosticoPrecosFaturamento";
+import FaturamentoComparativo from "@/components/faturamento/FaturamentoComparativo";
 
 
 import { generatePDF, downloadPDF, type FaturamentoData } from "@/lib/pdfUtils";
@@ -62,7 +63,7 @@ export default function GerarFaturamento() {
   
   // Ensure activeTab never gets set to removed values
   const safeSetActiveTab = (value: string) => {
-    const validTabs = ["gerar", "demonstrativo", "relatorios", "analise", "fechamento"];
+    const validTabs = ["gerar", "demonstrativo", "relatorios", "analise", "fechamento", "comparativo"];
     if (validTabs.includes(value)) {
       setActiveTab(value);
     } else {
@@ -1937,7 +1938,7 @@ export default function GerarFaturamento() {
       </div>
 
       <Tabs value={activeTab} onValueChange={safeSetActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="gerar" className="flex items-center gap-2">
             <Send className="h-4 w-4" />
             Gerar
@@ -1957,6 +1958,10 @@ export default function GerarFaturamento() {
           <TabsTrigger value="fechamento" className="flex items-center gap-2">
             <Clock className="h-4 w-4" />
             Fechamento de Período
+          </TabsTrigger>
+          <TabsTrigger value="comparativo" className="flex items-center gap-2">
+            <FileSpreadsheet className="h-4 w-4" />
+            Comparativo
           </TabsTrigger>
         </TabsList>
 
@@ -2255,6 +2260,10 @@ export default function GerarFaturamento() {
 
         <TabsContent value="fechamento" className="space-y-6 mt-6">
           <ControleFechamentoFaturamento />
+        </TabsContent>
+
+        <TabsContent value="comparativo" className="space-y-6 mt-6">
+          <FaturamentoComparativo />
         </TabsContent>
 
 
