@@ -48,18 +48,70 @@ serve(async (req) => {
 
     console.log(`📋 Carregados ${cadastroExames?.length || 0} exames do cadastro`)
 
-    // Criar mapa de exames para lookup rápido
+    // Criar mapa de exames para lookup rápido (usando nome do cadastro)
     const mapaExames = new Map<string, string>()
     cadastroExames?.forEach(ex => {
-      if (ex.exame && ex.especialidade) {
-        mapaExames.set(ex.exame.toUpperCase().trim(), ex.especialidade)
+      const nomeExame = ex.nome || ex.exame || ex.descricao
+      if (nomeExame && ex.especialidade) {
+        mapaExames.set(nomeExame.toUpperCase().trim(), ex.especialidade)
       }
     })
 
+    // Função para encontrar especialidade por similaridade
+    const encontrarEspecialidadePorSimilaridade = (estudo: string): string | null => {
+      const estudoLimpo = estudo.toUpperCase().trim()
+      
+      // 1. Tentativa: Match exato
+      if (mapaExames.has(estudoLimpo)) {
+        return mapaExames.get(estudoLimpo)!
+      }
+
+      // 2. Tentativa: Match parcial - verifica se o estudo contém algum nome do cadastro
+      for (const [nomeExame, especialidade] of mapaExames.entries()) {
+        if (estudoLimpo.includes(nomeExame) || nomeExame.includes(estudoLimpo)) {
+          console.log(`✓ Match parcial: "${estudo}" ≈ "${nomeExame}" → ${especialidade}`)
+          return especialidade
+        }
+      }
+
+      // 3. Tentativa: Match por palavras-chave principais
+      const palavrasChave = estudoLimpo.replace(/USG |US |ULTRASSONOGRAFIA |DE |DO |DA /g, '').trim()
+      for (const [nomeExame, especialidade] of mapaExames.entries()) {
+        const nomeExameLimpo = nomeExame.replace(/USG |US |ULTRASSONOGRAFIA |DE |DO |DA /g, '').trim()
+        if (palavrasChave.includes(nomeExameLimpo) || nomeExameLimpo.includes(palavrasChave)) {
+          console.log(`✓ Match por palavras-chave: "${estudo}" ≈ "${nomeExame}" → ${especialidade}`)
+          return especialidade
+        }
+      }
+
+      // 4. Tentativa: Inferir por modalidade US (todos US são MEDICINA INTERNA por padrão)
+      return null
+    }
+
     // Processar registros GERAL
     for (const registro of registrosGeral || []) {
-      const estudoDescricao = (registro.ESTUDO_DESCRICAO || '').toUpperCase().trim()
-      const especialidadeCorreta = mapaExames.get(estudoDescricao)
+      const estudoDescricao = registro.ESTUDO_DESCRICAO || ''
+      let especialidadeCorreta = encontrarEspecialidadePorSimilaridade(estudoDescricao)
+
+      // Se não encontrou, tentar inferir pela modalidade
+      if (!especialidadeCorreta) {
+        const modalidade = registro.MODALIDADE || ''
+        
+        // Para exames US que não foram encontrados, usar MEDICINA INTERNA como padrão
+        if (modalidade === 'US') {
+          especialidadeCorreta = 'MEDICINA INTERNA'
+          console.log(`ℹ️ Especialidade inferida por modalidade US: ${especialidadeCorreta}`)
+        } else {
+          const mapeamentoModalidade: Record<string, string> = {
+            'DO': 'MUSCULO ESQUELETICO',
+            'RX': 'MEDICINA INTERNA',
+            'CT': 'MEDICINA INTERNA',
+            'MR': 'MEDICINA INTERNA',
+            'MG': 'MAMA'
+          }
+          especialidadeCorreta = mapeamentoModalidade[modalidade] || null
+        }
+      }
 
       if (especialidadeCorreta) {
         const { error: updateError } = await supabase
@@ -103,8 +155,8 @@ serve(async (req) => {
 
     // Processar registros RX
     for (const registro of registrosRx || []) {
-      const estudoDescricao = (registro.ESTUDO_DESCRICAO || '').toUpperCase().trim()
-      let especialidadeCorreta = mapaExames.get(estudoDescricao)
+      const estudoDescricao = registro.ESTUDO_DESCRICAO || ''
+      let especialidadeCorreta = encontrarEspecialidadePorSimilaridade(estudoDescricao)
 
       // Se não encontrar no mapa, tentar inferir pela modalidade
       if (!especialidadeCorreta) {
