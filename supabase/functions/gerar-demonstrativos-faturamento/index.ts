@@ -227,9 +227,9 @@ serve(async (req) => {
           const isMedicinaInterna = especialidade.includes('MEDICINA INTERNA');
           const isMusculoEsqueletico = especialidade.includes('MUSCULO ESQUELETICO');
           
-          // CT com MEDICINA INTERNA ou MUSCULO ESQUELETICO faturam
+          // CT apenas com MEDICINA INTERNA fatura
           const isCT = modalidade === 'CT';
-          if (isCT && (isMedicinaInterna || isMusculoEsqueletico)) {
+          if (isCT && isMedicinaInterna) {
             return true;
           }
           
