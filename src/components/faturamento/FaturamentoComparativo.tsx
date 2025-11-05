@@ -595,52 +595,123 @@ export default function FaturamentoComparativo() {
               Diferenças Encontradas ({diferencas.length})
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            {/* Resumo por tipo */}
+            <div className="grid grid-cols-3 gap-4">
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="text-2xl font-bold text-blue-700">
+                  {diferencas.filter(d => d.tipo === 'arquivo_apenas').length}
+                </div>
+                <div className="text-sm text-blue-600">Apenas no Arquivo</div>
+              </div>
+              <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                <div className="text-2xl font-bold text-purple-700">
+                  {diferencas.filter(d => d.tipo === 'sistema_apenas').length}
+                </div>
+                <div className="text-sm text-purple-600">Apenas no Sistema</div>
+              </div>
+              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <div className="text-2xl font-bold text-yellow-700">
+                  {diferencas.filter(d => d.tipo === 'valores_diferentes').length}
+                </div>
+                <div className="text-sm text-yellow-600">Com Divergências</div>
+              </div>
+            </div>
+
+            {/* Tabela de diferenças */}
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b">
-                    <th className="text-left p-2">Tipo</th>
-                    <th className="text-left p-2">Data</th>
-                    <th className="text-left p-2">Paciente</th>
-                    <th className="text-left p-2">Exame</th>
-                    <th className="text-left p-2">Médico</th>
-                    <th className="text-left p-2">Qtd Arquivo</th>
-                    <th className="text-left p-2">Qtd Sistema</th>
-                    <th className="text-left p-2">Valor Arquivo</th>
-                    <th className="text-left p-2">Valor Sistema</th>
-                    <th className="text-left p-2">Detalhes</th>
+                  <tr className="border-b bg-muted/50">
+                    <th className="text-left p-2 font-medium">Tipo</th>
+                    <th className="text-left p-2 font-medium">Data</th>
+                    <th className="text-left p-2 font-medium">Paciente</th>
+                    <th className="text-left p-2 font-medium">Exame</th>
+                    <th className="text-left p-2 font-medium">Médico</th>
+                    <th className="text-left p-2 font-medium">Modalidade</th>
+                    <th className="text-left p-2 font-medium">Especialidade</th>
+                    <th className="text-left p-2 font-medium">Categoria</th>
+                    <th className="text-left p-2 font-medium">Prioridade</th>
+                    <th className="text-left p-2 font-medium">Qtd Arq/Sis</th>
+                    <th className="text-left p-2 font-medium">Valor Arq/Sis</th>
+                    <th className="text-left p-2 font-medium">Divergências</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {diferencas.map((diff, idx) => (
-                    <tr key={idx} className="border-b hover:bg-gray-50">
-                      <td className="p-2">
-                        <span className={`px-2 py-1 text-xs rounded ${
-                          diff.tipo === 'arquivo_apenas' ? 'bg-blue-100 text-blue-800' :
-                          diff.tipo === 'sistema_apenas' ? 'bg-purple-100 text-purple-800' :
-                          'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          {diff.tipo === 'arquivo_apenas' ? 'Só Arquivo' :
-                           diff.tipo === 'sistema_apenas' ? 'Só Sistema' :
-                           'Valores Diferentes'}
-                        </span>
-                      </td>
-                      <td className="p-2 text-sm">{diff.dataEstudo || '-'}</td>
-                      <td className="p-2 text-sm">{diff.paciente || '-'}</td>
-                      <td className="p-2 text-sm">{diff.exame || '-'}</td>
-                      <td className="p-2 text-sm">{diff.medico || '-'}</td>
-                      <td className="p-2 text-sm">{diff.quantidadeArquivo || '-'}</td>
-                      <td className="p-2 text-sm">{diff.quantidadeSistema || '-'}</td>
-                      <td className="p-2 text-sm">
-                        {diff.valorArquivo ? `R$ ${diff.valorArquivo.toFixed(2)}` : '-'}
-                      </td>
-                      <td className="p-2 text-sm">
-                        {diff.valorSistema ? `R$ ${diff.valorSistema.toFixed(2)}` : '-'}
-                      </td>
-                      <td className="p-2 text-sm text-gray-600">{diff.detalhes}</td>
-                    </tr>
-                  ))}
+                  {diferencas.map((diff, idx) => {
+                    // Extrair tipos de divergências do campo detalhes
+                    const temModalidadeDif = diff.detalhes.includes('Modalidade:');
+                    const temEspecialidadeDif = diff.detalhes.includes('Especialidade:');
+                    const temCategoriaDif = diff.detalhes.includes('Categoria:');
+                    const temPrioridadeDif = diff.detalhes.includes('Prioridade:');
+                    const temQuantidadeDif = diff.detalhes.includes('Quantidade:');
+                    const temValorDif = diff.detalhes.includes('Valor:');
+
+                    return (
+                      <tr key={idx} className="border-b hover:bg-muted/30 transition-colors">
+                        <td className="p-2">
+                          <span className={`px-2 py-1 text-xs rounded-full font-medium ${
+                            diff.tipo === 'arquivo_apenas' ? 'bg-blue-100 text-blue-700' :
+                            diff.tipo === 'sistema_apenas' ? 'bg-purple-100 text-purple-700' :
+                            'bg-yellow-100 text-yellow-700'
+                          }`}>
+                            {diff.tipo === 'arquivo_apenas' ? 'Só Arquivo' :
+                             diff.tipo === 'sistema_apenas' ? 'Só Sistema' :
+                             'Divergente'}
+                          </span>
+                        </td>
+                        <td className="p-2">{diff.dataEstudo || '-'}</td>
+                        <td className="p-2 font-medium">{diff.paciente || '-'}</td>
+                        <td className="p-2">{diff.exame || '-'}</td>
+                        <td className="p-2">{diff.medico || '-'}</td>
+                        <td className={`p-2 ${temModalidadeDif ? 'bg-red-50 font-medium' : ''}`}>
+                          {diff.modalidade || '-'}
+                        </td>
+                        <td className={`p-2 ${temEspecialidadeDif ? 'bg-red-50 font-medium' : ''}`}>
+                          {diff.especialidade || '-'}
+                        </td>
+                        <td className={`p-2 ${temCategoriaDif ? 'bg-red-50 font-medium' : ''}`}>
+                          {diff.categoria || '-'}
+                        </td>
+                        <td className={`p-2 ${temPrioridadeDif ? 'bg-red-50 font-medium' : ''}`}>
+                          {diff.prioridade || '-'}
+                        </td>
+                        <td className={`p-2 ${temQuantidadeDif ? 'bg-red-50 font-medium' : ''}`}>
+                          {diff.quantidadeArquivo || '-'} / {diff.quantidadeSistema || '-'}
+                        </td>
+                        <td className={`p-2 ${temValorDif ? 'bg-red-50 font-medium' : ''}`}>
+                          {diff.valorArquivo ? `R$ ${diff.valorArquivo.toFixed(2)}` : '-'} / 
+                          {diff.valorSistema ? ` R$ ${diff.valorSistema.toFixed(2)}` : '-'}
+                        </td>
+                        <td className="p-2">
+                          <div className="flex flex-wrap gap-1">
+                            {temModalidadeDif && (
+                              <span className="px-1.5 py-0.5 bg-red-100 text-red-700 text-xs rounded">Modal</span>
+                            )}
+                            {temEspecialidadeDif && (
+                              <span className="px-1.5 py-0.5 bg-red-100 text-red-700 text-xs rounded">Espec</span>
+                            )}
+                            {temCategoriaDif && (
+                              <span className="px-1.5 py-0.5 bg-red-100 text-red-700 text-xs rounded">Categ</span>
+                            )}
+                            {temPrioridadeDif && (
+                              <span className="px-1.5 py-0.5 bg-red-100 text-red-700 text-xs rounded">Prior</span>
+                            )}
+                            {temQuantidadeDif && (
+                              <span className="px-1.5 py-0.5 bg-red-100 text-red-700 text-xs rounded">Qtd</span>
+                            )}
+                            {temValorDif && (
+                              <span className="px-1.5 py-0.5 bg-red-100 text-red-700 text-xs rounded">Valor</span>
+                            )}
+                            {!temModalidadeDif && !temEspecialidadeDif && !temCategoriaDif && 
+                             !temPrioridadeDif && !temQuantidadeDif && !temValorDif && (
+                              <span className="text-xs text-gray-500">{diff.detalhes}</span>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
