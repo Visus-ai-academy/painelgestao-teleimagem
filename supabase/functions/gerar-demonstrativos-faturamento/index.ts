@@ -872,6 +872,43 @@ serve(async (req) => {
       clientes_regime_normal: demonstrativos.filter(dem => !dem.detalhes_tributacao?.simples_nacional).length
     };
 
+    // Save demonstrativos to database first
+    console.log('💾 Salvando demonstrativos no banco de dados...');
+    try {
+      const recordsToInsert = demonstrativos.map((demo) => ({
+        cliente_id: demo.cliente_id,
+        cliente_nome: demo.cliente_nome,
+        periodo_referencia: periodo,
+        total_exames: demo.total_exames || 0,
+        valor_exames: demo.valor_exames || 0,
+        valor_franquia: demo.valor_franquia || 0,
+        valor_portal_laudos: demo.valor_portal_laudos || 0,
+        valor_integracao: demo.valor_integracao || 0,
+        valor_bruto_total: demo.valor_bruto || 0,
+        valor_total_impostos: demo.valor_impostos || 0,
+        valor_liquido: demo.valor_total || 0,
+        detalhes_exames: demo.detalhes_exames || [],
+        detalhes_franquia: demo.detalhes_franquia || {},
+        parametros_utilizados: demo.detalhes_tributacao || {},
+        status: 'calculado'
+      }));
+
+      const { error: insertError } = await supabase
+        .from('demonstrativos_faturamento_calculados')
+        .upsert(recordsToInsert, {
+          onConflict: 'cliente_nome,periodo_referencia',
+          ignoreDuplicates: false
+        });
+
+      if (insertError) {
+        console.error('❌ Erro ao gravar demonstrativos no banco:', insertError);
+      } else {
+        console.log(`✅ ${demonstrativos.length} demonstrativos gravados no banco`);
+      }
+    } catch (dbError: any) {
+      console.error('❌ Erro ao gravar no banco:', dbError);
+    }
+
     // Generate reports automatically
     let relatoriosGerados = 0;
     let relatoriosComErro = 0;
