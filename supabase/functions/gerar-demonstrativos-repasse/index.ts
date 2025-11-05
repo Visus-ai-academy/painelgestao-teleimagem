@@ -46,13 +46,11 @@ serve(async (req) => {
         console.log(`[Repasse] Processando médico: ${medico.nome}`);
 
         // 2. Buscar exames do período para o médico na volumetria_mobilemed
-        // Excluir exames de clientes com tipo_faturamento que não gera demonstrativo
         const { data: exames, error: examesError } = await supabase
           .from('volumetria_mobilemed')
           .select('*')
           .eq('MEDICO', medico.nome)
-          .eq('periodo_referencia', periodo)
-          .not('tipo_faturamento', 'in', '("NC-NF","CO-NF","NC1-NF")');
+          .eq('periodo_referencia', periodo);
 
         if (examesError) throw examesError;
 
