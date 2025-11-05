@@ -602,12 +602,26 @@ serve(async (req: Request) => {
       // 3) Valor bruto = exames + adicionais
       valorBruto = valorExames + valorFranquia + valorPortal + valorIntegracao;
       
-      // Calcular impostos (padrão 6.15% para não-simples)
-      const pisLocal = valorBruto * 0.0065;
-      const cofinsLocal = valorBruto * 0.03;
-      const csllLocal = valorBruto * 0.01;
-      const irrfLocal = valorBruto * 0.015;
-      totalImpostos = pisLocal + cofinsLocal + csllLocal + irrfLocal;
+      // Buscar parâmetros do cliente para verificar se é Simples Nacional
+      const { data: parametros } = await supabase
+        .from('parametros_faturamento')
+        .select('simples')
+        .eq('cliente_id', cliente_id)
+        .eq('ativo', true)
+        .maybeSingle();
+      
+      // Calcular impostos APENAS se NÃO for Simples Nacional
+      if (parametros && !parametros.simples) {
+        const pisLocal = valorBruto * 0.0065;
+        const cofinsLocal = valorBruto * 0.03;
+        const csllLocal = valorBruto * 0.01;
+        const irrfLocal = valorBruto * 0.015;
+        totalImpostos = pisLocal + cofinsLocal + csllLocal + irrfLocal;
+        console.log(`💰 Cliente regime normal - Impostos calculados: ${totalImpostos}`);
+      } else {
+        totalImpostos = 0;
+        console.log(`💰 Cliente Simples Nacional - SEM retenção de impostos`);
+      }
       
       valorLiquido = valorBruto - totalImpostos;
 
@@ -627,11 +641,17 @@ serve(async (req: Request) => {
             valorBruto = totalBrutoAgg;
             // Ajustar valor dos exames para manter consistência com extras
             valorExames = Math.max(0, valorBruto - valorFranquia - valorPortal - valorIntegracao);
-            const pis2 = valorBruto * 0.0065;
-            const cofins2 = valorBruto * 0.03;
-            const csll2 = valorBruto * 0.01;
-            const irrf2 = valorBruto * 0.015;
-            totalImpostos = pis2 + cofins2 + csll2 + irrf2;
+            
+            // Recalcular impostos APENAS se NÃO for Simples Nacional
+            if (parametros && !parametros.simples) {
+              const pis2 = valorBruto * 0.0065;
+              const cofins2 = valorBruto * 0.03;
+              const csll2 = valorBruto * 0.01;
+              const irrf2 = valorBruto * 0.015;
+              totalImpostos = pis2 + cofins2 + csll2 + irrf2;
+            } else {
+              totalImpostos = 0;
+            }
             valorLiquido = valorBruto - totalImpostos;
           }
         } catch (e2) {
