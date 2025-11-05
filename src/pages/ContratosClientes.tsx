@@ -113,6 +113,7 @@ interface ContratoCliente {
   diaFechamento?: number;
   formaCobranca?: string;
   parametrosStatus?: string;
+  percentualISS?: number;
   // Histórico de alterações
   termosAditivos?: TermoAditivo[];
   documentos?: DocumentoCliente[];
@@ -196,6 +197,15 @@ export default function ContratosClientes() {
   const [editPortalValor, setEditPortalValor] = useState<number | "">(0);
   const [editDataVigencia, setEditDataVigencia] = useState("");
   const [editDescricaoAlteracao, setEditDescricaoAlteracao] = useState("");
+  
+  // Estados para parâmetros fiscais/tributários
+  const [editSimples, setEditSimples] = useState(false);
+  const [editPercentualISS, setEditPercentualISS] = useState<number | "">(0);
+  const [editImpostosAbMin, setEditImpostosAbMin] = useState<number | "">(0);
+  const [editVolumeFranquia, setEditVolumeFranquia] = useState<number | "">(0);
+  const [editFrequenciaContinua, setEditFrequenciaContinua] = useState(false);
+  const [editFrequenciaPorVolume, setEditFrequenciaPorVolume] = useState(false);
+  const [editValorAcimaFranquia, setEditValorAcimaFranquia] = useState<number | "">(0);
   
   // Estados para condições de preço
   const [precosCliente, setPrecosCliente] = useState<any[]>([]);
@@ -387,6 +397,7 @@ export default function ContratosClientes() {
           tipoFaturamento: parametros?.tipo_faturamento ?? contrato.tipo_faturamento ?? 'CO-FT',
           impostosAbMin: Number(parametros?.impostos_ab_min ?? contrato.impostos_ab_min ?? 0),
           simples: Boolean(parametros?.simples ?? contrato.simples ?? false),
+          percentualISS: Number(parametros?.percentual_iss ?? 0),
           // Campos adicionais dos parâmetros
           diaFechamento: parametros?.dia_fechamento ?? contrato.dia_fechamento ?? 7,
           formaCobranca: parametros?.forma_cobranca ?? 'mensal',
@@ -465,6 +476,15 @@ export default function ContratosClientes() {
       const integ = contratoEditando.configuracoesIntegracao || {};
       setEditIntegraValor(integ.valor_integracao ?? 0);
       setEditPortalValor(integ.valor_portal_laudos ?? 0);
+      
+      // Parâmetros fiscais/tributários
+      setEditSimples(contratoEditando.simples ?? false);
+      setEditPercentualISS(contratoEditando.percentualISS ?? 0);
+      setEditImpostosAbMin(contratoEditando.impostosAbMin ?? 0);
+      setEditVolumeFranquia(contratoEditando.volumeFranquia ?? 0);
+      setEditFrequenciaContinua(contratoEditando.frequenciaContinua ?? false);
+      setEditFrequenciaPorVolume(contratoEditando.frequenciaPorVolume ?? false);
+      setEditValorAcimaFranquia(contratoEditando.valorAcimaFranquia ?? 0);
       
       // Definir data de vigência padrão como hoje
       const hoje = new Date().toISOString().slice(0, 10);
@@ -680,7 +700,7 @@ export default function ContratosClientes() {
 
       if (error) throw error;
 
-      // Sincronizar parâmetros de faturamento (aplicar_franquia e valor)
+      // Sincronizar parâmetros de faturamento (bidirecional completa)
       try {
         const { data: paramAtual } = await supabase
           .from('parametros_faturamento')
@@ -688,22 +708,31 @@ export default function ContratosClientes() {
           .eq('cliente_id', contratoEditando.clienteId)
           .maybeSingle();
 
+        const parametrosUpdate = {
+          aplicar_franquia: aplicarFranquiaCalc,
+          valor_franquia: Number(editFranqValor || 0),
+          volume_franquia: Number(editVolumeFranquia || 0),
+          valor_acima_franquia: Number(editValorAcimaFranquia || 0),
+          frequencia_continua: editFrequenciaContinua,
+          frequencia_por_volume: editFrequenciaPorVolume,
+          valor_integracao: Number(editIntegraValor || 0),
+          simples: editSimples,
+          percentual_iss: Number(editPercentualISS || 0),
+          impostos_ab_min: Number(editImpostosAbMin || 0),
+        };
+
         if (paramAtual?.id) {
           await supabase
             .from('parametros_faturamento')
-            .update({
-              aplicar_franquia: aplicarFranquiaCalc,
-              valor_franquia: Number(editFranqValor || 0),
-            })
+            .update(parametrosUpdate)
             .eq('id', paramAtual.id);
         } else {
           await supabase
             .from('parametros_faturamento')
             .insert({
               cliente_id: contratoEditando.clienteId,
-              aplicar_franquia: aplicarFranquiaCalc,
-              valor_franquia: Number(editFranqValor || 0),
-              status: 'A',
+              ...parametrosUpdate,
+              ativo: true,
             });
         }
       } catch (syncErr) {
@@ -1416,6 +1445,147 @@ export default function ContratosClientes() {
                           readOnly
                         />
                       )}
+                    </div>
+                  </div>
+
+                  {/* Parâmetros Fiscais e Tributários */}
+                  <div className="w-full border rounded-lg p-4 space-y-4 bg-slate-50">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-lg font-semibold">Parâmetros Fiscais e Tributários</Label>
+                      <p className="text-sm text-muted-foreground">
+                        {showEditarContrato ? 'Edite os parâmetros de tributação' : 'Visualização dos parâmetros'}
+                      </p>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="grid gap-2">
+                        <Label>Simples Nacional</Label>
+                        {showEditarContrato ? (
+                          <div className="flex items-center space-x-2 h-10">
+                            <Checkbox 
+                              checked={editSimples}
+                              onCheckedChange={(checked) => setEditSimples(!!checked)}
+                            />
+                            <span className="text-sm">{editSimples ? 'Sim - Sem retenção de impostos' : 'Não - Regime normal'}</span>
+                          </div>
+                        ) : (
+                          <Badge variant={(contratoVisualizando || contratoEditando)?.simples ? 'default' : 'secondary'}>
+                            {(contratoVisualizando || contratoEditando)?.simples ? 'Sim' : 'Não'}
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="grid gap-2">
+                        <Label>Percentual ISS (%)</Label>
+                        {showEditarContrato ? (
+                          <Input 
+                            type="number" 
+                            step="0.01" 
+                            value={editPercentualISS} 
+                            onChange={(e) => setEditPercentualISS(Number(e.target.value) || "")} 
+                            placeholder="Ex: 5.00"
+                          />
+                        ) : (
+                          <Input 
+                            type="number" 
+                            step="0.01" 
+                            value={(contratoVisualizando || contratoEditando)?.percentualISS || ""} 
+                            readOnly
+                          />
+                        )}
+                      </div>
+                      <div className="grid gap-2">
+                        <Label>Impostos Mínimo (R$)</Label>
+                        {showEditarContrato ? (
+                          <Input 
+                            type="number" 
+                            step="0.01" 
+                            value={editImpostosAbMin} 
+                            onChange={(e) => setEditImpostosAbMin(Number(e.target.value) || "")} 
+                            placeholder="Ex: 50.00"
+                          />
+                        ) : (
+                          <Input 
+                            type="number" 
+                            step="0.01" 
+                            value={(contratoVisualizando || contratoEditando)?.impostosAbMin || ""} 
+                            readOnly
+                          />
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="grid gap-2">
+                        <Label>Volume Franquia</Label>
+                        {showEditarContrato ? (
+                          <Input 
+                            type="number" 
+                            value={editVolumeFranquia} 
+                            onChange={(e) => setEditVolumeFranquia(Number(e.target.value) || "")} 
+                            placeholder="Ex: 500"
+                          />
+                        ) : (
+                          <Input 
+                            type="number" 
+                            value={(contratoVisualizando || contratoEditando)?.volumeFranquia || ""} 
+                            readOnly
+                          />
+                        )}
+                      </div>
+                      <div className="grid gap-2">
+                        <Label>Frequência Contínua</Label>
+                        {showEditarContrato ? (
+                          <div className="flex items-center space-x-2 h-10">
+                            <Checkbox 
+                              checked={editFrequenciaContinua}
+                              onCheckedChange={(checked) => setEditFrequenciaContinua(!!checked)}
+                            />
+                            <span className="text-sm">{editFrequenciaContinua ? 'Sim - Cobra franquia sempre' : 'Não'}</span>
+                          </div>
+                        ) : (
+                          <Badge variant={(contratoVisualizando || contratoEditando)?.frequenciaContinua ? 'default' : 'secondary'}>
+                            {(contratoVisualizando || contratoEditando)?.frequenciaContinua ? 'Sim' : 'Não'}
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="grid gap-2">
+                        <Label>Frequência por Volume</Label>
+                        {showEditarContrato ? (
+                          <div className="flex items-center space-x-2 h-10">
+                            <Checkbox 
+                              checked={editFrequenciaPorVolume}
+                              onCheckedChange={(checked) => setEditFrequenciaPorVolume(!!checked)}
+                            />
+                            <span className="text-sm">{editFrequenciaPorVolume ? 'Sim - Varia por volume' : 'Não'}</span>
+                          </div>
+                        ) : (
+                          <Badge variant={(contratoVisualizando || contratoEditando)?.frequenciaPorVolume ? 'default' : 'secondary'}>
+                            {(contratoVisualizando || contratoEditando)?.frequenciaPorVolume ? 'Sim' : 'Não'}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="grid gap-2">
+                        <Label>Valor Acima Franquia (R$)</Label>
+                        {showEditarContrato ? (
+                          <Input 
+                            type="number" 
+                            step="0.01" 
+                            value={editValorAcimaFranquia} 
+                            onChange={(e) => setEditValorAcimaFranquia(Number(e.target.value) || "")} 
+                            placeholder="Ex: 600.00"
+                          />
+                        ) : (
+                          <Input 
+                            type="number" 
+                            step="0.01" 
+                            value={(contratoVisualizando || contratoEditando)?.valorAcimaFranquia || ""} 
+                            readOnly
+                          />
+                        )}
+                      </div>
                     </div>
                   </div>
 
