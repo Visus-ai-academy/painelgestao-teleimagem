@@ -378,8 +378,28 @@ serve(async (req) => {
         console.log(`🔍 CEMVALENCA: ${antesFiltro} → ${volumetria.length} registros (removidos ${antesFiltro - volumetria.length})`);
       }
       
+      // CISP: Only Cardio, Medicina Interna or Plantão
+      if (nomeUpper.includes('CISP') && volumetria.length > 0) {
+        const ESPECIALIDADES_FATURADAS = ['CARDIO', 'MEDICINA INTERNA'];
+        const antesFiltro = volumetria.length;
+        
+        volumetria = volumetria.filter(vol => {
+          const prioridade = (vol.PRIORIDADE || '').toString().toUpperCase();
+          const especialidade = (vol.ESPECIALIDADE || '').toString().toUpperCase();
+          
+          // Plantão sempre fatura
+          if (prioridade === 'PLANTÃO' || prioridade === 'PLANTAO') {
+            return true;
+          }
+          
+          // Apenas Cardio e Medicina Interna faturam
+          return ESPECIALIDADES_FATURADAS.some(esp => especialidade.includes(esp));
+        });
+        console.log(`🔍 CISP: ${antesFiltro} → ${volumetria.length} registros (removidos ${antesFiltro - volumetria.length})`);
+      }
+      
       // Other NC clients with standard rules
-      const OUTROS_NC = ['CDICARDIO', 'CDIGOIAS', 'CISP', 'CRWANDERLEY', 'DIAGMAX-PR', 
+      const OUTROS_NC = ['CDICARDIO', 'CDIGOIAS', 'CRWANDERLEY', 'DIAGMAX-PR', 
                         'GOLD', 'PRODIMAGEM', 'TRANSDUSON', 'ZANELLO', 'RMPADUA'];
       const isOutroNC = OUTROS_NC.some(nc => nomeUpper.includes(nc));
       
