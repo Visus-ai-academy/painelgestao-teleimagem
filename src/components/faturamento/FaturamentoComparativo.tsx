@@ -171,7 +171,7 @@ export default function FaturamentoComparativo() {
           prioridade: String(row[colIndexes.prioridade] || '').trim(),
           modalidade: String(row[colIndexes.modalidade] || '').trim(),
           especialidade: String(row[colIndexes.especialidade] || '').trim(),
-          categoria: String(row[colIndexes.categoria] || '').trim(),
+          categoria: String(row[colIndexes.categoria] || '').trim() || 'SC',
           laudos: parseQuantidade(row[colIndexes.laudos]),
           valor: parseValor(row[colIndexes.valor])
         });
