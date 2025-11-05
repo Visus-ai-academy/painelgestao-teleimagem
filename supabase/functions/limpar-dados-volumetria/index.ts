@@ -54,6 +54,47 @@ Deno.serve(async (req: Request): Promise<Response> => {
         const removidosVolumetria = volumetriaCount || 0
         console.log(`✅ VOLUMETRIA: ${removidosVolumetria} registros removidos`)
 
+        // 1.5 EXCLUIR REGISTROS COM MODALIDADE "US" (se houver registros remanescentes)
+        console.log(`🚫 Excluindo registros com modalidade US...`)
+        
+        // Primeiro, buscar registros US para salvar na tabela de rejeições
+        const { data: registrosUS } = await supabase
+          .from('volumetria_mobilemed')
+          .select('*')
+          .eq('MODALIDADE', 'US')
+
+        if (registrosUS && registrosUS.length > 0) {
+          console.log(`📊 Encontrados ${registrosUS.length} registros com modalidade US`)
+          
+          // Salvar na tabela de rejeições
+          const rejeicoes = registrosUS.map(registro => ({
+            empresa: registro.EMPRESA || 'N/I',
+            nome_paciente: registro.NOME_PACIENTE || 'N/I',
+            arquivo_fonte: registro.arquivo_fonte || 'N/I',
+            erro_detalhes: 'MODALIDADE_US_EXCLUIDA: Exames com modalidade US não são realizados, faturados e não têm repasse médico.',
+            dados_originais: registro,
+            status: 'rejeitado',
+            created_at: new Date().toISOString()
+          }))
+
+          // Inserir rejeições em batches
+          const BATCH_SIZE_REJ = 20
+          for (let i = 0; i < rejeicoes.length; i += BATCH_SIZE_REJ) {
+            const batchRejeicoes = rejeicoes.slice(i, i + BATCH_SIZE_REJ)
+            await supabase.from('volumetria_erros').insert(batchRejeicoes)
+          }
+
+          // Excluir registros US
+          const { count: deletedUS } = await supabase
+            .from('volumetria_mobilemed')
+            .delete()
+            .eq('MODALIDADE', 'US')
+
+          console.log(`✅ MODALIDADE US: ${deletedUS || 0} registros excluídos e registrados nas rejeições`)
+        } else {
+          console.log(`ℹ️ Nenhum registro com modalidade US encontrado`)
+        }
+
         // 2. LIMPAR TABELA processamento_uploads
         console.log(`📊 Limpando tabela: processamento_uploads`)
         

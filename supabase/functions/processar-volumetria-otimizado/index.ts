@@ -133,7 +133,19 @@ serve(async (req) => {
           const linhaOriginal = batchStart + i + 1;
           totalProcessados++;
           
-          // ✅ ACEITAR TODOS OS REGISTROS - Validações desabilitadas
+          // 🚫 EXCLUIR REGISTROS COM MODALIDADE "US" - Exames não realizados/não faturados
+          if (record.MODALIDADE === 'US') {
+            registrosRejeitados.push({
+              linha_original: linhaOriginal,
+              dados_originais: record,
+              motivo_rejeicao: 'MODALIDADE_US_EXCLUIDA',
+              detalhes_erro: 'Exames com modalidade US não são realizados, faturados e não têm repasse médico. Excluídos automaticamente.'
+            });
+            totalErros++;
+            continue; // Pular este registro
+          }
+          
+          // ✅ ACEITAR DEMAIS REGISTROS - Validações desabilitadas
           const recordToInsert = {
             ...record,
             data_referencia: dataReferencia,
