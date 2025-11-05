@@ -224,12 +224,22 @@ serve(async (req) => {
             return true;
           }
           
-          // Apenas CT com MEDICINA INTERNA ou MUSCULO ESQUELETICO faturam
-          const isCT = modalidade === 'CT';
           const isMedicinaInterna = especialidade.includes('MEDICINA INTERNA');
           const isMusculoEsqueletico = especialidade.includes('MUSCULO ESQUELETICO');
           
-          return isCT && (isMedicinaInterna || isMusculoEsqueletico);
+          // CT com MEDICINA INTERNA ou MUSCULO ESQUELETICO faturam
+          const isCT = modalidade === 'CT';
+          if (isCT && (isMedicinaInterna || isMusculoEsqueletico)) {
+            return true;
+          }
+          
+          // MR com MEDICINA INTERNA fatura
+          const isMR = modalidade === 'MR';
+          if (isMR && isMedicinaInterna) {
+            return true;
+          }
+          
+          return false;
         });
         
         const examesTotaisDepois = volumetria.reduce((acc, vol) => acc + (Number(vol.VALORES) || 0), 0);

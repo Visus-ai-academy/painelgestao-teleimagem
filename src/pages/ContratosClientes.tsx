@@ -541,7 +541,6 @@ export default function ContratosClientes() {
             categoria: preco.categoria,
             prioridade: preco.prioridade || 'Rotina',
             valor_base: preco.valor_base,
-            valor_urgencia: preco.valor_urgencia,
             volume_inicial: preco.volume_inicial,
             volume_final: preco.volume_final
           })) : [];
