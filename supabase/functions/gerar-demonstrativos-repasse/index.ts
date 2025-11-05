@@ -131,26 +131,47 @@ serve(async (req) => {
           const quantidade = exame.VALORES || 1;
  
           // Se especialidade vier como 'GERAL' (qualquer capitalização) ou vazia, tentar corrigir via cadastro_exames
-          if (!norm(especialidade) || norm(especialidade) === 'GERAL') {
+          if (!especialidade || norm(especialidade) === 'GERAL' || especialidade === '') {
             const desc = (exame.ESTUDO_DESCRICAO || '').toString();
             const key = normNoAccent(desc);
             if (key) {
               let mapped = especialidadeCache.get(key);
               if (mapped === undefined) {
-                const { data: ce } = await supabase
+                // Buscar no cadastro_exames pelo nome do exame
+                const { data: ce, error: ceError } = await supabase
                   .from('cadastro_exames')
                   .select('especialidade, nome, ativo')
-                  .ilike('nome', desc)
                   .eq('ativo', true)
-                  .limit(1)
-                  .maybeSingle();
-                mapped = (ce?.especialidade || '').toString();
+                  .limit(100);
+                
+                if (!ceError && ce && ce.length > 0) {
+                  // Procurar match exato ou similar
+                  const match = ce.find(e => normNoAccent(e.nome) === key);
+                  if (match && match.especialidade) {
+                    mapped = match.especialidade;
+                    console.log(`[Repasse] Mapeado ${desc} -> ${mapped}`);
+                  } else {
+                    // Tentar match parcial
+                    const partialMatch = ce.find(e => 
+                      normNoAccent(e.nome).includes(key) || key.includes(normNoAccent(e.nome))
+                    );
+                    if (partialMatch && partialMatch.especialidade) {
+                      mapped = partialMatch.especialidade;
+                      console.log(`[Repasse] Mapeado parcial ${desc} -> ${mapped}`);
+                    } else {
+                      mapped = '';
+                      console.warn(`[Repasse] Especialidade não encontrada para: ${desc}`);
+                    }
+                  }
+                } else {
+                  mapped = '';
+                  console.warn(`[Repasse] Erro ao buscar cadastro_exames ou vazio:`, ceError?.message);
+                }
                 especialidadeCache.set(key, mapped);
               }
               if (mapped) {
                 especialidade = mapped;
               } else {
-                // Se não encontrou mapeamento, deixar vazio para não aparecer como 'GERAL'
                 especialidade = '';
               }
             } else {

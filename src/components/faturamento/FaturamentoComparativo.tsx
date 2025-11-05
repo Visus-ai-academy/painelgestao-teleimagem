@@ -1,9 +1,10 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FileSpreadsheet, Upload, Trash2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import * as XLSX from 'xlsx';
 
 interface FaturamentoUploadRow {
@@ -45,6 +46,51 @@ export default function FaturamentoComparativo() {
   const [diferencas, setDiferencas] = useState<Diferenca[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [lastFileName, setLastFileName] = useState<string>("");
+  const [clientes, setClientes] = useState<Array<{ id: string; nome: string }>>([]);
+  const [periodos, setPeriodos] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Carregar clientes e períodos
+  useEffect(() => {
+    const carregarDados = async () => {
+      try {
+        // Buscar clientes
+        const { data: clientesData, error: clientesError } = await supabase
+          .from('clientes')
+          .select('id, nome')
+          .eq('ativo', true)
+          .order('nome');
+
+        if (clientesError) throw clientesError;
+        setClientes(clientesData || []);
+
+        // Buscar períodos únicos da volumetria_mobilemed
+        const { data: periodosData, error: periodosError } = await supabase
+          .from('volumetria_mobilemed')
+          .select('periodo_referencia')
+          .order('periodo_referencia', { ascending: false });
+
+        if (periodosError) throw periodosError;
+        
+        const periodosUnicos = Array.from(
+          new Set(periodosData?.map(p => p.periodo_referencia).filter(Boolean) || [])
+        );
+        setPeriodos(periodosUnicos);
+
+      } catch (error: any) {
+        console.error('Erro ao carregar dados:', error);
+        toast({
+          title: "Erro ao carregar dados",
+          description: error.message,
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    carregarDados();
+  }, [toast]);
 
   // Normalizar string para comparação
   const normalizar = (str: string): string => {
@@ -163,13 +209,95 @@ export default function FaturamentoComparativo() {
 
     setIsProcessing(true);
     try {
-      // Buscar dados do sistema (simulação - você deve implementar a busca real)
-      // TODO: Implementar busca real dos dados do sistema via Supabase
-      
+      // Buscar dados do sistema
+      const { data: dadosSistema, error: sistemaError } = await supabase
+        .from('volumetria_mobilemed')
+        .select('*')
+        .eq('EMPRESA', clientes.find(c => c.id === clienteSelecionado)?.nome || '')
+        .eq('periodo_referencia', periodoSelecionado);
+
+      if (sistemaError) throw sistemaError;
+
       const diferencasEncontradas: Diferenca[] = [];
-      
-      // Exemplo de lógica de comparação
-      // Você deve implementar a lógica real baseada nos seus dados
+
+      // Criar mapa dos dados do sistema
+      const sistemaMap = new Map<string, any>();
+      (dadosSistema || []).forEach((item: any) => {
+        const chave = `${item.NOME_PACIENTE}|${item.ESTUDO_DESCRICAO}|${item.DATA_LAUDO}|${item.MEDICO}`;
+        sistemaMap.set(chave, item);
+      });
+
+      // Criar mapa dos dados do arquivo
+      const arquivoMap = new Map<string, FaturamentoUploadRow>();
+      uploadedData.forEach((item) => {
+        const chave = `${item.paciente}|${item.nomeExame}|${item.dataEstudo}|${item.laudadoPor}`;
+        arquivoMap.set(chave, item);
+      });
+
+      // Comparar: itens no arquivo que não estão no sistema
+      arquivoMap.forEach((itemArquivo, chave) => {
+        if (!sistemaMap.has(chave)) {
+          diferencasEncontradas.push({
+            tipo: 'arquivo_apenas',
+            chave,
+            dataEstudo: itemArquivo.dataEstudo,
+            paciente: itemArquivo.paciente,
+            exame: itemArquivo.nomeExame,
+            medico: itemArquivo.laudadoPor,
+            prioridade: itemArquivo.prioridade,
+            modalidade: itemArquivo.modalidade,
+            especialidade: itemArquivo.especialidade,
+            categoria: itemArquivo.categoria,
+            quantidadeArquivo: itemArquivo.laudos,
+            valorArquivo: itemArquivo.valor,
+            detalhes: 'Registro existe apenas no arquivo, não encontrado no sistema'
+          });
+        } else {
+          // Verificar se os valores são diferentes
+          const itemSistema = sistemaMap.get(chave);
+          const qtdSistema = Number(itemSistema.VALORES) || 0;
+          const qtdArquivo = itemArquivo.laudos;
+          
+          if (qtdSistema !== qtdArquivo) {
+            diferencasEncontradas.push({
+              tipo: 'valores_diferentes',
+              chave,
+              dataEstudo: itemArquivo.dataEstudo,
+              paciente: itemArquivo.paciente,
+              exame: itemArquivo.nomeExame,
+              medico: itemArquivo.laudadoPor,
+              prioridade: itemArquivo.prioridade,
+              modalidade: itemArquivo.modalidade,
+              especialidade: itemArquivo.especialidade,
+              categoria: itemArquivo.categoria,
+              quantidadeArquivo: qtdArquivo,
+              quantidadeSistema: qtdSistema,
+              valorArquivo: itemArquivo.valor,
+              detalhes: `Quantidade diferente: Sistema=${qtdSistema}, Arquivo=${qtdArquivo}`
+            });
+          }
+        }
+      });
+
+      // Comparar: itens no sistema que não estão no arquivo
+      sistemaMap.forEach((itemSistema, chave) => {
+        if (!arquivoMap.has(chave)) {
+          diferencasEncontradas.push({
+            tipo: 'sistema_apenas',
+            chave,
+            dataEstudo: itemSistema.DATA_LAUDO,
+            paciente: itemSistema.NOME_PACIENTE,
+            exame: itemSistema.ESTUDO_DESCRICAO,
+            medico: itemSistema.MEDICO,
+            prioridade: itemSistema.PRIORIDADE,
+            modalidade: itemSistema.MODALIDADE,
+            especialidade: itemSistema.ESPECIALIDADE,
+            categoria: itemSistema.CATEGORIA,
+            quantidadeSistema: Number(itemSistema.VALORES) || 0,
+            detalhes: 'Registro existe apenas no sistema, não encontrado no arquivo'
+          });
+        }
+      });
       
       setDiferencas(diferencasEncontradas);
       
@@ -187,7 +315,7 @@ export default function FaturamentoComparativo() {
     } finally {
       setIsProcessing(false);
     }
-  }, [clienteSelecionado, periodoSelecionado, uploadedData, toast]);
+  }, [clienteSelecionado, periodoSelecionado, uploadedData, toast, clientes]);
 
   // Limpar dados
   const handleLimpar = () => {
@@ -258,9 +386,17 @@ export default function FaturamentoComparativo() {
                   <SelectValue placeholder="Selecione o cliente" />
                 </SelectTrigger>
                 <SelectContent>
-                  {/* TODO: Carregar clientes do sistema */}
-                  <SelectItem value="cliente1">Cliente 1</SelectItem>
-                  <SelectItem value="cliente2">Cliente 2</SelectItem>
+                  {loading ? (
+                    <SelectItem value="loading" disabled>Carregando...</SelectItem>
+                  ) : clientes.length === 0 ? (
+                    <SelectItem value="empty" disabled>Nenhum cliente encontrado</SelectItem>
+                  ) : (
+                    clientes.map(cliente => (
+                      <SelectItem key={cliente.id} value={cliente.id}>
+                        {cliente.nome}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -272,9 +408,17 @@ export default function FaturamentoComparativo() {
                   <SelectValue placeholder="Selecione o período" />
                 </SelectTrigger>
                 <SelectContent>
-                  {/* TODO: Carregar períodos disponíveis */}
-                  <SelectItem value="2025-06">Junho/2025</SelectItem>
-                  <SelectItem value="2025-07">Julho/2025</SelectItem>
+                  {loading ? (
+                    <SelectItem value="loading" disabled>Carregando...</SelectItem>
+                  ) : periodos.length === 0 ? (
+                    <SelectItem value="empty" disabled>Nenhum período encontrado</SelectItem>
+                  ) : (
+                    periodos.map(periodo => (
+                      <SelectItem key={periodo} value={periodo}>
+                        {periodo}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
