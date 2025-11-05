@@ -67,14 +67,17 @@ export default function FaturamentoComparativo() {
         // Buscar períodos únicos da tabela faturamento
         const { data: periodosData, error: periodosError } = await supabase
           .from('faturamento')
-          .select('periodo_referencia')
-          .order('periodo_referencia', { ascending: false });
+          .select('periodo_referencia');
 
-        if (periodosError) throw periodosError;
+        if (periodosError) {
+          console.error('Erro ao buscar períodos:', periodosError);
+        }
         
         const periodosUnicos = Array.from(
           new Set(periodosData?.map(p => p.periodo_referencia).filter(Boolean) || [])
-        );
+        ).sort((a, b) => b.localeCompare(a)); // Ordenar descendente
+        
+        console.log('Períodos encontrados:', periodosUnicos);
         setPeriodos(periodosUnicos);
 
       } catch (error: any) {

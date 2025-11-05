@@ -387,20 +387,20 @@ export default function GerarFaturamento() {
 
       // Preparar dados para o Excel - Quadro 2
       const dadosExcel = dadosVolumetria.map((item: any) => ({
-        'Data': item.data_exame ? new Date(item.data_exame).toLocaleDateString('pt-BR') : '',
-        'Data Laudo': item.data_laudo ? new Date(item.data_laudo).toLocaleDateString('pt-BR') : '',
-        'Paciente': item.paciente || '',
-        'Médico': item.medico || '',
-        'Exame': item.exame || '',
-        'Modalidade': item.modalidade || '',
-        'Especialidade': item.especialidade || '',
-        'Categoria': item.categoria || '',
-        'Prioridade': item.prioridade || '',
-        'Accession': item.accession_number || '',
-        'Origem': item.origem || item.unidade_origem || '',
-        'Quantidade': item.quantidade || 1,
-        'Valor': item.valor_exame || 0,
-        'Total': (item.quantidade || 1) * (item.valor_exame || 0)
+        'Data Exame': item.DATA_EXAME ? new Date(item.DATA_EXAME).toLocaleDateString('pt-BR') : '',
+        'Data Laudo': item.DATA_LAUDO || '',
+        'Paciente': item.NOME_PACIENTE || '',
+        'Médico': item.MEDICO || '',
+        'Exame': item.ESTUDO_DESCRICAO || '',
+        'Modalidade': item.MODALIDADE || '',
+        'Especialidade': item.ESPECIALIDADE || '',
+        'Categoria': item.CATEGORIA || '',
+        'Prioridade': item.PRIORIDADE || '',
+        'Accession': item.ACCESSION_NUMBER || '',
+        'Cliente': item.EMPRESA || '',
+        'Quantidade': item.VALORES || 1,
+        'Valor Unitário': item.VALOR_UNITARIO || 0,
+        'Valor Total': (item.VALORES || 1) * (item.VALOR_UNITARIO || 0)
       }));
 
       // Criar workbook e worksheet
@@ -409,20 +409,20 @@ export default function GerarFaturamento() {
 
       // Ajustar largura das colunas
       const colWidths = [
-        { wch: 12 }, // Data
+        { wch: 12 }, // Data Exame
         { wch: 12 }, // Data Laudo
         { wch: 30 }, // Paciente
         { wch: 30 }, // Médico
         { wch: 40 }, // Exame
         { wch: 12 }, // Modalidade
-        { wch: 15 }, // Especialidade
+        { wch: 18 }, // Especialidade
         { wch: 12 }, // Categoria
         { wch: 12 }, // Prioridade
         { wch: 15 }, // Accession
-        { wch: 20 }, // Origem
+        { wch: 25 }, // Cliente
         { wch: 10 }, // Quantidade
-        { wch: 12 }, // Valor
-        { wch: 12 }, // Total
+        { wch: 12 }, // Valor Unitário
+        { wch: 12 }, // Valor Total
       ];
       ws['!cols'] = colWidths;
 
