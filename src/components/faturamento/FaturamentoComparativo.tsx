@@ -101,6 +101,23 @@ export default function FaturamentoComparativo() {
       .trim();
   };
 
+  // Parse de data do Excel (pode vir como número serial do Excel)
+  const parseDataExcel = (val: any): string => {
+    if (!val) return '';
+    
+    // Se for número (serial date do Excel)
+    if (typeof val === 'number') {
+      const date = new Date((val - 25569) * 86400 * 1000);
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`;
+    }
+    
+    // Se for string, retornar como está
+    return String(val).trim();
+  };
+
   // Parse de valor numérico
   const parseValor = (val: any): number => {
     if (typeof val === 'number') return val;
@@ -164,8 +181,8 @@ export default function FaturamentoComparativo() {
         if (!paciente) continue;
 
         rows.push({
-          dataEstudo: String(row[colIndexes.dataEstudo] || '').trim(),
-          paciente,
+          dataEstudo: parseDataExcel(row[colIndexes.dataEstudo]),
+          paciente: normalizar(paciente),
           nomeExame: String(row[colIndexes.nomeExame] || '').trim(),
           laudadoPor: String(row[colIndexes.laudadoPor] || '').trim(),
           prioridade: String(row[colIndexes.prioridade] || '').trim(),
@@ -220,48 +237,36 @@ export default function FaturamentoComparativo() {
 
       const diferencasEncontradas: Diferenca[] = [];
 
-      // Criar mapa dos dados do sistema
-      const sistemaMap = new Map<string, any>();
+      // Criar mapa dos dados do sistema usando apenas PACIENTE + DATA
+      const sistemaMap = new Map<string, any[]>();
       (dadosSistema || []).forEach((item: any) => {
-        const chave = `${item.NOME_PACIENTE}|${item.ESTUDO_DESCRICAO}|${item.DATA_LAUDO}|${item.MEDICO}`;
-        sistemaMap.set(chave, item);
-      });
-
-      // Criar mapa dos dados do arquivo
-      const arquivoMap = new Map<string, FaturamentoUploadRow>();
-      uploadedData.forEach((item) => {
-        const chave = `${item.paciente}|${item.nomeExame}|${item.dataEstudo}|${item.laudadoPor}`;
-        arquivoMap.set(chave, item);
-      });
-
-      // Comparar: itens no arquivo que não estão no sistema
-      arquivoMap.forEach((itemArquivo, chave) => {
+        const chave = `${normalizar(item.NOME_PACIENTE)}|${item.DATA_LAUDO}`;
         if (!sistemaMap.has(chave)) {
-          diferencasEncontradas.push({
-            tipo: 'arquivo_apenas',
-            chave,
-            dataEstudo: itemArquivo.dataEstudo,
-            paciente: itemArquivo.paciente,
-            exame: itemArquivo.nomeExame,
-            medico: itemArquivo.laudadoPor,
-            prioridade: itemArquivo.prioridade,
-            modalidade: itemArquivo.modalidade,
-            especialidade: itemArquivo.especialidade,
-            categoria: itemArquivo.categoria,
-            quantidadeArquivo: itemArquivo.laudos,
-            valorArquivo: itemArquivo.valor,
-            detalhes: 'Registro existe apenas no arquivo, não encontrado no sistema'
-          });
-        } else {
-          // Verificar se os valores são diferentes
-          const itemSistema = sistemaMap.get(chave);
-          const qtdSistema = Number(itemSistema.VALORES) || 0;
-          const qtdArquivo = itemArquivo.laudos;
-          
-          if (qtdSistema !== qtdArquivo) {
+          sistemaMap.set(chave, []);
+        }
+        sistemaMap.get(chave)!.push(item);
+      });
+
+      // Criar mapa dos dados do arquivo usando apenas PACIENTE + DATA
+      const arquivoMap = new Map<string, FaturamentoUploadRow[]>();
+      uploadedData.forEach((item) => {
+        const chave = `${item.paciente}|${item.dataEstudo}`;
+        if (!arquivoMap.has(chave)) {
+          arquivoMap.set(chave, []);
+        }
+        arquivoMap.get(chave)!.push(item);
+      });
+
+      // Comparar: itens no arquivo vs sistema (por paciente + data)
+      arquivoMap.forEach((itensArquivo, chave) => {
+        const itensSistema = sistemaMap.get(chave);
+        
+        if (!itensSistema) {
+          // Paciente + data não existe no sistema
+          itensArquivo.forEach(itemArquivo => {
             diferencasEncontradas.push({
-              tipo: 'valores_diferentes',
-              chave,
+              tipo: 'arquivo_apenas',
+              chave: `${chave}|${itemArquivo.nomeExame}`,
               dataEstudo: itemArquivo.dataEstudo,
               paciente: itemArquivo.paciente,
               exame: itemArquivo.nomeExame,
@@ -270,31 +275,110 @@ export default function FaturamentoComparativo() {
               modalidade: itemArquivo.modalidade,
               especialidade: itemArquivo.especialidade,
               categoria: itemArquivo.categoria,
-              quantidadeArquivo: qtdArquivo,
-              quantidadeSistema: qtdSistema,
+              quantidadeArquivo: itemArquivo.laudos,
               valorArquivo: itemArquivo.valor,
-              detalhes: `Quantidade diferente: Sistema=${qtdSistema}, Arquivo=${qtdArquivo}`
+              detalhes: 'Paciente/Data existe apenas no arquivo'
             });
-          }
+          });
+        } else {
+          // Paciente + data existe em ambos, verificar divergências nos campos
+          itensArquivo.forEach(itemArquivo => {
+            // Tentar encontrar exame correspondente no sistema
+            const itemSistemaCorrespondente = itensSistema.find(s => 
+              normalizar(s.ESTUDO_DESCRICAO) === normalizar(itemArquivo.nomeExame)
+            );
+
+            if (!itemSistemaCorrespondente) {
+              diferencasEncontradas.push({
+                tipo: 'arquivo_apenas',
+                chave: `${chave}|${itemArquivo.nomeExame}`,
+                dataEstudo: itemArquivo.dataEstudo,
+                paciente: itemArquivo.paciente,
+                exame: itemArquivo.nomeExame,
+                medico: itemArquivo.laudadoPor,
+                prioridade: itemArquivo.prioridade,
+                modalidade: itemArquivo.modalidade,
+                especialidade: itemArquivo.especialidade,
+                categoria: itemArquivo.categoria,
+                quantidadeArquivo: itemArquivo.laudos,
+                valorArquivo: itemArquivo.valor,
+                detalhes: 'Exame não encontrado no sistema para este paciente/data'
+              });
+            } else {
+              // Verificar divergências nos campos
+              const divergencias: string[] = [];
+              
+              if (normalizar(itemArquivo.modalidade) !== normalizar(itemSistemaCorrespondente.MODALIDADE)) {
+                divergencias.push(`Modalidade: Arquivo="${itemArquivo.modalidade}" vs Sistema="${itemSistemaCorrespondente.MODALIDADE}"`);
+              }
+              
+              if (normalizar(itemArquivo.especialidade) !== normalizar(itemSistemaCorrespondente.ESPECIALIDADE)) {
+                divergencias.push(`Especialidade: Arquivo="${itemArquivo.especialidade}" vs Sistema="${itemSistemaCorrespondente.ESPECIALIDADE}"`);
+              }
+              
+              if (normalizar(itemArquivo.categoria) !== normalizar(itemSistemaCorrespondente.CATEGORIA)) {
+                divergencias.push(`Categoria: Arquivo="${itemArquivo.categoria}" vs Sistema="${itemSistemaCorrespondente.CATEGORIA}"`);
+              }
+              
+              if (normalizar(itemArquivo.prioridade) !== normalizar(itemSistemaCorrespondente.PRIORIDADE)) {
+                divergencias.push(`Prioridade: Arquivo="${itemArquivo.prioridade}" vs Sistema="${itemSistemaCorrespondente.PRIORIDADE}"`);
+              }
+              
+              const qtdSistema = Number(itemSistemaCorrespondente.VALORES) || 0;
+              const qtdArquivo = itemArquivo.laudos;
+              if (qtdArquivo !== qtdSistema) {
+                divergencias.push(`Quantidade: Arquivo=${qtdArquivo} vs Sistema=${qtdSistema}`);
+              }
+              
+              const valorSistema = Number(itemSistemaCorrespondente.VALOR_UNITARIO) || 0;
+              const valorArquivo = itemArquivo.valor;
+              if (Math.abs(valorArquivo - valorSistema) > 0.01) {
+                divergencias.push(`Valor: Arquivo=R$ ${valorArquivo.toFixed(2)} vs Sistema=R$ ${valorSistema.toFixed(2)}`);
+              }
+
+              if (divergencias.length > 0) {
+                diferencasEncontradas.push({
+                  tipo: 'valores_diferentes',
+                  chave: `${chave}|${itemArquivo.nomeExame}`,
+                  dataEstudo: itemArquivo.dataEstudo,
+                  paciente: itemArquivo.paciente,
+                  exame: itemArquivo.nomeExame,
+                  medico: itemArquivo.laudadoPor,
+                  prioridade: itemArquivo.prioridade,
+                  modalidade: itemArquivo.modalidade,
+                  especialidade: itemArquivo.especialidade,
+                  categoria: itemArquivo.categoria,
+                  quantidadeArquivo: qtdArquivo,
+                  quantidadeSistema: qtdSistema,
+                  valorArquivo: valorArquivo,
+                  valorSistema: valorSistema,
+                  detalhes: divergencias.join(' | ')
+                });
+              }
+            }
+          });
         }
       });
 
       // Comparar: itens no sistema que não estão no arquivo
-      sistemaMap.forEach((itemSistema, chave) => {
+      sistemaMap.forEach((itensSistema, chave) => {
         if (!arquivoMap.has(chave)) {
-          diferencasEncontradas.push({
-            tipo: 'sistema_apenas',
-            chave,
-            dataEstudo: itemSistema.DATA_LAUDO,
-            paciente: itemSistema.NOME_PACIENTE,
-            exame: itemSistema.ESTUDO_DESCRICAO,
-            medico: itemSistema.MEDICO,
-            prioridade: itemSistema.PRIORIDADE,
-            modalidade: itemSistema.MODALIDADE,
-            especialidade: itemSistema.ESPECIALIDADE,
-            categoria: itemSistema.CATEGORIA,
-            quantidadeSistema: Number(itemSistema.VALORES) || 0,
-            detalhes: 'Registro existe apenas no sistema, não encontrado no arquivo'
+          itensSistema.forEach(itemSistema => {
+            diferencasEncontradas.push({
+              tipo: 'sistema_apenas',
+              chave: `${chave}|${itemSistema.ESTUDO_DESCRICAO}`,
+              dataEstudo: itemSistema.DATA_LAUDO,
+              paciente: normalizar(itemSistema.NOME_PACIENTE),
+              exame: itemSistema.ESTUDO_DESCRICAO,
+              medico: itemSistema.MEDICO,
+              prioridade: itemSistema.PRIORIDADE,
+              modalidade: itemSistema.MODALIDADE,
+              especialidade: itemSistema.ESPECIALIDADE,
+              categoria: itemSistema.CATEGORIA,
+              quantidadeSistema: Number(itemSistema.VALORES) || 0,
+              valorSistema: Number(itemSistema.VALOR_UNITARIO) || 0,
+              detalhes: 'Paciente/Data existe apenas no sistema'
+            });
           });
         }
       });
