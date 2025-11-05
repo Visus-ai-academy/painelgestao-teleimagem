@@ -64,9 +64,9 @@ export default function FaturamentoComparativo() {
         if (clientesError) throw clientesError;
         setClientes(clientesData || []);
 
-        // Buscar períodos únicos da tabela faturamento
+        // Buscar períodos únicos da tabela volumetria_mobilemed
         const { data: periodosData, error: periodosError } = await supabase
-          .from('faturamento')
+          .from('volumetria_mobilemed')
           .select('periodo_referencia');
 
         if (periodosError) {
