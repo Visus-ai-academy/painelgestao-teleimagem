@@ -521,10 +521,9 @@ serve(async (req) => {
 
             const escolhido = poolFaixa[0] || poolPrioridade[0];
             if (escolhido) {
-              const prioridadeUrg = prioridadeN.includes('URG') || prioridadeN.includes('PLANT');
-              valorUnitario = (prioridadeUrg || escolhido.considera_prioridade_plantao)
-                ? (escolhido.valor_urgencia ?? escolhido.valor_base ?? 0)
-                : (escolhido.valor_base ?? 0);
+              // Busca correta: modalidade + especialidade + categoria + PRIORIDADE + faixa_volume
+              // Cada prioridade (Rotina, Urgência, Plantão) já tem sua linha específica com valor correto
+              valorUnitario = escolhido.valor_base ?? 0;
             }
           }
         }
