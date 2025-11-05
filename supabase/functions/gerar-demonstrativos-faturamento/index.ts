@@ -769,16 +769,15 @@ serve(async (req) => {
         simples: parametros?.simples
       });
 
-      if (parametros && parametros.percentual_iss) {
+      // Clientes Simples Nacional NÃO têm retenção de impostos
+      if (parametros && !parametros.simples && parametros.percentual_iss) {
         valorISS = valorBruto * (parametros.percentual_iss / 100);
-        if (parametros.simples && parametros.impostos_ab_min) {
+        if (parametros.impostos_ab_min) {
           valorISS = Math.max(valorISS, parametros.impostos_ab_min);
         }
         
-        // IRRF only for non-simples
-        if (!parametros.simples) {
-          valorIRRF = valorBruto * 0.015;
-        }
+        // IRRF para regime normal
+        valorIRRF = valorBruto * 0.015;
       }
 
       const totalImpostos = valorISS + valorIRRF;
