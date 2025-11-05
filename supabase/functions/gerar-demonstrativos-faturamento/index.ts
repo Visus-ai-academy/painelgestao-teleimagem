@@ -457,14 +457,48 @@ serve(async (req) => {
         gruposExames[key].quantidade += qtd;
       }
 
-      // Get client prices
+      // Get client prices (incluir volume_total)
       const { data: precosCliente } = await supabase
         .from('precos_servicos')
-        .select('modalidade, especialidade, categoria, prioridade, valor_base, valor_urgencia, volume_inicial, volume_final, considera_prioridade_plantao, ativo')
+        .select('modalidade, especialidade, categoria, prioridade, valor_base, volume_inicial, volume_final, volume_total, considera_prioridade_plantao, ativo')
         .eq('cliente_id', cliente.id)
         .eq('ativo', true);
 
       const norm = (s: string) => (s || '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
+
+      // Calcular volumes agrupados por condicionante ANTES do loop
+      const volumesPorCondicionante: Record<string, number> = {
+        'TOTAL': totalExames
+      };
+
+      // Agrupar por MOD
+      const volumesPorMod: Record<string, number> = {};
+      for (const [key, grupo] of Object.entries(gruposExames)) {
+        const mod = norm(grupo.modalidade);
+        volumesPorMod[mod] = (volumesPorMod[mod] || 0) + grupo.quantidade;
+      }
+
+      // Agrupar por MOD/ESP
+      const volumesPorModEsp: Record<string, number> = {};
+      for (const [key, grupo] of Object.entries(gruposExames)) {
+        const modEsp = `${norm(grupo.modalidade)}/${norm(grupo.especialidade)}`;
+        volumesPorModEsp[modEsp] = (volumesPorModEsp[modEsp] || 0) + grupo.quantidade;
+      }
+
+      // Agrupar por MOD/ESP/CAT
+      const volumesPorModEspCat: Record<string, number> = {};
+      for (const [key, grupo] of Object.entries(gruposExames)) {
+        const modEspCat = `${norm(grupo.modalidade)}/${norm(grupo.especialidade)}/${norm(grupo.categoria || 'SC')}`;
+        volumesPorModEspCat[modEspCat] = (volumesPorModEspCat[modEspCat] || 0) + grupo.quantidade;
+      }
+
+      console.log('📊 Volumes agrupados calculados:', {
+        total: volumesPorCondicionante['TOTAL'],
+        por_modalidade: Object.keys(volumesPorMod).length,
+        por_mod_esp: Object.keys(volumesPorModEsp).length,
+        por_mod_esp_cat: Object.keys(volumesPorModEspCat).length
+      });
+
 
       // Calculate prices for each group
       for (const [key, grupo] of Object.entries(gruposExames)) {
@@ -511,19 +545,52 @@ serve(async (req) => {
           }
 
           if (poolPrioridade.length > 0) {
-            // Selecionar faixa por volume do período (usar totalExames)
-            const poolFaixa = poolPrioridade
-              .filter((p: any) =>
-                (p.volume_inicial == null || totalExames >= p.volume_inicial) &&
-                (p.volume_final == null || totalExames <= p.volume_final)
-              )
-              .sort((a: any, b: any) => (b.volume_inicial || 0) - (a.volume_inicial || 0));
+            // Determinar o volume a ser usado baseado na condicionante
+            let volumeParaFaixa = 0;
+            
+            // Verificar se algum preço tem volume_total preenchido
+            const temCondicionante = poolPrioridade.some((p: any) => p.volume_total);
+            
+            if (temCondicionante) {
+              // Usar o primeiro preço para pegar a condicionante (todos do pool devem ter a mesma)
+              const condicionante = norm(poolPrioridade[0].volume_total || '');
+              
+              if (condicionante === 'MOD') {
+                volumeParaFaixa = volumesPorMod[modalidadeN] || 0;
+              } else if (condicionante === 'MOD/ESP') {
+                const chave = `${modalidadeN}/${especialidadeN}`;
+                volumeParaFaixa = volumesPorModEsp[chave] || 0;
+              } else if (condicionante === 'MOD/ESP/CAT') {
+                const chave = `${modalidadeN}/${especialidadeN}/${categoriaN}`;
+                volumeParaFaixa = volumesPorModEspCat[chave] || 0;
+              } else if (condicionante === 'TOTAL') {
+                volumeParaFaixa = volumesPorCondicionante['TOTAL'];
+              }
+              
+              console.log(`📐 Volume calculado para ${grupo.modalidade}/${grupo.especialidade}:`, {
+                condicionante: poolPrioridade[0].volume_total,
+                volume: volumeParaFaixa
+              });
 
-            const escolhido = poolFaixa[0] || poolPrioridade[0];
-            if (escolhido) {
-              // Busca correta: modalidade + especialidade + categoria + PRIORIDADE + faixa_volume
-              // Cada prioridade (Rotina, Urgência, Plantão) já tem sua linha específica com valor correto
-              valorUnitario = escolhido.valor_base ?? 0;
+              // Filtrar por faixa de volume
+              const poolFaixa = poolPrioridade
+                .filter((p: any) =>
+                  (p.volume_inicial == null || volumeParaFaixa >= p.volume_inicial) &&
+                  (p.volume_final == null || volumeParaFaixa <= p.volume_final)
+                )
+                .sort((a: any, b: any) => (b.volume_inicial || 0) - (a.volume_inicial || 0));
+
+              const escolhido = poolFaixa[0] || poolPrioridade[0];
+              if (escolhido) {
+                valorUnitario = escolhido.valor_base ?? 0;
+              }
+            } else {
+              // SEM condicionante = SEM faixa de volume = preço fixo
+              // Pegar qualquer preço do pool (todos devem ter o mesmo valor_base)
+              const escolhido = poolPrioridade[0];
+              if (escolhido) {
+                valorUnitario = escolhido.valor_base ?? 0;
+              }
             }
           }
         }
