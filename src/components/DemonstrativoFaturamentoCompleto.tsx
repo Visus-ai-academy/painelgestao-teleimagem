@@ -153,6 +153,43 @@ export function DemonstrativoFaturamentoCompleto({
         setDemonstrativos(Array.isArray(data.demonstrativos) ? data.demonstrativos : []);
         setResumo(data.resumo || null);
 
+        // 💾 Gravar demonstrativos no banco de dados (fallback path)
+        try {
+          const recordsToInsert = (data.demonstrativos || []).map((demo: DemonstrativoCliente) => ({
+            cliente_id: demo.cliente_id,
+            cliente_nome: demo.cliente_nome,
+            periodo_referencia: periodo,
+            total_exames: demo.total_exames || 0,
+            valor_exames: demo.valor_exames || 0,
+            valor_franquia: demo.valor_franquia || 0,
+            valor_portal_laudos: demo.valor_portal_laudos || 0,
+            valor_integracao: demo.valor_integracao || 0,
+            valor_bruto_total: demo.valor_bruto || 0,
+            valor_total_impostos: demo.valor_impostos || 0,
+            valor_liquido: demo.valor_total || 0,
+            detalhes_exames: demo.detalhes_exames || [],
+            detalhes_franquia: demo.detalhes_franquia || {},
+            parametros_utilizados: demo.detalhes_tributacao || {},
+            status: 'calculado'
+          }));
+
+          const { error: insertError } = await supabase
+            .from('demonstrativos_faturamento_calculados')
+            .upsert(recordsToInsert, {
+              onConflict: 'cliente_nome,periodo_referencia',
+              ignoreDuplicates: false
+            });
+
+          if (insertError) {
+            console.error('❌ Erro ao gravar demonstrativos no banco (fallback):', insertError);
+          } else {
+            console.log('✅ Demonstrativos gravados no banco (fallback)');
+          }
+        } catch (dbError: any) {
+          console.error('❌ Erro ao gravar no banco (fallback):', dbError);
+        }
+
+        // Cache local
         try {
           const dadosParaSalvar = {
             demonstrativos: data.demonstrativos,
@@ -243,7 +280,48 @@ export function DemonstrativoFaturamentoCompleto({
       setDemonstrativos(dedupedDemonstrativos);
       setResumo(resumoAgregado);
 
-      // Persistir também para a aba "Demonstrativos"
+      // 💾 Gravar demonstrativos no banco de dados
+      try {
+        const recordsToInsert = dedupedDemonstrativos.map((demo: DemonstrativoCliente) => ({
+          cliente_id: demo.cliente_id,
+          cliente_nome: demo.cliente_nome,
+          periodo_referencia: periodo,
+          total_exames: demo.total_exames || 0,
+          valor_exames: demo.valor_exames || 0,
+          valor_franquia: demo.valor_franquia || 0,
+          valor_portal_laudos: demo.valor_portal_laudos || 0,
+          valor_integracao: demo.valor_integracao || 0,
+          valor_bruto_total: demo.valor_bruto || 0,
+          valor_total_impostos: demo.valor_impostos || 0,
+          valor_liquido: demo.valor_total || 0,
+          detalhes_exames: demo.detalhes_exames || [],
+          detalhes_franquia: demo.detalhes_franquia || {},
+          parametros_utilizados: demo.detalhes_tributacao || {},
+          status: 'calculado'
+        }));
+
+        const { error: insertError } = await supabase
+          .from('demonstrativos_faturamento_calculados')
+          .upsert(recordsToInsert, {
+            onConflict: 'cliente_nome,periodo_referencia',
+            ignoreDuplicates: false
+          });
+
+        if (insertError) {
+          console.error('❌ Erro ao gravar demonstrativos no banco:', insertError);
+          toast({
+            title: '⚠️ Aviso',
+            description: 'Demonstrativos gerados mas não foram salvos no banco. Verifique os logs.',
+            variant: 'destructive'
+          });
+        } else {
+          console.log('✅ Demonstrativos gravados no banco com sucesso');
+        }
+      } catch (dbError: any) {
+        console.error('❌ Erro ao gravar no banco:', dbError);
+      }
+
+      // Persistir também no localStorage (cache local)
       try {
         const dadosParaSalvar = {
           demonstrativos: dedupedDemonstrativos,
@@ -252,9 +330,9 @@ export function DemonstrativoFaturamentoCompleto({
           timestamp: new Date().toISOString()
         };
         localStorage.setItem(`demonstrativos_completos_${periodo}`, JSON.stringify(dadosParaSalvar));
-        console.log('💾 demonstrativos_completos salvos (batched)');
+        console.log('💾 demonstrativos_completos salvos no localStorage (cache)');
       } catch (e) {
-        console.warn('Não foi possível salvar demonstrativos completos no localStorage (batched):', e);
+        console.warn('Não foi possível salvar demonstrativos completos no localStorage:', e);
       }
 
       if (onStatusChange) onStatusChange('concluido');
