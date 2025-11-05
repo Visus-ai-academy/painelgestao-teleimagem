@@ -39,7 +39,7 @@ serve(async (req) => {
     // Buscar mapeamentos do cadastro de exames
     const { data: cadastroExames, error: cadastroError } = await supabase
       .from('cadastro_exames')
-      .select('EXAME, especialidade')
+      .select('*')
       .eq('ativo', true)
 
     if (cadastroError) {
@@ -51,8 +51,8 @@ serve(async (req) => {
     // Criar mapa de exames para lookup rápido
     const mapaExames = new Map<string, string>()
     cadastroExames?.forEach(ex => {
-      if (ex.EXAME && ex.especialidade) {
-        mapaExames.set(ex.EXAME.toUpperCase().trim(), ex.especialidade)
+      if (ex.exame && ex.especialidade) {
+        mapaExames.set(ex.exame.toUpperCase().trim(), ex.especialidade)
       }
     })
 
