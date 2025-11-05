@@ -120,7 +120,8 @@ serve(async (req) => {
             const novaEspecialidade = examesCadastro[0].especialidade;
             if (novaEspecialidade !== registro.ESPECIALIDADE) {
               updates.ESPECIALIDADE = novaEspecialidade;
-            precisaAtualizar = true;
+              precisaAtualizar = true;
+            }
           }
         }
 
