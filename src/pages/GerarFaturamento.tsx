@@ -24,6 +24,7 @@ import {
   Trash2,
   Search
 } from "lucide-react";
+import * as XLSX from 'xlsx';
 import { FileUpload } from "@/components/FileUpload";
 import { VolumetriaUpload } from "@/components/VolumetriaUpload";
 import { VolumetriaPeriodoSelector } from "@/components/volumetria/VolumetriaPeriodoSelector";
@@ -356,6 +357,95 @@ export default function GerarFaturamento() {
       }
     }
   }, [periodoSelecionado]);
+
+  // Função para exportar relatórios do faturamento em Excel (Quadro 2)
+  const handleExportarRelatoriosFaturamentoExcel = async () => {
+    try {
+      toast({
+        title: "Exportando dados...",
+        description: "Aguarde enquanto preparamos o arquivo Excel",
+      });
+
+      // Buscar todos os dados do quadro 2 (volumetria_mobilemed) para o período
+      const { data: dadosVolumetria, error } = await supabase
+        .from('volumetria_mobilemed')
+        .select('*')
+        .eq('periodo_referencia', periodoSelecionado)
+        .order('data_exame', { ascending: false });
+
+      if (error) throw error;
+
+      if (!dadosVolumetria || dadosVolumetria.length === 0) {
+        toast({
+          title: "Nenhum dado encontrado",
+          description: `Não há dados de volumetria para o período ${periodoSelecionado}`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Preparar dados para o Excel - Quadro 2
+      const dadosExcel = dadosVolumetria.map((item: any) => ({
+        'Data': item.data_exame ? new Date(item.data_exame).toLocaleDateString('pt-BR') : '',
+        'Data Laudo': item.data_laudo ? new Date(item.data_laudo).toLocaleDateString('pt-BR') : '',
+        'Paciente': item.paciente || '',
+        'Médico': item.medico || '',
+        'Exame': item.exame || '',
+        'Modalidade': item.modalidade || '',
+        'Especialidade': item.especialidade || '',
+        'Categoria': item.categoria || '',
+        'Prioridade': item.prioridade || '',
+        'Accession': item.accession_number || '',
+        'Origem': item.origem || item.unidade_origem || '',
+        'Quantidade': item.quantidade || 1,
+        'Valor': item.valor_exame || 0,
+        'Total': (item.quantidade || 1) * (item.valor_exame || 0)
+      }));
+
+      // Criar workbook e worksheet
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(dadosExcel);
+
+      // Ajustar largura das colunas
+      const colWidths = [
+        { wch: 12 }, // Data
+        { wch: 12 }, // Data Laudo
+        { wch: 30 }, // Paciente
+        { wch: 30 }, // Médico
+        { wch: 40 }, // Exame
+        { wch: 12 }, // Modalidade
+        { wch: 15 }, // Especialidade
+        { wch: 12 }, // Categoria
+        { wch: 12 }, // Prioridade
+        { wch: 15 }, // Accession
+        { wch: 20 }, // Origem
+        { wch: 10 }, // Quantidade
+        { wch: 12 }, // Valor
+        { wch: 12 }, // Total
+      ];
+      ws['!cols'] = colWidths;
+
+      XLSX.utils.book_append_sheet(wb, ws, 'Quadro 2 - Faturamento');
+
+      // Gerar nome do arquivo
+      const nomeArquivo = `Quadro_2_Faturamento_${periodoSelecionado}.xlsx`;
+
+      // Fazer download
+      XLSX.writeFile(wb, nomeArquivo);
+
+      toast({
+        title: "Exportação concluída!",
+        description: `Arquivo ${nomeArquivo} baixado com sucesso`,
+      });
+    } catch (error) {
+      console.error('Erro ao exportar:', error);
+      toast({
+        title: "Erro na exportação",
+        description: error instanceof Error ? error.message : "Erro desconhecido ao exportar dados",
+        variant: "destructive",
+      });
+    }
+  };
 
   // Função para resetar todos os status
   const resetarTodosStatus = useCallback(() => {
@@ -2073,6 +2163,15 @@ export default function GerarFaturamento() {
                     onClick={() => setOrdemAlfabeticaRelatorios(!ordemAlfabeticaRelatorios)}
                   >
                     {ordemAlfabeticaRelatorios ? 'Z-A' : 'A-Z'}
+                  </Button>
+                  <Button
+                    onClick={handleExportarRelatoriosFaturamentoExcel}
+                    variant="default"
+                    size="sm"
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                    Exportar Excel
                   </Button>
                 </div>
               </div>
