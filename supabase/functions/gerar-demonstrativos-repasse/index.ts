@@ -118,15 +118,39 @@ serve(async (req) => {
         for (const exame of exames || []) {
           const clienteNome = exame.EMPRESA || 'Cliente não identificado';
           const modalidade = exame.MODALIDADE || '';
-          // Normalizar especialidade: "GEral" → "Geral"
-          let especialidade = exame.ESPECIALIDADE || '';
-          if (especialidade.toUpperCase() === 'GERAL') {
-            especialidade = 'Geral';
-          }
+          let especialidade = (exame.ESPECIALIDADE || '').toString();
           const categoria = exame.CATEGORIA || '';
           const prioridade = exame.PRIORIDADE || '';
           const quantidade = exame.VALORES || 1;
-
+ 
+          // Se especialidade vier como 'GERAL' (qualquer capitalização) ou vazia, tentar corrigir via cadastro_exames
+          if (!norm(especialidade) || norm(especialidade) === 'GERAL') {
+            const desc = (exame.ESTUDO_DESCRICAO || '').toString();
+            const key = normNoAccent(desc);
+            if (key) {
+              let mapped = especialidadeCache.get(key);
+              if (mapped === undefined) {
+                const { data: ce } = await supabase
+                  .from('cadastro_exames')
+                  .select('especialidade, nome, ativo')
+                  .ilike('nome', desc)
+                  .eq('ativo', true)
+                  .limit(1)
+                  .maybeSingle();
+                mapped = (ce?.especialidade || '').toString();
+                especialidadeCache.set(key, mapped);
+              }
+              if (mapped) {
+                especialidade = mapped;
+              } else {
+                // Se não encontrou mapeamento, deixar vazio para não aparecer como 'GERAL'
+                especialidade = '';
+              }
+            } else {
+              especialidade = '';
+            }
+          }
+ 
           const chave = `${modalidade}|${especialidade}|${categoria}|${prioridade}|${clienteNome}`;
           
           if (!examesAgrupados.has(chave)) {
@@ -141,16 +165,20 @@ serve(async (req) => {
               valor_total: 0
             });
           }
-
+ 
           const grupo = examesAgrupados.get(chave)!;
           grupo.quantidade += quantidade;
         }
 
         console.log(`[Repasse] ${examesAgrupados.size} grupos de exames para ${medico.nome}`);
-
+ 
         // Normalização de texto para comparação robusta
         const norm = (s: any) => (s ?? '').toString().trim().toUpperCase();
-
+        const normNoAccent = (s: any) => (s ?? '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
+ 
+        // Cache para mapear especialidade correta via cadastro_exames pela descrição do estudo
+        const especialidadeCache = new Map<string, string>();
+ 
         // Mapear clientes do período para obter IDs por nome
         const clienteNomes = Array.from(examesAgrupados.values()).map((g: any) => g.cliente).filter(Boolean);
         const uniqueClienteNomes = Array.from(new Set(clienteNomes));
