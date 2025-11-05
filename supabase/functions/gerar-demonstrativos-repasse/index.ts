@@ -118,7 +118,11 @@ serve(async (req) => {
         for (const exame of exames || []) {
           const clienteNome = exame.EMPRESA || 'Cliente não identificado';
           const modalidade = exame.MODALIDADE || '';
-          const especialidade = exame.ESPECIALIDADE || '';
+          // Normalizar especialidade: "GEral" → "Geral"
+          let especialidade = exame.ESPECIALIDADE || '';
+          if (especialidade.toUpperCase() === 'GERAL') {
+            especialidade = 'Geral';
+          }
           const categoria = exame.CATEGORIA || '';
           const prioridade = exame.PRIORIDADE || '';
           const quantidade = exame.VALORES || 1;
