@@ -407,6 +407,218 @@ export default function PagamentosMedicos() {
     }
   };
 
+  const handleExportarRelatoriosExcel = async () => {
+    try {
+      setLoading(true);
+      toast({
+        title: "Carregando dados",
+        description: "Buscando detalhes dos exames..."
+      });
+
+      // Buscar médicos com relatórios gerados
+      const medicosComRelatorio = statusPorMedico.filter(m => m.relatorioGerado);
+      
+      if (medicosComRelatorio.length === 0) {
+        toast({
+          title: "Atenção",
+          description: "Nenhum relatório gerado neste período.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const medicosNomes = medicosComRelatorio.map(m => m.medicoNome);
+
+      // Buscar exames detalhados de todos os médicos com relatório
+      const { data: exames, error: examesError } = await supabase
+        .from('volumetria_mobilemed')
+        .select(`
+          DATA_REALIZACAO,
+          DATA_LAUDO,
+          NOME_PACIENTE,
+          MEDICO,
+          ESTUDO_DESCRICAO,
+          ESPECIALIDADE,
+          MODALIDADE,
+          CATEGORIA,
+          PRIORIDADE,
+          ACCESSION_NUMBER,
+          EMPRESA,
+          Cliente_Nome_Fantasia,
+          cliente_nome_fantasia
+        `)
+        .eq('periodo_referencia', periodoSelecionado)
+        .in('MEDICO', medicosNomes)
+        .order('MEDICO', { ascending: true })
+        .order('DATA_REALIZACAO', { ascending: true });
+
+      if (examesError) {
+        throw examesError;
+      }
+
+      if (!exames || exames.length === 0) {
+        toast({
+          title: "Sem dados",
+          description: "Nenhum exame encontrado para este período.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Buscar valores de repasse para todos os médicos
+      const medicosIds = medicosComRelatorio.map(m => m.medicoId);
+      const { data: repasses, error: repasseError } = await supabase
+        .from('medicos_valores_repasse')
+        .select('*')
+        .in('medico_id', medicosIds)
+        .eq('ativo', true);
+
+      if (repasseError) {
+        console.error('Erro ao buscar repasses:', repasseError);
+      }
+
+      // Mapear clientes
+      const clienteNomes = Array.from(new Set(
+        exames.map(e => e.EMPRESA || e.Cliente_Nome_Fantasia || e.cliente_nome_fantasia).filter(Boolean)
+      ));
+      
+      const clienteMap = new Map<string, string>();
+      if (clienteNomes.length > 0) {
+        const { data: clientes, error: clientesError } = await supabase
+          .from('clientes')
+          .select('id, nome')
+          .in('nome', clienteNomes);
+        
+        if (!clientesError && clientes) {
+          for (const c of clientes) {
+            clienteMap.set(c.nome, c.id);
+          }
+        }
+      }
+
+      // Função para normalizar strings
+      const norm = (s: any) => (s ?? '').toString().trim().toUpperCase();
+
+      // Função para obter valor de repasse de um exame
+      const getValorRepasse = (exame: any, medicoId: string) => {
+        const repassesMedico = (repasses || []).filter((r: any) => r.medico_id === medicoId);
+        const clienteNome = exame.EMPRESA || exame.Cliente_Nome_Fantasia || exame.cliente_nome_fantasia || '';
+        const clienteId = clienteMap.get(clienteNome);
+        const modalidade = exame.MODALIDADE || '';
+        const especialidade = exame.ESPECIALIDADE || '';
+        const categoria = exame.CATEGORIA || '';
+        const prioridade = exame.PRIORIDADE || '';
+
+        // 1) Com cliente específico + categoria
+        let valorRepasse = repassesMedico.find((r: any) =>
+          norm(r.modalidade) === norm(modalidade) &&
+          norm(r.especialidade) === norm(especialidade) &&
+          norm(r.categoria) === norm(categoria) &&
+          norm(r.prioridade) === norm(prioridade) &&
+          (!!clienteId && r.cliente_id === clienteId)
+        );
+
+        // 2) Sem cliente, com categoria
+        if (!valorRepasse) {
+          valorRepasse = repassesMedico.find((r: any) =>
+            norm(r.modalidade) === norm(modalidade) &&
+            norm(r.especialidade) === norm(especialidade) &&
+            norm(r.categoria) === norm(categoria) &&
+            norm(r.prioridade) === norm(prioridade) &&
+            (r.cliente_id == null)
+          );
+        }
+
+        // 3) Sem cliente e sem categoria
+        if (!valorRepasse) {
+          valorRepasse = repassesMedico.find((r: any) =>
+            norm(r.modalidade) === norm(modalidade) &&
+            norm(r.especialidade) === norm(especialidade) &&
+            norm(r.prioridade) === norm(prioridade) &&
+            (!r.categoria || norm(r.categoria) === '') &&
+            (r.cliente_id == null)
+          );
+        }
+
+        // 4) Fallback: apenas modalidade + especialidade
+        if (!valorRepasse) {
+          valorRepasse = repassesMedico.find((r: any) =>
+            norm(r.modalidade) === norm(modalidade) &&
+            norm(r.especialidade) === norm(especialidade) &&
+            (r.cliente_id == null)
+          );
+        }
+
+        return Number(valorRepasse?.valor) || 0;
+      };
+
+      // Preparar dados para exportação
+      const dadosExportacao = exames.map(exame => {
+        const medico = medicosComRelatorio.find(m => m.medicoNome === exame.MEDICO);
+        const valor = medico ? getValorRepasse(exame, medico.medicoId) : 0;
+        
+        return {
+          'Data': exame.DATA_REALIZACAO ? new Date(exame.DATA_REALIZACAO).toLocaleDateString('pt-BR') : '-',
+          'Data Laudo': exame.DATA_LAUDO ? new Date(exame.DATA_LAUDO).toLocaleDateString('pt-BR') : '-',
+          'Paciente': exame.NOME_PACIENTE || '-',
+          'Médico': exame.MEDICO || '-',
+          'Exame': exame.ESTUDO_DESCRICAO || '-',
+          'Modalidade': exame.MODALIDADE || '-',
+          'Especialidade': exame.ESPECIALIDADE || '-',
+          'Categoria': exame.CATEGORIA || '-',
+          'Prioridade': exame.PRIORIDADE || '-',
+          'Accession': exame.ACCESSION_NUMBER || '-',
+          'Origem': exame.Cliente_Nome_Fantasia || exame.cliente_nome_fantasia || exame.EMPRESA || '-',
+          'Quantidade': 1,
+          'Valor': valor,
+          'Total': valor
+        };
+      });
+
+      // Criar workbook e worksheet
+      const ws = XLSX.utils.json_to_sheet(dadosExportacao);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Detalhamento Exames');
+
+      // Ajustar largura das colunas
+      const colWidths = [
+        { wch: 12 }, // Data
+        { wch: 12 }, // Data Laudo
+        { wch: 30 }, // Paciente
+        { wch: 25 }, // Médico
+        { wch: 35 }, // Exame
+        { wch: 12 }, // Modalidade
+        { wch: 20 }, // Especialidade
+        { wch: 15 }, // Categoria
+        { wch: 12 }, // Prioridade
+        { wch: 18 }, // Accession
+        { wch: 20 }, // Origem
+        { wch: 10 }, // Quantidade
+        { wch: 12 }, // Valor
+        { wch: 12 }  // Total
+      ];
+      ws['!cols'] = colWidths;
+
+      // Gerar arquivo e fazer download
+      const nomeArquivo = `detalhamento_exames_repasse_${periodoSelecionado}.xlsx`;
+      XLSX.writeFile(wb, nomeArquivo);
+
+      toast({
+        title: "Excel exportado",
+        description: `Arquivo exportado com ${exames.length} exames.`
+      });
+    } catch (error) {
+      console.error('Erro ao exportar Excel:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível exportar o arquivo Excel.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Médicos filtrados e ordenados
   const medicosFiltrados = useMemo(() => {
     let filtrados = [...statusPorMedico];
@@ -729,10 +941,23 @@ export default function PagamentosMedicos() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Relatórios Gerados</CardTitle>
-              <CardDescription>
-                Consulte e faça download dos relatórios de repasse do período {periodoSelecionado}
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Relatórios Gerados</CardTitle>
+                  <CardDescription>
+                    Consulte e faça download dos relatórios de repasse do período {periodoSelecionado}
+                  </CardDescription>
+                </div>
+                <Button
+                  onClick={handleExportarRelatoriosExcel}
+                  disabled={loading || statusPorMedico.filter(s => s.relatorioGerado).length === 0}
+                  variant="outline"
+                  size="lg"
+                >
+                  <FileSpreadsheet className="mr-2 h-5 w-5" />
+                  Exportar Detalhamento (Excel)
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               {loading ? (
