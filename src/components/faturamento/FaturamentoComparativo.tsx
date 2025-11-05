@@ -229,166 +229,135 @@ export default function FaturamentoComparativo() {
 
     setIsProcessing(true);
     try {
-      // Buscar dados do sistema (volumetria_mobilemed)
       const clienteNome = clientes.find(c => c.id === clienteSelecionado)?.nome || '';
       
-      const { data: dadosSistema, error: sistemaError } = await supabase
-        .from('volumetria_mobilemed')
-        .select('*')
-        .eq('EMPRESA', clienteNome)
-        .eq('periodo_referencia', periodoSelecionado);
+      // Buscar dados do demonstrativo calculado (dados processados para faturamento)
+      const { data: demonstrativo, error: demoError } = await supabase
+        .from('demonstrativos_faturamento_calculados')
+        .select('detalhes_exames')
+        .eq('cliente_nome', clienteNome)
+        .eq('periodo_referencia', periodoSelecionado)
+        .single();
 
-      if (sistemaError) throw sistemaError;
+      if (demoError && demoError.code !== 'PGRST116') {
+        throw demoError;
+      }
 
-      console.log(`Dados do sistema encontrados: ${dadosSistema?.length || 0} registros para ${clienteNome} em ${periodoSelecionado}`);
+      if (!demonstrativo || !demonstrativo.detalhes_exames) {
+        toast({
+          title: "Demonstrativo não encontrado",
+          description: `É necessário gerar o demonstrativo de faturamento para ${clienteNome} no período ${periodoSelecionado} antes de fazer o comparativo.`,
+          variant: "destructive",
+        });
+        setIsProcessing(false);
+        return;
+      }
+
+      const dadosSistema = demonstrativo.detalhes_exames as any[];
+      console.log(`Dados do demonstrativo encontrados: ${dadosSistema?.length || 0} exames processados para ${clienteNome} em ${periodoSelecionado}`);
 
       const diferencasEncontradas: Diferenca[] = [];
 
-      // Criar mapa dos dados do sistema usando apenas PACIENTE + DATA_LAUDO
-      const sistemaMap = new Map<string, any[]>();
+      // Criar mapa dos dados do sistema usando MODALIDADE + ESPECIALIDADE + CATEGORIA + PRIORIDADE
+      const sistemaMap = new Map<string, any>();
       (dadosSistema || []).forEach((item: any) => {
-        // Formatar data do sistema para comparação (usar DATA_LAUDO)
-        const dataSistema = item.DATA_LAUDO ? 
-          new Date(item.DATA_LAUDO).toLocaleDateString('pt-BR') : '';
-        const chave = `${normalizar(item.NOME_PACIENTE || '')}|${dataSistema}`;
-        if (!sistemaMap.has(chave)) {
-          sistemaMap.set(chave, []);
-        }
-        sistemaMap.get(chave)!.push(item);
+        const chave = `${normalizar(item.modalidade || '')}|${normalizar(item.especialidade || '')}|${normalizar(item.categoria || '')}|${normalizar(item.prioridade || '')}`;
+        sistemaMap.set(chave, item);
       });
 
-      // Criar mapa dos dados do arquivo usando apenas PACIENTE + DATA
-      const arquivoMap = new Map<string, FaturamentoUploadRow[]>();
+      // Criar mapa dos dados do arquivo agrupando por MODALIDADE + ESPECIALIDADE + CATEGORIA + PRIORIDADE
+      const arquivoMap = new Map<string, {
+        modalidade: string;
+        especialidade: string;
+        categoria: string;
+        prioridade: string;
+        quantidade: number;
+        valor: number;
+      }>();
+      
       uploadedData.forEach((item) => {
-        const chave = `${item.paciente}|${item.dataEstudo}`;
+        const chave = `${normalizar(item.modalidade)}|${normalizar(item.especialidade)}|${normalizar(item.categoria)}|${normalizar(item.prioridade)}`;
+        
         if (!arquivoMap.has(chave)) {
-          arquivoMap.set(chave, []);
+          arquivoMap.set(chave, {
+            modalidade: item.modalidade,
+            especialidade: item.especialidade,
+            categoria: item.categoria,
+            prioridade: item.prioridade,
+            quantidade: 0,
+            valor: 0
+          });
         }
-        arquivoMap.get(chave)!.push(item);
+        
+        const grupo = arquivoMap.get(chave)!;
+        grupo.quantidade += item.laudos;
+        grupo.valor += item.valor;
       });
 
-      // Comparar: itens no arquivo vs sistema (por paciente + data)
-      arquivoMap.forEach((itensArquivo, chave) => {
-        const itensSistema = sistemaMap.get(chave);
+      // Comparar: grupos no arquivo vs sistema
+      arquivoMap.forEach((grupoArquivo, chave) => {
+        const grupoSistema = sistemaMap.get(chave);
         
-        if (!itensSistema) {
-          // Paciente + data não existe no sistema
-          itensArquivo.forEach(itemArquivo => {
-            diferencasEncontradas.push({
-              tipo: 'arquivo_apenas',
-              chave: `${chave}|${itemArquivo.nomeExame}`,
-              dataEstudo: itemArquivo.dataEstudo,
-              paciente: itemArquivo.paciente,
-              exame: itemArquivo.nomeExame,
-              medico: itemArquivo.laudadoPor,
-              prioridade: itemArquivo.prioridade,
-              modalidade: itemArquivo.modalidade,
-              especialidade: itemArquivo.especialidade,
-              categoria: itemArquivo.categoria,
-              quantidadeArquivo: itemArquivo.laudos,
-              valorArquivo: itemArquivo.valor,
-              detalhes: 'Paciente/Data existe apenas no arquivo'
-            });
+        if (!grupoSistema) {
+          // Grupo não existe no sistema
+          diferencasEncontradas.push({
+            tipo: 'arquivo_apenas',
+            chave,
+            modalidade: grupoArquivo.modalidade,
+            especialidade: grupoArquivo.especialidade,
+            categoria: grupoArquivo.categoria,
+            prioridade: grupoArquivo.prioridade,
+            quantidadeArquivo: grupoArquivo.quantidade,
+            valorArquivo: grupoArquivo.valor,
+            detalhes: 'Grupo Modal/Espec/Cat/Prior existe apenas no arquivo'
           });
         } else {
-          // Paciente + data existe em ambos, verificar divergências nos campos
-          itensArquivo.forEach(itemArquivo => {
-            // Tentar encontrar exame correspondente no sistema
-            const itemSistemaCorrespondente = itensSistema.find(s => 
-              normalizar(s.ESTUDO_DESCRICAO || '') === normalizar(itemArquivo.nomeExame)
-            );
+          // Grupo existe em ambos, verificar divergências
+          const divergencias: string[] = [];
+          
+          const qtdSistema = Number(grupoSistema.quantidade) || 0;
+          const qtdArquivo = grupoArquivo.quantidade;
+          if (qtdArquivo !== qtdSistema) {
+            divergencias.push(`Quantidade: Arquivo=${qtdArquivo} vs Sistema=${qtdSistema}`);
+          }
+          
+          const valorSistema = Number(grupoSistema.valor_total) || 0;
+          const valorArquivo = grupoArquivo.valor;
+          if (Math.abs(valorArquivo - valorSistema) > 0.01) {
+            divergencias.push(`Valor: Arquivo=R$ ${valorArquivo.toFixed(2)} vs Sistema=R$ ${valorSistema.toFixed(2)}`);
+          }
 
-            if (!itemSistemaCorrespondente) {
-              diferencasEncontradas.push({
-                tipo: 'arquivo_apenas',
-                chave: `${chave}|${itemArquivo.nomeExame}`,
-                dataEstudo: itemArquivo.dataEstudo,
-                paciente: itemArquivo.paciente,
-                exame: itemArquivo.nomeExame,
-                medico: itemArquivo.laudadoPor,
-                prioridade: itemArquivo.prioridade,
-                modalidade: itemArquivo.modalidade,
-                especialidade: itemArquivo.especialidade,
-                categoria: itemArquivo.categoria,
-                quantidadeArquivo: itemArquivo.laudos,
-                valorArquivo: itemArquivo.valor,
-                detalhes: 'Exame não encontrado no sistema para este paciente/data'
-              });
-            } else {
-              // Verificar divergências nos campos
-              const divergencias: string[] = [];
-              
-              if (normalizar(itemArquivo.modalidade) !== normalizar(itemSistemaCorrespondente.MODALIDADE || '')) {
-                divergencias.push(`Modalidade: Arquivo="${itemArquivo.modalidade}" vs Sistema="${itemSistemaCorrespondente.MODALIDADE}"`);
-              }
-              
-              if (normalizar(itemArquivo.especialidade) !== normalizar(itemSistemaCorrespondente.ESPECIALIDADE || '')) {
-                divergencias.push(`Especialidade: Arquivo="${itemArquivo.especialidade}" vs Sistema="${itemSistemaCorrespondente.ESPECIALIDADE}"`);
-              }
-              
-              if (normalizar(itemArquivo.categoria) !== normalizar(itemSistemaCorrespondente.CATEGORIA || '')) {
-                divergencias.push(`Categoria: Arquivo="${itemArquivo.categoria}" vs Sistema="${itemSistemaCorrespondente.CATEGORIA}"`);
-              }
-              
-              if (normalizar(itemArquivo.prioridade) !== normalizar(itemSistemaCorrespondente.PRIORIDADE || '')) {
-                divergencias.push(`Prioridade: Arquivo="${itemArquivo.prioridade}" vs Sistema="${itemSistemaCorrespondente.PRIORIDADE}"`);
-              }
-              
-              const qtdSistema = Number(itemSistemaCorrespondente.VALORES) || 0;
-              const qtdArquivo = itemArquivo.laudos;
-              if (qtdArquivo !== qtdSistema) {
-                divergencias.push(`Quantidade: Arquivo=${qtdArquivo} vs Sistema=${qtdSistema}`);
-              }
-              
-              // Nota: volumetria_mobilemed não tem campo de valor calculado, apenas VALORES (quantidade)
-              // Removemos a comparação de valor pois não está disponível nesta fase
-
-              if (divergencias.length > 0) {
-                diferencasEncontradas.push({
-                  tipo: 'valores_diferentes',
-                  chave: `${chave}|${itemArquivo.nomeExame}`,
-                  dataEstudo: itemArquivo.dataEstudo,
-                  paciente: itemArquivo.paciente,
-                  exame: itemArquivo.nomeExame,
-                  medico: itemArquivo.laudadoPor,
-                  prioridade: itemArquivo.prioridade,
-                  modalidade: itemArquivo.modalidade,
-                  especialidade: itemArquivo.especialidade,
-                  categoria: itemArquivo.categoria,
-                  quantidadeArquivo: qtdArquivo,
-                  quantidadeSistema: qtdSistema,
-                  valorArquivo: itemArquivo.valor,
-                  valorSistema: 0, // volumetria não tem valor calculado
-                  detalhes: divergencias.join(' | ')
-                });
-              }
-            }
-          });
+          if (divergencias.length > 0) {
+            diferencasEncontradas.push({
+              tipo: 'valores_diferentes',
+              chave,
+              modalidade: grupoArquivo.modalidade,
+              especialidade: grupoArquivo.especialidade,
+              categoria: grupoArquivo.categoria,
+              prioridade: grupoArquivo.prioridade,
+              quantidadeArquivo: qtdArquivo,
+              quantidadeSistema: qtdSistema,
+              valorArquivo: valorArquivo,
+              valorSistema: valorSistema,
+              detalhes: divergencias.join(' | ')
+            });
+          }
         }
       });
 
-      // Comparar: itens no sistema que não estão no arquivo
-      sistemaMap.forEach((itensSistema, chave) => {
+      // Comparar: grupos no sistema que não estão no arquivo
+      sistemaMap.forEach((grupoSistema, chave) => {
         if (!arquivoMap.has(chave)) {
-          itensSistema.forEach(itemSistema => {
-            const dataSistema = itemSistema.DATA_LAUDO ? 
-              new Date(itemSistema.DATA_LAUDO).toLocaleDateString('pt-BR') : '';
-            
-            diferencasEncontradas.push({
-              tipo: 'sistema_apenas',
-              chave: `${chave}|${itemSistema.ESTUDO_DESCRICAO}`,
-              dataEstudo: dataSistema,
-              paciente: normalizar(itemSistema.NOME_PACIENTE || ''),
-              exame: itemSistema.ESTUDO_DESCRICAO,
-              medico: itemSistema.MEDICO,
-              prioridade: itemSistema.PRIORIDADE,
-              modalidade: itemSistema.MODALIDADE,
-              especialidade: itemSistema.ESPECIALIDADE,
-              categoria: itemSistema.CATEGORIA,
-              quantidadeSistema: Number(itemSistema.VALORES) || 0,
-              valorSistema: 0, // volumetria não tem valor calculado
-              detalhes: 'Paciente/Data existe apenas no sistema'
-            });
+          diferencasEncontradas.push({
+            tipo: 'sistema_apenas',
+            chave,
+            modalidade: grupoSistema.modalidade,
+            especialidade: grupoSistema.especialidade,
+            categoria: grupoSistema.categoria,
+            prioridade: grupoSistema.prioridade,
+            quantidadeSistema: Number(grupoSistema.quantidade) || 0,
+            valorSistema: Number(grupoSistema.valor_total) || 0,
+            detalhes: 'Grupo Modal/Espec/Cat/Prior existe apenas no sistema'
           });
         }
       });
@@ -435,14 +404,10 @@ export default function FaturamentoComparativo() {
         'Tipo': d.tipo === 'arquivo_apenas' ? 'Apenas no Arquivo' : 
                 d.tipo === 'sistema_apenas' ? 'Apenas no Sistema' : 
                 'Valores Diferentes',
-        'Data Estudo': d.dataEstudo || '',
-        'Paciente': d.paciente || '',
-        'Exame': d.exame || '',
-        'Médico': d.medico || '',
-        'Prioridade': d.prioridade || '',
         'Modalidade': d.modalidade || '',
         'Especialidade': d.especialidade || '',
         'Categoria': d.categoria || '',
+        'Prioridade': d.prioridade || '',
         'Qtd Arquivo': d.quantidadeArquivo || '',
         'Qtd Sistema': d.quantidadeSistema || '',
         'Valor Arquivo': d.valorArquivo ? d.valorArquivo.toFixed(2) : '',
@@ -634,10 +599,6 @@ export default function FaturamentoComparativo() {
                 <thead>
                   <tr className="border-b bg-muted/50">
                     <th className="text-left p-2 font-medium">Tipo</th>
-                    <th className="text-left p-2 font-medium">Data</th>
-                    <th className="text-left p-2 font-medium">Paciente</th>
-                    <th className="text-left p-2 font-medium">Exame</th>
-                    <th className="text-left p-2 font-medium">Médico</th>
                     <th className="text-left p-2 font-medium">Modalidade</th>
                     <th className="text-left p-2 font-medium">Especialidade</th>
                     <th className="text-left p-2 font-medium">Categoria</th>
@@ -650,10 +611,6 @@ export default function FaturamentoComparativo() {
                 <tbody>
                   {diferencas.map((diff, idx) => {
                     // Extrair tipos de divergências do campo detalhes
-                    const temModalidadeDif = diff.detalhes.includes('Modalidade:');
-                    const temEspecialidadeDif = diff.detalhes.includes('Especialidade:');
-                    const temCategoriaDif = diff.detalhes.includes('Categoria:');
-                    const temPrioridadeDif = diff.detalhes.includes('Prioridade:');
                     const temQuantidadeDif = diff.detalhes.includes('Quantidade:');
                     const temValorDif = diff.detalhes.includes('Valor:');
 
@@ -670,22 +627,10 @@ export default function FaturamentoComparativo() {
                              'Divergente'}
                           </span>
                         </td>
-                        <td className="p-2">{diff.dataEstudo || '-'}</td>
-                        <td className="p-2 font-medium">{diff.paciente || '-'}</td>
-                        <td className="p-2">{diff.exame || '-'}</td>
-                        <td className="p-2">{diff.medico || '-'}</td>
-                        <td className={`p-2 ${temModalidadeDif ? 'bg-red-50 font-medium' : ''}`}>
-                          {diff.modalidade || '-'}
-                        </td>
-                        <td className={`p-2 ${temEspecialidadeDif ? 'bg-red-50 font-medium' : ''}`}>
-                          {diff.especialidade || '-'}
-                        </td>
-                        <td className={`p-2 ${temCategoriaDif ? 'bg-red-50 font-medium' : ''}`}>
-                          {diff.categoria || '-'}
-                        </td>
-                        <td className={`p-2 ${temPrioridadeDif ? 'bg-red-50 font-medium' : ''}`}>
-                          {diff.prioridade || '-'}
-                        </td>
+                        <td className="p-2 font-medium">{diff.modalidade || '-'}</td>
+                        <td className="p-2">{diff.especialidade || '-'}</td>
+                        <td className="p-2">{diff.categoria || '-'}</td>
+                        <td className="p-2">{diff.prioridade || '-'}</td>
                         <td className={`p-2 ${temQuantidadeDif ? 'bg-red-50 font-medium' : ''}`}>
                           {diff.quantidadeArquivo || '-'} / {diff.quantidadeSistema || '-'}
                         </td>
@@ -695,26 +640,13 @@ export default function FaturamentoComparativo() {
                         </td>
                         <td className="p-2">
                           <div className="flex flex-wrap gap-1">
-                            {temModalidadeDif && (
-                              <span className="px-1.5 py-0.5 bg-red-100 text-red-700 text-xs rounded">Modal</span>
-                            )}
-                            {temEspecialidadeDif && (
-                              <span className="px-1.5 py-0.5 bg-red-100 text-red-700 text-xs rounded">Espec</span>
-                            )}
-                            {temCategoriaDif && (
-                              <span className="px-1.5 py-0.5 bg-red-100 text-red-700 text-xs rounded">Categ</span>
-                            )}
-                            {temPrioridadeDif && (
-                              <span className="px-1.5 py-0.5 bg-red-100 text-red-700 text-xs rounded">Prior</span>
-                            )}
                             {temQuantidadeDif && (
                               <span className="px-1.5 py-0.5 bg-red-100 text-red-700 text-xs rounded">Qtd</span>
                             )}
                             {temValorDif && (
                               <span className="px-1.5 py-0.5 bg-red-100 text-red-700 text-xs rounded">Valor</span>
                             )}
-                            {!temModalidadeDif && !temEspecialidadeDif && !temCategoriaDif && 
-                             !temPrioridadeDif && !temQuantidadeDif && !temValorDif && (
+                            {!temQuantidadeDif && !temValorDif && (
                               <span className="text-xs text-gray-500">{diff.detalhes}</span>
                             )}
                           </div>
