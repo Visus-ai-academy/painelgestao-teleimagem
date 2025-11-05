@@ -64,9 +64,9 @@ export default function FaturamentoComparativo() {
         if (clientesError) throw clientesError;
         setClientes(clientesData || []);
 
-        // Buscar períodos únicos da volumetria_mobilemed
+        // Buscar períodos únicos da tabela faturamento
         const { data: periodosData, error: periodosError } = await supabase
-          .from('volumetria_mobilemed')
+          .from('faturamento')
           .select('periodo_referencia')
           .order('periodo_referencia', { ascending: false });
 
@@ -226,21 +226,28 @@ export default function FaturamentoComparativo() {
 
     setIsProcessing(true);
     try {
-      // Buscar dados do sistema
+      // Buscar dados do sistema (faturamento, não volumetria)
+      const clienteNome = clientes.find(c => c.id === clienteSelecionado)?.nome || '';
+      
       const { data: dadosSistema, error: sistemaError } = await supabase
-        .from('volumetria_mobilemed')
+        .from('faturamento')
         .select('*')
-        .eq('EMPRESA', clientes.find(c => c.id === clienteSelecionado)?.nome || '')
+        .eq('cliente_nome', clienteNome)
         .eq('periodo_referencia', periodoSelecionado);
 
       if (sistemaError) throw sistemaError;
 
+      console.log(`Dados do sistema encontrados: ${dadosSistema?.length || 0} registros`);
+
       const diferencasEncontradas: Diferenca[] = [];
 
-      // Criar mapa dos dados do sistema usando apenas PACIENTE + DATA
+      // Criar mapa dos dados do sistema usando apenas PACIENTE + DATA_EXAME
       const sistemaMap = new Map<string, any[]>();
       (dadosSistema || []).forEach((item: any) => {
-        const chave = `${normalizar(item.NOME_PACIENTE)}|${item.DATA_LAUDO}`;
+        // Formatar data do sistema para comparação
+        const dataSistema = item.data_exame ? 
+          new Date(item.data_exame).toLocaleDateString('pt-BR') : '';
+        const chave = `${normalizar(item.paciente || '')}|${dataSistema}`;
         if (!sistemaMap.has(chave)) {
           sistemaMap.set(chave, []);
         }
@@ -285,7 +292,7 @@ export default function FaturamentoComparativo() {
           itensArquivo.forEach(itemArquivo => {
             // Tentar encontrar exame correspondente no sistema
             const itemSistemaCorrespondente = itensSistema.find(s => 
-              normalizar(s.ESTUDO_DESCRICAO) === normalizar(itemArquivo.nomeExame)
+              normalizar(s.nome_exame || '') === normalizar(itemArquivo.nomeExame)
             );
 
             if (!itemSistemaCorrespondente) {
@@ -308,29 +315,29 @@ export default function FaturamentoComparativo() {
               // Verificar divergências nos campos
               const divergencias: string[] = [];
               
-              if (normalizar(itemArquivo.modalidade) !== normalizar(itemSistemaCorrespondente.MODALIDADE)) {
-                divergencias.push(`Modalidade: Arquivo="${itemArquivo.modalidade}" vs Sistema="${itemSistemaCorrespondente.MODALIDADE}"`);
+              if (normalizar(itemArquivo.modalidade) !== normalizar(itemSistemaCorrespondente.modalidade || '')) {
+                divergencias.push(`Modalidade: Arquivo="${itemArquivo.modalidade}" vs Sistema="${itemSistemaCorrespondente.modalidade}"`);
               }
               
-              if (normalizar(itemArquivo.especialidade) !== normalizar(itemSistemaCorrespondente.ESPECIALIDADE)) {
-                divergencias.push(`Especialidade: Arquivo="${itemArquivo.especialidade}" vs Sistema="${itemSistemaCorrespondente.ESPECIALIDADE}"`);
+              if (normalizar(itemArquivo.especialidade) !== normalizar(itemSistemaCorrespondente.especialidade || '')) {
+                divergencias.push(`Especialidade: Arquivo="${itemArquivo.especialidade}" vs Sistema="${itemSistemaCorrespondente.especialidade}"`);
               }
               
-              if (normalizar(itemArquivo.categoria) !== normalizar(itemSistemaCorrespondente.CATEGORIA)) {
-                divergencias.push(`Categoria: Arquivo="${itemArquivo.categoria}" vs Sistema="${itemSistemaCorrespondente.CATEGORIA}"`);
+              if (normalizar(itemArquivo.categoria) !== normalizar(itemSistemaCorrespondente.categoria || '')) {
+                divergencias.push(`Categoria: Arquivo="${itemArquivo.categoria}" vs Sistema="${itemSistemaCorrespondente.categoria}"`);
               }
               
-              if (normalizar(itemArquivo.prioridade) !== normalizar(itemSistemaCorrespondente.PRIORIDADE)) {
-                divergencias.push(`Prioridade: Arquivo="${itemArquivo.prioridade}" vs Sistema="${itemSistemaCorrespondente.PRIORIDADE}"`);
+              if (normalizar(itemArquivo.prioridade) !== normalizar(itemSistemaCorrespondente.prioridade || '')) {
+                divergencias.push(`Prioridade: Arquivo="${itemArquivo.prioridade}" vs Sistema="${itemSistemaCorrespondente.prioridade}"`);
               }
               
-              const qtdSistema = Number(itemSistemaCorrespondente.VALORES) || 0;
+              const qtdSistema = Number(itemSistemaCorrespondente.quantidade) || 0;
               const qtdArquivo = itemArquivo.laudos;
               if (qtdArquivo !== qtdSistema) {
                 divergencias.push(`Quantidade: Arquivo=${qtdArquivo} vs Sistema=${qtdSistema}`);
               }
               
-              const valorSistema = Number(itemSistemaCorrespondente.VALOR_UNITARIO) || 0;
+              const valorSistema = Number(itemSistemaCorrespondente.valor) || 0;
               const valorArquivo = itemArquivo.valor;
               if (Math.abs(valorArquivo - valorSistema) > 0.01) {
                 divergencias.push(`Valor: Arquivo=R$ ${valorArquivo.toFixed(2)} vs Sistema=R$ ${valorSistema.toFixed(2)}`);
@@ -364,19 +371,22 @@ export default function FaturamentoComparativo() {
       sistemaMap.forEach((itensSistema, chave) => {
         if (!arquivoMap.has(chave)) {
           itensSistema.forEach(itemSistema => {
+            const dataSistema = itemSistema.data_exame ? 
+              new Date(itemSistema.data_exame).toLocaleDateString('pt-BR') : '';
+            
             diferencasEncontradas.push({
               tipo: 'sistema_apenas',
-              chave: `${chave}|${itemSistema.ESTUDO_DESCRICAO}`,
-              dataEstudo: itemSistema.DATA_LAUDO,
-              paciente: normalizar(itemSistema.NOME_PACIENTE),
-              exame: itemSistema.ESTUDO_DESCRICAO,
-              medico: itemSistema.MEDICO,
-              prioridade: itemSistema.PRIORIDADE,
-              modalidade: itemSistema.MODALIDADE,
-              especialidade: itemSistema.ESPECIALIDADE,
-              categoria: itemSistema.CATEGORIA,
-              quantidadeSistema: Number(itemSistema.VALORES) || 0,
-              valorSistema: Number(itemSistema.VALOR_UNITARIO) || 0,
+              chave: `${chave}|${itemSistema.nome_exame}`,
+              dataEstudo: dataSistema,
+              paciente: normalizar(itemSistema.paciente || ''),
+              exame: itemSistema.nome_exame,
+              medico: itemSistema.medico,
+              prioridade: itemSistema.prioridade,
+              modalidade: itemSistema.modalidade,
+              especialidade: itemSistema.especialidade,
+              categoria: itemSistema.categoria,
+              quantidadeSistema: Number(itemSistema.quantidade) || 0,
+              valorSistema: Number(itemSistema.valor) || 0,
               detalhes: 'Paciente/Data existe apenas no sistema'
             });
           });
