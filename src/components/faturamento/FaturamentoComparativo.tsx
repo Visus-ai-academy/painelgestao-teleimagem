@@ -457,6 +457,29 @@ export default function FaturamentoComparativo() {
       }
 
       if (!demonstrativo || !demonstrativo.detalhes_exames) {
+        // Fallback: tentar carregar do cache local (gerado na aba "Gerar")
+        try {
+          const cacheKey = `demonstrativos_completos_${periodoSelecionado}`;
+          const local = typeof window !== 'undefined' ? localStorage.getItem(cacheKey) : null;
+          if (local) {
+            const parsed = JSON.parse(local);
+            const demos = Array.isArray(parsed?.demonstrativos) ? parsed.demonstrativos : [];
+            const nomesNorm = nomesCandidatos.map(n => normalizar(n));
+            const found = demos.find((d: any) => (
+              (d?.cliente_id && String(d.cliente_id) === String(clienteSelecionado)) ||
+              (d?.cliente_nome && nomesNorm.includes(normalizar(String(d.cliente_nome))))
+            ));
+            if (found?.detalhes_exames?.length) {
+              console.log('✅ Demonstrativo obtido do cache local (localStorage).');
+              demonstrativo = { detalhes_exames: found.detalhes_exames } as any;
+            }
+          }
+        } catch (e) {
+          console.warn('Falha ao ler demonstrativo do cache local:', e);
+        }
+      }
+
+      if (!demonstrativo || !demonstrativo.detalhes_exames) {
         // Checagem adicional: existe faturamento para este cliente/período?
         let totalFat = 0;
         try {
