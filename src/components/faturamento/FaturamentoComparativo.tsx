@@ -381,6 +381,41 @@ export default function FaturamentoComparativo() {
         }
       }
 
+      // 2.3) Busca ampla por cliente e filtra por período normalizado no cliente
+      if ((!demonstrativo || !demonstrativo.detalhes_exames) && !demoError) {
+        const normalizePeriodoRef = (p?: string | null) => {
+          if (!p) return null;
+          const s = String(p).trim();
+          let m = s.match(/^(\d{4})-(\d{1,2})(?:-|$)/); // YYYY-M(M)[-DD]
+          if (!m) m = s.match(/^(\d{4})(\d{2})/);      // YYYYMM
+          if (!m) m = s.match(/^(\d{4})[\/](\d{1,2})/); // YYYY/M(M)
+          if (m) {
+            const mm = String(m[2]).padStart(2, '0');
+            return `${m[1]}-${mm}`;
+          }
+          return null;
+        };
+
+        const nomesCandidatosOr = [
+          `cliente_id.eq.${clienteSelecionado}`,
+          ...(nomesCandidatos?.length ? [`cliente_nome.in.(${nomesCandidatos.map(n => `"${n.replace(/\"/g, '\\\"')}"`).join(',')})`] : []),
+        ].join(',');
+
+        const broad = await supabase
+          .from('demonstrativos_faturamento_calculados')
+          .select('detalhes_exames, cliente_nome, cliente_id, updated_at, periodo_referencia')
+          .or(nomesCandidatosOr)
+          .order('updated_at', { ascending: false })
+          .limit(50);
+
+        if (!broad.error && Array.isArray(broad.data)) {
+          const match = (broad.data as any[]).find(r => normalizePeriodoRef(r.periodo_referencia) === periodoSelecionado);
+          if (match?.detalhes_exames) {
+            demonstrativo = match as any;
+          }
+        }
+      }
+
       // 3) Se ainda não existir, gera o demonstrativo on-demand via Edge Function e salva no banco
       if ((!demonstrativo || !demonstrativo.detalhes_exames) && !demoError) {
         const { data: genData, error: genError } = await supabase.functions.invoke('gerar-demonstrativos-faturamento', {
