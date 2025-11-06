@@ -64,9 +64,9 @@ export default function FaturamentoComparativo() {
         if (clientesError) throw clientesError;
         setClientes(clientesData || []);
 
-        // Buscar períodos únicos da tabela volumetria_mobilemed
+        // Buscar períodos únicos da tabela de faturamento (dados processados)
         const { data: periodosData, error: periodosError } = await supabase
-          .from('volumetria_mobilemed')
+          .from('faturamento')
           .select('periodo_referencia');
 
         if (periodosError) {
@@ -342,34 +342,31 @@ export default function FaturamentoComparativo() {
       }
 
       if (!demonstrativo || !demonstrativo.detalhes_exames) {
-        // Checagem adicional: existe volumetria para este cliente/período?
-        let totalVol = 0;
+        // Checagem adicional: existe faturamento para este cliente/período?
+        let totalFat = 0;
         try {
-          const { count: volCount1 } = await supabase
-            .from('volumetria_mobilemed')
+          const { count: fatCountById } = await supabase
+            .from('faturamento')
             .select('id', { count: 'exact', head: true })
             .eq('periodo_referencia', periodoSelecionado)
-            .in('cliente_nome_fantasia', nomesCandidatos);
-          const { count: volCount2 } = await supabase
-            .from('volumetria_mobilemed')
+            .eq('cliente_id', clienteSelecionado);
+
+          const { count: fatCountByNome } = await supabase
+            .from('faturamento')
             .select('id', { count: 'exact', head: true })
             .eq('periodo_referencia', periodoSelecionado)
-            .in('Cliente_Nome_Fantasia', nomesCandidatos);
-          const { count: volCount3 } = await supabase
-            .from('volumetria_mobilemed')
-            .select('id', { count: 'exact', head: true })
-            .eq('periodo_referencia', periodoSelecionado)
-            .in('EMPRESA', nomesCandidatos);
-          totalVol = (volCount1 || 0) + (volCount2 || 0) + (volCount3 || 0);
+            .in('cliente_nome', nomesCandidatos);
+
+          totalFat = (fatCountById || 0) + (fatCountByNome || 0);
         } catch (e) {
           // ignora contagem se der erro
         }
 
         toast({
           title: 'Demonstrativo não encontrado',
-          description: totalVol > 0
-            ? `Há volumetria (${totalVol} registros) para ${clienteNome} em ${periodoSelecionado}, mas o demonstrativo não foi gravado. Gere novamente o demonstrativo na aba "Gerar" e tente o comparativo depois.`
-            : `Não encontramos volumetria para ${clienteNome} em ${periodoSelecionado}. Carregue os dados desse período e gere o demonstrativo antes de comparar.`,
+          description: totalFat > 0
+            ? `Há dados de faturamento (${totalFat} exames) para ${clienteNome} em ${periodoSelecionado}, mas o demonstrativo não foi gravado. Gere novamente o demonstrativo na aba "Gerar" e tente o comparativo depois.`
+            : `Não encontramos dados de faturamento para ${clienteNome} em ${periodoSelecionado}. Gere o demonstrativo desse período antes de comparar.`,
           variant: 'destructive',
         });
         setIsProcessing(false);
