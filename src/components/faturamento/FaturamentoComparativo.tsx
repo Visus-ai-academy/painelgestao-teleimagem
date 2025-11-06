@@ -175,6 +175,37 @@ export default function FaturamentoComparativo() {
     return !v || v === 'X' ? 'SC' : v;
   };
 
+  // Normalizar modalidade (mapeia sinônimos: TC->CT, TOMOGRAFIA->CT, RM->MR, etc.)
+  const normalizarModalidade = (val?: string | null): string => {
+    const m = normalizar(String(val ?? ''));
+    if (m === 'TC' || m === 'TOMOGRAFIA') return 'CT';
+    if (m === 'RM' || m === 'RESSONANCIA' || m === 'RESSONANCIA MAGNETICA' || m === 'RESONANCIA MAGNETICA') return 'MR';
+    if (m === 'USG' || m === 'ULTRASSOM' || m === 'ULTRASSONOGRAFIA' || m === 'ULTRASONOGRAFIA' || m === 'ULTRASSOMGRAFIA') return 'US';
+    return m;
+  };
+
+  // Remover tags de categoria no início do nome do exame, ex.: "(ONCO) RM ABDOME" => "RM ABDOME"
+  const limparTagsCategoriaDoNomeExame = (nome: string): string => {
+    let s = String(nome || '').trim();
+    // remove tag entre parênteses no início quando for categoria conhecida
+    const match = s.match(/^\(([^)]+)\)\s*/);
+    if (match) {
+      const tag = normalizar(match[1]);
+      const tagsCategoria = new Set(['ONCO', 'SC', 'URG', 'URGENTE', 'ROTINA', 'ELETIVO', 'ELETIVA']);
+      if (tagsCategoria.has(tag)) {
+        s = s.replace(/^\([^)]+\)\s*/, '');
+      }
+    }
+    // normaliza espaços
+    s = s.replace(/\s+/g, ' ').trim();
+    return s;
+  };
+
+  // Nome do exame para a CHAVE (aplica limpeza de tags + normalização)
+  const normalizarNomeExameChave = (nome: string): string => {
+    return normalizar(limparTagsCategoriaDoNomeExame(nome));
+  };
+
   // Parse de data do Excel (pode vir como número serial do Excel)
   const parseDataExcel = (val: any): string => {
     if (!val) return '';
@@ -551,8 +582,8 @@ export default function FaturamentoComparativo() {
       
       (dadosSistema || []).forEach((item: any) => {
         // Chave SEM categoria para comparar mesmo exame independente da categoria
-        const nomeExame = normalizar(item.nome_exame || item.exame || '');
-        const chave = `${normalizar(item.modalidade || '')}|${normalizar(item.especialidade || '')}|${normalizar(item.prioridade || '')}|${nomeExame}`;
+        const nomeExame = normalizarNomeExameChave(item.nome_exame || item.exame || '');
+        const chave = `${normalizarModalidade(item.modalidade || '')}|${normalizar(item.especialidade || '')}|${normalizar(item.prioridade || '')}|${nomeExame}`;
         
         if (!sistemaMap.has(chave)) {
           sistemaMap.set(chave, {
@@ -563,6 +594,7 @@ export default function FaturamentoComparativo() {
         }
         
         const grupo = sistemaMap.get(chave)!;
+
         
         // Extrair exemplos de exames e pacientes se existirem nos detalhes
         if (item.nome_exame) grupo.exames.add(item.nome_exame);
