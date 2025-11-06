@@ -64,9 +64,9 @@ export default function FaturamentoComparativo() {
         if (clientesError) throw clientesError;
         setClientes(clientesData || []);
 
-        // Buscar períodos únicos da tabela de faturamento (dados processados)
+        // Buscar períodos únicos da tabela de demonstrativos calculados
         const { data: periodosData, error: periodosError } = await supabase
-          .from('faturamento')
+          .from('demonstrativos_faturamento_calculados')
           .select('periodo_referencia');
 
         if (periodosError) {
