@@ -536,10 +536,35 @@ export default function FaturamentoComparativo() {
       const diferencasEncontradas: Diferenca[] = [];
 
       // Criar mapa dos dados do sistema usando MODALIDADE + ESPECIALIDADE + CATEGORIA + PRIORIDADE
-      const sistemaMap = new Map<string, any>();
+      // Buscar também os detalhes dos exames individuais do demonstrativo completo
+      const sistemaMap = new Map<string, {
+        item: any;
+        exames: Set<string>;
+        pacientes: Set<string>;
+      }>();
+      
       (dadosSistema || []).forEach((item: any) => {
         const chave = `${normalizar(item.modalidade || '')}|${normalizar(item.especialidade || '')}|${normalizar(item.categoria || '')}|${normalizar(item.prioridade || '')}`;
-        sistemaMap.set(chave, item);
+        
+        if (!sistemaMap.has(chave)) {
+          sistemaMap.set(chave, {
+            item,
+            exames: new Set(),
+            pacientes: new Set()
+          });
+        }
+        
+        const grupo = sistemaMap.get(chave)!;
+        
+        // Extrair exemplos de exames e pacientes se existirem nos detalhes
+        if (item.nome_exame) grupo.exames.add(item.nome_exame);
+        if (item.paciente) grupo.pacientes.add(item.paciente);
+        if (item.exames && Array.isArray(item.exames)) {
+          item.exames.forEach((ex: any) => {
+            if (ex.nome) grupo.exames.add(ex.nome);
+            if (ex.paciente) grupo.pacientes.add(ex.paciente);
+          });
+        }
       });
 
       // Criar mapa dos dados do arquivo agrupando por MODALIDADE + ESPECIALIDADE + CATEGORIA + PRIORIDADE
@@ -591,13 +616,13 @@ export default function FaturamentoComparativo() {
 
       // Comparar: grupos no arquivo vs sistema
       arquivoMap.forEach((grupoArquivo, chave) => {
-        const grupoSistema = sistemaMap.get(chave);
+        const grupoSistemaData = sistemaMap.get(chave);
         
         // Pegar exemplos de exames e pacientes (primeiros 3 de cada)
         const examesExemplo = Array.from(grupoArquivo.exames).slice(0, 3).join(', ');
         const pacientesExemplo = Array.from(grupoArquivo.pacientes).slice(0, 3).join(', ');
         
-        if (!grupoSistema) {
+        if (!grupoSistemaData) {
           // Grupo não existe no sistema
           diferencasEncontradas.push({
             tipo: 'arquivo_apenas',
@@ -615,6 +640,7 @@ export default function FaturamentoComparativo() {
         } else {
           // Grupo existe em ambos, verificar divergências
           const divergencias: string[] = [];
+          const grupoSistema = grupoSistemaData.item;
           
           const qtdSistema = Number(grupoSistema.quantidade) || 0;
           const qtdArquivo = grupoArquivo.quantidade;
@@ -649,8 +675,14 @@ export default function FaturamentoComparativo() {
       });
 
       // Comparar: grupos no sistema que não estão no arquivo
-      sistemaMap.forEach((grupoSistema, chave) => {
+      sistemaMap.forEach((grupoSistemaData, chave) => {
         if (!arquivoMap.has(chave)) {
+          const grupoSistema = grupoSistemaData.item;
+          
+          // Pegar exemplos de exames e pacientes do sistema (primeiros 3 de cada)
+          const examesExemploSistema = Array.from(grupoSistemaData.exames).slice(0, 3).join(', ') || '(não disponível)';
+          const pacientesExemploSistema = Array.from(grupoSistemaData.pacientes).slice(0, 3).join(', ') || '(não disponível)';
+          
           diferencasEncontradas.push({
             tipo: 'sistema_apenas',
             chave,
@@ -660,8 +692,8 @@ export default function FaturamentoComparativo() {
             prioridade: grupoSistema.prioridade,
             quantidadeSistema: Number(grupoSistema.quantidade) || 0,
             valorSistema: Number(grupoSistema.valor_total) || 0,
-            exame: '(dados do sistema)',
-            paciente: '(dados do sistema)',
+            exame: examesExemploSistema,
+            paciente: pacientesExemploSistema,
             detalhes: 'Grupo Modal/Espec/Cat/Prior existe apenas no sistema'
           });
         }
