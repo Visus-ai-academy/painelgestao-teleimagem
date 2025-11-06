@@ -248,6 +248,12 @@ export default function FaturamentoComparativo() {
         const paciente = String(row[colIndexes.paciente] || '').trim();
         if (!paciente) continue;
 
+        // Normalizar categoria: vazio ou "X" = "SC"
+        let categoriaRaw = String(row[colIndexes.categoria] || '').trim().toUpperCase();
+        if (!categoriaRaw || categoriaRaw === 'X') {
+          categoriaRaw = 'SC';
+        }
+
         rows.push({
           dataEstudo: parseDataExcel(row[colIndexes.dataEstudo]),
           paciente: normalizar(paciente),
@@ -256,7 +262,7 @@ export default function FaturamentoComparativo() {
           prioridade: String(row[colIndexes.prioridade] || '').trim(),
           modalidade: String(row[colIndexes.modalidade] || '').trim(),
           especialidade: String(row[colIndexes.especialidade] || '').trim(),
-          categoria: String(row[colIndexes.categoria] || '').trim() || 'SC',
+          categoria: categoriaRaw,
           laudos: parseQuantidade(row[colIndexes.laudos]),
           valor: parseValor(row[colIndexes.valor])
         });
@@ -264,6 +270,13 @@ export default function FaturamentoComparativo() {
 
       setUploadedData(rows);
       setLastFileName(file.name);
+      
+      console.log('📄 ARQUIVO CARREGADO - TOTAIS:', {
+        totalLinhas: rows.length,
+        totalLaudos: rows.reduce((sum, r) => sum + r.laudos, 0),
+        totalValor: rows.reduce((sum, r) => sum + r.valor, 0),
+        primeiros5: rows.slice(0, 5)
+      });
       
       toast({
         title: "Arquivo carregado",
@@ -513,6 +526,12 @@ export default function FaturamentoComparativo() {
 
       const dadosSistema = demonstrativo.detalhes_exames as any[];
       console.log(`Dados do demonstrativo encontrados: ${dadosSistema?.length || 0} exames processados para ${clienteNome} em ${periodoSelecionado}`);
+      console.log('📊 PRIMEIROS 5 REGISTROS DO DEMONSTRATIVO:', dadosSistema?.slice(0, 5));
+      console.log('📊 TOTAIS DO DEMONSTRATIVO:', {
+        totalExames: dadosSistema?.length,
+        totalQuantidade: dadosSistema?.reduce((sum, d) => sum + (Number(d.quantidade) || 0), 0),
+        totalValor: dadosSistema?.reduce((sum, d) => sum + (Number(d.valor_total) || 0), 0)
+      });
 
       const diferencasEncontradas: Diferenca[] = [];
 
@@ -531,6 +550,8 @@ export default function FaturamentoComparativo() {
         prioridade: string;
         quantidade: number;
         valor: number;
+        exames: Set<string>;
+        pacientes: Set<string>;
       }>();
       
       uploadedData.forEach((item) => {
@@ -543,18 +564,38 @@ export default function FaturamentoComparativo() {
             categoria: item.categoria,
             prioridade: item.prioridade,
             quantidade: 0,
-            valor: 0
+            valor: 0,
+            exames: new Set(),
+            pacientes: new Set()
           });
         }
         
         const grupo = arquivoMap.get(chave)!;
         grupo.quantidade += item.laudos;
         grupo.valor += item.valor;
+        if (item.nomeExame) grupo.exames.add(item.nomeExame);
+        if (item.paciente) grupo.pacientes.add(item.paciente);
+      });
+      
+      console.log('📊 GRUPOS DO ARQUIVO (primeiros 5):', Array.from(arquivoMap.entries()).slice(0, 5).map(([k, v]) => ({
+        chave: k,
+        ...v,
+        exames: Array.from(v.exames),
+        pacientes: Array.from(v.pacientes)
+      })));
+      console.log('📊 TOTAIS AGRUPADOS DO ARQUIVO:', {
+        totalGrupos: arquivoMap.size,
+        totalQuantidade: Array.from(arquivoMap.values()).reduce((sum, g) => sum + g.quantidade, 0),
+        totalValor: Array.from(arquivoMap.values()).reduce((sum, g) => sum + g.valor, 0)
       });
 
       // Comparar: grupos no arquivo vs sistema
       arquivoMap.forEach((grupoArquivo, chave) => {
         const grupoSistema = sistemaMap.get(chave);
+        
+        // Pegar exemplos de exames e pacientes (primeiros 3 de cada)
+        const examesExemplo = Array.from(grupoArquivo.exames).slice(0, 3).join(', ');
+        const pacientesExemplo = Array.from(grupoArquivo.pacientes).slice(0, 3).join(', ');
         
         if (!grupoSistema) {
           // Grupo não existe no sistema
@@ -567,6 +608,8 @@ export default function FaturamentoComparativo() {
             prioridade: grupoArquivo.prioridade,
             quantidadeArquivo: grupoArquivo.quantidade,
             valorArquivo: grupoArquivo.valor,
+            exame: examesExemplo,
+            paciente: pacientesExemplo,
             detalhes: 'Grupo Modal/Espec/Cat/Prior existe apenas no arquivo'
           });
         } else {
@@ -597,6 +640,8 @@ export default function FaturamentoComparativo() {
               quantidadeSistema: qtdSistema,
               valorArquivo: valorArquivo,
               valorSistema: valorSistema,
+              exame: examesExemplo,
+              paciente: pacientesExemplo,
               detalhes: divergencias.join(' | ')
             });
           }
@@ -615,12 +660,22 @@ export default function FaturamentoComparativo() {
             prioridade: grupoSistema.prioridade,
             quantidadeSistema: Number(grupoSistema.quantidade) || 0,
             valorSistema: Number(grupoSistema.valor_total) || 0,
+            exame: '(dados do sistema)',
+            paciente: '(dados do sistema)',
             detalhes: 'Grupo Modal/Espec/Cat/Prior existe apenas no sistema'
           });
         }
       });
       
       setDiferencas(diferencasEncontradas);
+      
+      console.log('🔍 COMPARAÇÃO CONCLUÍDA:', {
+        totalDiferencas: diferencasEncontradas.length,
+        apenasArquivo: diferencasEncontradas.filter(d => d.tipo === 'arquivo_apenas').length,
+        apenasSistema: diferencasEncontradas.filter(d => d.tipo === 'sistema_apenas').length,
+        divergentes: diferencasEncontradas.filter(d => d.tipo === 'valores_diferentes').length,
+        primeiras5Difs: diferencasEncontradas.slice(0, 5)
+      });
       
       toast({
         title: "Comparação concluída",
@@ -666,6 +721,8 @@ export default function FaturamentoComparativo() {
         'Especialidade': d.especialidade || '',
         'Categoria': d.categoria || '',
         'Prioridade': d.prioridade || '',
+        'Pacientes': d.paciente || '',
+        'Exames': d.exame || '',
         'Qtd Arquivo': d.quantidadeArquivo || '',
         'Qtd Sistema': d.quantidadeSistema || '',
         'Valor Arquivo': d.valorArquivo ? d.valorArquivo.toFixed(2) : '',
@@ -861,6 +918,8 @@ export default function FaturamentoComparativo() {
                     <th className="text-left p-2 font-medium">Especialidade</th>
                     <th className="text-left p-2 font-medium">Categoria</th>
                     <th className="text-left p-2 font-medium">Prioridade</th>
+                    <th className="text-left p-2 font-medium">Pacientes</th>
+                    <th className="text-left p-2 font-medium">Exames</th>
                     <th className="text-left p-2 font-medium">Qtd Arq/Sis</th>
                     <th className="text-left p-2 font-medium">Valor Arq/Sis</th>
                     <th className="text-left p-2 font-medium">Divergências</th>
@@ -889,6 +948,12 @@ export default function FaturamentoComparativo() {
                         <td className="p-2">{diff.especialidade || '-'}</td>
                         <td className="p-2">{diff.categoria || '-'}</td>
                         <td className="p-2">{diff.prioridade || '-'}</td>
+                        <td className="p-2 text-xs max-w-[150px] truncate" title={diff.paciente}>
+                          {diff.paciente || '-'}
+                        </td>
+                        <td className="p-2 text-xs max-w-[200px] truncate" title={diff.exame}>
+                          {diff.exame || '-'}
+                        </td>
                         <td className={`p-2 ${temQuantidadeDif ? 'bg-red-50 font-medium' : ''}`}>
                           {diff.quantidadeArquivo || '-'} / {diff.quantidadeSistema || '-'}
                         </td>
