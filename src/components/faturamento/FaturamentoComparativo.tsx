@@ -541,8 +541,8 @@ export default function FaturamentoComparativo() {
 
       const diferencasEncontradas: Diferenca[] = [];
 
-      // Criar mapa dos dados do sistema usando MODALIDADE + ESPECIALIDADE + CATEGORIA + PRIORIDADE
-      // Buscar também os detalhes dos exames individuais do demonstrativo completo
+      // Criar mapa dos dados do sistema usando MODALIDADE + ESPECIALIDADE + CATEGORIA + PRIORIDADE + NOME_EXAME
+      // Agora agrupa por exame individual para comparação precisa
       const sistemaMap = new Map<string, {
         item: any;
         exames: Set<string>;
@@ -550,7 +550,9 @@ export default function FaturamentoComparativo() {
       }>();
       
       (dadosSistema || []).forEach((item: any) => {
-        const chave = `${normalizar(item.modalidade || '')}|${normalizar(item.especialidade || '')}|${normalizar(normalizarCategoria(item.categoria || ''))}|${normalizar(item.prioridade || '')}`;
+        // Incluir nome_exame na chave para comparar exame por exame
+        const nomeExame = normalizar(item.nome_exame || item.exame || '');
+        const chave = `${normalizar(item.modalidade || '')}|${normalizar(item.especialidade || '')}|${normalizar(normalizarCategoria(item.categoria || ''))}|${normalizar(item.prioridade || '')}|${nomeExame}`;
         
         if (!sistemaMap.has(chave)) {
           sistemaMap.set(chave, {
@@ -589,7 +591,8 @@ export default function FaturamentoComparativo() {
           
           if (!volSamplesError && Array.isArray(volSamples)) {
             volSamples.forEach((r: any) => {
-              const chaveSample = `${normalizar(r.MODALIDADE || '')}|${normalizar(r.ESPECIALIDADE || '')}|${normalizar(normalizarCategoria(r.CATEGORIA || ''))}|${normalizar(r.PRIORIDADE || '')}`;
+              const nomeExameSample = normalizar(r.ESTUDO_DESCRICAO || '');
+              const chaveSample = `${normalizar(r.MODALIDADE || '')}|${normalizar(r.ESPECIALIDADE || '')}|${normalizar(normalizarCategoria(r.CATEGORIA || ''))}|${normalizar(r.PRIORIDADE || '')}|${nomeExameSample}`;
               if (!sistemaMap.has(chaveSample)) {
                 sistemaMap.set(chaveSample, {
                   item: {
@@ -597,6 +600,7 @@ export default function FaturamentoComparativo() {
                     especialidade: r.ESPECIALIDADE || '',
                     categoria: normalizarCategoria(r.CATEGORIA || ''),
                     prioridade: r.PRIORIDADE || '',
+                    nome_exame: r.ESTUDO_DESCRICAO || '',
                     quantidade: 0,
                     valor_total: 0
                   },
@@ -614,12 +618,13 @@ export default function FaturamentoComparativo() {
         console.warn('Não foi possível enriquecer com amostras da volumetria:', e);
       }
       
-      // Criar mapa dos dados do arquivo agrupando por MODALIDADE + ESPECIALIDADE + CATEGORIA + PRIORIDADE
+      // Criar mapa dos dados do arquivo agrupando por MODALIDADE + ESPECIALIDADE + CATEGORIA + PRIORIDADE + NOME_EXAME
       const arquivoMap = new Map<string, {
         modalidade: string;
         especialidade: string;
         categoria: string;
         prioridade: string;
+        nomeExame: string;
         quantidade: number;
         valor: number;
         exames: Set<string>;
@@ -627,7 +632,9 @@ export default function FaturamentoComparativo() {
       }>();
       
       uploadedData.forEach((item) => {
-        const chave = `${normalizar(item.modalidade)}|${normalizar(item.especialidade)}|${normalizar(item.categoria)}|${normalizar(item.prioridade)}`;
+        // Incluir nome_exame na chave para comparar exame por exame
+        const nomeExameNorm = normalizar(item.nomeExame || '');
+        const chave = `${normalizar(item.modalidade)}|${normalizar(item.especialidade)}|${normalizar(item.categoria)}|${normalizar(item.prioridade)}|${nomeExameNorm}`;
         
         if (!arquivoMap.has(chave)) {
           arquivoMap.set(chave, {
@@ -635,6 +642,7 @@ export default function FaturamentoComparativo() {
             especialidade: item.especialidade,
             categoria: item.categoria,
             prioridade: item.prioridade,
+            nomeExame: item.nomeExame || '',
             quantidade: 0,
             valor: 0,
             exames: new Set(),
@@ -665,8 +673,7 @@ export default function FaturamentoComparativo() {
       arquivoMap.forEach((grupoArquivo, chave) => {
         const grupoSistemaData = sistemaMap.get(chave);
         
-        // Pegar exemplos de exames e pacientes (primeiros 3 de cada)
-        const examesExemplo = Array.from(grupoArquivo.exames).slice(0, 3).join(', ');
+        // Pegar exemplos de pacientes (primeiros 3)
         const pacientesExemplo = Array.from(grupoArquivo.pacientes).slice(0, 3).join(', ');
         
         if (!grupoSistemaData) {
@@ -680,9 +687,9 @@ export default function FaturamentoComparativo() {
             prioridade: grupoArquivo.prioridade,
             quantidadeArquivo: grupoArquivo.quantidade,
             valorArquivo: grupoArquivo.valor,
-            exame: examesExemplo,
+            exame: grupoArquivo.nomeExame,
             paciente: pacientesExemplo,
-            detalhes: 'Grupo Modal/Espec/Cat/Prior existe apenas no arquivo'
+            detalhes: 'Exame existe apenas no arquivo'
           });
         } else {
           // Grupo existe em ambos, verificar divergências
@@ -713,7 +720,7 @@ export default function FaturamentoComparativo() {
               quantidadeSistema: qtdSistema,
               valorArquivo: valorArquivo,
               valorSistema: valorSistema,
-              exame: examesExemplo,
+              exame: grupoArquivo.nomeExame,
               paciente: pacientesExemplo,
               detalhes: divergencias.join(' | ')
             });
@@ -726,8 +733,7 @@ export default function FaturamentoComparativo() {
         if (!arquivoMap.has(chave)) {
           const grupoSistema = grupoSistemaData.item;
           
-          // Pegar exemplos de exames e pacientes do sistema (primeiros 3 de cada)
-          const examesExemploSistema = Array.from(grupoSistemaData.exames).slice(0, 3).join(', ') || '(não disponível)';
+          // Pegar exemplos de pacientes do sistema (primeiros 3)
           const pacientesExemploSistema = Array.from(grupoSistemaData.pacientes).slice(0, 3).join(', ') || '(não disponível)';
           
           diferencasEncontradas.push({
@@ -739,9 +745,9 @@ export default function FaturamentoComparativo() {
             prioridade: grupoSistema.prioridade,
             quantidadeSistema: Number(grupoSistema.quantidade) || 0,
             valorSistema: Number(grupoSistema.valor_total) || 0,
-            exame: examesExemploSistema,
+            exame: grupoSistema.nome_exame || grupoSistema.exame || '(não disponível)',
             paciente: pacientesExemploSistema,
-            detalhes: 'Grupo Modal/Espec/Cat/Prior existe apenas no sistema'
+            detalhes: 'Exame existe apenas no sistema'
           });
         }
       });
@@ -800,8 +806,8 @@ export default function FaturamentoComparativo() {
         'Especialidade': d.especialidade || '',
         'Categoria': d.categoria || '',
         'Prioridade': d.prioridade || '',
+        'Exame': d.exame || '',
         'Pacientes': d.paciente || '',
-        'Exames': d.exame || '',
         'Qtd Arquivo': d.quantidadeArquivo || '',
         'Qtd Sistema': d.quantidadeSistema || '',
         'Valor Arquivo': d.valorArquivo ? d.valorArquivo.toFixed(2) : '',
@@ -997,8 +1003,8 @@ export default function FaturamentoComparativo() {
                     <th className="text-left p-2 font-medium">Especialidade</th>
                     <th className="text-left p-2 font-medium">Categoria</th>
                     <th className="text-left p-2 font-medium">Prioridade</th>
+                    <th className="text-left p-2 font-medium">Exame</th>
                     <th className="text-left p-2 font-medium">Pacientes (exemplos)</th>
-                    <th className="text-left p-2 font-medium">Exames (exemplos)</th>
                     <th className="text-left p-2 font-medium">Qtd Arq/Sis</th>
                     <th className="text-left p-2 font-medium">Valor Arq/Sis</th>
                     <th className="text-left p-2 font-medium">Divergências</th>
@@ -1027,11 +1033,11 @@ export default function FaturamentoComparativo() {
                         <td className="p-2">{diff.especialidade || '-'}</td>
                         <td className="p-2">{diff.categoria || '-'}</td>
                         <td className="p-2">{diff.prioridade || '-'}</td>
+                        <td className="p-2 text-xs max-w-[200px] truncate font-medium" title={diff.exame}>
+                          {diff.exame || '-'}
+                        </td>
                         <td className="p-2 text-xs max-w-[150px] truncate" title={diff.paciente}>
                           {diff.paciente || '-'}
-                        </td>
-                        <td className="p-2 text-xs max-w-[200px] truncate" title={diff.exame}>
-                          {diff.exame || '-'}
                         </td>
                         <td className={`p-2 ${temQuantidadeDif ? 'bg-red-50 font-medium' : ''}`}>
                           {diff.quantidadeArquivo || '-'} / {diff.quantidadeSistema || '-'}
