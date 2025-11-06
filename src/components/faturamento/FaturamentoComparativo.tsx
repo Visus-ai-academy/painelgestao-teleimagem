@@ -9,7 +9,8 @@ import * as XLSX from 'xlsx';
 
 interface FaturamentoUploadRow {
   dataEstudo: string; // Data do laudo
-  paciente: string;
+  paciente: string; // nome do paciente (normalizado)
+  pacienteOriginal?: string; // nome original do paciente para exibição
   nomeExame: string;
   laudadoPor: string; // nome do médico
   prioridade: string;
@@ -299,18 +300,19 @@ export default function FaturamentoComparativo() {
           categoriaRaw = 'SC';
         }
 
-        rows.push({
-          dataEstudo: parseDataExcel(row[colIndexes.dataEstudo]),
-          paciente: normalizar(paciente),
-          nomeExame: String(row[colIndexes.nomeExame] || '').trim(),
-          laudadoPor: String(row[colIndexes.laudadoPor] || '').trim(),
-          prioridade: String(row[colIndexes.prioridade] || '').trim(),
-          modalidade: String(row[colIndexes.modalidade] || '').trim(),
-          especialidade: String(row[colIndexes.especialidade] || '').trim(),
-          categoria: categoriaRaw,
-          laudos: parseQuantidade(row[colIndexes.laudos]),
-          valor: parseValor(row[colIndexes.valor])
-        });
+rows.push({
+  dataEstudo: parseDataExcel(row[colIndexes.dataEstudo]),
+  paciente: normalizar(paciente),
+  pacienteOriginal: String(row[colIndexes.paciente] || '').trim(),
+  nomeExame: String(row[colIndexes.nomeExame] || '').trim(),
+  laudadoPor: String(row[colIndexes.laudadoPor] || '').trim(),
+  prioridade: String(row[colIndexes.prioridade] || '').trim(),
+  modalidade: String(row[colIndexes.modalidade] || '').trim(),
+  especialidade: String(row[colIndexes.especialidade] || '').trim(),
+  categoria: categoriaRaw,
+  laudos: parseQuantidade(row[colIndexes.laudos]),
+  valor: parseValor(row[colIndexes.valor])
+});
       }
 
       setUploadedData(rows);
@@ -580,262 +582,182 @@ export default function FaturamentoComparativo() {
 
       const diferencasEncontradas: Diferenca[] = [];
 
-      // Criar mapas COESOS (sem nome do exame) para permitir comparação mesmo quando o sistema não traz o nome do exame
-      // Chave: MODALIDADE|ESPECIALIDADE|CATEGORIA|PRIORIDADE
-      const sistemaCoarseMap = new Map<string, {
-        item: any;
+      // 1) Construir mapa por PACIENTE a partir do ARQUIVO
+      const arquivoPacMap = new Map<string, {
+        nome: string;
+        laudos: number;
+        valor: number;
         exames: Set<string>;
-        pacientes: Set<string>;
+        modalidades: Set<string>;
+        especialidades: Set<string>;
+        categorias: Set<string>;
+        prioridades: Set<string>;
+        displayName: string;
       }>();
 
-      (dadosSistema || []).forEach((item: any) => {
-        const chave = `${normalizarModalidade(item.modalidade || '')}|${normalizar(item.especialidade || '')}|${normalizarCategoria(item.categoria || '')}|${normalizarPrioridade(item.prioridade || '')}`;
-
-        if (!sistemaCoarseMap.has(chave)) {
-          sistemaCoarseMap.set(chave, {
-            item: {
-              modalidade: item.modalidade,
-              especialidade: item.especialidade,
-              categoria: item.categoria,
-              prioridade: item.prioridade,
-              quantidade: Number(item.quantidade) || 0,
-              valor_total: Number(item.valor_total) || 0,
-            },
+      uploadedData.forEach((item) => {
+        const key = item.paciente; // já normalizado
+        if (!key) return;
+        if (!arquivoPacMap.has(key)) {
+          arquivoPacMap.set(key, {
+            nome: key,
+            laudos: 0,
+            valor: 0,
             exames: new Set<string>(),
-            pacientes: new Set<string>()
+            modalidades: new Set<string>(),
+            especialidades: new Set<string>(),
+            categorias: new Set<string>(),
+            prioridades: new Set<string>(),
+            displayName: item.pacienteOriginal || item.paciente,
           });
-        } else {
-          // Se vierem múltiplas linhas do mesmo grupo, somar
-          const grp = sistemaCoarseMap.get(chave)!;
-          grp.item.quantidade += Number(item.quantidade) || 0;
-          grp.item.valor_total += Number(item.valor_total) || 0;
         }
+        const grp = arquivoPacMap.get(key)!;
+        grp.laudos += Number(item.laudos) || 0;
+        grp.valor += Number(item.valor) || 0;
+        if (item.nomeExame) grp.exames.add(item.nomeExame);
+        if (item.modalidade) grp.modalidades.add(item.modalidade);
+        if (item.especialidade) grp.especialidades.add(item.especialidade);
+        if (item.categoria) grp.categorias.add(normalizarCategoria(item.categoria));
+        if (item.prioridade) grp.prioridades.add(item.prioridade);
       });
 
-      // Enriquecer com amostras da volumetria para NOME DO EXAME/PACIENTE (por grupo COESO)
+      // 2) Construir mapa por PACIENTE a partir do SISTEMA (volumetria_mobilemed)
+      const sistemaPacMap = new Map<string, {
+        nome: string;
+        laudos: number;
+        valor: number;
+        exames: Set<string>;
+        modalidades: Set<string>;
+        especialidades: Set<string>;
+        categorias: Set<string>;
+        prioridades: Set<string>;
+        displayName: string;
+      }>();
+
       try {
         const patterns = Array.from(new Set(nomesCandidatos?.map(n => `%${n}%`) || []));
         if (patterns.length > 0) {
-          const { data: volSamples, error: volSamplesError } = await supabase
+          const { data: volPac, error: volPacError } = await supabase
             .from('volumetria_mobilemed')
-            .select('EMPRESA, MODALIDADE, ESPECIALIDADE, CATEGORIA, PRIORIDADE, ESTUDO_DESCRICAO, NOME_PACIENTE, cliente_nome_fantasia')
+            .select('NOME_PACIENTE, ESTUDO_DESCRICAO, MODALIDADE, ESPECIALIDADE, CATEGORIA, PRIORIDADE, VALORES, EMPRESA, cliente_nome_fantasia')
             .eq('periodo_referencia', periodoSelecionado)
             .or([
               ...patterns.map(p => `EMPRESA.ilike.${p}`),
               ...patterns.map(p => `cliente_nome_fantasia.ilike.${p}`)
             ].join(','))
-            .limit(2000);
+            .limit(10000);
 
-          if (!volSamplesError && Array.isArray(volSamples)) {
-            volSamples.forEach((r: any) => {
-              const chaveCoesa = `${normalizarModalidade(r.MODALIDADE || '')}|${normalizar(r.ESPECIALIDADE || '')}|${normalizarCategoria(r.CATEGORIA || '')}|${normalizarPrioridade(r.PRIORIDADE || '')}`;
-              const grupo = sistemaCoarseMap.get(chaveCoesa);
-              if (grupo) {
-                if (r.ESTUDO_DESCRICAO) grupo.exames.add(String(r.ESTUDO_DESCRICAO).trim());
-                if (r.NOME_PACIENTE) grupo.pacientes.add(String(r.NOME_PACIENTE).trim());
+          if (!volPacError && Array.isArray(volPac)) {
+            volPac.forEach((r: any) => {
+              const nomePac = normalizar(String(r.NOME_PACIENTE || ''));
+              if (!nomePac) return;
+              if (!sistemaPacMap.has(nomePac)) {
+                sistemaPacMap.set(nomePac, {
+                  nome: nomePac,
+                  laudos: 0,
+                  valor: 0,
+                  exames: new Set<string>(),
+                  modalidades: new Set<string>(),
+                  especialidades: new Set<string>(),
+                  categorias: new Set<string>(),
+                  prioridades: new Set<string>(),
+                  displayName: String(r.NOME_PACIENTE || '').trim(),
+                });
               }
+              const grp = sistemaPacMap.get(nomePac)!;
+              grp.laudos += 1; // cada linha = 1 exame/laudo
+              const v = parseValor((r as any).VALORES);
+              grp.valor += Number.isFinite(v) ? v : 0;
+              if (r.ESTUDO_DESCRICAO) grp.exames.add(String(r.ESTUDO_DESCRICAO).trim());
+              if (r.MODALIDADE) grp.modalidades.add(String(r.MODALIDADE).trim());
+              if (r.ESPECIALIDADE) grp.especialidades.add(String(r.ESPECIALIDADE).trim());
+              grp.categorias.add(normalizarCategoria(r.CATEGORIA));
+              if (r.PRIORIDADE) grp.prioridades.add(String(r.PRIORIDADE).trim());
             });
           }
         }
       } catch (e) {
-        console.warn('Não foi possível enriquecer com amostras da volumetria (coeso):', e);
+        console.warn('Não foi possível montar mapa por paciente do sistema:', e);
       }
 
-      // Criar mapa do ARQUIVO agrupando pelo mesmo nível COESO (sem nome do exame)
-      const arquivoCoarseMap = new Map<string, {
-        modalidade: string;
-        especialidade: string;
-        categoria: string;
-        prioridade: string;
-        quantidade: number;
-        valor: number;
-        exames: Set<string>;
-        pacientes: Set<string>;
-      }>();
+      // 3) Comparar por PACIENTE
+      // - Arquivo -> Sistema
+      arquivoPacMap.forEach((arq, key) => {
+        const sis = sistemaPacMap.get(key);
+        const examesExemplo = Array.from(arq.exames).slice(0, 3).join(', ') || '(diversos)';
+        const modExemplo = Array.from(arq.modalidades).slice(0, 1)[0] || '-';
+        const espExemplo = Array.from(arq.especialidades).slice(0, 1)[0] || '-';
+        const catExemplo = Array.from(arq.categorias).slice(0, 1)[0] || '-';
+        const priExemplo = Array.from(arq.prioridades).slice(0, 1)[0] || '-';
 
-      uploadedData.forEach((item) => {
-        const chave = `${normalizarModalidade(item.modalidade)}|${normalizar(item.especialidade)}|${normalizarCategoria(item.categoria)}|${normalizarPrioridade(item.prioridade)}`;
-        if (!arquivoCoarseMap.has(chave)) {
-          arquivoCoarseMap.set(chave, {
-            modalidade: item.modalidade,
-            especialidade: item.especialidade,
-            categoria: normalizarCategoria(item.categoria),
-            prioridade: item.prioridade,
-            quantidade: 0,
-            valor: 0,
-            exames: new Set<string>(),
-            pacientes: new Set<string>()
+        if (!sis) {
+          diferencasEncontradas.push({
+            tipo: 'arquivo_apenas',
+            chave: key,
+            modalidade: modExemplo,
+            especialidade: espExemplo,
+            categoria: catExemplo,
+            prioridade: priExemplo,
+            quantidadeArquivo: arq.laudos,
+            valorArquivo: arq.valor,
+            exame: examesExemplo,
+            paciente: arq.displayName,
+            detalhes: 'Paciente existe apenas no arquivo'
           });
-        }
-        const grp = arquivoCoarseMap.get(chave)!;
-        grp.quantidade += item.laudos;
-        grp.valor += item.valor;
-        if (item.nomeExame) grp.exames.add(item.nomeExame);
-        if (item.paciente) grp.pacientes.add(item.paciente);
-      });
-
-      console.log('📊 GRUPOS COESOS DO ARQUIVO (primeiros 5):', Array.from(arquivoCoarseMap.entries()).slice(0, 5).map(([k, v]) => ({
-        chave: k,
-        ...v,
-        exames: Array.from(v.exames),
-        pacientes: Array.from(v.pacientes)
-      })));
-
-      // Função auxiliar: tentar encontrar grupo do SISTEMA ignorando categoria (para apontar divergência de categoria)
-      const encontrarSistemaSemCategoria = (modN: string, espN: string, priN: string): [string, ReturnType<typeof sistemaCoarseMap.get>] | null => {
-        for (const [k, v] of sistemaCoarseMap.entries()) {
-          const [m, e, c, p] = k.split('|');
-          if (m === modN && e === espN && p === priN) {
-            return [k, v];
-          }
-        }
-        return null;
-      };
-
-      // Comparar: grupos no arquivo vs sistema (nível COESO)
-      arquivoCoarseMap.forEach((grupoArquivo, chave) => {
-        const grupoSistemaData = sistemaCoarseMap.get(chave);
-
-        const pacientesExemplo = Array.from(grupoArquivo.pacientes).slice(0, 3).join(', ');
-        const examesExemplo = Array.from(grupoArquivo.exames).slice(0, 3).join(', ');
-
-        if (!grupoSistemaData) {
-          // Tenta ignorando categoria para identificar possível divergência de categoria
-          const [modN, espN, _catN, priN] = chave.split('|');
-          const fallback = encontrarSistemaSemCategoria(modN, espN, priN);
-          if (fallback) {
-            const grupoSistema = fallback[1]!.item;
-            const qtdSistema = Number(grupoSistema.quantidade) || 0;
-            const qtdArquivo = grupoArquivo.quantidade;
-            const valorSistema = Number(grupoSistema.valor_total) || 0;
-            const valorArquivo = grupoArquivo.valor;
-
-            const divergencias: string[] = [];
-            if (qtdArquivo !== qtdSistema) divergencias.push(`Quantidade: Arquivo=${qtdArquivo} vs Sistema=${qtdSistema}`);
-            if (Math.abs(valorArquivo - valorSistema) > 0.01) divergencias.push(`Valor: Arquivo=R$ ${valorArquivo.toFixed(2)} vs Sistema=R$ ${valorSistema.toFixed(2)}`);
-            divergencias.push(`Categoria: Arquivo=${grupoArquivo.categoria} vs Sistema=${normalizarCategoria(grupoSistema.categoria || '')}`);
-
-            diferencasEncontradas.push({
-              tipo: 'valores_diferentes',
-              chave: fallback[0],
-              modalidade: grupoArquivo.modalidade,
-              especialidade: grupoArquivo.especialidade,
-              categoria: `${grupoArquivo.categoria} / ${normalizarCategoria(grupoSistema.categoria || '')}`,
-              prioridade: grupoArquivo.prioridade,
-              quantidadeArquivo: qtdArquivo,
-              quantidadeSistema: qtdSistema,
-              valorArquivo: valorArquivo,
-              valorSistema: valorSistema,
-              exame: examesExemplo || '(diversos)',
-              paciente: pacientesExemplo,
-              detalhes: divergencias.join(' | ')
-            });
-          } else {
-            // Grupo não existe no sistema
-            diferencasEncontradas.push({
-              tipo: 'arquivo_apenas',
-              chave,
-              modalidade: grupoArquivo.modalidade,
-              especialidade: grupoArquivo.especialidade,
-              categoria: grupoArquivo.categoria,
-              prioridade: grupoArquivo.prioridade,
-              quantidadeArquivo: grupoArquivo.quantidade,
-              valorArquivo: grupoArquivo.valor,
-              exame: examesExemplo || '(diversos)',
-              paciente: pacientesExemplo,
-              detalhes: 'Exame existe apenas no arquivo'
-            });
-          }
         } else {
-          // Grupo existe em ambos, verificar divergências
           const divergencias: string[] = [];
-          const grupoSistema = grupoSistemaData.item;
-
-          const qtdSistema = Number(grupoSistema.quantidade) || 0;
-          const qtdArquivo = grupoArquivo.quantidade;
-          if (qtdArquivo !== qtdSistema) {
-            divergencias.push(`Quantidade: Arquivo=${qtdArquivo} vs Sistema=${qtdSistema}`);
+          if (arq.laudos !== sis.laudos) {
+            divergencias.push(`Quantidade: Arquivo=${arq.laudos} vs Sistema=${sis.laudos}`);
           }
-
-          const valorSistema = Number(grupoSistema.valor_total) || 0;
-          const valorArquivo = grupoArquivo.valor;
-          if (Math.abs(valorArquivo - valorSistema) > 0.01) {
-            divergencias.push(`Valor: Arquivo=R$ ${valorArquivo.toFixed(2)} vs Sistema=R$ ${valorSistema.toFixed(2)}`);
+          if (Math.abs(arq.valor - sis.valor) > 0.01) {
+            divergencias.push(`Valor: Arquivo=R$ ${arq.valor.toFixed(2)} vs Sistema=R$ ${sis.valor.toFixed(2)}`);
           }
-
-          // Categorias já são iguais neste nível (fazem parte da chave)
 
           if (divergencias.length > 0) {
             diferencasEncontradas.push({
               tipo: 'valores_diferentes',
-              chave,
-              modalidade: grupoArquivo.modalidade,
-              especialidade: grupoArquivo.especialidade,
-              categoria: grupoArquivo.categoria,
-              prioridade: grupoArquivo.prioridade,
-              quantidadeArquivo: qtdArquivo,
-              quantidadeSistema: qtdSistema,
-              valorArquivo: valorArquivo,
-              valorSistema: valorSistema,
-              exame: examesExemplo || '(diversos)',
-              paciente: pacientesExemplo,
+              chave: key,
+              modalidade: modExemplo,
+              especialidade: espExemplo,
+              categoria: catExemplo,
+              prioridade: priExemplo,
+              quantidadeArquivo: arq.laudos,
+              quantidadeSistema: sis.laudos,
+              valorArquivo: arq.valor,
+              valorSistema: sis.valor,
+              exame: examesExemplo,
+              paciente: arq.displayName,
               detalhes: divergencias.join(' | ')
             });
           }
         }
       });
 
-      // Comparar: grupos no sistema que não estão no arquivo (nível COESO)
-      sistemaCoarseMap.forEach((grupoSistemaData, chave) => {
-        if (!arquivoCoarseMap.has(chave)) {
-          const grupoSistema = grupoSistemaData.item;
+      // - Sistema -> Arquivo
+      sistemaPacMap.forEach((sis, key) => {
+        if (!arquivoPacMap.has(key)) {
+          const examesExemplo = Array.from(sis.exames).slice(0, 3).join(', ') || '(diversos)';
+          const modExemplo = Array.from(sis.modalidades).slice(0, 1)[0] || '-';
+          const espExemplo = Array.from(sis.especialidades).slice(0, 1)[0] || '-';
+          const catExemplo = Array.from(sis.categorias).slice(0, 1)[0] || '-';
+          const priExemplo = Array.from(sis.prioridades).slice(0, 1)[0] || '-';
 
-          // Tenta achar no arquivo ignorando categoria para sugerir divergência de categoria
-          const [modN, espN, _catN, priN] = chave.split('|');
-          let temArquivoSemCat = false;
-          for (const [k, v] of arquivoCoarseMap.entries()) {
-            const [m, e, c, p] = k.split('|');
-            if (m === modN && e === espN && p === priN) {
-              temArquivoSemCat = true;
-              break;
-            }
-          }
-
-          const pacientesExemploSistema = Array.from(grupoSistemaData.pacientes).slice(0, 3).join(', ') || '(não disponível)';
-          const examesExemploSistema = Array.from(grupoSistemaData.exames).slice(0, 3).join(', ') || '(diversos)';
-
-          if (temArquivoSemCat) {
-            diferencasEncontradas.push({
-              tipo: 'valores_diferentes',
-              chave,
-              modalidade: grupoSistema.modalidade,
-              especialidade: grupoSistema.especialidade,
-              categoria: normalizarCategoria(grupoSistema.categoria || ''),
-              prioridade: grupoSistema.prioridade,
-              quantidadeSistema: Number(grupoSistema.quantidade) || 0,
-              valorSistema: Number(grupoSistema.valor_total) || 0,
-              exame: examesExemploSistema,
-              paciente: pacientesExemploSistema,
-              detalhes: `Categoria possivelmente divergente. Arquivo tem grupo semelhante em outra categoria.`
-            });
-          } else {
-            diferencasEncontradas.push({
-              tipo: 'sistema_apenas',
-              chave,
-              modalidade: grupoSistema.modalidade,
-              especialidade: grupoSistema.especialidade,
-              categoria: normalizarCategoria(grupoSistema.categoria || ''),
-              prioridade: grupoSistema.prioridade,
-              quantidadeSistema: Number(grupoSistema.quantidade) || 0,
-              valorSistema: Number(grupoSistema.valor_total) || 0,
-              exame: examesExemploSistema,
-              paciente: pacientesExemploSistema,
-              detalhes: 'Exame existe apenas no sistema'
-            });
-          }
+          diferencasEncontradas.push({
+            tipo: 'sistema_apenas',
+            chave: key,
+            modalidade: modExemplo,
+            especialidade: espExemplo,
+            categoria: catExemplo,
+            prioridade: priExemplo,
+            quantidadeSistema: sis.laudos,
+            valorSistema: sis.valor,
+            exame: examesExemplo,
+            paciente: sis.displayName,
+            detalhes: 'Paciente existe apenas no sistema'
+          });
         }
       });
-      
+
       setDiferencas(diferencasEncontradas);
       
       console.log('🔍 COMPARAÇÃO CONCLUÍDA:', {
