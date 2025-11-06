@@ -541,8 +541,8 @@ export default function FaturamentoComparativo() {
 
       const diferencasEncontradas: Diferenca[] = [];
 
-      // Criar mapa dos dados do sistema usando MODALIDADE + ESPECIALIDADE + CATEGORIA + PRIORIDADE + NOME_EXAME
-      // Agora agrupa por exame individual para comparação precisa
+      // Criar mapa dos dados do sistema usando MODALIDADE + ESPECIALIDADE + PRIORIDADE + NOME_EXAME
+      // IMPORTANTE: Não incluir CATEGORIA na chave para permitir detectar divergências de categoria
       const sistemaMap = new Map<string, {
         item: any;
         exames: Set<string>;
@@ -550,9 +550,9 @@ export default function FaturamentoComparativo() {
       }>();
       
       (dadosSistema || []).forEach((item: any) => {
-        // Incluir nome_exame na chave para comparar exame por exame
+        // Chave SEM categoria para comparar mesmo exame independente da categoria
         const nomeExame = normalizar(item.nome_exame || item.exame || '');
-        const chave = `${normalizar(item.modalidade || '')}|${normalizar(item.especialidade || '')}|${normalizar(normalizarCategoria(item.categoria || ''))}|${normalizar(item.prioridade || '')}|${nomeExame}`;
+        const chave = `${normalizar(item.modalidade || '')}|${normalizar(item.especialidade || '')}|${normalizar(item.prioridade || '')}|${nomeExame}`;
         
         if (!sistemaMap.has(chave)) {
           sistemaMap.set(chave, {
@@ -592,7 +592,8 @@ export default function FaturamentoComparativo() {
           if (!volSamplesError && Array.isArray(volSamples)) {
             volSamples.forEach((r: any) => {
               const nomeExameSample = normalizar(r.ESTUDO_DESCRICAO || '');
-              const chaveSample = `${normalizar(r.MODALIDADE || '')}|${normalizar(r.ESPECIALIDADE || '')}|${normalizar(normalizarCategoria(r.CATEGORIA || ''))}|${normalizar(r.PRIORIDADE || '')}|${nomeExameSample}`;
+              // Chave SEM categoria
+              const chaveSample = `${normalizar(r.MODALIDADE || '')}|${normalizar(r.ESPECIALIDADE || '')}|${normalizar(r.PRIORIDADE || '')}|${nomeExameSample}`;
               if (!sistemaMap.has(chaveSample)) {
                 sistemaMap.set(chaveSample, {
                   item: {
@@ -618,7 +619,8 @@ export default function FaturamentoComparativo() {
         console.warn('Não foi possível enriquecer com amostras da volumetria:', e);
       }
       
-      // Criar mapa dos dados do arquivo agrupando por MODALIDADE + ESPECIALIDADE + CATEGORIA + PRIORIDADE + NOME_EXAME
+      // Criar mapa dos dados do arquivo agrupando por MODALIDADE + ESPECIALIDADE + PRIORIDADE + NOME_EXAME
+      // IMPORTANTE: Não incluir CATEGORIA na chave para permitir detectar divergências de categoria
       const arquivoMap = new Map<string, {
         modalidade: string;
         especialidade: string;
@@ -632,9 +634,9 @@ export default function FaturamentoComparativo() {
       }>();
       
       uploadedData.forEach((item) => {
-        // Incluir nome_exame na chave para comparar exame por exame
+        // Chave SEM categoria para comparar mesmo exame independente da categoria
         const nomeExameNorm = normalizar(item.nomeExame || '');
-        const chave = `${normalizar(item.modalidade)}|${normalizar(item.especialidade)}|${normalizar(item.categoria)}|${normalizar(item.prioridade)}|${nomeExameNorm}`;
+        const chave = `${normalizar(item.modalidade)}|${normalizar(item.especialidade)}|${normalizar(item.prioridade)}|${nomeExameNorm}`;
         
         if (!arquivoMap.has(chave)) {
           arquivoMap.set(chave, {
@@ -707,6 +709,13 @@ export default function FaturamentoComparativo() {
           if (Math.abs(valorArquivo - valorSistema) > 0.01) {
             divergencias.push(`Valor: Arquivo=R$ ${valorArquivo.toFixed(2)} vs Sistema=R$ ${valorSistema.toFixed(2)}`);
           }
+          
+          // Verificar divergência de categoria
+          const categoriaArquivo = normalizar(grupoArquivo.categoria);
+          const categoriaSistema = normalizar(normalizarCategoria(grupoSistema.categoria || ''));
+          if (categoriaArquivo !== categoriaSistema) {
+            divergencias.push(`Categoria: Arquivo=${grupoArquivo.categoria} vs Sistema=${normalizarCategoria(grupoSistema.categoria || '')}`);
+          }
 
           if (divergencias.length > 0) {
             diferencasEncontradas.push({
@@ -714,7 +723,7 @@ export default function FaturamentoComparativo() {
               chave,
               modalidade: grupoArquivo.modalidade,
               especialidade: grupoArquivo.especialidade,
-              categoria: grupoArquivo.categoria,
+              categoria: `${grupoArquivo.categoria} / ${normalizarCategoria(grupoSistema.categoria || '')}`,
               prioridade: grupoArquivo.prioridade,
               quantidadeArquivo: qtdArquivo,
               quantidadeSistema: qtdSistema,
