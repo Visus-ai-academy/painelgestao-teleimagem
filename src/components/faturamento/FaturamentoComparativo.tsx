@@ -589,29 +589,47 @@ export default function FaturamentoComparativo() {
       }>();
       
       (dadosSistema || []).forEach((item: any) => {
-        // Chave SEM categoria para comparar mesmo exame independente da categoria
-        const nomeExame = normalizarNomeExameChave(item.nome_exame || item.exame || '');
-        const chave = `${normalizarModalidade(item.modalidade || '')}|${normalizar(item.especialidade || '')}|${normalizarPrioridade(item.prioridade || '')}|${nomeExame}`;
-        
-        if (!sistemaMap.has(chave)) {
-          sistemaMap.set(chave, {
-            item,
-            exames: new Set(),
-            pacientes: new Set()
-          });
-        }
-        
-        const grupo = sistemaMap.get(chave)!;
-
-        
-        // Extrair exemplos de exames e pacientes se existirem nos detalhes
-        if (item.nome_exame) grupo.exames.add(item.nome_exame);
-        if (item.paciente) grupo.pacientes.add(item.paciente);
-        if (item.exames && Array.isArray(item.exames)) {
+        // Se o demonstrativo tiver quebra por exame dentro de "exames", expandimos para o nível de exame
+        if (Array.isArray(item.exames) && item.exames.length > 0) {
           item.exames.forEach((ex: any) => {
-            if (ex.nome) grupo.exames.add(ex.nome);
-            if (ex.paciente) grupo.pacientes.add(ex.paciente);
+            const nomeExameEx = ex?.nome || ex?.exame || item?.nome_exame || item?.exame || '';
+            const nomeExame = normalizarNomeExameChave(nomeExameEx);
+            const chave = `${normalizarModalidade(item.modalidade || ex?.modalidade || '')}|${normalizar(item.especialidade || ex?.especialidade || '')}|${normalizarPrioridade(item.prioridade || ex?.prioridade || '')}|${nomeExame}`;
+
+            if (!sistemaMap.has(chave)) {
+              sistemaMap.set(chave, {
+                item: {
+                  ...item,
+                  nome_exame: nomeExameEx,
+                  quantidade: Number(ex?.quantidade ?? ex?.qtd ?? ex?.laudos ?? 0),
+                  valor_total: Number(ex?.valor_total ?? ex?.valor ?? 0),
+                },
+                exames: new Set(),
+                pacientes: new Set(),
+              });
+            }
+
+            const grupo = sistemaMap.get(chave)!;
+            if (nomeExameEx) grupo.exames.add(String(nomeExameEx).trim());
+            const pac = ex?.paciente || ex?.nome_paciente || ex?.NOME_PACIENTE;
+            if (pac) grupo.pacientes.add(String(pac).trim());
           });
+        } else {
+          // Caso contrário, usa o nível do item
+          const nomeExame = normalizarNomeExameChave(item.nome_exame || item.exame || '');
+          const chave = `${normalizarModalidade(item.modalidade || '')}|${normalizar(item.especialidade || '')}|${normalizarPrioridade(item.prioridade || '')}|${nomeExame}`;
+          
+          if (!sistemaMap.has(chave)) {
+            sistemaMap.set(chave, {
+              item,
+              exames: new Set(),
+              pacientes: new Set()
+            });
+          }
+          
+          const grupo = sistemaMap.get(chave)!;
+          if (item.nome_exame) grupo.exames.add(item.nome_exame);
+          if (item.paciente) grupo.pacientes.add(item.paciente);
         }
       });
       
@@ -634,24 +652,12 @@ export default function FaturamentoComparativo() {
               const nomeExameSample = normalizarNomeExameChave(r.ESTUDO_DESCRICAO || '');
               // Chave SEM categoria
               const chaveSample = `${normalizarModalidade(r.MODALIDADE || '')}|${normalizar(r.ESPECIALIDADE || '')}|${normalizarPrioridade(r.PRIORIDADE || '')}|${nomeExameSample}`;
-              if (!sistemaMap.has(chaveSample)) {
-                sistemaMap.set(chaveSample, {
-                  item: {
-                    modalidade: r.MODALIDADE || '',
-                    especialidade: r.ESPECIALIDADE || '',
-                    categoria: normalizarCategoria(r.CATEGORIA || ''),
-                    prioridade: r.PRIORIDADE || '',
-                    nome_exame: r.ESTUDO_DESCRICAO || '',
-                    quantidade: 0,
-                    valor_total: 0
-                  },
-                  exames: new Set(),
-                  pacientes: new Set()
-                });
+              // Não criar grupos novos a partir da volumetria; apenas enriquecer grupos existentes
+              const grupo = sistemaMap.get(chaveSample);
+              if (grupo) {
+                if (r.ESTUDO_DESCRICAO) grupo.exames.add(String(r.ESTUDO_DESCRICAO).trim());
+                if (r.NOME_PACIENTE) grupo.pacientes.add(String(r.NOME_PACIENTE).trim());
               }
-              const grupo = sistemaMap.get(chaveSample)!;
-              if (r.ESTUDO_DESCRICAO) grupo.exames.add(String(r.ESTUDO_DESCRICAO).trim());
-              if (r.NOME_PACIENTE) grupo.pacientes.add(String(r.NOME_PACIENTE).trim());
             });
           }
         }
@@ -785,6 +791,7 @@ export default function FaturamentoComparativo() {
           // Pegar exemplos de pacientes do sistema (primeiros 3)
           const pacientesExemploSistema = Array.from(grupoSistemaData.pacientes).slice(0, 3).join(', ') || '(não disponível)';
           
+          const exameDisplay = grupoSistema.nome_exame || grupoSistema.exame || Array.from(grupoSistemaData.exames)[0] || (chave.split('|')[3] || '(não disponível)');
           diferencasEncontradas.push({
             tipo: 'sistema_apenas',
             chave,
@@ -794,7 +801,7 @@ export default function FaturamentoComparativo() {
             prioridade: grupoSistema.prioridade,
             quantidadeSistema: Number(grupoSistema.quantidade) || 0,
             valorSistema: Number(grupoSistema.valor_total) || 0,
-            exame: grupoSistema.nome_exame || grupoSistema.exame || '(não disponível)',
+            exame: exameDisplay,
             paciente: pacientesExemploSistema,
             detalhes: 'Exame existe apenas no sistema'
           });
