@@ -232,21 +232,37 @@ export default function FaturamentoComparativo() {
       const clienteNome = clientes.find(c => c.id === clienteSelecionado)?.nome || '';
       
       // Buscar dados do demonstrativo calculado (dados processados para faturamento)
+      // Obter também o nome_fantasia do cliente selecionado para alinhar com o que é salvo pela função
+      const { data: clienteInfo } = await supabase
+        .from('clientes')
+        .select('nome, nome_fantasia')
+        .eq('id', clienteSelecionado)
+        .maybeSingle();
+
+      const nomesCandidatos = Array.from(
+        new Set([
+          clienteNome,
+          clienteInfo?.nome_fantasia || undefined,
+        ].filter(Boolean) as string[])
+      );
+      
       // 1) Tenta por cliente_id (mais confiável)
       let { data: demonstrativo, error: demoError } = await supabase
         .from('demonstrativos_faturamento_calculados')
-        .select('detalhes_exames')
+        .select('detalhes_exames, cliente_nome, cliente_id, updated_at')
         .eq('cliente_id', clienteSelecionado)
         .eq('periodo_referencia', periodoSelecionado)
         .maybeSingle();
 
-      // 2) Se não encontrou, tenta por cliente_nome (retrocompatibilidade)
-      if ((!demonstrativo || !demonstrativo.detalhes_exames) && !demoError) {
+      // 2) Se não encontrou, tenta por cliente_nome considerando nome e nome_fantasia
+      if ((!demonstrativo || !demonstrativo.detalhes_exames) && !demoError && nomesCandidatos.length > 0) {
         const alt = await supabase
           .from('demonstrativos_faturamento_calculados')
-          .select('detalhes_exames')
-          .eq('cliente_nome', clienteNome)
+          .select('detalhes_exames, cliente_nome, cliente_id, updated_at')
           .eq('periodo_referencia', periodoSelecionado)
+          .in('cliente_nome', nomesCandidatos)
+          .order('updated_at', { ascending: false })
+          .limit(1)
           .maybeSingle();
         demonstrativo = alt.data as any;
         demoError = alt.error as any;
