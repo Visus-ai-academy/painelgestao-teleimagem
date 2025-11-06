@@ -169,6 +169,12 @@ export default function FaturamentoComparativo() {
       .trim();
   };
 
+  // Normalizar categoria: tratar vazio ou "X" como "SC"
+  const normalizarCategoria = (val?: string | null): string => {
+    const v = String(val ?? '').trim().toUpperCase();
+    return !v || v === 'X' ? 'SC' : v;
+  };
+
   // Parse de data do Excel (pode vir como número serial do Excel)
   const parseDataExcel = (val: any): string => {
     if (!val) return '';
@@ -544,7 +550,7 @@ export default function FaturamentoComparativo() {
       }>();
       
       (dadosSistema || []).forEach((item: any) => {
-        const chave = `${normalizar(item.modalidade || '')}|${normalizar(item.especialidade || '')}|${normalizar(item.categoria || '')}|${normalizar(item.prioridade || '')}`;
+        const chave = `${normalizar(item.modalidade || '')}|${normalizar(item.especialidade || '')}|${normalizar(normalizarCategoria(item.categoria || ''))}|${normalizar(item.prioridade || '')}`;
         
         if (!sistemaMap.has(chave)) {
           sistemaMap.set(chave, {
@@ -566,7 +572,48 @@ export default function FaturamentoComparativo() {
           });
         }
       });
-
+      
+      // Enriquecer com amostras da volumetria para nomes de paciente/exame
+      try {
+        const patterns = Array.from(new Set(nomesCandidatos?.map(n => `%${n}%`) || []));
+        if (patterns.length > 0) {
+          const { data: volSamples, error: volSamplesError } = await supabase
+            .from('volumetria_mobilemed')
+            .select('EMPRESA, MODALIDADE, ESPECIALIDADE, CATEGORIA, PRIORIDADE, ESTUDO_DESCRICAO, NOME_PACIENTE, cliente_nome_fantasia')
+            .eq('periodo_referencia', periodoSelecionado)
+            .or([
+              ...patterns.map(p => `EMPRESA.ilike.${p}`),
+              ...patterns.map(p => `cliente_nome_fantasia.ilike.${p}`)
+            ].join(','))
+            .limit(1000);
+          
+          if (!volSamplesError && Array.isArray(volSamples)) {
+            volSamples.forEach((r: any) => {
+              const chaveSample = `${normalizar(r.MODALIDADE || '')}|${normalizar(r.ESPECIALIDADE || '')}|${normalizar(normalizarCategoria(r.CATEGORIA || ''))}|${normalizar(r.PRIORIDADE || '')}`;
+              if (!sistemaMap.has(chaveSample)) {
+                sistemaMap.set(chaveSample, {
+                  item: {
+                    modalidade: r.MODALIDADE || '',
+                    especialidade: r.ESPECIALIDADE || '',
+                    categoria: normalizarCategoria(r.CATEGORIA || ''),
+                    prioridade: r.PRIORIDADE || '',
+                    quantidade: 0,
+                    valor_total: 0
+                  },
+                  exames: new Set(),
+                  pacientes: new Set()
+                });
+              }
+              const grupo = sistemaMap.get(chaveSample)!;
+              if (r.ESTUDO_DESCRICAO) grupo.exames.add(String(r.ESTUDO_DESCRICAO).trim());
+              if (r.NOME_PACIENTE) grupo.pacientes.add(String(r.NOME_PACIENTE).trim());
+            });
+          }
+        }
+      } catch (e) {
+        console.warn('Não foi possível enriquecer com amostras da volumetria:', e);
+      }
+      
       // Criar mapa dos dados do arquivo agrupando por MODALIDADE + ESPECIALIDADE + CATEGORIA + PRIORIDADE
       const arquivoMap = new Map<string, {
         modalidade: string;
@@ -688,7 +735,7 @@ export default function FaturamentoComparativo() {
             chave,
             modalidade: grupoSistema.modalidade,
             especialidade: grupoSistema.especialidade,
-            categoria: grupoSistema.categoria,
+            categoria: normalizarCategoria(grupoSistema.categoria || ''),
             prioridade: grupoSistema.prioridade,
             quantidadeSistema: Number(grupoSistema.quantidade) || 0,
             valorSistema: Number(grupoSistema.valor_total) || 0,
@@ -950,8 +997,8 @@ export default function FaturamentoComparativo() {
                     <th className="text-left p-2 font-medium">Especialidade</th>
                     <th className="text-left p-2 font-medium">Categoria</th>
                     <th className="text-left p-2 font-medium">Prioridade</th>
-                    <th className="text-left p-2 font-medium">Pacientes</th>
-                    <th className="text-left p-2 font-medium">Exames</th>
+                    <th className="text-left p-2 font-medium">Pacientes (exemplos)</th>
+                    <th className="text-left p-2 font-medium">Exames (exemplos)</th>
                     <th className="text-left p-2 font-medium">Qtd Arq/Sis</th>
                     <th className="text-left p-2 font-medium">Valor Arq/Sis</th>
                     <th className="text-left p-2 font-medium">Divergências</th>
