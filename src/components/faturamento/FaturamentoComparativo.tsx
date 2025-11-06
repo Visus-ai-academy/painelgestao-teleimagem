@@ -57,49 +57,92 @@ export default function FaturamentoComparativo() {
         // Buscar clientes
         const { data: clientesData, error: clientesError } = await supabase
           .from('clientes')
-          .select('id, nome')
+          .select('id, nome, nome_fantasia')
           .eq('ativo', true)
           .order('nome');
 
         if (clientesError) throw clientesError;
-        setClientes(clientesData || []);
+        setClientes((clientesData || []).map(c => ({ id: c.id, nome: c.nome })));
 
-        // Buscar períodos únicos unificando faturamento e demonstrativos (normalizados para YYYY-MM)
+        // Exigir cliente selecionado para carregar períodos (evita listar meses de outros clientes)
+        if (!clienteSelecionado) {
+          setPeriodos([]);
+          return;
+        }
+
+        // Info do cliente selecionado
+        const clienteInfo = (clientesData || []).find(c => c.id === clienteSelecionado);
+        const nomesCandidatos = Array.from(new Set([
+          clienteInfo?.nome,
+          clienteInfo?.nome_fantasia,
+        ].filter(Boolean) as string[]));
+
+        // Normalizador de período (YYYY-MM)
         const normalizePeriodo = (p?: string | null) => {
           if (!p) return null;
-          const s = String(p);
-          // Accept YYYY-MM, YYYY-M, YYYYMM, YYYY-MM-DD, YYYY-M-D
-          let m = s.match(/^(\d{4})[-\/]?(\d{1,2})/);
-          if (!m) m = s.match(/^(\d{4})(\d{2})/);
+          const s = String(p).trim();
+          // Tenta YYYY-MM ou YYYY-MM-DD primeiro
+          let m = s.match(/^(\d{4})-(\d{1,2})(?:-|$)/);
+          if (!m) m = s.match(/^(\d{4})(\d{2})/); // YYYYMM
+          if (!m) m = s.match(/^(\d{4})[\/](\d{1,2})/); // YYYY/M ou YYYY\/MM
           if (m) {
-            const mm = (m[2] as string).padStart ? (m[2] as string).padStart(2, '0') : String(m[2]).padStart(2, '0');
+            const mm = String(m[2]).padStart(2, '0');
             return `${m[1]}-${mm}`;
           }
           return null;
         };
 
-        const [fatRes, demoRes] = await Promise.all([
-          supabase.from('faturamento').select('periodo_referencia, cliente_id, cliente_nome'),
-          supabase.from('demonstrativos_faturamento_calculados').select('periodo_referencia, cliente_id, cliente_nome'),
-        ]);
+        // Consultas filtradas por cliente selecionado
+        const queries = [
+          supabase
+            .from('faturamento')
+            .select('periodo_referencia')
+            .eq('cliente_id', clienteSelecionado),
+          supabase
+            .from('demonstrativos_faturamento_calculados')
+            .select('periodo_referencia, cliente_nome')
+            .or([
+              `cliente_id.eq.${clienteSelecionado}`,
+              nomesCandidatos.length > 0 ? `cliente_nome.in.(${nomesCandidatos.map(n => `\"${n.replace(/\"/g, '\\\"')}\"`).join(',')})` : ''
+            ].filter(Boolean).join(',')),
+        ] as const;
 
-        if (fatRes.error) console.error('Erro períodos faturamento:', fatRes.error);
-        if (demoRes.error) console.error('Erro períodos demonstrativos:', demoRes.error);
+        // Fallback: períodos da volumetria para este cliente (apenas como sugestão de meses)
+        let volRes: any = null;
+        if (nomesCandidatos.length > 0) {
+          const patterns = nomesCandidatos.map(n => `%${n}%`);
+          volRes = await supabase
+            .from('volumetria_mobilemed')
+            .select('periodo_referencia, EMPRESA, cliente_nome_fantasia')
+            .or([
+              ...patterns.map(p => `EMPRESA.ilike.${p}`),
+              ...patterns.map(p => `cliente_nome_fantasia.ilike.${p}`)
+            ].join(','));
+        }
 
-        const fatPeriods = (fatRes.data as any[] | null)?.
-          filter(r => !clienteSelecionado || r.cliente_id === clienteSelecionado).
-          map(r => normalizePeriodo(r.periodo_referencia)).
+        const [fatRes, demoRes] = await Promise.all(queries as unknown as Promise<any>[]);
+
+        if (fatRes?.error) console.error('Erro períodos faturamento:', fatRes.error);
+        if (demoRes?.error) console.error('Erro períodos demonstrativos:', demoRes.error);
+        if (volRes?.error) console.warn('Erro períodos volumetria (fallback):', volRes.error);
+
+        const fatPeriods = (fatRes?.data as any[] | null)?.
+          map(r => normalizePeriodo(r.periodo_referencia))?.
           filter(Boolean) as string[] || [];
 
-        const demoPeriods = (demoRes.data as any[] | null)?.
-          filter(r => !clienteSelecionado || r.cliente_id === clienteSelecionado).
-          map(r => normalizePeriodo(r.periodo_referencia)).
+        const demoPeriods = (demoRes?.data as any[] | null)?.
+          map(r => normalizePeriodo(r.periodo_referencia))?.
           filter(Boolean) as string[] || [];
 
-        const unicos = Array.from(new Set([...fatPeriods, ...demoPeriods])).
+        const volPeriods = (volRes?.data as any[] | null)?.
+          map(r => normalizePeriodo(r.periodo_referencia))?.
+          filter(Boolean) as string[] || [];
+
+        // Unificar, remover duplicatas e ordenar desc
+        const unicos = Array.from(new Set([ ...fatPeriods, ...demoPeriods, ...volPeriods ])).
           sort((a, b) => b.localeCompare(a));
 
-        console.log('Períodos encontrados (normalizados):', unicos);
+        console.log('Períodos encontrados (cliente, normalizados):', unicos);
         setPeriodos(unicos);
 
       } catch (error: any) {
