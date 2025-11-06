@@ -64,21 +64,43 @@ export default function FaturamentoComparativo() {
         if (clientesError) throw clientesError;
         setClientes(clientesData || []);
 
-        // Buscar períodos únicos da tabela de demonstrativos calculados
-        const { data: periodosData, error: periodosError } = await supabase
-          .from('demonstrativos_faturamento_calculados')
-          .select('periodo_referencia');
+        // Buscar períodos únicos unificando faturamento e demonstrativos (normalizados para YYYY-MM)
+        const normalizePeriodo = (p?: string | null) => {
+          if (!p) return null;
+          const s = String(p);
+          // Accept YYYY-MM, YYYY-M, YYYYMM, YYYY-MM-DD, YYYY-M-D
+          let m = s.match(/^(\d{4})[-\/]?(\d{1,2})/);
+          if (!m) m = s.match(/^(\d{4})(\d{2})/);
+          if (m) {
+            const mm = (m[2] as string).padStart ? (m[2] as string).padStart(2, '0') : String(m[2]).padStart(2, '0');
+            return `${m[1]}-${mm}`;
+          }
+          return null;
+        };
 
-        if (periodosError) {
-          console.error('Erro ao buscar períodos:', periodosError);
-        }
-        
-        const periodosUnicos = Array.from(
-          new Set(periodosData?.map(p => p.periodo_referencia).filter(Boolean) || [])
-        ).sort((a, b) => b.localeCompare(a)); // Ordenar descendente
-        
-        console.log('Períodos encontrados:', periodosUnicos);
-        setPeriodos(periodosUnicos);
+        const [fatRes, demoRes] = await Promise.all([
+          supabase.from('faturamento').select('periodo_referencia, cliente_id, cliente_nome'),
+          supabase.from('demonstrativos_faturamento_calculados').select('periodo_referencia, cliente_id, cliente_nome'),
+        ]);
+
+        if (fatRes.error) console.error('Erro períodos faturamento:', fatRes.error);
+        if (demoRes.error) console.error('Erro períodos demonstrativos:', demoRes.error);
+
+        const fatPeriods = (fatRes.data as any[] | null)?.
+          filter(r => !clienteSelecionado || r.cliente_id === clienteSelecionado).
+          map(r => normalizePeriodo(r.periodo_referencia)).
+          filter(Boolean) as string[] || [];
+
+        const demoPeriods = (demoRes.data as any[] | null)?.
+          filter(r => !clienteSelecionado || r.cliente_id === clienteSelecionado).
+          map(r => normalizePeriodo(r.periodo_referencia)).
+          filter(Boolean) as string[] || [];
+
+        const unicos = Array.from(new Set([...fatPeriods, ...demoPeriods])).
+          sort((a, b) => b.localeCompare(a));
+
+        console.log('Períodos encontrados (normalizados):', unicos);
+        setPeriodos(unicos);
 
       } catch (error: any) {
         console.error('Erro ao carregar dados:', error);
@@ -93,7 +115,7 @@ export default function FaturamentoComparativo() {
     };
 
     carregarDados();
-  }, [toast]);
+  }, [toast, clienteSelecionado]);
 
   // Normalizar string para comparação
   const normalizar = (str: string): string => {
