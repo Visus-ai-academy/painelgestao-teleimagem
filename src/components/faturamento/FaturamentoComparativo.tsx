@@ -184,6 +184,14 @@ export default function FaturamentoComparativo() {
     return m;
   };
 
+  // Normalizar prioridade (mapeia sinônimos: URGÊNCIA->URGENTE, URG->URGENTE, etc.)
+  const normalizarPrioridade = (val?: string | null): string => {
+    const p = normalizar(String(val ?? ''));
+    if (p === 'URGENCIA' || p === 'URG' || p === 'URGENTE') return 'URGENTE';
+    if (p === 'ROTINA' || p === 'ELETIVA' || p === 'ELETIVO') return 'ROTINA';
+    return p;
+  };
+
   // Remover tags de categoria no início do nome do exame, ex.: "(ONCO) RM ABDOME" => "RM ABDOME"
   const limparTagsCategoriaDoNomeExame = (nome: string): string => {
     let s = String(nome || '').trim();
@@ -583,7 +591,7 @@ export default function FaturamentoComparativo() {
       (dadosSistema || []).forEach((item: any) => {
         // Chave SEM categoria para comparar mesmo exame independente da categoria
         const nomeExame = normalizarNomeExameChave(item.nome_exame || item.exame || '');
-        const chave = `${normalizarModalidade(item.modalidade || '')}|${normalizar(item.especialidade || '')}|${normalizar(item.prioridade || '')}|${nomeExame}`;
+        const chave = `${normalizarModalidade(item.modalidade || '')}|${normalizar(item.especialidade || '')}|${normalizarPrioridade(item.prioridade || '')}|${nomeExame}`;
         
         if (!sistemaMap.has(chave)) {
           sistemaMap.set(chave, {
@@ -623,9 +631,9 @@ export default function FaturamentoComparativo() {
           
           if (!volSamplesError && Array.isArray(volSamples)) {
             volSamples.forEach((r: any) => {
-              const nomeExameSample = normalizar(r.ESTUDO_DESCRICAO || '');
+              const nomeExameSample = normalizarNomeExameChave(r.ESTUDO_DESCRICAO || '');
               // Chave SEM categoria
-              const chaveSample = `${normalizar(r.MODALIDADE || '')}|${normalizar(r.ESPECIALIDADE || '')}|${normalizar(r.PRIORIDADE || '')}|${nomeExameSample}`;
+              const chaveSample = `${normalizarModalidade(r.MODALIDADE || '')}|${normalizar(r.ESPECIALIDADE || '')}|${normalizarPrioridade(r.PRIORIDADE || '')}|${nomeExameSample}`;
               if (!sistemaMap.has(chaveSample)) {
                 sistemaMap.set(chaveSample, {
                   item: {
@@ -667,8 +675,8 @@ export default function FaturamentoComparativo() {
       
       uploadedData.forEach((item) => {
         // Chave SEM categoria para comparar mesmo exame independente da categoria
-        const nomeExameNorm = normalizar(item.nomeExame || '');
-        const chave = `${normalizar(item.modalidade)}|${normalizar(item.especialidade)}|${normalizar(item.prioridade)}|${nomeExameNorm}`;
+        const nomeExameNorm = normalizarNomeExameChave(item.nomeExame || '');
+        const chave = `${normalizarModalidade(item.modalidade)}|${normalizar(item.especialidade)}|${normalizarPrioridade(item.prioridade)}|${nomeExameNorm}`;
         
         if (!arquivoMap.has(chave)) {
           arquivoMap.set(chave, {
@@ -1081,11 +1089,11 @@ export default function FaturamentoComparativo() {
                           {diff.paciente || '-'}
                         </td>
                         <td className={`p-2 ${temQuantidadeDif ? 'bg-red-50 font-medium' : ''}`}>
-                          {diff.quantidadeArquivo || '-'} / {diff.quantidadeSistema || '-'}
+                          {diff.quantidadeArquivo !== undefined ? diff.quantidadeArquivo : '-'} / {diff.quantidadeSistema !== undefined ? diff.quantidadeSistema : '-'}
                         </td>
                         <td className={`p-2 ${temValorDif ? 'bg-red-50 font-medium' : ''}`}>
-                          {diff.valorArquivo ? `R$ ${diff.valorArquivo.toFixed(2)}` : '-'} / 
-                          {diff.valorSistema ? ` R$ ${diff.valorSistema.toFixed(2)}` : '-'}
+                          {diff.valorArquivo !== undefined ? `R$ ${diff.valorArquivo.toFixed(2)}` : '-'} / 
+                          {diff.valorSistema !== undefined ? `R$ ${diff.valorSistema.toFixed(2)}` : '-'}
                         </td>
                         <td className="p-2">
                           <div className="flex flex-wrap gap-1">
