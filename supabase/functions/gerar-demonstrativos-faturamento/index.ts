@@ -162,7 +162,7 @@ serve(async (req) => {
       console.log(`📊 ${cliente.nome_fantasia}: ${volumetria.length} registros, ${examesTotaisAntesFiltros} exames (antes filtros)`);
 
       // Pattern-based search for grouped clients (PRN, AKCPALMAS, etc.)
-      const nomeFantasia = cliente.nome_fantasia || cliente.nome;
+      // nomeFantasia já foi declarado acima (linha 107)
       let padroesBusca: string[] = [];
       
       if (nomeFantasia === 'PRN') {
