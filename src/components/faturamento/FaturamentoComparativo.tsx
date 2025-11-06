@@ -254,7 +254,7 @@ export default function FaturamentoComparativo() {
         .eq('periodo_referencia', periodoSelecionado)
         .maybeSingle();
 
-      // 2) Se não encontrou, tenta por cliente_nome considerando nome e nome_fantasia
+      // 2) Se não encontrou, tenta por cliente_nome considerando nome e nome_fantasia (igualdade exata)
       if ((!demonstrativo || !demonstrativo.detalhes_exames) && !demoError && nomesCandidatos.length > 0) {
         const alt = await supabase
           .from('demonstrativos_faturamento_calculados')
@@ -266,6 +266,54 @@ export default function FaturamentoComparativo() {
           .maybeSingle();
         demonstrativo = alt.data as any;
         demoError = alt.error as any;
+      }
+
+      // 2.1) Se ainda não encontrou: busca parcial por nome com ILIKE no mesmo período
+      if ((!demonstrativo || !demonstrativo.detalhes_exames) && !demoError) {
+        const patterns = Array.from(new Set([
+          `%${clienteNome}%`,
+          ...(clienteInfo?.nome_fantasia ? [`%${clienteInfo.nome_fantasia}%`] : []),
+        ]));
+
+        for (const p of patterns) {
+          const alt2 = await supabase
+            .from('demonstrativos_faturamento_calculados')
+            .select('detalhes_exames, cliente_nome, cliente_id, updated_at')
+            .eq('periodo_referencia', periodoSelecionado)
+            .ilike('cliente_nome', p)
+            .order('updated_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (alt2.data?.detalhes_exames) {
+            demonstrativo = alt2.data as any;
+            demoError = alt2.error as any;
+            break;
+          }
+        }
+      }
+
+      // 2.2) Última tentativa: período flexível (ex.: 2025-09-01) + ILIKE no nome
+      if ((!demonstrativo || !demonstrativo.detalhes_exames) && !demoError) {
+        const patterns = Array.from(new Set([
+          `%${clienteNome}%`,
+          ...(clienteInfo?.nome_fantasia ? [`%${clienteInfo.nome_fantasia}%`] : []),
+        ]));
+
+        for (const p of patterns) {
+          const alt3 = await supabase
+            .from('demonstrativos_faturamento_calculados')
+            .select('detalhes_exames, cliente_nome, cliente_id, updated_at')
+            .ilike('periodo_referencia', `${periodoSelecionado}%`)
+            .ilike('cliente_nome', p)
+            .order('updated_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (alt3.data?.detalhes_exames) {
+            demonstrativo = alt3.data as any;
+            demoError = alt3.error as any;
+            break;
+          }
+        }
       }
 
       // 3) Se ainda não existir, gera o demonstrativo on-demand via Edge Function e salva no banco
@@ -307,7 +355,12 @@ export default function FaturamentoComparativo() {
             .select('id', { count: 'exact', head: true })
             .eq('periodo_referencia', periodoSelecionado)
             .in('Cliente_Nome_Fantasia', nomesCandidatos);
-          totalVol = (volCount1 || 0) + (volCount2 || 0);
+          const { count: volCount3 } = await supabase
+            .from('volumetria_mobilemed')
+            .select('id', { count: 'exact', head: true })
+            .eq('periodo_referencia', periodoSelecionado)
+            .in('EMPRESA', nomesCandidatos);
+          totalVol = (volCount1 || 0) + (volCount2 || 0) + (volCount3 || 0);
         } catch (e) {
           // ignora contagem se der erro
         }
