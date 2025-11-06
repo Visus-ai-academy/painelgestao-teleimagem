@@ -426,15 +426,30 @@ export default function FaturamentoComparativo() {
           throw genError;
         }
 
-        // Reconsulta após geração
-        const recheck = await supabase
+        // Reconsulta após geração (período flexível)
+        let recheck = await supabase
           .from('demonstrativos_faturamento_calculados')
-          .select('detalhes_exames')
+          .select('detalhes_exames, cliente_nome, cliente_id, updated_at, periodo_referencia')
           .eq('cliente_id', clienteSelecionado)
-          .eq('periodo_referencia', periodoSelecionado)
+          .ilike('periodo_referencia', `${periodoSelecionado}%`)
+          .order('updated_at', { ascending: false })
+          .limit(1)
           .maybeSingle();
         demonstrativo = recheck.data as any;
         demoError = recheck.error as any;
+
+        if ((!demonstrativo || !demonstrativo.detalhes_exames) && !demoError && nomesCandidatos.length > 0) {
+          const recheckByName = await supabase
+            .from('demonstrativos_faturamento_calculados')
+            .select('detalhes_exames, cliente_nome, cliente_id, updated_at, periodo_referencia')
+            .ilike('periodo_referencia', `${periodoSelecionado}%`)
+            .in('cliente_nome', nomesCandidatos)
+            .order('updated_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          demonstrativo = recheckByName.data as any;
+          demoError = recheckByName.error as any;
+        }
       }
 
       if (demoError && (demoError as any).code !== 'PGRST116') {
@@ -448,13 +463,13 @@ export default function FaturamentoComparativo() {
           const { count: fatCountById } = await supabase
             .from('faturamento')
             .select('id', { count: 'exact', head: true })
-            .eq('periodo_referencia', periodoSelecionado)
+            .ilike('periodo_referencia', `${periodoSelecionado}%`)
             .eq('cliente_id', clienteSelecionado);
 
           const { count: fatCountByNome } = await supabase
             .from('faturamento')
             .select('id', { count: 'exact', head: true })
-            .eq('periodo_referencia', periodoSelecionado)
+            .ilike('periodo_referencia', `${periodoSelecionado}%`)
             .in('cliente_nome', nomesCandidatos);
 
           totalFat = (fatCountById || 0) + (fatCountByNome || 0);
