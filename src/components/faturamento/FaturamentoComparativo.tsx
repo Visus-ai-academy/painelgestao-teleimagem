@@ -635,57 +635,48 @@ rows.push({
       }>();
 
       try {
-        // Montar mapa do SISTEMA a partir da tabela de faturamento (por PACIENTE)
-        const inicioMes = `${periodoSelecionado}-01`;
-        const prox = new Date(`${periodoSelecionado}-01T00:00:00`);
-        prox.setMonth(prox.getMonth() + 1);
-        const fimMes = prox.toISOString().slice(0, 10);
-
-        const orFiltro = [
-          `cliente_id.eq.${clienteSelecionado}`,
-          ...(nomesCandidatos?.length ? [`cliente_nome.in.(${nomesCandidatos.map(n => `"${n.replace(/\"/g, '\\\"')}"`).join(',')})`] : [])
-        ].join(',');
-
-        const { data: fatRows, error: fatError } = await supabase
-          .from('faturamento')
-          .select('paciente, nome_exame, modalidade, especialidade, categoria, prioridade, quantidade, valor, cliente_id, cliente_nome, data_exame')
-          .gte('data_exame', inicioMes)
-          .lt('data_exame', fimMes)
-          .or(orFiltro)
-          .limit(20000);
-
-        if (!fatError && Array.isArray(fatRows)) {
-          fatRows.forEach((r: any) => {
-            const nomePac = normalizar(String(r.paciente || ''));
-            if (!nomePac) return;
-            if (!sistemaPacMap.has(nomePac)) {
-              sistemaPacMap.set(nomePac, {
-                nome: nomePac,
-                laudos: 0,
-                valor: 0,
-                exames: new Set<string>(),
-                modalidades: new Set<string>(),
-                especialidades: new Set<string>(),
-                categorias: new Set<string>(),
-                prioridades: new Set<string>(),
-                displayName: String(r.paciente || '').trim(),
-              });
-            }
-            const grp = sistemaPacMap.get(nomePac)!;
-            grp.laudos += Number(r.quantidade) || 0;
-            const v = parseValor((r as any).valor);
-            grp.valor += Number.isFinite(v) ? v : 0;
-            if (r.nome_exame) grp.exames.add(String(r.nome_exame).trim());
-            if (r.modalidade) grp.modalidades.add(String(r.modalidade).trim());
-            if (r.especialidade) grp.especialidades.add(String(r.especialidade).trim());
-            grp.categorias.add(normalizarCategoria(r.categoria));
-            if (r.prioridade) grp.prioridades.add(String(r.prioridade).trim());
-          });
-        } else if (fatError) {
-          console.warn('Erro ao buscar faturamento para o comparativo:', fatError);
-        }
+        // Montar mapa do SISTEMA a partir do demonstrativo calculado (por PACIENTE)
+        (dadosSistema || []).forEach((r: any) => {
+          const nomeRaw =
+            (r as any).paciente ??
+            (r as any).paciente_nome ??
+            (r as any).nome_paciente ??
+            (r as any).nomePaciente ??
+            (r as any).NOME_PACIENTE ??
+            '';
+          const nomePac = normalizar(String(nomeRaw || ''));
+          if (!nomePac) return;
+          if (!sistemaPacMap.has(nomePac)) {
+            sistemaPacMap.set(nomePac, {
+              nome: nomePac,
+              laudos: 0,
+              valor: 0,
+              exames: new Set<string>(),
+              modalidades: new Set<string>(),
+              especialidades: new Set<string>(),
+              categorias: new Set<string>(),
+              prioridades: new Set<string>(),
+              displayName: String(nomeRaw || '').trim(),
+            });
+          }
+          const grp = sistemaPacMap.get(nomePac)!;
+          const qtd = Number((r as any).quantidade ?? (r as any).qtd ?? (r as any).laudos ?? 1) || 0;
+          grp.laudos += qtd;
+          const val = parseValor(((r as any).valor_total ?? (r as any).valor ?? (r as any).valor_exames ?? (r as any).valor_exame ?? (r as any).valor_liquido) as any);
+          grp.valor += Number.isFinite(val) ? val : 0;
+          const nomeEx = (r as any).nome_exame ?? (r as any).exame ?? (r as any).nomeExame ?? (r as any).ESTUDO_DESCRICAO;
+          if (nomeEx) grp.exames.add(String(nomeEx).trim());
+          const mod = (r as any).modalidade ?? (r as any).MODALIDADE;
+          if (mod) grp.modalidades.add(String(mod).trim());
+          const esp = (r as any).especialidade ?? (r as any).ESPECIALIDADE;
+          if (esp) grp.especialidades.add(String(esp).trim());
+          const cat = (r as any).categoria ?? (r as any).CATEGORIA;
+          grp.categorias.add(normalizarCategoria(cat));
+          const pri = (r as any).prioridade ?? (r as any).PRIORIDADE;
+          if (pri) grp.prioridades.add(String(pri).trim());
+        });
       } catch (e) {
-        console.warn('Não foi possível montar mapa por paciente do sistema (faturamento):', e);
+        console.warn('Não foi possível montar mapa por paciente do sistema (demonstrativo):', e);
       }
 
       // 3) Comparar por PACIENTE
