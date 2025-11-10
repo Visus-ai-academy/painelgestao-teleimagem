@@ -237,7 +237,7 @@ export default function ContratosClientes() {
       setEditAcrescimo(contratoEditando.acrescimoPercentual || 0);
       setEditFranqValor(contratoEditando.valorFranquia || 0);
       setEditIntegraValor(contratoEditando.valorIntegracao || 0);
-      setEditPortalValor(contratoEditando.configuracoesFranquia?.valor_franquia || 0);
+      setEditPortalValor((contratoEditando as any).configuracoesIntegracao?.valor_portal_laudos || 0);
       setEditSimples(contratoEditando.simples || false);
       setEditPercentualISS(contratoEditando.percentualISS || 0);
       setEditImpostosAbMin(contratoEditando.impostosAbMin || 0);
@@ -769,7 +769,7 @@ export default function ContratosClientes() {
           frequencia_continua: editFrequenciaContinua,
           frequencia_por_volume: frequenciaPorVolumeValue,
           valor_integracao: Number(editIntegraValor || 0),
-          portal_laudos: editPortalLaudos,
+          valor_portal_laudos: Number(editPortalValor || 0),
           simples: editSimples,
           percentual_iss: Number(editPercentualISS || 0),
           impostos_ab_min: Number(editImpostosAbMin || 0),
@@ -1265,21 +1265,14 @@ export default function ContratosClientes() {
                       ) : '-'}
                     </TableCell>
                     <TableCell>
-                      {contrato.cobrancaIntegracao ? (
-                        <div className="flex flex-col">
-                          <Badge variant="default" className="mb-1">Sim</Badge>
-                          <span className="text-xs">
-                            R$ {Number(contrato.valorIntegracao || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </span>
-                        </div>
-                      ) : (
-                        <Badge variant="secondary">Não</Badge>
-                      )}
+                      <span className="font-medium">
+                        R$ {Number(contrato.valorIntegracao ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={contrato.portalLaudos ? 'default' : 'secondary'}>
-                        {contrato.portalLaudos ? 'Sim' : 'Não'}
-                      </Badge>
+                      <span className="font-medium">
+                        R$ {Number((contrato as any).configuracoesIntegracao?.valor_portal_laudos ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
                     </TableCell>
                     <TableCell>
                       <span className={
@@ -1633,22 +1626,6 @@ export default function ContratosClientes() {
                         ) : (
                           <Badge variant={(contratoVisualizando || contratoEditando)?.aplicarFranquia ? 'default' : 'secondary'}>
                             {(contratoVisualizando || contratoEditando)?.aplicarFranquia ? 'Sim' : 'Não'}
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="grid gap-2">
-                        <Label>Portal de Laudos</Label>
-                        {showEditarContrato ? (
-                          <div className="flex items-center space-x-2 h-10">
-                            <Checkbox 
-                              checked={editPortalLaudos}
-                              onCheckedChange={(checked) => setEditPortalLaudos(!!checked)}
-                            />
-                            <span className="text-sm">{editPortalLaudos ? 'Sim - Cobra portal' : 'Não'}</span>
-                          </div>
-                        ) : (
-                          <Badge variant={(contratoVisualizando || contratoEditando)?.portalLaudos ? 'default' : 'secondary'}>
-                            {(contratoVisualizando || contratoEditando)?.portalLaudos ? 'Sim' : 'Não'}
                           </Badge>
                         )}
                       </div>
