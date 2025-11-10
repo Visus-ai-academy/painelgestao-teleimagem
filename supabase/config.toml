@@ -223,3 +223,6 @@ verify_jwt = false
 
 [functions.auditar-franquias-periodo]
 verify_jwt = true
+
+[functions.corrigir-especialidades-do]
+verify_jwt = true
