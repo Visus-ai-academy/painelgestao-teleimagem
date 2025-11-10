@@ -46,12 +46,14 @@ const COLUMN_MAPPING = {
   tipoDesconto: ['Tipo Desconto / Acréscimo', 'TIPO DESCONTO / ACRÉSCIMO'],
   descontoAcrescimo: ['Desconto / Acréscimo', 'DESCONTO / ACRÉSCIMO'],
   
-  // Integração
+  // Integração (separar boolean de valor)
   integracao: ['Integração', 'INTEGRAÇÃO'],
+  valorIntegracao: ['Valor Integração', 'VALOR INTEGRAÇÃO', 'valor_integracao'],
   dataInicioIntegracao: ['Data Início Integração', 'DATA INÍCIO INTEGRAÇÃO'],
   
-  // Portal
+  // Portal (separar boolean de valor)
   portalLaudos: ['Portal de Laudos', 'PORTAL DE LAUDOS'],
+  valorPortalLaudos: ['Valor Portal Laudos', 'VALOR PORTAL LAUDOS', 'valor_portal_laudos'],
   
   // Franquia
   possuiFranquia: ['Possui Franquia', 'POSSUI FRANQUIA'],
@@ -386,20 +388,28 @@ serve(async (req) => {
             return valor ? Number(valor) : 0;
           })(),
           
-          // Integração
-          valor_integracao: (() => {
-            const valor = findColumnValue(row, COLUMN_MAPPING.integracao);
-            return valor ? Number(valor) : 0;
-          })(),
+          // Integração - separar boolean de valor
           cobrar_integracao: (() => {
             const valor = findColumnValue(row, COLUMN_MAPPING.integracao);
-            return valor ? Number(valor) > 0 : false;
+            if (!valor) return false;
+            const valorStr = valor.toString().trim().toLowerCase();
+            return valorStr === 'sim' || valorStr === 's';
+          })(),
+          valor_integracao: (() => {
+            const valor = findColumnValue(row, COLUMN_MAPPING.valorIntegracao);
+            return valor ? Number(valor) : 0;
           })(),
           
-          // Portal de Laudos
+          // Portal de Laudos - separar boolean de valor
           portal_laudos: (() => {
             const valor = findColumnValue(row, COLUMN_MAPPING.portalLaudos);
-            return valor ? Number(valor) > 0 : false;
+            if (!valor) return false;
+            const valorStr = valor.toString().trim().toLowerCase();
+            return valorStr === 'sim' || valorStr === 's';
+          })(),
+          valor_portal_laudos: (() => {
+            const valor = findColumnValue(row, COLUMN_MAPPING.valorPortalLaudos);
+            return valor ? Number(valor) : 0;
           })(),
           
           // Franquia - todos os campos necessários
