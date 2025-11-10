@@ -393,12 +393,6 @@ serve(async (req) => {
             const valorNum = Number(valor);
             return isNaN(valorNum) ? 0 : valorNum;
           })(),
-          cobrar_integracao: (() => {
-            const valor = findColumnValue(row, COLUMN_MAPPING.valorIntegracao);
-            if (!valor) return false;
-            const valorNum = Number(valor);
-            return !isNaN(valorNum) && valorNum > 0;
-          })(),
           
           // Portal de Laudos - apenas valor monetário (se vazio = 0)
           valor_portal_laudos: (() => {
@@ -406,12 +400,6 @@ serve(async (req) => {
             if (!valor) return 0;
             const valorNum = Number(valor);
             return isNaN(valorNum) ? 0 : valorNum;
-          })(),
-          portal_laudos: (() => {
-            const valor = findColumnValue(row, COLUMN_MAPPING.valorPortalLaudos);
-            if (!valor) return false;
-            const valorNum = Number(valor);
-            return !isNaN(valorNum) && valorNum > 0;
           })(),
           
           // Franquia - todos os campos necessários
