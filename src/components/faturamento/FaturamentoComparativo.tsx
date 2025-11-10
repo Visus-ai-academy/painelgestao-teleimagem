@@ -636,21 +636,97 @@ rows.push({
 
       try {
         // Montar mapa do SISTEMA a partir da tabela de faturamento (por PACIENTE)
-        const orFiltro = [
-          `cliente_id.eq.${clienteSelecionado}`,
-          ...(nomesCandidatos?.length ? [`cliente_nome.in.(${nomesCandidatos.map(n => `"${n.replace(/\"/g, '\\\"')}"`).join(',')})`] : [])
-        ].join(',');
+        // Buscamos por cliente_id e, como fallback, por cliente_nome (nome e nome_fantasia),
+        // e também lidamos com possíveis variações de período (YYYY-MM e mon/YY).
+        const selecionarCampos = 'paciente, nome_exame, modalidade, especialidade, categoria, prioridade, quantidade, valor';
 
-        const { data: fatRows, error: fatError } = await supabase
-          .from('faturamento')
-          .select('paciente, nome_exame, modalidade, especialidade, categoria, prioridade, quantidade, valor')
-          .ilike('periodo_referencia', `${periodoSelecionado}%`)
-          .or(orFiltro)
-          .limit(50000);
+        // Converter YYYY-MM para mon/YY (ex.: 2025-09 -> set/25)
+        const toMonYY = (yyyyMM: string) => {
+          const [y, m] = yyyyMM.split('-');
+          const meses = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+          const mon = meses[Math.max(0, Math.min(11, Number(m) - 1))];
+          return `${mon}/${y.slice(2)}`;
+        };
+        const periodoMonYY = toMonYY(periodoSelecionado);
 
-        if (fatError) {
-          console.warn('Erro ao buscar faturamento para o comparativo:', fatError);
+        const fatRows: any[] = [];
+
+        // 1) Consultas principais (cliente_id e cliente_nome) com período YYYY-MM
+        const consultas: Promise<any>[] = [
+          (supabase
+            .from('faturamento')
+            .select(selecionarCampos)
+            .eq('periodo_referencia', periodoSelecionado)
+            .eq('cliente_id', clienteSelecionado)
+            .limit(50000)) as any as Promise<any>,
+        ];
+        if (nomesCandidatos?.length) {
+          consultas.push(
+            (supabase
+              .from('faturamento')
+              .select(selecionarCampos)
+              .eq('periodo_referencia', periodoSelecionado)
+              .in('cliente_nome', nomesCandidatos)
+              .limit(50000)) as any as Promise<any>
+          );
         }
+
+        // 2) Fallback mon/YY
+        consultas.push(
+          (supabase
+            .from('faturamento')
+            .select(selecionarCampos)
+            .eq('periodo_referencia', periodoMonYY)
+            .eq('cliente_id', clienteSelecionado)
+            .limit(50000)) as any as Promise<any>
+        );
+        if (nomesCandidatos?.length) {
+          consultas.push(
+            (supabase
+              .from('faturamento')
+              .select(selecionarCampos)
+              .eq('periodo_referencia', periodoMonYY)
+              .in('cliente_nome', nomesCandidatos)
+              .limit(50000)) as any as Promise<any>
+          );
+        }
+
+        const resultados = await Promise.all(consultas);
+        resultados.forEach((r) => {
+          if (r?.error) console.warn('Erro ao buscar faturamento (consulta):', r.error);
+          if (Array.isArray(r?.data)) fatRows.push(...r.data);
+        });
+
+        // 3) Último fallback: ilike no período + OR em cliente_id/cliente_nome (parcial)
+        if (fatRows.length === 0) {
+          const adicionais: Promise<any>[] = [
+            (supabase
+              .from('faturamento')
+              .select(selecionarCampos)
+              .ilike('periodo_referencia', `${periodoSelecionado}%`)
+              .eq('cliente_id', clienteSelecionado)
+              .limit(50000)) as any as Promise<any>,
+          ];
+          if (nomesCandidatos?.length) {
+            for (const nome of nomesCandidatos) {
+              adicionais.push(
+                (supabase
+                  .from('faturamento')
+                  .select(selecionarCampos)
+                  .ilike('periodo_referencia', `${periodoSelecionado}%`)
+                  .ilike('cliente_nome', `%${nome}%`)
+                  .limit(50000)) as any as Promise<any>
+              );
+            }
+          }
+          const resAdic = await Promise.all(adicionais);
+          resAdic.forEach((r) => {
+            if (r?.error) console.warn('Erro ao buscar faturamento (fallback ilike):', r.error);
+            if (Array.isArray(r?.data)) fatRows.push(...r.data);
+          });
+        }
+
+        console.log(`📥 Faturamento carregado p/ comparativo: ${fatRows.length} itens (cliente ${clienteNome}, período ${periodoSelecionado} | ${periodoMonYY})`);
 
         (fatRows || []).forEach((r: any) => {
           const nomeRaw = String(r.paciente || '').trim();
