@@ -613,8 +613,14 @@ serve(async (req: Request) => {
         }
       }
       
-      // Complementar adicionais via RPC quando ausentes
-      if (valorFranquia === 0 || valorPortal === 0 || valorIntegracao === 0) {
+      // Complementar adicionais via RPC apenas quando NÃO informados explicitamente
+      const temFranquiaInformada = ('valor_franquia' in dadosFinais) || ('franquia' in dadosFinais) || ('valorFranquia' in dadosFinais) || (dadosFinais?.custos && ('franquia' in dadosFinais.custos));
+      const temPortalInformado = ('valor_portal_laudos' in dadosFinais) || ('portal_laudos' in dadosFinais) || ('portal' in dadosFinais) || ('valor_portal' in dadosFinais) || (dadosFinais?.custos && ('portal' in dadosFinais.custos));
+      const temIntegracaoInformada = ('valor_integracao' in dadosFinais) || ('integracao' in dadosFinais) || ('taxa_integracao' in dadosFinais) || (dadosFinais?.custos && ('integracao' in dadosFinais.custos));
+
+      const precisaComplementar = (!temFranquiaInformada && valorFranquia === 0) || (!temPortalInformado && valorPortal === 0) || (!temIntegracaoInformada && valorIntegracao === 0);
+
+      if (precisaComplementar) {
         try {
           const { data: calcData2, error: calcErr2 } = await supabase
             .rpc('calcular_faturamento_completo', {
@@ -624,9 +630,9 @@ serve(async (req: Request) => {
             });
           if (!calcErr2 && calcData2 && Array.isArray(calcData2) && calcData2.length > 0) {
             const c2 = calcData2[0];
-            if (valorFranquia === 0) valorFranquia = Number(c2.valor_franquia) || 0;
-            if (valorPortal === 0) valorPortal = Number(c2.valor_portal_laudos) || 0;
-            if (valorIntegracao === 0) valorIntegracao = Number(c2.valor_integracao) || 0;
+            if (!temFranquiaInformada && valorFranquia === 0) valorFranquia = Number(c2.valor_franquia) || 0;
+            if (!temPortalInformado && valorPortal === 0) valorPortal = Number(c2.valor_portal_laudos) || 0;
+            if (!temIntegracaoInformada && valorIntegracao === 0) valorIntegracao = Number(c2.valor_integracao) || 0;
             console.log('🧩 Adicionais complementados via RPC', { valorFranquia, valorPortal, valorIntegracao });
           } else {
             console.warn('⚠️ RPC complementar sem dados', calcErr2);

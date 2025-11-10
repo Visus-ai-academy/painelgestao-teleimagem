@@ -801,28 +801,15 @@ serve(async (req) => {
                 };
               }
             } else {
-              // Frequência por Volume = NÃO
-              if (totalExames < volumeFranquia) {
-                // Volume abaixo do threshold → cobra franquia
-                valorFranquia = valorFranquiaBase;
-                detalhesFranquia = {
-                  tipo: 'continua_nao_volume_nao_abaixo',
-                  volume_base: volumeFranquia,
-                  volume_atual: totalExames,
-                  valor_aplicado: valorFranquia,
-                  motivo: `Frequência Contínua=Não + Freq por Volume=Não + Volume < ${volumeFranquia}: cobra ${valorFranquiaBase}`
-                };
-              } else {
-                // Volume >= threshold → NÃO cobra
-                valorFranquia = 0;
-                detalhesFranquia = {
-                  tipo: 'continua_nao_volume_nao_acima',
-                  volume_base: volumeFranquia,
-                  volume_atual: totalExames,
-                  valor_aplicado: 0,
-                  motivo: `Frequência Contínua=Não + Freq por Volume=Não + Volume >= ${volumeFranquia}: NÃO cobra`
-                };
-              }
+              // Frequência por Volume = NÃO ou indefinido → NÃO cobra franquia
+              valorFranquia = 0;
+              detalhesFranquia = {
+                tipo: 'continua_nao_volume_nao',
+                volume_base: volumeFranquia,
+                volume_atual: totalExames,
+                valor_aplicado: 0,
+                motivo: 'Frequência Contínua=Não + Freq por Volume≠Sim: NÃO cobra franquia'
+              };
             }
           }
           
