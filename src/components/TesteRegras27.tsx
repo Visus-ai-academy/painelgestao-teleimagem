@@ -284,19 +284,6 @@ export function TesteRegras27() {
               )}
             </div>
           )}
-
-            {/* Informações sobre as 27 Regras */}
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <h4 className="font-semibold text-blue-800 mb-2">Sobre as 27 Regras</h4>
-              <ul className="text-sm text-blue-700 space-y-1">
-                <li>• Executa a função <code>aplicar-27-regras-completas</code></li>
-                <li>• Aplica todas as regras de exclusão (v002, v003, v004, v017)</li>
-                <li>• Realiza correções automáticas (v005, v007, v019)</li>
-                <li>• Executa mapeamentos (v008, v009, v011, v013)</li>
-                <li>• Aplica regras avançadas (v010, v014, v016)</li>
-                <li>• Processa o período de referência: <strong>Junho/2025</strong></li>
-              </ul>
-            </div>
           </TabsContent>
 
           <TabsContent value="regra-v007" className="space-y-6">
