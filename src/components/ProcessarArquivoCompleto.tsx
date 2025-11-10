@@ -12,13 +12,15 @@ interface ProcessarArquivoCompletoProps {
   arquivoFonte: string;
   totalEstimado?: number;
   onComplete?: () => void;
+  periodoFaturamento?: { ano: number; mes: number };
 }
 
 export function ProcessarArquivoCompleto({
   filePath,
   arquivoFonte,
   totalEstimado,
-  onComplete
+  onComplete,
+  periodoFaturamento
 }: ProcessarArquivoCompletoProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -39,20 +41,20 @@ export function ProcessarArquivoCompleto({
         arquivoFonte
       });
 
-      // Adicionar logs detalhados para debug
-      console.log('📋 Dados enviados para edge function:', {
-        file_path: filePath,
-        arquivo_fonte: arquivoFonte,
-        periodo: { ano: new Date().getFullYear(), mes: new Date().getMonth() + 1 }
-      });
+// Adicionar logs detalhados para debug
+console.log('📋 Dados enviados para edge function:', {
+  file_path: filePath,
+  arquivo_fonte: arquivoFonte,
+  periodo: periodoFaturamento ?? { ano: new Date().getFullYear(), mes: new Date().getMonth() + 1 }
+});
 
-      const { data, error } = await supabase.functions.invoke('processar-volumetria-otimizado', {
-        body: {
-          file_path: filePath,
-          arquivo_fonte: arquivoFonte,
-          periodo: { ano: new Date().getFullYear(), mes: new Date().getMonth() + 1 }
-        }
-      });
+const { data, error } = await supabase.functions.invoke('processar-volumetria-otimizado', {
+  body: {
+    file_path: filePath,
+    arquivo_fonte: arquivoFonte,
+    periodo: periodoFaturamento ?? { ano: new Date().getFullYear(), mes: new Date().getMonth() + 1 }
+  }
+});
 
       console.log('📥 Resposta completa da edge function:', JSON.stringify({ data, error }, null, 2));
 

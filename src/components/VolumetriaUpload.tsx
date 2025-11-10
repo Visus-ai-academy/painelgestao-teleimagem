@@ -262,6 +262,7 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
                   filePath={lastUploadedFile}
                   arquivoFonte={arquivoFonte}
                   totalEstimado={34000}
+                  periodoFaturamento={periodoFaturamento}
                   onComplete={() => {
                     setShowProcessarCompleto(false);
                     setLastUploadedFile(null);
