@@ -478,7 +478,7 @@ export function DemonstrativoVolumetriaPorCliente({ periodo: periodoInicial }: D
             <CardTitle>Resumo Geral - {periodoSelecionado}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div className="text-center">
                 <div className="text-2xl font-bold text-blue-600">
                   {resumo.total_clientes}
@@ -490,18 +490,6 @@ export function DemonstrativoVolumetriaPorCliente({ periodo: periodoInicial }: D
                   {formatNumber(resumo.total_exames_geral)}
                 </div>
                 <div className="text-sm text-muted-foreground">Total Exames</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-orange-600">
-                  {resumo.total_modalidades}
-                </div>
-                <div className="text-sm text-muted-foreground">Modalidades</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-red-600">
-                  {resumo.total_especialidades}
-                </div>
-                <div className="text-sm text-muted-foreground">Especialidades</div>
               </div>
             </div>
           </CardContent>
