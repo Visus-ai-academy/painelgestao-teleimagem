@@ -5,7 +5,6 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CorrigirContratosDuplicados } from "@/components/CorrigirContratosDuplicados";
-import { ExcluirPrecoEspecifico } from "@/components/ExcluirPrecoEspecifico";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -969,9 +968,6 @@ export default function ContratosClientes() {
       
       {/* Seção de Correção de Contratos Duplicados */}
       <CorrigirContratosDuplicados />
-      
-      {/* Seção de Exclusão de Preço Específico */}
-      <ExcluirPrecoEspecifico />
       
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Contratos Clientes</h1>
