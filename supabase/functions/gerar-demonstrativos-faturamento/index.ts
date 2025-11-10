@@ -94,7 +94,9 @@ serve(async (req) => {
     const clientesProcessados = new Set<string>(); // Track by nome_fantasia to avoid duplicates
 
     for (const cliente of clientes) {
-      const parametros = (cliente.parametros_faturamento || []).find((p: any) => p?.ativo === true || p?.status === 'A' || p?.status === 'Ativo') || cliente.parametros_faturamento?.[0];
+      const parametros = Array.isArray(cliente.parametros_faturamento)
+        ? (cliente.parametros_faturamento.find((p: any) => p?.ativo === true || p?.status === 'A' || p?.status === 'Ativo') || cliente.parametros_faturamento[0])
+        : cliente.parametros_faturamento;
       const contrato = cliente.contratos_clientes?.[0];
       const tipoFaturamento = contrato?.tipo_faturamento || 'CO-FT';
 
