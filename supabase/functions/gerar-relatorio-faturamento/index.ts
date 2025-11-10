@@ -234,27 +234,21 @@ serve(async (req: Request) => {
       console.log(`🔍 CBU: ${antesFiltro} → ${volumetriaFiltrada.length} registros | ${examesTotaisAntes} → ${examesTotaisDepois} exames (removidos ${examesTotaisAntes - examesTotaisDepois})`);
     }
     
-    // CLIRAM: Only specific specialties OR plantão OR specific doctors
+    // CLIRAM: Only Cardio + Plantão
     if (nomeClienteUpper.includes('CLIRAM') && volumetriaFiltrada.length > 0) {
-      const ESPECIALIDADES_FATURADAS = ['MUSCULO ESQUELETICO', 'NEURO', 'PEDIATRIA'];
-      const MEDICOS_FATURADOS = ['JOAO VITOR DE SOUSA', 'DR. JOAO VITOR DE SOUSA'];
       const antesFiltro = volumetriaFiltrada.length;
       
       volumetriaFiltrada = volumetriaFiltrada.filter(vol => {
         const prioridade = (vol.PRIORIDADE || '').toString().toUpperCase();
         const especialidade = (vol.ESPECIALIDADE || '').toString().toUpperCase();
-        const medico = (vol.MEDICO || '').toString().toUpperCase();
         
-        if (prioridade === 'PLANTÃO' || prioridade === 'PLANTAO') {
-          return true;
-        }
+        // Apenas exames com Cardio E Plantão
+        const isCardio = especialidade.includes('CARDIO');
+        const isPlantao = prioridade === 'PLANTÃO' || prioridade === 'PLANTAO';
         
-        const temEspecialidadeFaturada = ESPECIALIDADES_FATURADAS.some(esp => especialidade.includes(esp));
-        const temMedicoFaturado = MEDICOS_FATURADOS.some(med => medico.includes(med));
-        
-        return temEspecialidadeFaturada || temMedicoFaturado;
+        return isCardio && isPlantao;
       });
-      console.log(`🔍 CLIRAM: ${antesFiltro} → ${volumetriaFiltrada.length} registros (removidos ${antesFiltro - volumetriaFiltrada.length})`);
+      console.log(`🔍 CLIRAM (Cardio+Plantão): ${antesFiltro} → ${volumetriaFiltrada.length} registros (removidos ${antesFiltro - volumetriaFiltrada.length})`);
     }
     
     // RADI-IMAGEM: Specific rules
@@ -340,9 +334,29 @@ serve(async (req: Request) => {
       console.log(`🔍 CEMVALENCA: ${antesFiltro} → ${volumetriaFiltrada.length} registros (removidos ${antesFiltro - volumetriaFiltrada.length})`);
     }
     
-    // Other NC clients with standard rules
-    const OUTROS_NC = ['CDICARDIO', 'CDIGOIAS', 'CISP', 'CRWANDERLEY', 'DIAGMAX-PR', 
-                      'GOLD', 'PRODIMAGEM', 'TRANSDUSON', 'ZANELLO', 'RMPADUA'];
+    // Clientes com regra específica: apenas Cardio + Plantão
+    const CLIENTES_CARDIO_PLANTAO = ['CDICARDIO', 'CDIGOIAS', 'CISP', 'CLIRAM', 'CRWANDERLEY', 
+                                      'DIAGMAX-PR', 'GOLD', 'PRODIMAGEM', 'TRANSDUSON', 'ZANELLO'];
+    const isCardioPlantao = CLIENTES_CARDIO_PLANTAO.some(nc => nomeClienteUpper.includes(nc));
+    
+    if (isCardioPlantao && volumetriaFiltrada.length > 0) {
+      const antesFiltro = volumetriaFiltrada.length;
+      
+      volumetriaFiltrada = volumetriaFiltrada.filter(vol => {
+        const prioridade = (vol.PRIORIDADE || '').toString().toUpperCase();
+        const especialidade = (vol.ESPECIALIDADE || '').toString().toUpperCase();
+        
+        // Apenas exames com Cardio E Plantão
+        const isCardio = especialidade.includes('CARDIO');
+        const isPlantao = prioridade === 'PLANTÃO' || prioridade === 'PLANTAO';
+        
+        return isCardio && isPlantao;
+      });
+      console.log(`🔍 ${cliente.nome_fantasia || cliente.nome} (Cardio+Plantão): ${antesFiltro} → ${volumetriaFiltrada.length} registros (removidos ${antesFiltro - volumetriaFiltrada.length})`);
+    }
+    
+    // Other NC clients with standard rules (RMPADUA)
+    const OUTROS_NC = ['RMPADUA'];
     const isOutroNC = OUTROS_NC.some(nc => nomeClienteUpper.includes(nc));
     
     if (isOutroNC && volumetriaFiltrada.length > 0) {
