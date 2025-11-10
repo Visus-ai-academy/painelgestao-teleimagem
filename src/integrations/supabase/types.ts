@@ -4529,6 +4529,22 @@ export type Database = {
       calcular_preco_exame:
         | {
             Args: {
+              p_categoria: string
+              p_cliente_id: string
+              p_especialidade: string
+              p_modalidade: string
+              p_periodo: string
+              p_prioridade: string
+              p_volume_total: number
+            }
+            Returns: {
+              detalhes_calculo: Json
+              faixa_volume: string
+              valor_unitario: number
+            }[]
+          }
+        | {
+            Args: {
               p_categoria?: string
               p_cliente_id: string
               p_especialidade: string
