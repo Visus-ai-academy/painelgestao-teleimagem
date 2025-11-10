@@ -494,50 +494,11 @@ export default function DemonstrativoFaturamento() {
                      tipo_faturamento: c.tipo_faturamento || mapContratoTipos.get(c.nome)
                    }));
                  }
-                  // ✅ Após enriquecer, ajustar valores com adicionais e impostos (6,15% quando NÃO simples)
-                  const isUUID = (id?: string) => !!id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-                  const ajustados: ClienteFaturamento[] = [];
-                  for (const c of enriquecidos) {
-                    let vFranquia = 0, vPortal = 0, vIntegracao = 0;
-                    if (isUUID(c.id)) {
-                      try {
-                        const { data: calc } = await supabase.rpc('calcular_faturamento_completo', {
-                          p_cliente_id: c.id,
-                          p_periodo: periodo,
-                          p_volume_total: c.total_exames,
-                        });
-                        if (calc && calc.length > 0) {
-                          vFranquia = Number(calc[0]?.valor_franquia || 0);
-                          vPortal = Number(calc[0]?.valor_portal_laudos || 0);
-                          vIntegracao = Number(calc[0]?.valor_integracao || 0);
-                        }
-                      } catch (e) {
-                        console.warn('Falha ao calcular adicionais do cliente (via demonstrativo local):', c.nome, e);
-                      }
-                    }
-                    const valorBrutoFinal = Number(c.valor_bruto || 0) + vFranquia + vPortal + vIntegracao;
-                    let simples = false;
-                    try {
-                      if (isUUID(c.id)) {
-                        const { data: params } = await supabase
-                          .from('parametros_faturamento')
-                          .select('simples')
-                          .eq('cliente_id', c.id)
-                          .eq('status', 'A')
-                          .maybeSingle();
-                        simples = !!params?.simples;
-                      }
-                    } catch (e) {
-                      console.warn('Falha ao buscar regime tributário do cliente (demonstrativo local):', c.nome, e);
-                    }
-                    const impostos = simples ? 0 : Number((valorBrutoFinal * 0.0615).toFixed(2));
-                    ajustados.push({
-                      ...c,
-                      valor_bruto: Number(valorBrutoFinal.toFixed(2)),
-                      valor_liquido: Number((valorBrutoFinal - impostos).toFixed(2)),
-                      observacoes: `Exames: ${c.total_exames || 0} | Franquia: R$ ${vFranquia.toFixed(2)} | Portal: R$ ${vPortal.toFixed(2)} | Integração: R$ ${vIntegracao.toFixed(2)} | Impostos: R$ ${impostos.toFixed(2)}`,
-                    });
-                  }
+                  // ✅ Após enriquecer, NÃO recalcular valores – usar exatamente os do backend para manter paridade com os relatórios
+                  // Apenas propagar o tipo_faturamento enriquecido
+                  const ajustados: ClienteFaturamento[] = enriquecidos.map((c) => ({
+                    ...c,
+                  }));
                   setClientes(ajustados);
                   setClientesFiltrados(ajustados);
                } catch (e) {
@@ -1285,22 +1246,23 @@ export default function DemonstrativoFaturamento() {
     }
 
     const dados = clientesFiltrados.map((c) => {
-      const valorExames = c.valor_exames ?? c.valor_bruto ?? 0;
-      const valorFranquia = c.valor_franquia ?? 0;
-      const valorIntegracao = c.valor_integracao ?? 0;
-      const valorPortal = c.valor_portal ?? 0;
-      const valorImpostos = c.valor_impostos ?? 0;
-      const valorLiquido = c.valor_liquido ?? 0;
+      const valorExames = Number(c.valor_exames ?? 0);
+      const valorFranquia = Number(c.valor_franquia ?? 0);
+      const valorIntegracao = Number(c.valor_integracao ?? 0);
+      const valorPortal = Number(c.valor_portal ?? 0);
+      const valorImpostos = Number(c.valor_impostos ?? 0);
+      const valorBrutoCalc = Number(c.valor_bruto ?? (valorExames + valorFranquia + valorIntegracao + valorPortal));
+      const valorLiquidoCalc = valorBrutoCalc - valorImpostos;
 
       return {
         "Nome do Cliente": c.nome,
         "Quantidade de Exames": c.total_exames,
-        "Valor Total Exames": parseFloat(valorExames.toString()),
-        "Valor Franquia": parseFloat(valorFranquia.toString()),
-        "Valor Integração": parseFloat(valorIntegracao.toString()),
-        "Valor Portal Laudos": parseFloat(valorPortal.toString()),
-        "Impostos": parseFloat(valorImpostos.toString()),
-        "Valor Líquido": parseFloat(valorLiquido.toString()),
+        "Valor Total Exames": valorExames,
+        "Valor Franquia": valorFranquia,
+        "Valor Integração": valorIntegracao,
+        "Valor Portal Laudos": valorPortal,
+        "Impostos": valorImpostos,
+        "Valor Líquido": Number(valorLiquidoCalc.toFixed(2)),
       };
     });
 
