@@ -1344,34 +1344,16 @@ export default function DemonstrativoFaturamento() {
 
       {/* ✅ RESUMO GERAL - Usando mesma fonte que Excel (clientesFiltrados) */}
       {clientesFiltrados.length > 0 && (() => {
-        // ✅ CALCULAR DIRETAMENTE DE clientesFiltrados (mesma fonte que Excel)
+        // ✅ CALCULAR DIRETAMENTE DOS CAMPOS DO OBJETO (mesma lógica que Excel)
         const resumoCalculado = (() => {
-          let totalExamesGeral = 0;
-          let valorFranquiasTotal = 0;
-          let valorPortalTotal = 0;
-          let valorIntegracaoTotal = 0;
-          let valorImpostosTotal = 0;
-          
-          // ✅ USAR clientesFiltrados (mesma fonte que Excel)
-          clientesFiltrados.forEach((cliente) => {
-            totalExamesGeral += cliente.total_exames || 0;
-            
-            if (cliente.observacoes) {
-              const franquiaMatch = cliente.observacoes.match(/Franquia: R\$ ([\d.,]+)/);
-              const portalMatch = cliente.observacoes.match(/Portal: R\$ ([\d.,]+)/);
-              const integracaoMatch = cliente.observacoes.match(/Integração: R\$ ([\d.,]+)/);
-              const impostosMatch = cliente.observacoes.match(/Impostos: R\$ ([\d.,]+)/);
-              
-              if (franquiaMatch) valorFranquiasTotal += parseFloat(franquiaMatch[1].replace(/\./g, '').replace(',', '.')) || 0;
-              if (portalMatch) valorPortalTotal += parseFloat(portalMatch[1].replace(/\./g, '').replace(',', '.')) || 0;
-              if (integracaoMatch) valorIntegracaoTotal += parseFloat(integracaoMatch[1].replace(/\./g, '').replace(',', '.')) || 0;
-              if (impostosMatch) valorImpostosTotal += parseFloat(impostosMatch[1].replace(/\./g, '').replace(',', '.')) || 0;
-            }
-          });
-          
-          const valorBrutoGeral = clientesFiltrados.reduce((sum, c) => sum + (c.valor_bruto || 0), 0);
-          const valorExamesGeral = valorBrutoGeral - valorFranquiasTotal - valorPortalTotal - valorIntegracaoTotal;
+          const totalExamesGeral = clientesFiltrados.reduce((sum, c) => sum + (c.total_exames || 0), 0);
+          const valorExamesGeral = clientesFiltrados.reduce((sum, c) => sum + (c.valor_exames || 0), 0);
+          const valorFranquiasTotal = clientesFiltrados.reduce((sum, c) => sum + (c.valor_franquia || 0), 0);
+          const valorPortalTotal = clientesFiltrados.reduce((sum, c) => sum + (c.valor_portal || 0), 0);
+          const valorIntegracaoTotal = clientesFiltrados.reduce((sum, c) => sum + (c.valor_integracao || 0), 0);
           const valorAdicionaisGeral = valorFranquiasTotal + valorPortalTotal + valorIntegracaoTotal;
+          const valorBrutoGeral = clientesFiltrados.reduce((sum, c) => sum + (c.valor_bruto || 0), 0);
+          const valorImpostosTotal = clientesFiltrados.reduce((sum, c) => sum + (c.valor_impostos || 0), 0);
           const valorLiquidoGeral = clientesFiltrados.reduce((sum, c) => sum + (c.valor_liquido || 0), 0);
           
           console.log('🧮 Resumo Geral calculado (fonte: clientesFiltrados):', {
