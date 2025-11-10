@@ -20,14 +20,18 @@ serve(async (req) => {
     console.log('🔄 INICIANDO FINALIZAÇÃO DE UPLOADS TRAVADOS');
 
     // Buscar uploads travados há mais de 10 minutos
+    const tempoLimite = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    console.log(`📅 Buscando uploads em processamento criados antes de: ${tempoLimite}`);
+    
     const { data: uploadsTravados, error: fetchError } = await supabaseClient
       .from('processamento_uploads')
       .select('*')
       .eq('status', 'processando')
-      .lt('created_at', new Date(Date.now() - 10 * 60 * 1000).toISOString());
+      .lt('created_at', tempoLimite);
 
     if (fetchError) {
-      throw new Error(`Erro ao buscar uploads: ${fetchError.message}`);
+      console.error('❌ Erro ao buscar uploads:', fetchError);
+      throw new Error(`Erro ao buscar uploads: ${JSON.stringify(fetchError)}`);
     }
 
     if (!uploadsTravados?.length) {
