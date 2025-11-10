@@ -2478,6 +2478,7 @@ export type Database = {
           valor_acima_franquia: number | null
           valor_franquia: number | null
           valor_integracao: number | null
+          valor_portal_laudos: number | null
           volume_franquia: number | null
         }
         Insert: {
@@ -2531,6 +2532,7 @@ export type Database = {
           valor_acima_franquia?: number | null
           valor_franquia?: number | null
           valor_integracao?: number | null
+          valor_portal_laudos?: number | null
           volume_franquia?: number | null
         }
         Update: {
@@ -2584,6 +2586,7 @@ export type Database = {
           valor_acima_franquia?: number | null
           valor_franquia?: number | null
           valor_integracao?: number | null
+          valor_portal_laudos?: number | null
           volume_franquia?: number | null
         }
         Relationships: [

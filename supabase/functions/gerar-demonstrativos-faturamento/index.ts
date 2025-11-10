@@ -58,6 +58,7 @@ serve(async (req) => {
           frequencia_por_volume,
           valor_acima_franquia,
           valor_integracao,
+          valor_portal_laudos,
           portal_laudos,
           cobrar_integracao,
           impostos_ab_min,
@@ -719,9 +720,16 @@ serve(async (req) => {
 
       // Calcular franquia baseado nos parâmetros do cliente
       if (parametros) {
-        // Integração (valor_integracao é usado APENAS AQUI, não duplicar!)
+        // Portal de Laudos
+        if (parametros.portal_laudos && parametros.valor_portal_laudos > 0) {
+          valorPortalLaudos = Number(parametros.valor_portal_laudos);
+          console.log(`📋 ${nomeFantasia}: Portal de Laudos = R$ ${valorPortalLaudos.toFixed(2)}`);
+        }
+
+        // Integração
         if (parametros.cobrar_integracao && parametros.valor_integracao > 0) {
           valorIntegracao = Number(parametros.valor_integracao);
+          console.log(`📋 ${nomeFantasia}: Integração = R$ ${valorIntegracao.toFixed(2)}`);
         }
 
         // Franquia - Nova lógica consolidada
