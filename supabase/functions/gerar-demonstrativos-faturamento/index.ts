@@ -167,7 +167,8 @@ serve(async (req) => {
       
       if (nomeFantasia === 'PRN') {
         padroesBusca = ['PRN%'];
-      } else if (['CEDIDIAG', 'CEDI-RJ', 'CEDI-RO'].includes(nomeFantasia)) {
+      } else if (['CEDI-RJ', 'CEDI-RO'].includes(nomeFantasia)) {
+        // CEDIDIAG foi removido desta lista - deve buscar apenas seus próprios dados
         padroesBusca = ['CEDI%'];
       } else if (nomeFantasia.includes('AKCPALMAS') || nomeFantasia.includes('AKC')) {
         padroesBusca = ['AKC%', 'AKCPALMAS%'];
