@@ -129,8 +129,9 @@ export function ExamesValoresZerados() {
               p_is_plantao: (combinacao.prioridade || '').toUpperCase().includes('PLANT')
             });
 
-            combinacao.valor_unitario = precoCalculado || 0;
-            combinacao.tem_preco_cadastrado = precoCalculado && precoCalculado > 0;
+            const valorPreco = typeof precoCalculado === 'number' ? precoCalculado : 0;
+            combinacao.valor_unitario = valorPreco;
+            combinacao.tem_preco_cadastrado = valorPreco > 0;
 
             // Só incluir se NÃO tem preço cadastrado (valor zerado)
             if (!combinacao.tem_preco_cadastrado || combinacao.valor_unitario === 0) {

@@ -844,12 +844,13 @@ export default function DemonstrativoFaturamento() {
                     p_is_plantao: combinacao.config.is_plantao
                   });
                   
-                  if (precoCalculado && precoCalculado > 0) {
-                    const valorCombinacao = Number(precoCalculado) * combinacao.quantidade;
+                  const valorPreco = typeof precoCalculado === 'number' ? precoCalculado : 0;
+                  if (valorPreco > 0) {
+                    const valorCombinacao = valorPreco * combinacao.quantidade;
                     valorTotalCliente += valorCombinacao;
                     temPrecoConfigurado = true;
                     
-                    console.log(`💰 ${clienteNome} - ${chave}: ${combinacao.quantidade} exames x R$ ${precoCalculado} = R$ ${valorCombinacao.toFixed(2)}`);
+                    console.log(`💰 ${clienteNome} - ${chave}: ${combinacao.quantidade} exames x R$ ${valorPreco} = R$ ${valorCombinacao.toFixed(2)}`);
                   }
                 } catch (error) {
                   console.log(`Erro ao calcular preço para ${clienteNome} (${chave}):`, error);

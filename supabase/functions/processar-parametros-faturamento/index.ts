@@ -46,14 +46,12 @@ const COLUMN_MAPPING = {
   tipoDesconto: ['Tipo Desconto / Acréscimo', 'TIPO DESCONTO / ACRÉSCIMO'],
   descontoAcrescimo: ['Desconto / Acréscimo', 'DESCONTO / ACRÉSCIMO'],
   
-  // Integração (separar boolean de valor)
-  integracao: ['Integração', 'INTEGRAÇÃO'],
-  valorIntegracao: ['Valor Integração', 'VALOR INTEGRAÇÃO', 'valor_integracao'],
+  // Integração - apenas valor
+  valorIntegracao: ['Integração', 'INTEGRAÇÃO', 'Valor Integração', 'VALOR INTEGRAÇÃO', 'valor_integracao'],
   dataInicioIntegracao: ['Data Início Integração', 'DATA INÍCIO INTEGRAÇÃO'],
   
-  // Portal (separar boolean de valor)
-  portalLaudos: ['Portal de Laudos', 'PORTAL DE LAUDOS'],
-  valorPortalLaudos: ['Valor Portal Laudos', 'VALOR PORTAL LAUDOS', 'valor_portal_laudos'],
+  // Portal - apenas valor
+  valorPortalLaudos: ['Portal de Laudos', 'PORTAL DE LAUDOS', 'Valor Portal Laudos', 'VALOR PORTAL LAUDOS', 'valor_portal_laudos'],
   
   // Franquia
   possuiFranquia: ['Possui Franquia', 'POSSUI FRANQUIA'],
@@ -388,28 +386,32 @@ serve(async (req) => {
             return valor ? Number(valor) : 0;
           })(),
           
-          // Integração - separar boolean de valor
-          cobrar_integracao: (() => {
-            const valor = findColumnValue(row, COLUMN_MAPPING.integracao);
-            if (!valor) return false;
-            const valorStr = valor.toString().trim().toLowerCase();
-            return valorStr === 'sim' || valorStr === 's';
-          })(),
+          // Integração - apenas valor monetário (se vazio = 0)
           valor_integracao: (() => {
             const valor = findColumnValue(row, COLUMN_MAPPING.valorIntegracao);
-            return valor ? Number(valor) : 0;
+            if (!valor) return 0;
+            const valorNum = Number(valor);
+            return isNaN(valorNum) ? 0 : valorNum;
+          })(),
+          cobrar_integracao: (() => {
+            const valor = findColumnValue(row, COLUMN_MAPPING.valorIntegracao);
+            if (!valor) return false;
+            const valorNum = Number(valor);
+            return !isNaN(valorNum) && valorNum > 0;
           })(),
           
-          // Portal de Laudos - separar boolean de valor
-          portal_laudos: (() => {
-            const valor = findColumnValue(row, COLUMN_MAPPING.portalLaudos);
-            if (!valor) return false;
-            const valorStr = valor.toString().trim().toLowerCase();
-            return valorStr === 'sim' || valorStr === 's';
-          })(),
+          // Portal de Laudos - apenas valor monetário (se vazio = 0)
           valor_portal_laudos: (() => {
             const valor = findColumnValue(row, COLUMN_MAPPING.valorPortalLaudos);
-            return valor ? Number(valor) : 0;
+            if (!valor) return 0;
+            const valorNum = Number(valor);
+            return isNaN(valorNum) ? 0 : valorNum;
+          })(),
+          portal_laudos: (() => {
+            const valor = findColumnValue(row, COLUMN_MAPPING.valorPortalLaudos);
+            if (!valor) return false;
+            const valorNum = Number(valor);
+            return !isNaN(valorNum) && valorNum > 0;
           })(),
           
           // Franquia - todos os campos necessários

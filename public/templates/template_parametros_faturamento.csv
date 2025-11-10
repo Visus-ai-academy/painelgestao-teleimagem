@@ -1,4 +1,4 @@
-cliente_nome,tipo_cliente,aplicar_franquia,volume_franquia,valor_franquia,valor_acima_franquia,aplicar_adicional_urgencia,percentual_adicional_urgencia,Integração,Valor Integração,Portal de Laudos,Valor Portal Laudos,dia_fechamento,forma_cobranca,data_aniversario_contrato,observacoes
-"Hospital São João",CO,true,100,5000.00,45.00,true,50,"Sim",150.00,"Sim",180.00,7,"mensal","2025-01-15","Parâmetros padrão para hospital"
-"Clínica Exemplo",CO,false,0,0.00,0.00,true,30,"Não",0.00,"Não",0.00,5,"quinzenal","2025-02-01","Clínica sem franquia"
-"Centro Médico ABC",PAR,true,200,8000.00,40.00,true,40,"Sim",200.00,"Sim",250.00,10,"mensal","2025-03-01","Parceiro estratégico"
+cliente_nome,tipo_cliente,aplicar_franquia,volume_franquia,valor_franquia,valor_acima_franquia,aplicar_adicional_urgencia,percentual_adicional_urgencia,Integração,Portal de Laudos,dia_fechamento,forma_cobranca,data_aniversario_contrato,observacoes
+"Hospital São João",CO,true,100,5000.00,45.00,true,50,150.00,180.00,7,"mensal","2025-01-15","Parâmetros padrão para hospital"
+"Clínica Exemplo",CO,false,0,0.00,0.00,true,30,0,0,5,"quinzenal","2025-02-01","Clínica sem franquia"
+"Centro Médico ABC",PAR,true,200,8000.00,40.00,true,40,200.00,250.00,10,"mensal","2025-03-01","Parceiro estratégico"
