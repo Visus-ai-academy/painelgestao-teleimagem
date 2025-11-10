@@ -220,3 +220,6 @@ verify_jwt = true
 
 [functions.excluir-preco-especifico]
 verify_jwt = false
+
+[functions.auditar-franquias-periodo]
+verify_jwt = true

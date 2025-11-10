@@ -51,6 +51,7 @@ import { ControleFechamentoFaturamento } from '@/components/ControleFechamentoFa
 import { ExamesValoresZerados } from "@/components/ExamesValorezrados";
 import { DiagnosticoPrecosFaturamento } from "@/components/DiagnosticoPrecosFaturamento";
 import FaturamentoComparativo from "@/components/faturamento/FaturamentoComparativo";
+import { AuditoriaFranquias } from "@/components/AuditoriaFranquias";
 
 
 import { generatePDF, downloadPDF, type FaturamentoData } from "@/lib/pdfUtils";
@@ -63,7 +64,7 @@ export default function GerarFaturamento() {
   
   // Ensure activeTab never gets set to removed values
   const safeSetActiveTab = (value: string) => {
-    const validTabs = ["gerar", "demonstrativo", "relatorios", "analise", "fechamento", "comparativo"];
+    const validTabs = ["gerar", "demonstrativo", "relatorios", "analise", "fechamento", "comparativo", "auditoria"];
     if (validTabs.includes(value)) {
       setActiveTab(value);
     } else {
@@ -1934,7 +1935,7 @@ export default function GerarFaturamento() {
       </div>
 
       <Tabs value={activeTab} onValueChange={safeSetActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="gerar" className="flex items-center gap-2">
             <Send className="h-4 w-4" />
             Gerar
@@ -1958,6 +1959,10 @@ export default function GerarFaturamento() {
           <TabsTrigger value="comparativo" className="flex items-center gap-2">
             <FileSpreadsheet className="h-4 w-4" />
             Comparativo
+          </TabsTrigger>
+          <TabsTrigger value="auditoria" className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4" />
+            Auditoria
           </TabsTrigger>
         </TabsList>
 
@@ -2736,55 +2741,21 @@ export default function GerarFaturamento() {
                 Verificação de Dados
               </CardTitle>
               <CardDescription>
-                Análise de consistência entre volumetria e demonstrativos
+                Diagnóstico de possíveis problemas nos dados de faturamento
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <div className="text-sm">
-                  <div className="text-yellow-700">
-                    <div>Total na Volumetria (excluindo NC-NF): <span className="font-medium">38.528 exames</span></div>
-                    <div>Total nos Demonstrativos: <span className="font-medium">
-                      {(() => {
-                        const demonstrativosCompletos = localStorage.getItem(`demonstrativos_completos_${periodoSelecionado}`);
-                        if (demonstrativosCompletos) {
-                          try {
-                            const dados = JSON.parse(demonstrativosCompletos);
-                            const total = dados.resumo?.total_exames_geral || 0;
-                            return total.toLocaleString('pt-BR');
-                          } catch {
-                            return '0';
-                          }
-                        }
-                        return '0';
-                      })()} exames
-                    </span></div>
-                    {(() => {
-                      const demonstrativosCompletos = localStorage.getItem(`demonstrativos_completos_${periodoSelecionado}`);
-                      if (demonstrativosCompletos) {
-                        try {
-                          const dados = JSON.parse(demonstrativosCompletos);
-                          const totalDemonstrativos = dados.resumo?.total_exames_geral || 0;
-                          if (totalDemonstrativos !== 38528) {
-                            return (
-                              <div className="text-red-600 font-medium mt-1">
-                                ⚠️ Discrepância encontrada: {Math.abs(38528 - totalDemonstrativos).toLocaleString('pt-BR')} exames de diferença
-                              </div>
-                            );
-                          }
-                        } catch {}
-                      }
-                      return null;
-                    })()}
-                  </div>
-                </div>
-              </div>
+            <CardContent className="space-y-4">
+              <VolumetriaStatusPanel />
             </CardContent>
           </Card>
           
           <ExamesValoresZerados />
           
           <DiagnosticoPrecosFaturamento />
+        </TabsContent>
+
+        <TabsContent value="auditoria" className="space-y-6 mt-6">
+          <AuditoriaFranquias />
         </TabsContent>
 
           </Tabs>
