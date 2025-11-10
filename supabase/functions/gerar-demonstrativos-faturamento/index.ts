@@ -498,216 +498,152 @@ serve(async (req) => {
 
       // Calculate exam values using prices
       let valorExamesCalculado = 0;
-      const detalhesExames = [];
 
-      // Group volumetria by modalidade/especialidade/categoria/prioridade
-      const gruposExames: Record<string, any> = {};
-      
-      for (const vol of volumetria) {
-        if (vol.tipo_faturamento === 'NC-NF' || vol.tipo_faturamento === 'EXCLUSAO') {
-          continue;
-        }
-        
-        const modalidade = (vol.MODALIDADE || '').toString();
-        const especialidade = (vol.ESPECIALIDADE || '').toString();
-        const categoria = (vol.CATEGORIA || 'SC').toString();
-        const prioridade = (vol.PRIORIDADE || '').toString();
-        const key = `${modalidade}|${especialidade}|${categoria}|${prioridade}`;
-        const qtd = Number(vol.VALORES || 0) || 0;
-        
-        if (!gruposExames[key]) {
-          gruposExames[key] = { modalidade, especialidade, categoria, prioridade, quantidade: 0 };
-        }
-        gruposExames[key].quantidade += qtd;
-      }
-
-      // Get client prices (incluir volume_total)
+      // Get client prices
       const { data: precosCliente } = await supabase
         .from('precos_servicos')
-        .select('modalidade, especialidade, categoria, prioridade, valor_base, volume_inicial, volume_final, volume_total, considera_prioridade_plantao, ativo')
-        .eq('cliente_id', cliente.id)
-        .eq('ativo', true);
+        .select('*')
+        .eq('cliente_id', cliente.id);
 
-      const norm = (s: string) => (s || '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
+      const norm = (s: any) => (s ?? '').toString().trim().toUpperCase();
+      
+      // Calculate total volume for price range selection (IGUAL RELATÓRIO)
+      const volumeTotal = volumetria.reduce((sum, v) => sum + (Number(v.VALORES) || 0), 0);
+      
+      // Função para buscar preço POR EXAME (IGUAL RELATÓRIO)
+      const buscarPreco = (exame: any) => {
+        if (!precosCliente || precosCliente.length === 0) return 0;
 
-      // Calcular volumes agrupados por condicionante ANTES do loop
-      const volumesPorCondicionante: Record<string, number> = {
-        'TOTAL': totalExames
+        const modalidadeN = norm(exame.MODALIDADE);
+        const especialidadeN = norm(exame.ESPECIALIDADE);
+        const categoriaN = norm(exame.CATEGORIA || 'SC');
+        const prioridadeN = norm(exame.PRIORIDADE || '');
+
+        let pool: any[] = [];
+
+        // 1) Match EXATO com categoria
+        let candidatos = (precosCliente || []).filter((p: any) =>
+          (p.ativo ?? true) === true &&
+          norm(p.modalidade) === modalidadeN &&
+          norm(p.especialidade) === especialidadeN &&
+          norm(p.categoria || 'SC') === categoriaN
+        );
+
+        if (candidatos.length === 0) {
+          // 2) Fallback: ignorar categoria (modalidade+especialidade)
+          candidatos = (precosCliente || []).filter((p: any) =>
+            (p.ativo ?? true) === true &&
+            norm(p.modalidade) === modalidadeN &&
+            norm(p.especialidade) === especialidadeN
+          );
+        }
+
+        if (candidatos.length === 0) {
+          // 3) Fallback: somente modalidade
+          candidatos = (precosCliente || []).filter((p: any) =>
+            (p.ativo ?? true) === true &&
+            norm(p.modalidade) === modalidadeN
+          );
+        }
+
+        if (candidatos.length === 0) return 0;
+
+        // Preferência por cliente
+        let candidatosCliente = candidatos.filter((p: any) => p.cliente_id === cliente.id);
+        if (candidatosCliente.length === 0) candidatosCliente = candidatos.filter((p: any) => !p.cliente_id);
+
+        // Filtro por prioridade (preferência), com fallback
+        const priMatch = candidatosCliente.filter((p: any) => norm(p.prioridade || '') === prioridadeN);
+        pool = priMatch.length > 0 ? priMatch : candidatosCliente;
+
+        // Selecionar faixa por volume do período (IGUAL RELATÓRIO)
+        const porFaixa = pool
+          .filter((p: any) =>
+            (p.volume_inicial == null || volumeTotal >= p.volume_inicial) &&
+            (p.volume_final == null || volumeTotal <= p.volume_final)
+          )
+          .sort((a: any, b: any) => (b.volume_inicial || 0) - (a.volume_inicial || 0));
+
+        const selecionado = porFaixa[0] || pool[0];
+        if (!selecionado) return 0;
+
+        const prioridadeUrgencia = prioridadeN.includes('URG') || prioridadeN.includes('PLANT');
+        const usarUrgencia = exame.tipo_faturamento === 'urgencia' || prioridadeUrgencia || !!selecionado.considera_prioridade_plantao;
+
+        const valor = usarUrgencia ? (selecionado.valor_urgencia ?? 0) : (selecionado.valor_base ?? 0);
+        return valor > 0 ? valor : (selecionado.valor_base ?? 0) || 0;
       };
 
-      // Agrupar por MOD
-      const volumesPorMod: Record<string, number> = {};
-      for (const [key, grupo] of Object.entries(gruposExames)) {
-        const mod = norm(grupo.modalidade);
-        volumesPorMod[mod] = (volumesPorMod[mod] || 0) + grupo.quantidade;
-      }
-
-      // Agrupar por MOD/ESP
-      const volumesPorModEsp: Record<string, number> = {};
-      for (const [key, grupo] of Object.entries(gruposExames)) {
-        const modEsp = `${norm(grupo.modalidade)}/${norm(grupo.especialidade)}`;
-        volumesPorModEsp[modEsp] = (volumesPorModEsp[modEsp] || 0) + grupo.quantidade;
-      }
-
-      // Agrupar por MOD/ESP/CAT
-      const volumesPorModEspCat: Record<string, number> = {};
-      for (const [key, grupo] of Object.entries(gruposExames)) {
-        const modEspCat = `${norm(grupo.modalidade)}/${norm(grupo.especialidade)}/${norm(grupo.categoria || 'SC')}`;
-        volumesPorModEspCat[modEspCat] = (volumesPorModEspCat[modEspCat] || 0) + grupo.quantidade;
-      }
-
-      console.log('📊 Volumes agrupados calculados:', {
-        total: volumesPorCondicionante['TOTAL'],
-        por_modalidade: Object.keys(volumesPorMod).length,
-        por_mod_esp: Object.keys(volumesPorModEsp).length,
-        por_mod_esp_cat: Object.keys(volumesPorModEspCat).length
-      });
-
-
-      // Calculate prices for each group
-      for (const [key, grupo] of Object.entries(gruposExames)) {
-        let valorUnitario = 0;
-        let matchedBy = 'none';
-        
-        if (precosCliente && precosCliente.length > 0) {
-          const modalidadeN = norm(grupo.modalidade);
-          const especialidadeN = norm(grupo.especialidade);
-          const categoriaN = norm(grupo.categoria || 'SC');
-          const prioridadeN = norm(grupo.prioridade || '');
-
-          // 1) Match EXATO com categoria
-          let candidatos = precosCliente.filter((p: any) =>
-            norm(p.modalidade) === modalidadeN &&
-            norm(p.especialidade) === especialidadeN &&
-            norm(p.categoria || 'SC') === categoriaN
-          );
-
-          let poolPrioridade: any[] = [];
-          if (candidatos.length > 0) {
-            const preferPri = candidatos.filter((p: any) => norm(p.prioridade || '') === prioridadeN);
-            poolPrioridade = preferPri.length > 0 ? preferPri : candidatos;
-            matchedBy = 'modalidade+especialidade+categoria';
-          } else {
-            // 2) Fallback: ignorar categoria (modalidade+especialidade)
-            candidatos = precosCliente.filter((p: any) =>
-              norm(p.modalidade) === modalidadeN &&
-              norm(p.especialidade) === especialidadeN
-            );
-            if (candidatos.length > 0) {
-              const preferPri2 = candidatos.filter((p: any) => norm(p.prioridade || '') === prioridadeN);
-              poolPrioridade = preferPri2.length > 0 ? preferPri2 : candidatos;
-              matchedBy = 'modalidade+especialidade';
-            } else {
-              // 3) Fallback: somente modalidade
-              candidatos = precosCliente.filter((p: any) => norm(p.modalidade) === modalidadeN);
-              if (candidatos.length > 0) {
-                const preferPri3 = candidatos.filter((p: any) => norm(p.prioridade || '') === prioridadeN);
-                poolPrioridade = preferPri3.length > 0 ? preferPri3 : candidatos;
-                matchedBy = 'modalidade';
-              }
-            }
-          }
-
-          if (poolPrioridade.length > 0) {
-            // Determinar o volume a ser usado baseado na condicionante
-            let volumeParaFaixa = 0;
-            
-            // Verificar se algum preço tem volume_total preenchido
-            const temCondicionante = poolPrioridade.some((p: any) => p.volume_total);
-            
-            if (temCondicionante) {
-              // Usar o primeiro preço para pegar a condicionante (todos do pool devem ter a mesma)
-              const condicionante = norm(poolPrioridade[0].volume_total || '');
-              
-              if (condicionante === 'MOD') {
-                volumeParaFaixa = volumesPorMod[modalidadeN] || 0;
-              } else if (condicionante === 'MOD/ESP') {
-                const chave = `${modalidadeN}/${especialidadeN}`;
-                volumeParaFaixa = volumesPorModEsp[chave] || 0;
-              } else if (condicionante === 'MOD/ESP/CAT') {
-                const chave = `${modalidadeN}/${especialidadeN}/${categoriaN}`;
-                volumeParaFaixa = volumesPorModEspCat[chave] || 0;
-              } else if (condicionante === 'TOTAL') {
-                volumeParaFaixa = volumesPorCondicionante['TOTAL'];
-              }
-              
-              console.log(`📐 Volume calculado para ${grupo.modalidade}/${grupo.especialidade}:`, {
-                condicionante: poolPrioridade[0].volume_total,
-                volume: volumeParaFaixa
-              });
-
-              // Filtrar por faixa de volume
-              const poolFaixa = poolPrioridade
-                .filter((p: any) =>
-                  (p.volume_inicial == null || volumeParaFaixa >= p.volume_inicial) &&
-                  (p.volume_final == null || volumeParaFaixa <= p.volume_final)
-                )
-                .sort((a: any, b: any) => (b.volume_inicial || 0) - (a.volume_inicial || 0));
-
-              const escolhido = poolFaixa[0] || poolPrioridade[0];
-              if (escolhido) {
-                valorUnitario = escolhido.valor_base ?? 0;
-              }
-            } else {
-              // SEM condicionante = SEM faixa de volume = preço fixo
-              // Se houver múltiplos preços para mesma combinação, use o MENOR valor
-              const precosSemFaixa = poolPrioridade
-                .filter((p: any) => !p.volume_inicial && !p.volume_final)
-                .sort((a: any, b: any) => (a.valor_base || 0) - (b.valor_base || 0));
-              
-              const escolhido = precosSemFaixa[0] || poolPrioridade[0];
-              if (escolhido) {
-                valorUnitario = escolhido.valor_base ?? 0;
-                
-                // Log se houver preços duplicados
-                if (poolPrioridade.length > 1) {
-                  console.log(`⚠️ Múltiplos preços encontrados para ${grupo.modalidade}/${grupo.especialidade}/${grupo.categoria}:`, {
-                    total: poolPrioridade.length,
-                    valores: poolPrioridade.map((p: any) => p.valor_base),
-                    escolhido: valorUnitario
-                  });
-                }
-              }
-            }
-          }
+      // Calcular valores POR EXAME (IGUAL RELATÓRIO)
+      const examesCalculados = volumetria.map(v => {
+        if (v.tipo_faturamento === 'NC-NF' || v.tipo_faturamento === 'EXCLUSAO') {
+          return null;
         }
         
-        const valorTotalGrupo = valorUnitario * grupo.quantidade;
-        valorExamesCalculado += valorTotalGrupo;
+        const valorUnitario = buscarPreco(v);
+        const quantidade = Number(v.VALORES) || 1;
+        
+        return {
+          modalidade: v.MODALIDADE || '',
+          especialidade: v.ESPECIALIDADE || '',
+          categoria: v.CATEGORIA || '',
+          prioridade: v.PRIORIDADE || '',
+          quantidade: quantidade,
+          valor_unitario: valorUnitario,
+          valor_total: valorUnitario * quantidade
+        };
+      }).filter(e => e !== null);
 
-        if (valorUnitario === 0) {
-          console.log('⚠️ Sem preço para grupo:', {
-            cliente: nomeFantasia,
-            modalidade: grupo.modalidade,
-            especialidade: grupo.especialidade,
-            categoria: grupo.categoria,
-            prioridade: grupo.prioridade,
-            quantidade: grupo.quantidade
-          });
-        } else {
-          console.log('💵 Preço aplicado:', {
-            cliente: nomeFantasia,
-            by: matchedBy,
-            modalidade: grupo.modalidade,
-            especialidade: grupo.especialidade,
-            categoria: grupo.categoria,
-            prioridade: grupo.prioridade,
-            quantidade: grupo.quantidade,
-            valorUnitario
-          });
+      // Calcular valor total dos exames (IGUAL RELATÓRIO)
+      valorExamesCalculado = examesCalculados.reduce((sum, e: any) => sum + e.valor_total, 0);
+
+      // Agrupar para o detalhamento (soma dos valores já calculados)
+      const gruposDetalhes: Record<string, {
+        modalidade: string;
+        especialidade: string;
+        categoria: string;
+        prioridade: string;
+        quantidade: number;
+        valor_total: number;
+        valor_unitario: number;
+      }> = {};
+
+      for (const exame of examesCalculados) {
+        const key = `${exame.modalidade}|${exame.especialidade}|${exame.categoria}|${exame.prioridade}`;
+        
+        if (!gruposDetalhes[key]) {
+          gruposDetalhes[key] = {
+            modalidade: exame.modalidade,
+            especialidade: exame.especialidade,
+            categoria: exame.categoria,
+            prioridade: exame.prioridade,
+            quantidade: 0,
+            valor_total: 0,
+            valor_unitario: 0
+          };
         }
+        
+        gruposDetalhes[key].quantidade += exame.quantidade;
+        gruposDetalhes[key].valor_total += exame.valor_total;
+      }
 
+      // Calcular valor unitário médio para cada grupo e montar detalhes
+      const detalhesExames: any[] = [];
+      for (const [key, grupo] of Object.entries(gruposDetalhes)) {
+        grupo.valor_unitario = grupo.quantidade > 0 ? grupo.valor_total / grupo.quantidade : 0;
+        
         detalhesExames.push({
           modalidade: grupo.modalidade,
           especialidade: grupo.especialidade,
           categoria: grupo.categoria,
           prioridade: grupo.prioridade,
           quantidade: grupo.quantidade,
-          valor_unitario: valorUnitario,
-          valor_total: valorTotalGrupo,
-          status: valorUnitario > 0 ? 'com_preco' : 'sem_preco'
+          valor_unitario: grupo.valor_unitario,
+          valor_total: grupo.valor_total,
+          status: grupo.valor_unitario > 0 ? 'com_preco' : 'sem_preco'
         });
       }
+
 
       // ============================================
       // USAR RPC IGUAL AO RELATÓRIO (MESMA LÓGICA)
