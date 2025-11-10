@@ -76,6 +76,7 @@ export default function DemonstrativoFaturamento() {
     const saved = localStorage.getItem('periodoFaturamentoSelecionado');
     return saved || "2025-06"; // Fallback para jun/25
   });
+  const [periodosDisponiveis, setPeriodosDisponiveis] = useState<string[]>([]);
   const [ordemAlfabetica, setOrdemAlfabetica] = useState(true);
   const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set());
   const hasShownInitialToast = useRef(false);
@@ -84,6 +85,54 @@ export default function DemonstrativoFaturamento() {
   useEffect(() => {
     localStorage.setItem('periodoFaturamentoSelecionado', periodo);
   }, [periodo]);
+
+  // Buscar períodos disponíveis nos demonstrativos calculados
+  useEffect(() => {
+    const buscarPeriodosDisponiveis = async () => {
+      try {
+        // Buscar de demonstrativos_faturamento_calculados
+        const { data: dataDemo, error: errorDemo } = await supabase
+          .from('demonstrativos_faturamento_calculados')
+          .select('periodo_referencia')
+          .not('periodo_referencia', 'is', null);
+
+        const periodosSet = new Set<string>();
+
+        // Adicionar períodos dos demonstrativos
+        dataDemo?.forEach(d => {
+          if (d.periodo_referencia) {
+            periodosSet.add(d.periodo_referencia);
+          }
+        });
+
+        // Buscar também do localStorage (demonstrativos completos)
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key?.startsWith('demonstrativos_completos_')) {
+            const periodo = key.replace('demonstrativos_completos_', '');
+            periodosSet.add(periodo);
+          }
+        }
+
+        // Ordenar períodos (mais recentes primeiro)
+        const periodosOrdenados = Array.from(periodosSet)
+          .filter(p => p)
+          .sort()
+          .reverse();
+
+        setPeriodosDisponiveis(periodosOrdenados);
+
+        // Se o período atual não está na lista e há períodos disponíveis, usar o primeiro
+        if (periodosOrdenados.length > 0 && !periodosOrdenados.includes(periodo)) {
+          setPeriodo(periodosOrdenados[0]);
+        }
+      } catch (error) {
+        console.error('Erro ao buscar períodos disponíveis:', error);
+      }
+    };
+
+    buscarPeriodosDisponiveis();
+  }, []); // Executar apenas uma vez ao montar
   
   // Evita correções em loop: registra tentativas por período e status de execução
   const tcCorrectionTried = useRef<Set<string>>(new Set());
@@ -1265,7 +1314,30 @@ export default function DemonstrativoFaturamento() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-end">
+      {/* Filtro de Período e Exportação */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2">
+          <Calendar className="h-4 w-4 text-muted-foreground" />
+          <Label htmlFor="periodo-filtro" className="text-sm font-medium">Período:</Label>
+          <Select value={periodo} onValueChange={setPeriodo}>
+            <SelectTrigger id="periodo-filtro" className="w-[180px]">
+              <SelectValue placeholder="Selecione o período" />
+            </SelectTrigger>
+            <SelectContent>
+              {periodosDisponiveis.length > 0 ? (
+                periodosDisponiveis.map((p) => (
+                  <SelectItem key={p} value={p}>
+                    {p}
+                  </SelectItem>
+                ))
+              ) : (
+                <SelectItem value="2025-06" disabled>
+                  Nenhum período disponível
+                </SelectItem>
+              )}
+            </SelectContent>
+          </Select>
+        </div>
         <Button
           onClick={exportarExcel}
           disabled={carregando || clientesFiltrados.length === 0}
