@@ -378,8 +378,12 @@ serve(async (req) => {
         console.log(`🔍 CEMVALENCA: ${antesFiltro} → ${volumetria.length} registros (removidos ${antesFiltro - volumetria.length})`);
       }
       
-      // CISP: Cardio OU Plantão
-      if (nomeUpper.includes('CISP') && volumetria.length > 0) {
+      // Clientes com regra específica: apenas Cardio OU Plantão
+      const CLIENTES_CARDIO_OU_PLANTAO = ['CDICARDIO', 'CDIGOIAS', 'CISP', 'CLIRAM', 'CRWANDERLEY', 
+                                           'DIAGMAX-PR', 'GOLD', 'PRODIMAGEM', 'TRANSDUSON', 'ZANELLO'];
+      const isCardioOuPlantao = CLIENTES_CARDIO_OU_PLANTAO.some(nc => nomeUpper.includes(nc));
+      
+      if (isCardioOuPlantao && volumetria.length > 0) {
         const antesFiltro = volumetria.length;
         
         volumetria = volumetria.filter(vol => {
@@ -392,32 +396,11 @@ serve(async (req) => {
           
           return isCardio || isPlantao;
         });
-        console.log(`🔍 CISP (Cardio OU Plantão): ${antesFiltro} → ${volumetria.length} registros (removidos ${antesFiltro - volumetria.length})`);
-      }
-      
-      // Clientes com regra Cardio + Plantão
-      const CLIENTES_CARDIO_PLANTAO = ['CDICARDIO', 'CDIGOIAS', 'CRWANDERLEY', 'DIAGMAX-PR', 
-                                        'GOLD', 'PRODIMAGEM', 'TRANSDUSON', 'ZANELLO'];
-      const isCardioPlantao = CLIENTES_CARDIO_PLANTAO.some(nc => nomeUpper.includes(nc));
-      
-      if (isCardioPlantao && tipoFaturamento === 'NC-FT' && volumetria.length > 0) {
-        const antesFiltro = volumetria.length;
-        
-        volumetria = volumetria.filter(vol => {
-          const prioridade = (vol.PRIORIDADE || '').toString().toUpperCase();
-          const especialidade = (vol.ESPECIALIDADE || '').toString().toUpperCase();
-          
-          // Apenas exames com Cardio E Plantão
-          const isCardio = especialidade.includes('CARDIO');
-          const isPlantao = prioridade === 'PLANTÃO' || prioridade === 'PLANTAO';
-          
-          return isCardio && isPlantao;
-        });
-        console.log(`🔍 ${nomeFantasia} (Cardio+Plantão): ${antesFiltro} → ${volumetria.length} registros (removidos ${antesFiltro - volumetria.length})`);
+        console.log(`🔍 ${cliente.nome_fantasia || cliente.nome} (Cardio OU Plantão): ${antesFiltro} → ${volumetria.length} registros (removidos ${antesFiltro - volumetria.length})`);
       }
       
       // RMPADUA: Plantão OU Medicina Interna OU Cardio OU Médicos Equipe 2
-      if (nomeUpper.includes('RMPADUA') && tipoFaturamento === 'NC-FT' && volumetria.length > 0) {
+      if (nomeUpper.includes('RMPADUA') && volumetria.length > 0) {
         const ESPECIALIDADES_FATURADAS = ['MEDICINA INTERNA', 'CARDIO'];
         const MEDICOS_EQUIPE_2 = ['Dr. Antonio Gualberto Chianca Filho', 'Dr. Daniel Chrispim', 'Dr. Efraim Da Silva Ferreira', 'Dr. Felipe Falcão de Sá', 'Dr. Guilherme N. Schincariol', 'Dr. Gustavo Andreis', 'Dr. João Carlos Dantas do Amaral', 'Dr. João Fernando Miranda Pompermayer', 'Dr. Leonardo de Paula Ribeiro Figueiredo', 'Dr. Raphael Sanfelice João', 'Dr. Thiago P. Martins', 'Dr. Virgílio Oliveira Barreto', 'Dra. Adriana Giubilei Pimenta', 'Dra. Aline Andrade Dorea', 'Dra. Camila Amaral Campos', 'Dra. Cynthia Mendes Vieira de Morais', 'Dra. Fernanda Gama Barbosa', 'Dra. Kenia Menezes Fernandes', 'Dra. Lara M. Durante Bacelar', 'Dr. Aguinaldo Cunha Zuppani', 'Dr. Alex Gueiros de Barros', 'Dr. Eduardo Caminha Nunes', 'Dr. Márcio D\'Andréa Rossi', 'Dr. Rubens Pereira Moura Filho', 'Dr. Wesley Walber da Silva', 'Dra. Luna Azambuja Satte Alam', 'Dra. Roberta Bertoldo Sabatini Treml', 'Dra. Thais Nogueira D. Gastaldi', 'Dra. Vanessa da Costa Maldonado'];
         const antesFiltro = volumetria.length;
