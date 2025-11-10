@@ -661,23 +661,95 @@ serve(async (req) => {
 
       // Aplicar valores de Portal e Integração: se há valor no campo, cobrar sempre
       if (parametros) {
-        // Franquia: respeitar flag aplicar_franquia (tem lógica complexa de volume)
+        // Franquia: respeitar flag aplicar_franquia (tem lógica de volume/frequência)
         if (!parametros.aplicar_franquia) {
           console.log(`📋 ${nomeFantasia}: Franquia DESABILITADA por parâmetro`);
           valorFranquia = 0;
           detalhesFranquia = { tipo: 'desabilitado', valor_aplicado: 0, motivo: 'Franquia desabilitada' };
         }
-        
+
         // Portal: se há valor no parâmetro, usar (ignorar flag portal_laudos)
         if ((valorPortalLaudos ?? 0) === 0 && Number(parametros.valor_portal_laudos) > 0) {
           valorPortalLaudos = Number(parametros.valor_portal_laudos);
           console.log(`📋 ${nomeFantasia}: Portal aplicado do parâmetro: R$ ${valorPortalLaudos.toFixed(2)}`);
         }
-        
+
         // Integração: se há valor no parâmetro, usar (ignorar flag cobrar_integracao)
         if ((valorIntegracao ?? 0) === 0 && Number(parametros.valor_integracao) > 0) {
           valorIntegracao = Number(parametros.valor_integracao);
           console.log(`📋 ${nomeFantasia}: Integração aplicada do parâmetro: R$ ${valorIntegracao.toFixed(2)}`);
+        }
+
+        // Forçar a mesma regra de franquia utilizada na auditoria (fonte única da verdade)
+        // Esta regra SOBREPOE qualquer valor retornado pela RPC quando incompatível com a parametrização
+        try {
+          const volumeFranquia = Number(parametros.volume_franquia || 0);
+          const valorFranquiaBase = Number(parametros.valor_franquia || 0);
+          const valorAcimaFranquia = Number(parametros.valor_acima_franquia || 0);
+          const frequenciaContinua = parametros.frequencia_continua === true;
+          const frequenciaPorVolume = parametros.frequencia_por_volume === true;
+
+          let regra = 'nao_aplica';
+          let valorCalculado = 0;
+
+          if (parametros.aplicar_franquia) {
+            if (frequenciaContinua) {
+              if (frequenciaPorVolume) {
+                if (totalExames < volumeFranquia) {
+                  valorCalculado = valorFranquiaBase;
+                  regra = 'continua_sim_volume_sim_abaixo';
+                } else {
+                  valorCalculado = valorAcimaFranquia > 0 ? valorAcimaFranquia : 0;
+                  regra = valorAcimaFranquia > 0 ? 'continua_sim_volume_sim_acima' : 'continua_sim_volume_sim_acima_sem_valor';
+                }
+              } else {
+                valorCalculado = valorFranquiaBase;
+                regra = 'continua_sim_volume_nao';
+              }
+            } else {
+              if (frequenciaPorVolume) {
+                if (totalExames < volumeFranquia) {
+                  valorCalculado = valorFranquiaBase;
+                  regra = 'continua_nao_volume_sim_abaixo';
+                } else {
+                  valorCalculado = 0;
+                  regra = 'continua_nao_volume_sim_acima';
+                }
+              } else {
+                if (totalExames < volumeFranquia) {
+                  valorCalculado = valorFranquiaBase;
+                  regra = 'continua_nao_volume_nao_abaixo';
+                } else {
+                  valorCalculado = 0;
+                  regra = 'continua_nao_volume_nao_acima';
+                }
+              }
+            }
+          }
+
+          // Segurança adicional: volume 0 com frequências desativadas jamais aplica franquia
+          if (!frequenciaContinua && !frequenciaPorVolume && volumeFranquia <= 0) {
+            valorCalculado = 0;
+            regra = 'volume_zero_sem_frequencia';
+          }
+
+          // Se o valor retornado pela RPC divergir da regra, priorizar a regra
+          if (valorFranquia !== valorCalculado) {
+            console.log(`🔁 ${nomeFantasia}: Ajustando franquia (RPC=${valorFranquia}) → (Regra=${valorCalculado}) | regra=${regra}`);
+            valorFranquia = valorCalculado;
+          }
+
+          detalhesFranquia = {
+            ...(detalhesFranquia || {}),
+            regra,
+            volume_referencia: volumeFranquia,
+            valor_base: valorFranquiaBase,
+            valor_acima_volume: valorAcimaFranquia,
+            total_exames_periodo: totalExames,
+            valor_aplicado: valorFranquia,
+          };
+        } catch (e) {
+          console.warn(`⚠️ ${nomeFantasia}: Falha ao consolidar regra de franquia`, e?.message || e);
         }
       } else {
         console.log(`📋 ${nomeFantasia}: Sem parâmetros encontrados`);
