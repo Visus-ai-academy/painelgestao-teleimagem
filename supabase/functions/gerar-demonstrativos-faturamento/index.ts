@@ -632,10 +632,23 @@ serve(async (req) => {
               }
             } else {
               // SEM condicionante = SEM faixa de volume = preço fixo
-              // Pegar qualquer preço do pool (todos devem ter o mesmo valor_base)
-              const escolhido = poolPrioridade[0];
+              // Se houver múltiplos preços para mesma combinação, use o MENOR valor
+              const precosSemFaixa = poolPrioridade
+                .filter((p: any) => !p.volume_inicial && !p.volume_final)
+                .sort((a: any, b: any) => (a.valor_base || 0) - (b.valor_base || 0));
+              
+              const escolhido = precosSemFaixa[0] || poolPrioridade[0];
               if (escolhido) {
                 valorUnitario = escolhido.valor_base ?? 0;
+                
+                // Log se houver preços duplicados
+                if (poolPrioridade.length > 1) {
+                  console.log(`⚠️ Múltiplos preços encontrados para ${grupo.modalidade}/${grupo.especialidade}/${grupo.categoria}:`, {
+                    total: poolPrioridade.length,
+                    valores: poolPrioridade.map((p: any) => p.valor_base),
+                    escolhido: valorUnitario
+                  });
+                }
               }
             }
           }
