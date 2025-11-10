@@ -377,17 +377,21 @@ serve(async (req) => {
         console.log(`🔍 CEMVALENCA: ${antesFiltro} → ${volumetria.length} registros (removidos ${antesFiltro - volumetria.length})`);
       }
       
-      // CISP: Only Cardio (all priorities)
+      // CISP: Cardio OU Plantão
       if (nomeUpper.includes('CISP') && volumetria.length > 0) {
         const antesFiltro = volumetria.length;
         
         volumetria = volumetria.filter(vol => {
+          const prioridade = (vol.PRIORIDADE || '').toString().toUpperCase();
           const especialidade = (vol.ESPECIALIDADE || '').toString().toUpperCase();
           
-          // Apenas exames de Cardio (todas as prioridades)
-          return especialidade.includes('CARDIO');
+          // Exames de Cardio OU Plantão
+          const isCardio = especialidade.includes('CARDIO');
+          const isPlantao = prioridade === 'PLANTÃO' || prioridade === 'PLANTAO';
+          
+          return isCardio || isPlantao;
         });
-        console.log(`🔍 CISP (Somente Cardio): ${antesFiltro} → ${volumetria.length} registros (removidos ${antesFiltro - volumetria.length})`);
+        console.log(`🔍 CISP (Cardio OU Plantão): ${antesFiltro} → ${volumetria.length} registros (removidos ${antesFiltro - volumetria.length})`);
       }
       
       // Clientes com regra Cardio + Plantão
@@ -715,12 +719,7 @@ serve(async (req) => {
 
       // Calcular franquia baseado nos parâmetros do cliente
       if (parametros) {
-        // Portal de Laudos
-        if (parametros.portal_laudos && parametros.valor_integracao > 0) {
-          valorPortalLaudos = Number(parametros.valor_integracao);
-        }
-
-        // Integração
+        // Integração (valor_integracao é usado APENAS AQUI, não duplicar!)
         if (parametros.cobrar_integracao && parametros.valor_integracao > 0) {
           valorIntegracao = Number(parametros.valor_integracao);
         }

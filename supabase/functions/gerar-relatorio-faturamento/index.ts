@@ -334,25 +334,25 @@ serve(async (req: Request) => {
       console.log(`🔍 CEMVALENCA: ${antesFiltro} → ${volumetriaFiltrada.length} registros (removidos ${antesFiltro - volumetriaFiltrada.length})`);
     }
     
-    // Clientes com regra específica: apenas Cardio + Plantão
-    const CLIENTES_CARDIO_PLANTAO = ['CDICARDIO', 'CDIGOIAS', 'CISP', 'CLIRAM', 'CRWANDERLEY', 
-                                      'DIAGMAX-PR', 'GOLD', 'PRODIMAGEM', 'TRANSDUSON', 'ZANELLO'];
-    const isCardioPlantao = CLIENTES_CARDIO_PLANTAO.some(nc => nomeClienteUpper.includes(nc));
+    // Clientes com regra específica: apenas Cardio OU Plantão
+    const CLIENTES_CARDIO_OU_PLANTAO = ['CDICARDIO', 'CDIGOIAS', 'CISP', 'CLIRAM', 'CRWANDERLEY', 
+                                         'DIAGMAX-PR', 'GOLD', 'PRODIMAGEM', 'TRANSDUSON', 'ZANELLO'];
+    const isCardioOuPlantao = CLIENTES_CARDIO_OU_PLANTAO.some(nc => nomeClienteUpper.includes(nc));
     
-    if (isCardioPlantao && volumetriaFiltrada.length > 0) {
+    if (isCardioOuPlantao && volumetriaFiltrada.length > 0) {
       const antesFiltro = volumetriaFiltrada.length;
       
       volumetriaFiltrada = volumetriaFiltrada.filter(vol => {
         const prioridade = (vol.PRIORIDADE || '').toString().toUpperCase();
         const especialidade = (vol.ESPECIALIDADE || '').toString().toUpperCase();
         
-        // Apenas exames com Cardio E Plantão
+        // Exames de Cardio OU Plantão
         const isCardio = especialidade.includes('CARDIO');
         const isPlantao = prioridade === 'PLANTÃO' || prioridade === 'PLANTAO';
         
-        return isCardio && isPlantao;
+        return isCardio || isPlantao;
       });
-      console.log(`🔍 ${cliente.nome_fantasia || cliente.nome} (Cardio+Plantão): ${antesFiltro} → ${volumetriaFiltrada.length} registros (removidos ${antesFiltro - volumetriaFiltrada.length})`);
+      console.log(`🔍 ${cliente.nome_fantasia || cliente.nome} (Cardio OU Plantão): ${antesFiltro} → ${volumetriaFiltrada.length} registros (removidos ${antesFiltro - volumetriaFiltrada.length})`);
     }
     
     // RMPADUA: Plantão OU Medicina Interna OU Cardio OU Médicos Equipe 2
