@@ -53,26 +53,56 @@ export function DemonstrativoVolumetriaPorCliente({ periodo: periodoInicial }: D
   useEffect(() => {
     const fetchPeriodos = async () => {
       try {
-        const { data, error } = await supabase
+        // Buscar períodos de periodo_referencia
+        const { data: dataRef, error: errorRef } = await supabase
           .from('volumetria_mobilemed')
           .select('periodo_referencia')
           .not('arquivo_fonte', 'in', '("volumetria_onco_padrao")')
           .not('periodo_referencia', 'is', null);
 
-        if (error) throw error;
+        if (errorRef) throw errorRef;
 
-        const periodosUnicos = Array.from(new Set(data?.map(d => d.periodo_referencia) || []))
+        // Buscar períodos de DATA_REALIZACAO
+        const { data: dataReal, error: errorReal } = await supabase
+          .from('volumetria_mobilemed')
+          .select('DATA_REALIZACAO')
+          .not('arquivo_fonte', 'in', '("volumetria_onco_padrao")')
+          .not('DATA_REALIZACAO', 'is', null);
+
+        if (errorReal) throw errorReal;
+
+        // Combinar períodos de ambas as fontes
+        const periodosSet = new Set<string>();
+        
+        // Adicionar períodos de periodo_referencia
+        dataRef?.forEach(d => {
+          if (d.periodo_referencia) {
+            periodosSet.add(d.periodo_referencia);
+          }
+        });
+
+        // Adicionar períodos de DATA_REALIZACAO (formato YYYY-MM)
+        dataReal?.forEach(d => {
+          if (d.DATA_REALIZACAO) {
+            const data = new Date(d.DATA_REALIZACAO);
+            const ano = data.getFullYear();
+            const mes = String(data.getMonth() + 1).padStart(2, '0');
+            periodosSet.add(`${ano}-${mes}`);
+          }
+        });
+
+        const periodosUnicos = Array.from(periodosSet)
           .filter(p => p)
           .sort()
           .reverse();
 
-        setPeriodosFiltro(periodosUnicos as string[]);
+        setPeriodosFiltro(periodosUnicos);
         
         // Se tem período inicial, usar ele, senão usar o primeiro disponível
         if (periodoInicial) {
           setPeriodoSelecionado(periodoInicial);
         } else if (periodosUnicos.length > 0) {
-          setPeriodoSelecionado(periodosUnicos[0] as string);
+          setPeriodoSelecionado(periodosUnicos[0]);
         }
       } catch (error: any) {
         console.error('Erro ao buscar períodos:', error);
@@ -150,18 +180,45 @@ export function DemonstrativoVolumetriaPorCliente({ periodo: periodoInicial }: D
       });
 
       // Buscar dados agrupados por cliente com todas as combinações
+      // Primeiro tentar por periodo_referencia, se não encontrar tentar por DATA_REALIZACAO
       let query = supabase
         .from('volumetria_mobilemed')
-        .select('EMPRESA, MODALIDADE, ESPECIALIDADE, PRIORIDADE, CATEGORIA, VALORES, unidade_origem')
-        .eq('periodo_referencia', periodo)
+        .select('EMPRESA, MODALIDADE, ESPECIALIDADE, PRIORIDADE, CATEGORIA, VALORES, unidade_origem, DATA_REALIZACAO, periodo_referencia')
         .not('arquivo_fonte', 'in', '("volumetria_onco_padrao")');
 
+      // Tentar buscar por periodo_referencia primeiro
+      const queryRef = query.eq('periodo_referencia', periodo);
+      
       // Aplicar filtro de clientes se necessário
       if (clientesFiltrados && clientesFiltrados.length > 0) {
-        query = query.in('EMPRESA', clientesFiltrados);
+        queryRef.in('EMPRESA', clientesFiltrados);
       }
 
-      const { data: volumetriaData, error: volumetriaError } = await query;
+      let { data: volumetriaData, error: volumetriaError } = await queryRef;
+
+      // Se não encontrou por periodo_referencia, tentar por DATA_REALIZACAO
+      if (!volumetriaData || volumetriaData.length === 0) {
+        const [ano, mes] = periodo.split('-');
+        const dataInicio = `${ano}-${mes}-01`;
+        const proximoMes = parseInt(mes) === 12 ? 1 : parseInt(mes) + 1;
+        const proximoAno = parseInt(mes) === 12 ? parseInt(ano) + 1 : parseInt(ano);
+        const dataFim = `${proximoAno}-${String(proximoMes).padStart(2, '0')}-01`;
+
+        let queryData = supabase
+          .from('volumetria_mobilemed')
+          .select('EMPRESA, MODALIDADE, ESPECIALIDADE, PRIORIDADE, CATEGORIA, VALORES, unidade_origem, DATA_REALIZACAO, periodo_referencia')
+          .gte('DATA_REALIZACAO', dataInicio)
+          .lt('DATA_REALIZACAO', dataFim)
+          .not('arquivo_fonte', 'in', '("volumetria_onco_padrao")');
+
+        if (clientesFiltrados && clientesFiltrados.length > 0) {
+          queryData = queryData.in('EMPRESA', clientesFiltrados);
+        }
+
+        const result = await queryData;
+        volumetriaData = result.data;
+        volumetriaError = result.error;
+      }
 
       if (volumetriaError) throw volumetriaError;
 
