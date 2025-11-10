@@ -923,8 +923,14 @@ export default function DemonstrativoFaturamento() {
             console.log('📊 Clientes processados da volumetria:', clientesArray.length);
             console.log('📋 Primeiros 5 clientes:', clientesArray.slice(0, 5).map(c => ({ nome: c.nome, exames: c.total_exames, valor: c.valor_bruto })));
             
-            setClientes(clientesArray);
-            setClientesFiltrados(clientesArray);
+            // Filtrar clientes com valores zerados
+            const clientesComValor = clientesArray.filter(c => 
+              c.total_exames > 0 && c.valor_bruto > 0 && c.valor_liquido > 0
+            );
+            console.log(`🔍 Filtrados ${clientesArray.length - clientesComValor.length} clientes com valores zerados`);
+            
+            setClientes(clientesComValor);
+            setClientesFiltrados(clientesComValor);
             
             // Mostrar toast apenas na primeira carga para evitar loop
             if (!hasShownInitialToast.current) {
@@ -1105,8 +1111,14 @@ export default function DemonstrativoFaturamento() {
       console.log('📊 Clientes processados finais:', clientesArray.length);
       console.log('📋 Nomes dos clientes processados:', clientesArray.map(c => c.nome));
       
-      setClientes(clientesArray);
-      setClientesFiltrados(clientesArray);
+      // Filtrar clientes com valores zerados
+      const clientesComValor = clientesArray.filter(c => 
+        c.total_exames > 0 && c.valor_bruto > 0 && c.valor_liquido > 0
+      );
+      console.log(`🔍 Filtrados ${clientesArray.length - clientesComValor.length} clientes com valores zerados`);
+      
+      setClientes(clientesComValor);
+      setClientesFiltrados(clientesComValor);
 
       // Calcular totais para o log
       const totaisCalculados = clientesArray.reduce((acc, cliente) => ({
@@ -1226,8 +1238,18 @@ export default function DemonstrativoFaturamento() {
       return;
     }
 
+    // Filtrar clientes com valores zerados antes de exportar
+    const clientesParaExportar = clientesFiltrados.filter(c => 
+      c.total_exames > 0 && c.valor_bruto > 0 && c.valor_liquido > 0
+    );
+
+    if (clientesParaExportar.length === 0) {
+      toast({ title: "Sem dados", description: "Nenhum cliente com valores para exportar.", variant: "destructive" });
+      return;
+    }
+
     // ✅ Usar EXATAMENTE os valores que estão no demonstrativo visível, sem recálculos
-    const dados = clientesFiltrados.map((c) => ({
+    const dados = clientesParaExportar.map((c) => ({
       "Nome do Cliente": c.nome,
       "Quantidade de Exames": c.total_exames || 0,
       "Valor Total Exames": Number(c.valor_exames || 0),

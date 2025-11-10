@@ -769,8 +769,10 @@ serve(async (req) => {
       });
 
       // Include if has exams OR net value > 0
-      if (totalExames > 0 || valorLiquido > 0) {
+      if (totalExames > 0 && valorLiquido > 0) {
         demonstrativos.push(demonstrativo);
+      } else {
+        console.log(`⏭️ ${nomeFantasia} pulado (valores zerados): exames=${totalExames}, líquido=${valorLiquido}`);
       }
     }
 
