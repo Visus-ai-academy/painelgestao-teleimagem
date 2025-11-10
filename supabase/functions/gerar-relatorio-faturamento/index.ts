@@ -355,25 +355,37 @@ serve(async (req: Request) => {
       console.log(`🔍 ${cliente.nome_fantasia || cliente.nome} (Cardio+Plantão): ${antesFiltro} → ${volumetriaFiltrada.length} registros (removidos ${antesFiltro - volumetriaFiltrada.length})`);
     }
     
-    // Other NC clients with standard rules (RMPADUA)
-    const OUTROS_NC = ['RMPADUA'];
-    const isOutroNC = OUTROS_NC.some(nc => nomeClienteUpper.includes(nc));
-    
-    if (isOutroNC && volumetriaFiltrada.length > 0) {
-      const ESPECIALIDADES_FATURADAS = ['MUSCULO ESQUELETICO', 'NEURO', 'PEDIATRIA'];
+    // RMPADUA: Plantão OU Medicina Interna OU Cardio OU Médicos Equipe 2
+    if (nomeClienteUpper.includes('RMPADUA') && volumetriaFiltrada.length > 0) {
+      const ESPECIALIDADES_FATURADAS = ['MEDICINA INTERNA', 'CARDIO'];
+      const MEDICOS_EQUIPE_2 = ['Dr. Antonio Gualberto Chianca Filho', 'Dr. Daniel Chrispim', 'Dr. Efraim Da Silva Ferreira', 'Dr. Felipe Falcão de Sá', 'Dr. Guilherme N. Schincariol', 'Dr. Gustavo Andreis', 'Dr. João Carlos Dantas do Amaral', 'Dr. João Fernando Miranda Pompermayer', 'Dr. Leonardo de Paula Ribeiro Figueiredo', 'Dr. Raphael Sanfelice João', 'Dr. Thiago P. Martins', 'Dr. Virgílio Oliveira Barreto', 'Dra. Adriana Giubilei Pimenta', 'Dra. Aline Andrade Dorea', 'Dra. Camila Amaral Campos', 'Dra. Cynthia Mendes Vieira de Morais', 'Dra. Fernanda Gama Barbosa', 'Dra. Kenia Menezes Fernandes', 'Dra. Lara M. Durante Bacelar', 'Dr. Aguinaldo Cunha Zuppani', 'Dr. Alex Gueiros de Barros', 'Dr. Eduardo Caminha Nunes', 'Dr. Márcio D\'Andréa Rossi', 'Dr. Rubens Pereira Moura Filho', 'Dr. Wesley Walber da Silva', 'Dra. Luna Azambuja Satte Alam', 'Dra. Roberta Bertoldo Sabatini Treml', 'Dra. Thais Nogueira D. Gastaldi', 'Dra. Vanessa da Costa Maldonado'];
       const antesFiltro = volumetriaFiltrada.length;
       
       volumetriaFiltrada = volumetriaFiltrada.filter(vol => {
         const prioridade = (vol.PRIORIDADE || '').toString().toUpperCase();
         const especialidade = (vol.ESPECIALIDADE || '').toString().toUpperCase();
+        const medico = (vol.MEDICO || '').toString();
         
+        // Plantão sempre fatura
         if (prioridade === 'PLANTÃO' || prioridade === 'PLANTAO') {
           return true;
         }
         
-        return ESPECIALIDADES_FATURADAS.some(esp => especialidade.includes(esp));
+        // Especialidades Medicina Interna ou Cardio faturam
+        const temEspecialidadeFaturada = ESPECIALIDADES_FATURADAS.some(esp => especialidade.includes(esp));
+        if (temEspecialidadeFaturada) {
+          return true;
+        }
+        
+        // Médicos da Equipe 2 faturam
+        const temMedicoEquipe2 = MEDICOS_EQUIPE_2.some(med => medico.includes(med));
+        if (temMedicoEquipe2) {
+          return true;
+        }
+        
+        return false;
       });
-      console.log(`🔍 ${cliente.nome_fantasia || cliente.nome} (NC-FT): ${antesFiltro} → ${volumetriaFiltrada.length} registros (removidos ${antesFiltro - volumetriaFiltrada.length})`);
+      console.log(`🔍 RMPADUA (Plantão/MI/Cardio/Equipe2): ${antesFiltro} → ${volumetriaFiltrada.length} registros (removidos ${antesFiltro - volumetriaFiltrada.length})`);
     }
     
     console.log('📊 Volumetria final após filtros:', volumetriaFiltrada.length, 'registros');
