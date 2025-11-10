@@ -112,18 +112,17 @@ serve(async (req: Request) => {
       volumetriaMap.set(key, item);
     });
 
-    // Pattern-based search for grouped clients
+    // Pattern-based search apenas para clientes que precisam (se aplicável)
     const nomeFantasia = cliente.nome_fantasia || cliente.nome;
     let padroesBusca: string[] = [];
     
+    // PRN pode precisar de pattern search se não estiver agrupado na volumetria
     if (nomeFantasia === 'PRN') {
       padroesBusca = ['PRN%'];
-    } else if (['CEDI-RJ', 'CEDI-RO'].includes(nomeFantasia)) {
-      // CEDIDIAG NÃO está nesta lista - apenas CEDI-RJ e CEDI-RO agrupam com CEDI%
-      padroesBusca = ['CEDI%'];
     } else if (nomeFantasia.includes('AKCPALMAS') || nomeFantasia.includes('AKC')) {
       padroesBusca = ['AKC%', 'AKCPALMAS%'];
     }
+    // CEDIDIAG removido - agrupamento já feito na volumetria (CEDI-RJ e CEDI-RO já vêm como CEDIDIAG)
     
     if (padroesBusca.length > 0) {
       for (const padrao of padroesBusca) {

@@ -161,18 +161,17 @@ serve(async (req) => {
       const examesTotaisAntesFiltros = volumetria.reduce((acc, vol) => acc + (Number(vol.VALORES) || 0), 0);
       console.log(`📊 ${cliente.nome_fantasia}: ${volumetria.length} registros, ${examesTotaisAntesFiltros} exames (antes filtros)`);
 
-      // Pattern-based search for grouped clients
+      // Pattern-based search apenas para clientes que precisam (se aplicável)
       // nomeFantasia já foi declarado acima (linha 107)
       let padroesBusca: string[] = [];
       
+      // PRN pode precisar de pattern search se não estiver agrupado na volumetria
       if (nomeFantasia === 'PRN') {
         padroesBusca = ['PRN%'];
-      } else if (['CEDI-RJ', 'CEDI-RO'].includes(nomeFantasia)) {
-        // CEDIDIAG NÃO está nesta lista - apenas CEDI-RJ e CEDI-RO agrupam com CEDI%
-        padroesBusca = ['CEDI%'];
       } else if (nomeFantasia.includes('AKCPALMAS') || nomeFantasia.includes('AKC')) {
         padroesBusca = ['AKC%', 'AKCPALMAS%'];
       }
+      // CEDIDIAG removido - agrupamento já feito na volumetria (CEDI-RJ e CEDI-RO já vêm como CEDIDIAG)
       
       if (padroesBusca.length > 0) {
         for (const padrao of padroesBusca) {
