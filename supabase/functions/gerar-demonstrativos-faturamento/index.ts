@@ -161,45 +161,7 @@ serve(async (req) => {
       const examesTotaisAntesFiltros = volumetria.reduce((acc, vol) => acc + (Number(vol.VALORES) || 0), 0);
       console.log(`📊 ${cliente.nome_fantasia}: ${volumetria.length} registros, ${examesTotaisAntesFiltros} exames (antes filtros)`);
 
-      // Pattern-based search for grouped clients (PRN, AKCPALMAS, etc.)
-      // nomeFantasia já foi declarado acima (linha 107)
-      let padroesBusca: string[] = [];
-      
-      if (nomeFantasia === 'PRN') {
-        padroesBusca = ['PRN%'];
-      } else if (['CEDI-RJ', 'CEDI-RO'].includes(nomeFantasia)) {
-        // CEDIDIAG foi removido desta lista - deve buscar apenas seus próprios dados
-        padroesBusca = ['CEDI%'];
-      } else if (nomeFantasia.includes('AKCPALMAS') || nomeFantasia.includes('AKC')) {
-        padroesBusca = ['AKC%', 'AKCPALMAS%'];
-      }
-      
-      if (padroesBusca.length > 0) {
-        for (const padrao of padroesBusca) {
-          const { data: volEmp } = await supabase
-            .from('volumetria_mobilemed')
-            .select('id, *')
-            .eq('periodo_referencia', periodo)
-            .ilike('EMPRESA', padrao);
-          
-          const { data: volFant } = await supabase
-            .from('volumetria_mobilemed')
-            .select('id, *')
-            .eq('periodo_referencia', periodo)
-            .ilike('Cliente_Nome_Fantasia', padrao);
-          
-          [...(volEmp || []), ...(volFant || [])].forEach(item => {
-            const key = item.id ? item.id.toString() : `pattern_${item.EMPRESA}_${item.VALORES}_${Math.random()}`;
-            volumetriaMap.set(key, item);
-          });
-        }
-        
-        volumetria = Array.from(volumetriaMap.values());
-        
-        // Log pós-pattern search
-        const examesAposPattern = volumetria.reduce((acc, vol) => acc + (Number(vol.VALORES) || 0), 0);
-        console.log(`📊 ${nomeFantasia}: ${volumetria.length} registros, ${examesAposPattern} exames (após pattern search)`);
-      }
+      // Removido pattern-based search - cada cliente busca apenas seus próprios dados via aliases
 
       // CRITICAL: Filter out NC-NF and EXCLUSAO records FIRST
       volumetria = volumetria.filter(vol => {
