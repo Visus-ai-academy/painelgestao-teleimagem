@@ -709,147 +709,57 @@ serve(async (req) => {
         });
       }
 
-      // Calculate franchise, portal and integration directly (without RPC)
+      // ============================================
+      // USAR RPC IGUAL AO RELATÓRIO (MESMA LÓGICA)
+      // ============================================
       let valorFranquia = 0;
       let valorPortalLaudos = 0;
       let valorIntegracao = 0;
       let detalhesFranquia = {};
 
-      console.log(`📋 Calculando franquia para ${nomeFantasia} - Volume: ${totalExames}`);
-      console.log('📋 Parâmetros encontrados:', JSON.stringify(parametros, null, 2));
+      console.log(`📋 Calculando adicionais para ${nomeFantasia} - Volume: ${totalExames}`);
 
-      // Calcular franquia baseado nos parâmetros do cliente
-      if (parametros) {
-        // Portal de Laudos
-        if (parametros.portal_laudos && parametros.valor_portal_laudos > 0) {
-          valorPortalLaudos = Number(parametros.valor_portal_laudos);
-          console.log(`📋 ${nomeFantasia}: Portal de Laudos = R$ ${valorPortalLaudos.toFixed(2)}`);
-        }
+      // Usar RPC calcular_faturamento_completo para obter franquia/portal/integração (IGUAL RELATÓRIO)
+      try {
+        const { data: calcData, error: calcErr } = await supabase
+          .rpc('calcular_faturamento_completo', {
+            p_cliente_id: cliente.id,
+            p_periodo: periodo,
+            p_volume_total: totalExames
+          });
 
-        // Integração
-        if (parametros.cobrar_integracao && parametros.valor_integracao > 0) {
-          valorIntegracao = Number(parametros.valor_integracao);
-          console.log(`📋 ${nomeFantasia}: Integração = R$ ${valorIntegracao.toFixed(2)}`);
-        }
-
-        // Franquia - Nova lógica consolidada
-        if (parametros.aplicar_franquia) {
-          const volumeFranquia = parametros.volume_franquia || 0;
-          const valorFranquiaBase = Number(parametros.valor_franquia || 0);
-          const valorAcimaFranquia = Number(parametros.valor_acima_franquia || 0);
-          const frequenciaContinua = parametros.frequencia_continua === true;
-          const frequenciaPorVolume = parametros.frequencia_por_volume === true;
-          
-          console.log(`📋 ${nomeFantasia}: Aplica franquia = ${parametros.aplicar_franquia}`);
-          console.log(`📋 ${nomeFantasia}: Freq contínua = ${frequenciaContinua}`);
-          console.log(`📋 ${nomeFantasia}: Freq por volume = ${frequenciaPorVolume}`);
-          console.log(`📋 ${nomeFantasia}: Volume franquia = ${volumeFranquia}`);
-          console.log(`📋 ${nomeFantasia}: Valor franquia = ${valorFranquiaBase}`);
-          console.log(`📋 ${nomeFantasia}: Valor acima franquia = ${valorAcimaFranquia}`);
-          console.log(`📋 ${nomeFantasia}: Total exames = ${totalExames}`);
-          
-          // LÓGICA CONSOLIDADA DE FRANQUIA
-          if (frequenciaContinua === true) {
-            // Frequência Contínua = SIM
-            if (frequenciaPorVolume === true) {
-              // Frequência por Volume = SIM
-              if (totalExames < volumeFranquia) {
-                // Volume abaixo do threshold → cobra valor base
-                valorFranquia = valorFranquiaBase;
-                detalhesFranquia = {
-                  tipo: 'continua_sim_volume_sim_abaixo',
-                  volume_base: volumeFranquia,
-                  volume_atual: totalExames,
-                  valor_aplicado: valorFranquia,
-                  motivo: `Frequência Contínua=Sim + Volume < ${volumeFranquia}: cobra valor base ${valorFranquiaBase}`
-                };
-              } else {
-                // Volume >= threshold → cobra valor acima franquia (se existir) ou NÃO cobra
-                if (valorAcimaFranquia > 0) {
-                  valorFranquia = valorAcimaFranquia;
-                  detalhesFranquia = {
-                    tipo: 'continua_sim_volume_sim_acima',
-                    volume_base: volumeFranquia,
-                    volume_atual: totalExames,
-                    valor_aplicado: valorFranquia,
-                    motivo: `Frequência Contínua=Sim + Volume >= ${volumeFranquia}: cobra valor acima ${valorAcimaFranquia}`
-                  };
-                } else {
-                  valorFranquia = 0;
-                  detalhesFranquia = {
-                    tipo: 'continua_sim_volume_sim_acima_sem_valor',
-                    volume_base: volumeFranquia,
-                    volume_atual: totalExames,
-                    valor_aplicado: 0,
-                    motivo: `Frequência Contínua=Sim + Volume >= ${volumeFranquia} + Sem valor acima: NÃO cobra`
-                  };
-                }
-              }
-            } else {
-              // Frequência por Volume = NÃO ou vazio → SEMPRE cobra valor base
-              valorFranquia = valorFranquiaBase;
-              detalhesFranquia = {
-                tipo: 'continua_sim_volume_nao',
-                volume_atual: totalExames,
-                valor_aplicado: valorFranquia,
-                motivo: `Frequência Contínua=Sim + Freq por Volume≠Sim: SEMPRE cobra ${valorFranquiaBase}`
-              };
-            }
-          } else {
-            // Frequência Contínua = NÃO
-            if (frequenciaPorVolume === true) {
-              // Frequência por Volume = SIM
-              if (totalExames < volumeFranquia) {
-                // Volume abaixo do threshold → cobra franquia
-                valorFranquia = valorFranquiaBase;
-                detalhesFranquia = {
-                  tipo: 'continua_nao_volume_sim_abaixo',
-                  volume_base: volumeFranquia,
-                  volume_atual: totalExames,
-                  valor_aplicado: valorFranquia,
-                  motivo: `Frequência Contínua=Não + Volume < ${volumeFranquia}: cobra ${valorFranquiaBase}`
-                };
-              } else {
-                // Volume >= threshold → NÃO cobra
-                valorFranquia = 0;
-                detalhesFranquia = {
-                  tipo: 'continua_nao_volume_sim_acima',
-                  volume_base: volumeFranquia,
-                  volume_atual: totalExames,
-                  valor_aplicado: 0,
-                  motivo: `Frequência Contínua=Não + Volume >= ${volumeFranquia}: NÃO cobra`
-                };
-              }
-            } else {
-              // Frequência por Volume = NÃO ou indefinido → NÃO cobra franquia
-              valorFranquia = 0;
-              detalhesFranquia = {
-                tipo: 'continua_nao_volume_nao',
-                volume_base: volumeFranquia,
-                volume_atual: totalExames,
-                valor_aplicado: 0,
-                motivo: 'Frequência Contínua=Não + Freq por Volume≠Sim: NÃO cobra franquia'
-              };
-            }
-          }
-          
-          console.log(`📋 ${nomeFantasia}: Franquia calculada = R$ ${valorFranquia.toFixed(2)}`);
-          console.log(`📋 ${nomeFantasia}: Detalhes:`, detalhesFranquia);
+        if (!calcErr && calcData && Array.isArray(calcData) && calcData.length > 0) {
+          const c = calcData[0];
+          valorFranquia = Number(c.valor_franquia) || 0;
+          valorPortalLaudos = Number(c.valor_portal_laudos) || 0;
+          valorIntegracao = Number(c.valor_integracao) || 0;
+          detalhesFranquia = c.detalhes_franquia || {};
+          console.log(`✅ ${nomeFantasia}: Adicionais via RPC`, { valorFranquia, valorPortalLaudos, valorIntegracao });
         } else {
-          detalhesFranquia = {
-            tipo: 'nao_aplica',
-            valor_aplicado: 0,
-            motivo: 'Cliente não possui franquia configurada'
-          };
-          console.log(`📋 ${nomeFantasia}: Não aplica franquia`);
+          console.warn(`⚠️ ${nomeFantasia}: RPC indisponível`, calcErr);
+        }
+      } catch (e) {
+        console.warn(`⚠️ ${nomeFantasia}: Erro RPC:`, e?.message || e);
+      }
+
+      // Respeitar flags dos parâmetros (IGUAL RELATÓRIO)
+      if (parametros) {
+        if (!parametros.aplicar_franquia) {
+          console.log(`📋 ${nomeFantasia}: Franquia DESABILITADA por parâmetro`);
+          valorFranquia = 0;
+          detalhesFranquia = { tipo: 'desabilitado', valor_aplicado: 0, motivo: 'Franquia desabilitada nos parâmetros' };
+        }
+        if (!parametros.portal_laudos) {
+          console.log(`📋 ${nomeFantasia}: Portal DESABILITADO por parâmetro`);
+          valorPortalLaudos = 0;
+        }
+        if (!parametros.cobrar_integracao) {
+          console.log(`📋 ${nomeFantasia}: Integração DESABILITADA por parâmetro`);
+          valorIntegracao = 0;
         }
       } else {
-        console.log(`📋 ${nomeFantasia}: Sem parâmetros de faturamento encontrados`);
-        detalhesFranquia = {
-          tipo: 'nao_aplica',
-          valor_aplicado: 0,
-          motivo: 'Cliente não possui parâmetros de faturamento configurados'
-        };
+        console.log(`📋 ${nomeFantasia}: Sem parâmetros encontrados`);
+        detalhesFranquia = { tipo: 'nao_aplica', valor_aplicado: 0, motivo: 'Cliente sem parâmetros de faturamento' };
       }
 
       // ✅ FIX 3: Calculate taxes properly
@@ -867,15 +777,25 @@ serve(async (req) => {
         simples: parametros?.simples
       });
 
-      // Clientes Simples Nacional NÃO têm retenção de impostos
-      if (parametros && !parametros.simples && parametros.percentual_iss) {
-        valorISS = valorBruto * (parametros.percentual_iss / 100);
-        if (parametros.impostos_ab_min) {
-          valorISS = Math.max(valorISS, parametros.impostos_ab_min);
+      // Clientes Simples Nacional NÃO têm retenção de impostos (IGUAL RELATÓRIO)
+      if (parametros && !parametros.simples) {
+        const pis = valorBruto * 0.0065;
+        const cofins = valorBruto * 0.03;
+        const csll = valorBruto * 0.01;
+        const irrf = valorBruto * 0.015;
+        
+        // ISS específico do cliente
+        if (parametros.percentual_iss) {
+          valorISS = valorBruto * (parametros.percentual_iss / 100);
+          if (parametros.impostos_ab_min) {
+            valorISS = Math.max(valorISS, parametros.impostos_ab_min);
+          }
         }
         
-        // IRRF para regime normal
-        valorIRRF = valorBruto * 0.015;
+        valorIRRF = pis + cofins + csll + irrf;
+        console.log(`💰 ${nomeFantasia}: Regime NORMAL - ISS: ${valorISS}, Federais: ${valorIRRF}`);
+      } else {
+        console.log(`💰 ${nomeFantasia}: Simples Nacional - SEM retenção`);
       }
 
       const totalImpostos = valorISS + valorIRRF;
