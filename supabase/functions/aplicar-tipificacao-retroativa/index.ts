@@ -60,11 +60,11 @@ function determinarTipoFaturamento(
     const ehPlantao = prioridade === "PLANTÃO";
     const temMedicoFaturado = medico && MEDICOS_NC_FATURADOS.includes(medico);
     
-    // Exceção especial para RADI-IMAGEM: incluir especialidade MAMA
-    const temMamaRadiImagem = cliente === "RADI-IMAGEM" && especialidade === "MAMA";
+    // Exceção especial para RADI-IMAGEM: incluir especialidade MAMO (mamografia)
+    const temMamoRadiImagem = cliente === "RADI-IMAGEM" && especialidade === "MAMO";
 
-    // NC-FT: especialidades específicas OU prioridade plantão OU médicos específicos OU MAMA para RADI-IMAGEM
-    if (temEspecialidadeFaturada || ehPlantao || temMedicoFaturado || temMamaRadiImagem) {
+    // NC-FT: especialidades específicas OU prioridade plantão OU médicos específicos OU MAMO para RADI-IMAGEM
+    if (temEspecialidadeFaturada || ehPlantao || temMedicoFaturado || temMamoRadiImagem) {
       return "NC-FT";
     }
     return "NC-NF";

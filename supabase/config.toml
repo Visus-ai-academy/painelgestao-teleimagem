@@ -214,3 +214,6 @@ verify_jwt = true
 
 [functions.corrigir-especialidades-invalidas-completo]
 verify_jwt = false
+
+[functions.aplicar-especialidades-cadastro]
+verify_jwt = true

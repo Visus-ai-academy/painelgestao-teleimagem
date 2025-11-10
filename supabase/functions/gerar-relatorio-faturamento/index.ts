@@ -328,9 +328,9 @@ serve(async (req: Request) => {
       console.log(`🔍 CEMVALENCA_PL: ${antesFiltro} → ${volumetriaFiltrada.length} registros (removidos ${antesFiltro - volumetriaFiltrada.length})`);
     }
     
-    // CEMVALENCA: Only MEDICINA INTERNA and MAMA specialties
+    // CEMVALENCA: Only MEDICINA INTERNA and MAMO (mamografia) specialties
     if (nomeClienteUpper.includes('CEMVALENCA') && !nomeClienteUpper.includes('CEMVALENCA_RX') && !nomeClienteUpper.includes('CEMVALENCA_PL') && volumetriaFiltrada.length > 0) {
-      const ESPECIALIDADES_FATURADAS = ['MEDICINA INTERNA', 'MAMA'];
+      const ESPECIALIDADES_FATURADAS = ['MEDICINA INTERNA', 'MAMO'];
       const antesFiltro = volumetriaFiltrada.length;
       
       volumetriaFiltrada = volumetriaFiltrada.filter(vol => {

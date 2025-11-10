@@ -44,6 +44,8 @@ serve(async (req) => {
 
     // Regras de aplicação automática de especialidade baseado na modalidade
     // IMPORTANTE: Consulte cadastro_exames para modalidade/especialidade/categoria específicas
+    // NOTA: Esta função só deve ser usada para modalidades genéricas
+    // Para exames específicos (ex: MAMOGRAFIA), use a função aplicar-especialidades-cadastro
     const regrasEspecialidade: Record<string, string> = {
       'RX': 'RX',
       'CT': 'CT',
@@ -55,7 +57,8 @@ serve(async (req) => {
       'RF': 'RX',
       'RM': 'RM',
       'TC': 'CT',
-      'ECO': 'US'
+      'ECO': 'US',
+      'MG': 'MAMO'  // Mamografia/Tomossíntese sempre MAMO
     };
 
     // Processar em lotes de 100 registros

@@ -220,7 +220,7 @@ serve(async (req) => {
           const temEspecialidadeFaturada = especialidade && ESPECIALIDADES_NC_FATURADAS.includes(especialidade);
           const ehPlantao = prioridade === "PLANTÃO";
           const temMedicoFaturado = medico && MEDICOS_NC_FATURADOS.includes(medico);
-          const temMamaRadiImagem = cliente === "RADI-IMAGEM" && especialidade === "MAMA";
+          const temMamoRadiImagem = cliente === "RADI-IMAGEM" && especialidade === "MAMO";
           return (temEspecialidadeFaturada || ehPlantao || temMedicoFaturado || temMamaRadiImagem) ? "NC-FT" : "NC-NF";
         }
         
