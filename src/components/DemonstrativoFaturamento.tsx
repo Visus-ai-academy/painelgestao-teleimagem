@@ -1342,60 +1342,18 @@ export default function DemonstrativoFaturamento() {
         </Button>
       </div>
 
-      {/* ✅ RESUMO GERAL - Agora na aba correta */}
-      {clientes.length > 0 && (() => {
-        // ✅ EXTRAIR VALORES REAIS DOS DEMONSTRATIVOS SALVOS
-        const demonstrativosCompletos = localStorage.getItem(`demonstrativos_completos_${periodo}`);
-        let resumoReal = null;
-        
-        if (demonstrativosCompletos) {
-          try {
-            const dados = JSON.parse(demonstrativosCompletos);
-            console.log('✅ Dados carregados do localStorage:', dados);
-            
-            // Verificar se temos demonstrativos válidos e que seja um array
-            const demonstrativos = dados?.demonstrativos;
-            if (demonstrativos && Array.isArray(demonstrativos)) {
-              const demonstrativosValidos = demonstrativos.filter((dem: any) => Number(dem.valor_total ?? dem.valor_liquido ?? 0) > 0);
-              resumoReal = {
-                clientes_processados: demonstrativosValidos.length,
-                total_exames_geral: demonstrativosValidos.reduce((sum: number, dem: any) => sum + (dem.total_exames || 0), 0),
-                valor_exames_geral: demonstrativosValidos.reduce((sum: number, dem: any) => sum + (dem.valor_exames || 0), 0),
-                valor_franquias_geral: demonstrativosValidos.reduce((sum: number, dem: any) => sum + (dem.valor_franquia || 0), 0),
-                valor_portal_geral: demonstrativosValidos.reduce((sum: number, dem: any) => sum + (dem.valor_portal_laudos || 0), 0),
-                valor_integracao_geral: demonstrativosValidos.reduce((sum: number, dem: any) => sum + (dem.valor_integracao || 0), 0),
-                valor_adicionais_geral: demonstrativosValidos.reduce((sum: number, dem: any) => sum + ((dem.valor_franquia || 0) + (dem.valor_portal_laudos || 0) + (dem.valor_integracao || 0)), 0),
-                valor_bruto_geral: demonstrativosValidos.reduce((sum: number, dem: any) => sum + ((dem.valor_exames || 0) + (dem.valor_franquia || 0) + (dem.valor_portal_laudos || 0) + (dem.valor_integracao || 0)), 0),
-                valor_impostos_geral: demonstrativosValidos.reduce((sum: number, dem: any) => sum + (dem.valor_impostos || 0), 0),
-                valor_total_geral: demonstrativosValidos.reduce((sum: number, dem: any) => sum + (dem.valor_total || dem.valor_liquido || 0), 0),
-                clientes_simples_nacional: demonstrativosValidos.filter((dem: any) => dem.detalhes_tributacao?.simples_nacional).length,
-                clientes_regime_normal: demonstrativosValidos.filter((dem: any) => !dem.detalhes_tributacao?.simples_nacional).length
-              };
-              console.log('✅ Resumo calculado (somente clientes com valor > 0):', resumoReal);
-            } else {
-              console.log('⚠️ Demonstrativos não encontrados ou formato inválido');
-            }
-          } catch (error) {
-            console.error('❌ Erro ao processar demonstrativos do localStorage:', error);
-          }
-        } else {
-          console.warn('⚠️ Não há demonstrativos no localStorage para período:', periodo);
-        }
-        
-        const usarResumoLocal = resumoReal && (((resumoReal as any).valor_adicionais_geral ?? 0) > 0 || ((resumoReal as any).valor_impostos_geral ?? 0) > 0);
-        const resumoCalculado = usarResumoLocal ? (resumoReal as any) : (() => {
-          // 🔧 CALCULAR VALORES COMPLETOS a partir das observações dos clientes
-          console.log('⚠️ FALLBACK: Calculando resumo a partir dos dados dos clientes');
-          
+      {/* ✅ RESUMO GERAL - Usando mesma fonte que Excel (clientesFiltrados) */}
+      {clientesFiltrados.length > 0 && (() => {
+        // ✅ CALCULAR DIRETAMENTE DE clientesFiltrados (mesma fonte que Excel)
+        const resumoCalculado = (() => {
+          let totalExamesGeral = 0;
           let valorFranquiasTotal = 0;
           let valorPortalTotal = 0;
           let valorIntegracaoTotal = 0;
           let valorImpostosTotal = 0;
-          let totalExamesGeral = 0;
           
-          // Extrair valores das observações de cada cliente
-          clientes.forEach(cliente => {
-            // Somar exames
+          // ✅ USAR clientesFiltrados (mesma fonte que Excel)
+          clientesFiltrados.forEach((cliente) => {
             totalExamesGeral += cliente.total_exames || 0;
             
             if (cliente.observacoes) {
@@ -1404,41 +1362,41 @@ export default function DemonstrativoFaturamento() {
               const integracaoMatch = cliente.observacoes.match(/Integração: R\$ ([\d.,]+)/);
               const impostosMatch = cliente.observacoes.match(/Impostos: R\$ ([\d.,]+)/);
               
-              if (franquiaMatch) valorFranquiasTotal += parseFloat(franquiaMatch[1].replace(',', '.')) || 0;
-              if (portalMatch) valorPortalTotal += parseFloat(portalMatch[1].replace(',', '.')) || 0;
-              if (integracaoMatch) valorIntegracaoTotal += parseFloat(integracaoMatch[1].replace(',', '.')) || 0;
-              if (impostosMatch) valorImpostosTotal += parseFloat(impostosMatch[1].replace(',', '.')) || 0;
+              if (franquiaMatch) valorFranquiasTotal += parseFloat(franquiaMatch[1].replace(/\./g, '').replace(',', '.')) || 0;
+              if (portalMatch) valorPortalTotal += parseFloat(portalMatch[1].replace(/\./g, '').replace(',', '.')) || 0;
+              if (integracaoMatch) valorIntegracaoTotal += parseFloat(integracaoMatch[1].replace(/\./g, '').replace(',', '.')) || 0;
+              if (impostosMatch) valorImpostosTotal += parseFloat(impostosMatch[1].replace(/\./g, '').replace(',', '.')) || 0;
             }
           });
           
-          const valorExamesGeral = clientes.reduce((sum, c) => sum + (c.valor_bruto || 0), 0);
-          const valorBrutoGeral = valorExamesGeral; // valor_bruto já inclui adicionais após nossa correção
-          const valorLiquidoGeral = valorBrutoGeral - valorImpostosTotal;
+          const valorBrutoGeral = clientesFiltrados.reduce((sum, c) => sum + (c.valor_bruto || 0), 0);
+          const valorExamesGeral = valorBrutoGeral - valorFranquiasTotal - valorPortalTotal - valorIntegracaoTotal;
+          const valorAdicionaisGeral = valorFranquiasTotal + valorPortalTotal + valorIntegracaoTotal;
+          const valorLiquidoGeral = clientesFiltrados.reduce((sum, c) => sum + (c.valor_liquido || 0), 0);
           
-          console.log('🧮 Resumo calculado via fallback:', {
+          console.log('🧮 Resumo Geral calculado (fonte: clientesFiltrados):', {
+            clientes: clientesFiltrados.length,
             totalExamesGeral,
-            valorExamesGeral: valorExamesGeral - valorFranquiasTotal - valorPortalTotal - valorIntegracaoTotal, // apenas exames
-            valorFranquiasTotal,
-            valorPortalTotal, 
-            valorIntegracaoTotal,
-            valorImpostosTotal,
+            valorExamesGeral,
+            valorAdicionaisGeral,
             valorBrutoGeral,
+            valorImpostosTotal,
             valorLiquidoGeral
           });
           
           return {
-            clientes_processados: clientes.length,
+            clientes_processados: clientesFiltrados.length,
             total_exames_geral: totalExamesGeral,
-            valor_exames_geral: valorExamesGeral - valorFranquiasTotal - valorPortalTotal - valorIntegracaoTotal, // apenas exames
+            valor_exames_geral: valorExamesGeral,
             valor_franquias_geral: valorFranquiasTotal,
             valor_portal_geral: valorPortalTotal,     
             valor_integracao_geral: valorIntegracaoTotal, 
-            valor_adicionais_geral: valorFranquiasTotal + valorPortalTotal + valorIntegracaoTotal,
+            valor_adicionais_geral: valorAdicionaisGeral,
             valor_bruto_geral: valorBrutoGeral,
             valor_impostos_geral: valorImpostosTotal,   
             valor_total_geral: valorLiquidoGeral,
             clientes_simples_nacional: 0,
-            clientes_regime_normal: clientes.length
+            clientes_regime_normal: clientesFiltrados.length
           };
         })();
         
@@ -1489,9 +1447,9 @@ export default function DemonstrativoFaturamento() {
 
               <Separator className="my-6" />
 
-              {/* Resumo Consolidado */}
+              {/* Resumo Consolidado - usando clientesFiltrados */}
               {(() => {
-                const resumoConsolidado = clientes.reduce((acc, cliente) => {
+                const resumoConsolidado = clientesFiltrados.reduce((acc, cliente) => {
                   if (cliente.detalhes_exames && Array.isArray(cliente.detalhes_exames)) {
                     cliente.detalhes_exames.forEach((detalhe: any) => {
                       const chave = `${detalhe.modalidade}-${detalhe.especialidade}-${detalhe.categoria}-${detalhe.prioridade}`;
