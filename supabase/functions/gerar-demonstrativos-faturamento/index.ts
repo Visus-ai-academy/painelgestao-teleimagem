@@ -699,73 +699,122 @@ serve(async (req) => {
           valorIntegracao = Number(parametros.valor_integracao);
         }
 
-        // Franquia
+        // Franquia - Nova lógica consolidada
         if (parametros.aplicar_franquia) {
-          console.log(`📋 ${nomeFantasia}: Aplica franquia = ${parametros.aplicar_franquia}`);
-          console.log(`📋 ${nomeFantasia}: Freq contínua = ${parametros.frequencia_continua}`);
-          console.log(`📋 ${nomeFantasia}: Freq por volume = ${parametros.frequencia_por_volume}`);
-          console.log(`📋 ${nomeFantasia}: Volume franquia = ${parametros.volume_franquia}`);
-          console.log(`📋 ${nomeFantasia}: Valor franquia = ${parametros.valor_franquia}`);
-          console.log(`📋 ${nomeFantasia}: Valor acima franquia = ${parametros.valor_acima_franquia}`);
+          const volumeFranquia = parametros.volume_franquia || 0;
+          const valorFranquiaBase = Number(parametros.valor_franquia || 0);
+          const valorAcimaFranquia = Number(parametros.valor_acima_franquia || 0);
+          const frequenciaContinua = parametros.frequencia_continua;
+          const frequenciaPorVolume = parametros.frequencia_por_volume;
           
-          // Se frequência contínua = SIM, sempre cobra franquia
-          if (parametros.frequencia_continua) {
-            if (parametros.frequencia_por_volume && totalExames > (parametros.volume_franquia || 0)) {
-              // Volume acima da franquia
-              valorFranquia = Number(parametros.valor_acima_franquia || parametros.valor_franquia || 0);
-              detalhesFranquia = {
-                tipo: 'continua_com_volume',
-                volume_base: parametros.volume_franquia,
-                volume_atual: totalExames,
-                valor_aplicado: valorFranquia,
-                motivo: 'Frequência contínua + volume acima da franquia'
-              };
+          console.log(`📋 ${nomeFantasia}: Aplica franquia = ${parametros.aplicar_franquia}`);
+          console.log(`📋 ${nomeFantasia}: Freq contínua = ${frequenciaContinua}`);
+          console.log(`📋 ${nomeFantasia}: Freq por volume = ${frequenciaPorVolume}`);
+          console.log(`📋 ${nomeFantasia}: Volume franquia = ${volumeFranquia}`);
+          console.log(`📋 ${nomeFantasia}: Valor franquia = ${valorFranquiaBase}`);
+          console.log(`📋 ${nomeFantasia}: Valor acima franquia = ${valorAcimaFranquia}`);
+          console.log(`📋 ${nomeFantasia}: Total exames = ${totalExames}`);
+          
+          // LÓGICA CONSOLIDADA DE FRANQUIA
+          if (frequenciaContinua === true) {
+            // Frequência Contínua = SIM
+            if (frequenciaPorVolume === true) {
+              // Frequência por Volume = SIM
+              if (totalExames < volumeFranquia) {
+                // Volume abaixo do threshold → cobra valor base
+                valorFranquia = valorFranquiaBase;
+                detalhesFranquia = {
+                  tipo: 'continua_sim_volume_sim_abaixo',
+                  volume_base: volumeFranquia,
+                  volume_atual: totalExames,
+                  valor_aplicado: valorFranquia,
+                  motivo: `Frequência Contínua=Sim + Volume < ${volumeFranquia}: cobra valor base ${valorFranquiaBase}`
+                };
+              } else {
+                // Volume >= threshold → cobra valor acima franquia (se existir) ou NÃO cobra
+                if (valorAcimaFranquia > 0) {
+                  valorFranquia = valorAcimaFranquia;
+                  detalhesFranquia = {
+                    tipo: 'continua_sim_volume_sim_acima',
+                    volume_base: volumeFranquia,
+                    volume_atual: totalExames,
+                    valor_aplicado: valorFranquia,
+                    motivo: `Frequência Contínua=Sim + Volume >= ${volumeFranquia}: cobra valor acima ${valorAcimaFranquia}`
+                  };
+                } else {
+                  valorFranquia = 0;
+                  detalhesFranquia = {
+                    tipo: 'continua_sim_volume_sim_acima_sem_valor',
+                    volume_base: volumeFranquia,
+                    volume_atual: totalExames,
+                    valor_aplicado: 0,
+                    motivo: `Frequência Contínua=Sim + Volume >= ${volumeFranquia} + Sem valor acima: NÃO cobra`
+                  };
+                }
+              }
             } else {
-              // Volume dentro da franquia ou não aplica por volume
-              valorFranquia = Number(parametros.valor_franquia || 0);
+              // Frequência por Volume = NÃO ou vazio → SEMPRE cobra valor base
+              valorFranquia = valorFranquiaBase;
               detalhesFranquia = {
-                tipo: 'continua_normal',
+                tipo: 'continua_sim_volume_nao',
                 volume_atual: totalExames,
                 valor_aplicado: valorFranquia,
-                motivo: 'Frequência contínua - valor base'
+                motivo: `Frequência Contínua=Sim + Freq por Volume≠Sim: SEMPRE cobra ${valorFranquiaBase}`
               };
             }
           } else {
-            // Frequência contínua = NÃO, só cobra se houver volume
-            if (totalExames > 0) {
-              if (parametros.frequencia_por_volume && totalExames > (parametros.volume_franquia || 0)) {
-                // Volume acima da franquia
-                valorFranquia = Number(parametros.valor_acima_franquia || parametros.valor_franquia || 0);
+            // Frequência Contínua = NÃO
+            if (frequenciaPorVolume === true || frequenciaPorVolume === null || frequenciaPorVolume === undefined) {
+              // Frequência por Volume = SIM ou vazio
+              if (totalExames < volumeFranquia) {
+                // Volume abaixo do threshold → cobra franquia
+                valorFranquia = valorFranquiaBase;
                 detalhesFranquia = {
-                  tipo: 'volume_acima',
-                  volume_base: parametros.volume_franquia,
+                  tipo: 'continua_nao_volume_sim_abaixo',
+                  volume_base: volumeFranquia,
                   volume_atual: totalExames,
                   valor_aplicado: valorFranquia,
-                  motivo: 'Volume acima da franquia'
+                  motivo: `Frequência Contínua=Não + Volume < ${volumeFranquia}: cobra ${valorFranquiaBase}`
                 };
               } else {
-                // Volume dentro da franquia
-                valorFranquia = Number(parametros.valor_franquia || 0);
+                // Volume >= threshold → NÃO cobra
+                valorFranquia = 0;
                 detalhesFranquia = {
-                  tipo: 'volume_normal',
+                  tipo: 'continua_nao_volume_sim_acima',
+                  volume_base: volumeFranquia,
                   volume_atual: totalExames,
-                  valor_aplicado: valorFranquia,
-                  motivo: 'Volume dentro da franquia'
+                  valor_aplicado: 0,
+                  motivo: `Frequência Contínua=Não + Volume >= ${volumeFranquia}: NÃO cobra`
                 };
               }
             } else {
-              // Sem volume, não cobra franquia
-              valorFranquia = 0;
-              detalhesFranquia = {
-                tipo: 'sem_volume',
-                volume_atual: 0,
-                valor_aplicado: 0,
-                motivo: 'Sem volume de exames - franquia não aplicada'
-              };
+              // Frequência por Volume = NÃO
+              if (totalExames < volumeFranquia) {
+                // Volume abaixo do threshold → cobra franquia
+                valorFranquia = valorFranquiaBase;
+                detalhesFranquia = {
+                  tipo: 'continua_nao_volume_nao_abaixo',
+                  volume_base: volumeFranquia,
+                  volume_atual: totalExames,
+                  valor_aplicado: valorFranquia,
+                  motivo: `Frequência Contínua=Não + Freq por Volume=Não + Volume < ${volumeFranquia}: cobra ${valorFranquiaBase}`
+                };
+              } else {
+                // Volume >= threshold → NÃO cobra
+                valorFranquia = 0;
+                detalhesFranquia = {
+                  tipo: 'continua_nao_volume_nao_acima',
+                  volume_base: volumeFranquia,
+                  volume_atual: totalExames,
+                  valor_aplicado: 0,
+                  motivo: `Frequência Contínua=Não + Freq por Volume=Não + Volume >= ${volumeFranquia}: NÃO cobra`
+                };
+              }
             }
           }
           
           console.log(`📋 ${nomeFantasia}: Franquia calculada = R$ ${valorFranquia.toFixed(2)}`);
+          console.log(`📋 ${nomeFantasia}: Detalhes:`, detalhesFranquia);
         } else {
           detalhesFranquia = {
             tipo: 'nao_aplica',

@@ -204,8 +204,10 @@ export default function ContratosClientes() {
   const [editImpostosAbMin, setEditImpostosAbMin] = useState<number | "">(0);
   const [editVolumeFranquia, setEditVolumeFranquia] = useState<number | "">(0);
   const [editFrequenciaContinua, setEditFrequenciaContinua] = useState(false);
-  const [editFrequenciaPorVolume, setEditFrequenciaPorVolume] = useState(false);
+  const [editFrequenciaPorVolume, setEditFrequenciaPorVolume] = useState<"sim" | "nao" | "vazio">("vazio");
   const [editValorAcimaFranquia, setEditValorAcimaFranquia] = useState<number | "">(0);
+  const [editAplicarFranquia, setEditAplicarFranquia] = useState(false);
+  const [editPortalLaudos, setEditPortalLaudos] = useState(false);
   
   // Estados para condições de preço
   const [precosCliente, setPrecosCliente] = useState<any[]>([]);
@@ -224,6 +226,38 @@ export default function ContratosClientes() {
   const [sincronizandoOmie, setSincronizandoOmie] = useState(false);
   
   const { toast } = useToast();
+
+  // useEffect para inicializar campos de edição quando abre o formulário
+  useEffect(() => {
+    if (contratoEditando && showEditarContrato) {
+      setEditDataInicio(contratoEditando.dataInicio || "");
+      setEditDataFim(contratoEditando.dataFim || "");
+      setEditDiaVencimento(contratoEditando.diaVencimento || 10);
+      setEditDesconto(contratoEditando.descontoPercentual || 0);
+      setEditAcrescimo(contratoEditando.acrescimoPercentual || 0);
+      setEditFranqValor(contratoEditando.valorFranquia || 0);
+      setEditIntegraValor(contratoEditando.valorIntegracao || 0);
+      setEditPortalValor(contratoEditando.configuracoesFranquia?.valor_franquia || 0);
+      setEditSimples(contratoEditando.simples || false);
+      setEditPercentualISS(contratoEditando.percentualISS || 0);
+      setEditImpostosAbMin(contratoEditando.impostosAbMin || 0);
+      setEditVolumeFranquia(contratoEditando.volumeFranquia || 0);
+      setEditFrequenciaContinua(contratoEditando.frequenciaContinua || false);
+      setEditValorAcimaFranquia(contratoEditando.valorAcimaFranquia || 0);
+      setEditAplicarFranquia(contratoEditando.aplicarFranquia || false);
+      setEditPortalLaudos(contratoEditando.portalLaudos || false);
+      
+      // Converter frequenciaPorVolume para o formato do select
+      const freqPorVol = contratoEditando.frequenciaPorVolume;
+      if (freqPorVol === true) {
+        setEditFrequenciaPorVolume("sim");
+      } else if (freqPorVol === false) {
+        setEditFrequenciaPorVolume("nao");
+      } else {
+        setEditFrequenciaPorVolume("vazio");
+      }
+    }
+  }, [contratoEditando, showEditarContrato]);
 
   // Carregar dados dos contratos do Supabase
   const carregarContratos = async () => {
@@ -483,8 +517,19 @@ export default function ContratosClientes() {
       setEditImpostosAbMin(contratoEditando.impostosAbMin ?? 0);
       setEditVolumeFranquia(contratoEditando.volumeFranquia ?? 0);
       setEditFrequenciaContinua(contratoEditando.frequenciaContinua ?? false);
-      setEditFrequenciaPorVolume(contratoEditando.frequenciaPorVolume ?? false);
       setEditValorAcimaFranquia(contratoEditando.valorAcimaFranquia ?? 0);
+      setEditAplicarFranquia(contratoEditando.aplicarFranquia ?? false);
+      setEditPortalLaudos(contratoEditando.portalLaudos ?? false);
+      
+      // Converter frequenciaPorVolume para o formato do select
+      const freqPorVol = contratoEditando.frequenciaPorVolume;
+      if (freqPorVol === true) {
+        setEditFrequenciaPorVolume("sim");
+      } else if (freqPorVol === false) {
+        setEditFrequenciaPorVolume("nao");
+      } else {
+        setEditFrequenciaPorVolume("vazio");
+      }
       
       // Definir data de vigência padrão como hoje
       const hoje = new Date().toISOString().slice(0, 10);
@@ -708,14 +753,23 @@ export default function ContratosClientes() {
           .eq('cliente_id', contratoEditando.clienteId)
           .maybeSingle();
 
+        // Converter editFrequenciaPorVolume para boolean ou null
+        let frequenciaPorVolumeValue: boolean | null = null;
+        if (editFrequenciaPorVolume === "sim") {
+          frequenciaPorVolumeValue = true;
+        } else if (editFrequenciaPorVolume === "nao") {
+          frequenciaPorVolumeValue = false;
+        }
+
         const parametrosUpdate = {
-          aplicar_franquia: aplicarFranquiaCalc,
+          aplicar_franquia: editAplicarFranquia,
           valor_franquia: Number(editFranqValor || 0),
           volume_franquia: Number(editVolumeFranquia || 0),
           valor_acima_franquia: Number(editValorAcimaFranquia || 0),
           frequencia_continua: editFrequenciaContinua,
-          frequencia_por_volume: editFrequenciaPorVolume,
+          frequencia_por_volume: frequenciaPorVolumeValue,
           valor_integracao: Number(editIntegraValor || 0),
+          portal_laudos: editPortalLaudos,
           simples: editSimples,
           percentual_iss: Number(editPercentualISS || 0),
           impostos_ab_min: Number(editImpostosAbMin || 0),
@@ -1514,6 +1568,41 @@ export default function ContratosClientes() {
                       </div>
                     </div>
                     
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid gap-2">
+                        <Label>Aplicar Franquia</Label>
+                        {showEditarContrato ? (
+                          <div className="flex items-center space-x-2 h-10">
+                            <Checkbox 
+                              checked={editAplicarFranquia}
+                              onCheckedChange={(checked) => setEditAplicarFranquia(!!checked)}
+                            />
+                            <span className="text-sm">{editAplicarFranquia ? 'Sim - Cliente possui franquia' : 'Não'}</span>
+                          </div>
+                        ) : (
+                          <Badge variant={(contratoVisualizando || contratoEditando)?.aplicarFranquia ? 'default' : 'secondary'}>
+                            {(contratoVisualizando || contratoEditando)?.aplicarFranquia ? 'Sim' : 'Não'}
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="grid gap-2">
+                        <Label>Portal de Laudos</Label>
+                        {showEditarContrato ? (
+                          <div className="flex items-center space-x-2 h-10">
+                            <Checkbox 
+                              checked={editPortalLaudos}
+                              onCheckedChange={(checked) => setEditPortalLaudos(!!checked)}
+                            />
+                            <span className="text-sm">{editPortalLaudos ? 'Sim - Cobra portal' : 'Não'}</span>
+                          </div>
+                        ) : (
+                          <Badge variant={(contratoVisualizando || contratoEditando)?.portalLaudos ? 'default' : 'secondary'}>
+                            {(contratoVisualizando || contratoEditando)?.portalLaudos ? 'Sim' : 'Não'}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="grid gap-2">
                         <Label>Volume Franquia</Label>
@@ -1540,7 +1629,7 @@ export default function ContratosClientes() {
                               checked={editFrequenciaContinua}
                               onCheckedChange={(checked) => setEditFrequenciaContinua(!!checked)}
                             />
-                            <span className="text-sm">{editFrequenciaContinua ? 'Sim - Cobra franquia sempre' : 'Não'}</span>
+                            <span className="text-sm">{editFrequenciaContinua ? 'Sim - Cobra sempre' : 'Não - Só com volume'}</span>
                           </div>
                         ) : (
                           <Badge variant={(contratoVisualizando || contratoEditando)?.frequenciaContinua ? 'default' : 'secondary'}>
@@ -1551,22 +1640,31 @@ export default function ContratosClientes() {
                       <div className="grid gap-2">
                         <Label>Frequência por Volume</Label>
                         {showEditarContrato ? (
-                          <div className="flex items-center space-x-2 h-10">
-                            <Checkbox 
-                              checked={editFrequenciaPorVolume}
-                              onCheckedChange={(checked) => setEditFrequenciaPorVolume(!!checked)}
-                            />
-                            <span className="text-sm">{editFrequenciaPorVolume ? 'Sim - Varia por volume' : 'Não'}</span>
-                          </div>
+                          <Select value={editFrequenciaPorVolume} onValueChange={(value: "sim" | "nao" | "vazio") => setEditFrequenciaPorVolume(value)}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="vazio">(Vazio) - Só cobra se volume abaixo</SelectItem>
+                              <SelectItem value="sim">Sim - Considera volume</SelectItem>
+                              <SelectItem value="nao">Não - Volume não interfere</SelectItem>
+                            </SelectContent>
+                          </Select>
                         ) : (
-                          <Badge variant={(contratoVisualizando || contratoEditando)?.frequenciaPorVolume ? 'default' : 'secondary'}>
-                            {(contratoVisualizando || contratoEditando)?.frequenciaPorVolume ? 'Sim' : 'Não'}
+                          <Badge variant={
+                            (contratoVisualizando || contratoEditando)?.frequenciaPorVolume === true ? 'default' :
+                            (contratoVisualizando || contratoEditando)?.frequenciaPorVolume === false ? 'secondary' :
+                            'outline'
+                          }>
+                            {(contratoVisualizando || contratoEditando)?.frequenciaPorVolume === true ? 'Sim' :
+                             (contratoVisualizando || contratoEditando)?.frequenciaPorVolume === false ? 'Não' :
+                             '(Vazio)'}
                           </Badge>
                         )}
                       </div>
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="grid gap-2">
                         <Label>Valor Acima Franquia (R$)</Label>
                         {showEditarContrato ? (
@@ -1575,7 +1673,7 @@ export default function ContratosClientes() {
                             step="0.01" 
                             value={editValorAcimaFranquia} 
                             onChange={(e) => setEditValorAcimaFranquia(Number(e.target.value) || "")} 
-                            placeholder="Ex: 600.00"
+                            placeholder="Ex: 600.00 (cobrado quando volume > Volume Franquia)"
                           />
                         ) : (
                           <Input 
