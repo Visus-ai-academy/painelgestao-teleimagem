@@ -550,11 +550,9 @@ serve(async (req) => {
         const selecionado = porFaixa[0] || pool[0];
         if (!selecionado) return 0;
 
-        const prioridadeUrgencia = prioridadeN.includes('URG') || prioridadeN.includes('PLANT');
-        const usarUrgencia = exame.tipo_faturamento === 'urgencia' || prioridadeUrgencia || !!selecionado.considera_prioridade_plantao;
-
-        const valor = usarUrgencia ? (selecionado.valor_urgencia ?? 0) : (selecionado.valor_base ?? 0);
-        return valor > 0 ? valor : (selecionado.valor_base ?? 0) || 0;
+        // ✅ USAR SEMPRE valor_base da linha encontrada (a prioridade já foi considerada na seleção)
+        const valor = Number(selecionado.valor_base) || 0;
+        return valor;
       };
 
       // Calcular valores POR EXAME (IGUAL RELATÓRIO)
