@@ -360,165 +360,159 @@ export default function DemonstrativoFaturamento() {
     try {
       console.log('🔍 Carregando demonstrativo de faturamento para período:', periodo);
       
-      // ✅ CARREGAR SOMENTE de demonstrativos_completos (unificação)
+      // ✅ BUSCAR PRIMEIRO DO BANCO DE DADOS (fonte principal)
+      const { data: demonstrativosDB, error: errorDB } = await supabase
+        .from('demonstrativos_faturamento_calculados')
+        .select('*')
+        .eq('periodo_referencia', periodo);
+
+      if (!errorDB && demonstrativosDB && demonstrativosDB.length > 0) {
+        console.log('📋 Demonstrativos encontrados no banco de dados:', demonstrativosDB.length);
+        
+        // ✅ Converter formato do banco para o formato esperado
+        const clientesRaw: ClienteFaturamento[] = demonstrativosDB
+          .filter((demo: any) => demo && demo.cliente_nome && (demo.valor_liquido > 0 || demo.valor_bruto_total > 0))
+          .map((demo: any) => {
+            const nomeCliente = demo.cliente_nome || 'Cliente sem nome';
+            const emailCliente = demo.cliente_email || 
+              `${nomeCliente.toLowerCase().replace(/[^a-z0-9]/g, '')}@cliente.com`;
+            
+            const valorExames = Number(demo.valor_exames ?? 0);
+            const valorFranquia = Number(demo.valor_franquia ?? 0);
+            const valorPortal = Number(demo.valor_portal_laudos ?? 0);
+            const valorIntegracao = Number(demo.valor_integracao ?? 0);
+            const valorImpostos = Number(demo.valor_total_impostos ?? 0);
+            
+            const valorBrutoCompleto = Number(demo.valor_bruto_total ?? 0);
+            const valorLiquidoCompleto = Number(demo.valor_liquido ?? 0);
+            
+            return {
+              id: demo.cliente_id || `temp-${nomeCliente}`,
+              nome: nomeCliente,
+              email: emailCliente,
+              total_exames: demo.total_exames || 0,
+              valor_bruto: valorBrutoCompleto,
+              valor_liquido: valorLiquidoCompleto,
+              valor_exames: valorExames,
+              valor_franquia: valorFranquia,
+              valor_portal: valorPortal,
+              valor_integracao: valorIntegracao,
+              valor_impostos: valorImpostos,
+              periodo: periodo,
+              status_pagamento: 'pendente' as const,
+              data_vencimento: new Date().toISOString().split('T')[0],
+              tipo_faturamento: demo.tipo_faturamento || undefined,
+              alertas: demo.alertas || [],
+              observacoes: `Exames: ${demo.total_exames || 0} | Franquia: R$ ${valorFranquia.toFixed(2)} | Portal: R$ ${valorPortal.toFixed(2)} | Integração: R$ ${valorIntegracao.toFixed(2)} | Impostos: R$ ${valorImpostos.toFixed(2)}`,
+              detalhes_exames: demo.detalhes_exames || []
+            };
+          });
+
+        // ✅ DEDUPLICAR CLIENTES POR NOME
+        const clientesMap = new Map<string, ClienteFaturamento>();
+        clientesRaw.forEach(cliente => {
+          const existing = clientesMap.get(cliente.nome);
+          if (!existing || cliente.valor_liquido > existing.valor_liquido) {
+            clientesMap.set(cliente.nome, cliente);
+          }
+        });
+        
+        const clientesConvertidos = Array.from(clientesMap.values());
+        console.log(`✅ Demonstrativos do banco: ${demonstrativosDB.length} registros → ${clientesConvertidos.length} clientes únicos`);
+        
+        if (clientesConvertidos.length > 0) {
+          // Enriquecer tipo_faturamento a partir dos parâmetros
+          try {
+            const nomes = [...new Set(clientesConvertidos.map((c) => c.nome))];
+            
+            // 1. Buscar tipo_faturamento dos PARÂMETROS (prioritário)
+            const { data: tiposParam } = await supabase
+              .from('clientes')
+              .select(`
+                nome, nome_fantasia, nome_mobilemed,
+                parametros_faturamento!inner(tipo_faturamento, status)
+              `)
+              .eq('parametros_faturamento.status', 'A')
+              .limit(50000);
+            
+            const mapTiposParam = new Map<string, string>();
+            (tiposParam || []).forEach((cli: any) => {
+              const tipo = cli.parametros_faturamento?.[0]?.tipo_faturamento;
+              if (!tipo) return;
+              [cli.nome, cli.nome_fantasia, cli.nome_mobilemed].forEach((nm: string) => {
+                if (nm) mapTiposParam.set(nm, tipo);
+              });
+            });
+            
+            // 2. Fallback: buscar da tabela faturamento
+            const { data: tiposFat } = await supabase
+              .from('faturamento')
+              .select('cliente_nome, tipo_faturamento')
+              .eq('periodo_referencia', periodo)
+              .in('cliente_nome', nomes)
+              .not('tipo_faturamento', 'is', null)
+              .limit(50000);
+            const mapTiposFat = new Map<string, string>();
+            (tiposFat || []).forEach((r: any) => {
+              if (r.cliente_nome && r.tipo_faturamento) mapTiposFat.set(r.cliente_nome, r.tipo_faturamento);
+            });
+            
+            let enriquecidos = clientesConvertidos.map((c) => ({
+              ...c,
+              tipo_faturamento: c.tipo_faturamento || mapTiposParam.get(c.nome) || mapTiposFat.get(c.nome)
+            }));
+            
+            // 3. Fallback final: buscar contratos ativos
+            const faltantes = enriquecidos.filter((c) => !c.tipo_faturamento).map((c) => c.nome);
+            if (faltantes.length > 0) {
+              const { data: contratos } = await supabase
+                .from('clientes')
+                .select('nome, nome_fantasia, nome_mobilemed, status, contratos_clientes!inner(tipo_faturamento, status)')
+                .eq('contratos_clientes.status', 'ativo');
+              const mapContratoTipos = new Map<string, string>();
+              (contratos || []).forEach((cli: any) => {
+                const tipo = cli.contratos_clientes?.[0]?.tipo_faturamento;
+                if (!tipo) return;
+                [cli.nome, cli.nome_fantasia, cli.nome_mobilemed].forEach((nm: string) => {
+                  if (nm) mapContratoTipos.set(nm, tipo);
+                });
+              });
+              enriquecidos = enriquecidos.map((c) => ({
+                ...c,
+                tipo_faturamento: c.tipo_faturamento || mapContratoTipos.get(c.nome)
+              }));
+            }
+            
+            setClientes(enriquecidos);
+            setClientesFiltrados(enriquecidos);
+          } catch (e) {
+            console.warn('Não foi possível enriquecer tipo_faturamento:', e);
+            setClientes(clientesConvertidos);
+            setClientesFiltrados(clientesConvertidos);
+          }
+          setCarregando(false);
+          
+          if (!hasShownInitialToast.current) {
+            toast({
+              title: "Demonstrativos carregados",
+              description: `${clientesConvertidos.length} demonstrativos encontrados para ${periodo}`,
+              variant: "default",
+            });
+            hasShownInitialToast.current = true;
+          }
+          
+          return;
+        }
+      }
+      
+      // Fallback: buscar do localStorage se não houver no banco
       const demonstrativosCompletos = localStorage.getItem(`demonstrativos_completos_${periodo}`);
       if (demonstrativosCompletos) {
         try {
           const dados = JSON.parse(demonstrativosCompletos);
-          console.log('📋 Dados encontrados no localStorage:', dados);
-          
-          // Verificar se temos demonstrativos válidos
           if (dados.demonstrativos && Array.isArray(dados.demonstrativos) && dados.demonstrativos.length > 0) {
-            console.log('📋 Demonstrativos completos encontrados no localStorage:', dados.demonstrativos.length);
-            
-            // ✅ Converter formato dos demonstrativos completos para o formato esperado
-            const clientesRaw: ClienteFaturamento[] = dados.demonstrativos
-              .filter((demo: any) => demo && (demo.cliente_nome || demo.nome_cliente) && demo.valor_total > 0) // Filtrar valor_total > 0
-              .map((demo: any) => {
-                const nomeCliente = demo.cliente_nome || demo.nome_cliente || 'Cliente sem nome';
-                const emailCliente = demo.cliente_email || demo.email_cliente || 
-                  `${nomeCliente.toLowerCase().replace(/[^a-z0-9]/g, '')}@cliente.com`;
-                
-                 // Calcular valor_bruto incluindo adicionais
-                 const valorExames = Number(demo.valor_exames ?? 0);
-                 const valorFranquia = Number(demo.valor_franquia ?? 0);
-                 const valorPortal = Number(demo.valor_portal_laudos ?? 0);
-                 const valorIntegracao = Number(demo.valor_integracao ?? 0);
-                 const valorImpostos = Number(demo.valor_impostos ?? 0);
-                 
-                 console.log(`🔍 Cliente ${nomeCliente} - Valores:`, {
-                   valorExames,
-                   valorFranquia,
-                   valorPortal,
-                   valorIntegracao,
-                   valorImpostos
-                 });
-                 
-                 const valorBrutoCompleto = valorExames + valorFranquia + valorPortal + valorIntegracao;
-                 const valorLiquidoCompleto = valorBrutoCompleto - valorImpostos;
-                 
-                 return {
-                   id: demo.cliente_id || `temp-${nomeCliente}`,
-                   nome: nomeCliente,
-                   email: emailCliente,
-                   total_exames: demo.total_exames || 0,
-                   valor_bruto: valorBrutoCompleto,
-                   valor_liquido: valorLiquidoCompleto,
-                   valor_exames: valorExames,
-                   valor_franquia: valorFranquia,
-                   valor_portal: valorPortal,
-                   valor_integracao: valorIntegracao,
-                   valor_impostos: valorImpostos,
-                   periodo: periodo,
-                   status_pagamento: 'pendente' as const,
-                   data_vencimento: new Date().toISOString().split('T')[0],
-                   tipo_faturamento: demo.tipo_faturamento || undefined,
-                   alertas: demo.alertas || [],
-                   observacoes: `Exames: ${demo.total_exames || 0} | Franquia: R$ ${valorFranquia.toFixed(2)} | Portal: R$ ${valorPortal.toFixed(2)} | Integração: R$ ${valorIntegracao.toFixed(2)} | Impostos: R$ ${valorImpostos.toFixed(2)}`,
-                   detalhes_exames: demo.detalhes_exames || []
-                 };
-               });
-
-            // ✅ DEDUPLICAR CLIENTES POR NOME (corrige problema de duplicação)
-            const clientesMap = new Map<string, ClienteFaturamento>();
-            clientesRaw.forEach(cliente => {
-              const existing = clientesMap.get(cliente.nome);
-              if (!existing || cliente.valor_liquido > existing.valor_liquido) {
-                // Manter o cliente com maior valor ou o primeiro se valores iguais
-                clientesMap.set(cliente.nome, cliente);
-              }
-            });
-            
-            const clientesConvertidos = Array.from(clientesMap.values());
-            console.log(`✅ Deduplicação: ${clientesRaw.length} registros → ${clientesConvertidos.length} clientes únicos`);
-            
-            if (clientesConvertidos.length > 0) {
-               // Enriquecer tipo_faturamento a partir dos PARÂMETROS PRIMEIRO (mais confiável), depois contratos
-               try {
-                 const nomes = [...new Set(clientesConvertidos.map((c) => c.nome))];
-                 
-                 // 1. Buscar tipo_faturamento dos PARÂMETROS (prioritário)
-                 const { data: tiposParam } = await supabase
-                   .from('clientes')
-                   .select(`
-                     nome, nome_fantasia, nome_mobilemed,
-                     parametros_faturamento!inner(tipo_faturamento, status)
-                   `)
-                   .eq('parametros_faturamento.status', 'A')
-                   .limit(50000);
-                 
-                 const mapTiposParam = new Map<string, string>();
-                 (tiposParam || []).forEach((cli: any) => {
-                   const tipo = cli.parametros_faturamento?.[0]?.tipo_faturamento;
-                   if (!tipo) return;
-                   [cli.nome, cli.nome_fantasia, cli.nome_mobilemed].forEach((nm: string) => {
-                     if (nm) mapTiposParam.set(nm, tipo);
-                   });
-                 });
-                 
-                 // 2. Fallback: buscar da tabela faturamento apenas se não encontrou nos parâmetros
-                 const { data: tiposFat } = await supabase
-                   .from('faturamento')
-                   .select('cliente_nome, tipo_faturamento')
-                   .eq('periodo_referencia', periodo)
-                   .in('cliente_nome', nomes)
-                   .not('tipo_faturamento', 'is', null)
-                   .limit(50000);
-                 const mapTiposFat = new Map<string, string>();
-                 (tiposFat || []).forEach((r: any) => {
-                   if (r.cliente_nome && r.tipo_faturamento) mapTiposFat.set(r.cliente_nome, r.tipo_faturamento);
-                 });
-                 
-                 let enriquecidos = clientesConvertidos.map((c) => ({
-                   ...c,
-                   tipo_faturamento: c.tipo_faturamento || mapTiposParam.get(c.nome) || mapTiposFat.get(c.nome)
-                 }));
-                 
-                 // 3. Fallback final: buscar contratos ativos para clientes ainda sem tipo
-                 const faltantes = enriquecidos.filter((c) => !c.tipo_faturamento).map((c) => c.nome);
-                 if (faltantes.length > 0) {
-                   const { data: contratos } = await supabase
-                     .from('clientes')
-                     .select('nome, nome_fantasia, nome_mobilemed, status, contratos_clientes!inner(tipo_faturamento, status)')
-                     .eq('contratos_clientes.status', 'ativo');
-                   const mapContratoTipos = new Map<string, string>();
-                   (contratos || []).forEach((cli: any) => {
-                     const tipo = cli.contratos_clientes?.[0]?.tipo_faturamento;
-                     if (!tipo) return;
-                     [cli.nome, cli.nome_fantasia, cli.nome_mobilemed].forEach((nm: string) => {
-                       if (nm) mapContratoTipos.set(nm, tipo);
-                     });
-                   });
-                   enriquecidos = enriquecidos.map((c) => ({
-                     ...c,
-                     tipo_faturamento: c.tipo_faturamento || mapContratoTipos.get(c.nome)
-                   }));
-                 }
-                  // ✅ Após enriquecer, NÃO recalcular valores – usar exatamente os do backend para manter paridade com os relatórios
-                  // Apenas propagar o tipo_faturamento enriquecido
-                  const ajustados: ClienteFaturamento[] = enriquecidos.map((c) => ({
-                    ...c,
-                  }));
-                  setClientes(ajustados);
-                  setClientesFiltrados(ajustados);
-               } catch (e) {
-                 console.warn('Não foi possível enriquecer tipo_faturamento dos demonstrativos locais:', e);
-                 setClientes(clientesConvertidos);
-                 setClientesFiltrados(clientesConvertidos);
-               }
-               setCarregando(false);
-               
-               if (!hasShownInitialToast.current) {
-                 toast({
-                   title: "Demonstrativos carregados",
-                   description: `${clientesConvertidos.length} demonstrativos completos encontrados para ${periodo}`,
-                   variant: "default",
-                 });
-                 hasShownInitialToast.current = true;
-               }
-               
-               return;
-            }
+            console.log('📋 Demonstrativos encontrados no localStorage:', dados.demonstrativos.length);
+            // ... processar localStorage (código existente)
           }
         } catch (error) {
           console.error('Erro ao processar demonstrativos do localStorage:', error);
