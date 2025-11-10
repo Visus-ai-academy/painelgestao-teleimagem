@@ -290,55 +290,6 @@ export default function DemonstrativoFaturamento() {
     }
   };
 
-  const corrigirMamaMamo = async () => {
-    try {
-      setCarregando(true);
-      toast({
-        title: "Corrigindo especialidade MAMA → MAMO",
-        description: "Processando exames de mamografia (MG)...",
-      });
-
-      const response = await supabase.functions.invoke('corrigir-mama-mamo-retroativo', {
-        body: { arquivo_fonte: null }
-      });
-
-      if (response.error) {
-        toast({
-          title: "Erro ao corrigir MAMA → MAMO",
-          description: response.error.message,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const resultado = response.data;
-      if (resultado.sucesso) {
-        toast({
-          title: "Correção concluída",
-          description: `${resultado.total_corrigidos} registros corrigidos de MAMA para MAMO`,
-        });
-        // Limpar cache e recarregar dados
-        const keysToRemove: string[] = [];
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (key?.startsWith('demonstrativos_completos_')) {
-            keysToRemove.push(key);
-          }
-        }
-        keysToRemove.forEach(key => localStorage.removeItem(key));
-        carregarDados();
-      }
-    } catch (error: any) {
-      console.error('Erro ao corrigir MAMA → MAMO:', error);
-      toast({
-        title: "Erro na correção",
-        description: error.message || "Erro desconhecido",
-        variant: "destructive",
-      });
-    } finally {
-      setCarregando(false);
-    }
-  };
 
   // Verificar e corrigir automaticamente categorias TC ao carregar (apenas 1x por período)
   useEffect(() => {
@@ -1421,16 +1372,6 @@ export default function DemonstrativoFaturamento() {
           >
             <Trash2 className="h-4 w-4" />
             Limpar Cache
-          </Button>
-          <Button
-            onClick={corrigirMamaMamo}
-            variant="outline"
-            size="sm"
-            className="gap-2"
-            disabled={carregando}
-          >
-            <AlertTriangle className="h-4 w-4" />
-            Corrigir MAMA → MAMO
           </Button>
         </div>
         <Button
