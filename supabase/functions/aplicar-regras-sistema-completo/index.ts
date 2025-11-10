@@ -188,15 +188,18 @@ serve(async (req) => {
           // GERAL não deve mais existir - será corrigido via cadastro_exames abaixo
 
           // 3. APLICAR CATEGORIAS E ESPECIALIDADES DO CADASTRO_EXAMES
+          // FONTE DA VERDADE: cadastro_exames SEMPRE sobrescreve quando há match
           if (registro.ESTUDO_DESCRICAO) {
             const dadosExame = mapaCategoriasEspecialidades.get(registro.ESTUDO_DESCRICAO.toUpperCase().trim());
             if (dadosExame) {
-              if (dadosExame.categoria && (!registro.CATEGORIA || registro.CATEGORIA === 'SC' || registro.CATEGORIA === '')) {
+              // SEMPRE aplicar categoria do cadastro quando disponível
+              if (dadosExame.categoria && dadosExame.categoria !== registro.CATEGORIA) {
                 updates.CATEGORIA = dadosExame.categoria;
                 needsUpdate = true;
                 correcoesCategorias++;
               }
-              if (dadosExame.especialidade && (!registro.ESPECIALIDADE || registro.ESPECIALIDADE === 'GERAL' || registro.ESPECIALIDADE === '')) {
+              // SEMPRE aplicar especialidade do cadastro quando disponível
+              if (dadosExame.especialidade && dadosExame.especialidade !== registro.ESPECIALIDADE) {
                 updates.ESPECIALIDADE = dadosExame.especialidade;
                 needsUpdate = true;
                 correcoesEspecialidades++;
