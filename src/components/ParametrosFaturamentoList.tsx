@@ -31,7 +31,7 @@ interface ParametroFaturamento {
   valor_acima_franquia: number | null;
   cobrar_integracao: boolean;
   valor_integracao: number | null;
-  portal_laudos: boolean;
+  valor_portal_laudos: number | null;
   incluir_medico_solicitante: boolean;
   impostos_ab_min?: number | null;
   simples: boolean;
@@ -138,12 +138,12 @@ export function ParametrosFaturamentoList() {
           bValue = b.simples ? 1 : 0;
           break;
         case 'integracao':
-          aValue = a.cobrar_integracao ? 1 : 0;
-          bValue = b.cobrar_integracao ? 1 : 0;
+          aValue = a.valor_integracao || 0;
+          bValue = b.valor_integracao || 0;
           break;
         case 'portal_laudos':
-          aValue = a.portal_laudos ? 1 : 0;
-          bValue = b.portal_laudos ? 1 : 0;
+          aValue = (a as any).valor_portal_laudos || 0;
+          bValue = (b as any).valor_portal_laudos || 0;
           break;
         case 'possui_franquia':
           aValue = a.aplicar_franquia ? 1 : 0;
@@ -331,12 +331,12 @@ export function ParametrosFaturamentoList() {
                 </TableHead>
                 <TableHead className="bg-background border-b whitespace-nowrap">
                   <Button variant="ghost" size="sm" onClick={() => handleSort('integracao')} className="flex items-center gap-1 font-semibold">
-                    Integração {getSortIcon('integracao')}
+                    Valor Integração {getSortIcon('integracao')}
                   </Button>
                 </TableHead>
                 <TableHead className="bg-background border-b whitespace-nowrap">
                   <Button variant="ghost" size="sm" onClick={() => handleSort('portal_laudos')} className="flex items-center gap-1 font-semibold">
-                    Portal de Laudos {getSortIcon('portal_laudos')}
+                    Valor Portal Laudos {getSortIcon('portal_laudos')}
                   </Button>
                 </TableHead>
                 <TableHead className="bg-background border-b whitespace-nowrap">
@@ -428,8 +428,8 @@ export function ParametrosFaturamentoList() {
                   </TableCell>
                   <TableCell className="whitespace-nowrap">{parametro.impostos_ab_min || '-'}</TableCell>
                   <TableCell className="whitespace-nowrap">{formatBoolean(parametro.simples || false)}</TableCell>
-                  <TableCell className="whitespace-nowrap">{formatBoolean(parametro.cobrar_integracao)}</TableCell>
-                  <TableCell className="whitespace-nowrap">{formatBoolean(parametro.portal_laudos)}</TableCell>
+                  <TableCell className="whitespace-nowrap">{formatCurrency(parametro.valor_integracao)}</TableCell>
+                  <TableCell className="whitespace-nowrap">{formatCurrency((parametro as any).valor_portal_laudos)}</TableCell>
                   <TableCell className="whitespace-nowrap">{formatBoolean(parametro.aplicar_franquia)}</TableCell>
                   <TableCell className="whitespace-nowrap">{formatCurrency(parametro.valor_franquia)}</TableCell>
                   <TableCell className="whitespace-nowrap">{formatBoolean(parametro.frequencia_continua)}</TableCell>

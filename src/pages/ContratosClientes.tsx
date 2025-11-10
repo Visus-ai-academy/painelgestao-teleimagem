@@ -379,7 +379,7 @@ export default function ContratosClientes() {
         const configuracoesIntegracao = parametros ? {
           cobra_integracao: parametros.cobrar_integracao,
           valor_integracao: parametros.valor_integracao,
-          portal_laudos: parametros.portal_laudos
+          valor_portal_laudos: parametros.valor_portal_laudos
         } : (typeof contrato.configuracoes_integracao === 'object' && contrato.configuracoes_integracao) ? contrato.configuracoes_integracao as any : {};
 
         return {
