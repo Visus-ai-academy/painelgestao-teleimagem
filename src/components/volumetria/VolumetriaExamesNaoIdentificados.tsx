@@ -36,25 +36,26 @@ export function VolumetriaExamesNaoIdentificados() {
     try {
       console.log('🚀 INICIANDO loadExamesNaoIdentificados');
       
-      // BUSCAR DIRETAMENTE DO BANCO TODOS OS REGISTROS ZERADOS
-      // O contexto não está fornecendo os dados completos
+      // BUSCAR APENAS REGISTROS FORA DO PADRÃO, SEM QUANTIDADE E SEM MODALIDADE US
       const { data: volumetriaData, error: volumetriaError } = await supabase
         .from('volumetria_mobilemed')
         .select('ESTUDO_DESCRICAO, MODALIDADE, ESPECIALIDADE, arquivo_fonte, VALORES')
+        .like('arquivo_fonte', '%fora_padrao%')
         .or('VALORES.eq.0,VALORES.is.null')
-        .limit(50000); // Aumentar limite para garantir que todos os exames zerados sejam analisados
+        .neq('MODALIDADE', 'US')
+        .limit(50000);
 
       if (volumetriaError) {
         console.error('❌ Erro ao buscar volumetria:', volumetriaError);
         throw volumetriaError;
       }
       
-      console.log('📊 REGISTROS ZERADOS ENCONTRADOS:', volumetriaData?.length || 0);
-      console.log('📊 EXEMPLO DE REGISTROS ZERADOS:', volumetriaData?.slice(0, 5));
+      console.log('📊 REGISTROS FORA DO PADRÃO (SEM QUANTIDADE, EXCETO US):', volumetriaData?.length || 0);
+      console.log('📊 EXEMPLO DE REGISTROS:', volumetriaData?.slice(0, 5));
       
       
       if (!volumetriaData || volumetriaData.length === 0) {
-        console.log('📊 Nenhum registro zerado encontrado');
+        console.log('📊 Nenhum registro fora do padrão (sem quantidade, exceto US) encontrado');
         setLoading(false);
         return;
       }
@@ -79,8 +80,8 @@ export function VolumetriaExamesNaoIdentificados() {
       ).filter(Boolean) || []);
 
       console.log('📋 Estudos no De Para (após limpeza X):', estudosNoDePara.size);
-      console.log('📊 Total registros volumetria zerados (do contexto completo):', volumetriaData?.length || 0);
-      console.log('📊 Estudos únicos zerados:', new Set(volumetriaData?.map(item => item.ESTUDO_DESCRICAO).filter(Boolean)).size);
+      console.log('📊 Total registros fora do padrão sem quantidade (exceto US):', volumetriaData?.length || 0);
+      console.log('📊 Estudos únicos encontrados:', new Set(volumetriaData?.map(item => item.ESTUDO_DESCRICAO).filter(Boolean)).size);
 
       // Buscar regras de quebra para classificação
       const { data: regrasQuebra } = await supabase
@@ -88,7 +89,7 @@ export function VolumetriaExamesNaoIdentificados() {
         .select('exame_original, exame_quebrado')
         .eq('ativo', true);
 
-      // Agrupar TODOS os registros zerados por nome do estudo e arquivo fonte
+      // Agrupar registros fora do padrão sem quantidade (exceto US) por nome do estudo e arquivo fonte
       const agrupados: Record<string, ExameNaoIdentificado & { temNoDePara: boolean; temNasRegras: boolean }> = {};
       
       volumetriaData.forEach((item) => {
@@ -131,8 +132,8 @@ export function VolumetriaExamesNaoIdentificados() {
 
       const examesArray = Object.values(agrupados).sort((a, b) => b.quantidade - a.quantidade);
       
-      console.log('🔍 ANÁLISE DETALHADA DOS 73 TIPOS:');
-      console.log('🔍 Total de tipos únicos de exames zerados:', examesArray.length);
+      console.log('🔍 ANÁLISE DETALHADA:');
+      console.log('🔍 Total de tipos únicos de exames fora do padrão sem quantidade (exceto US):', examesArray.length);
       
       const naoIdentificados = examesArray.filter(e => !e.temNoDePara && !e.temNasRegras);
       const noDePara = examesArray.filter(e => e.temNoDePara);
@@ -196,7 +197,7 @@ export function VolumetriaExamesNaoIdentificados() {
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground">
-            Todos os exames foram identificados na tabela "De Para". Nenhum exame zerado encontrado.
+            Nenhum exame fora do padrão sem quantidade encontrado (modalidade US excluída).
           </p>
         </CardContent>
       </Card>
@@ -210,10 +211,10 @@ export function VolumetriaExamesNaoIdentificados() {
           <div>
             <CardTitle className="flex items-center gap-2 text-orange-600">
               <AlertTriangle className="h-5 w-5" />
-              Todos os Exames Zerados - Análise Completa
+              Exames Fora do Padrão Sem Quantidade
             </CardTitle>
             <div className="text-sm text-muted-foreground mt-1">
-              Total de {totalExamesNaoIdentificados} exames zerados de {examesNaoIdentificados.length} tipos únicos
+              Total de {totalExamesNaoIdentificados} exames sem quantidade de {examesNaoIdentificados.length} tipos únicos (US excluído)
             </div>
           </div>
           <Button 
@@ -259,9 +260,9 @@ export function VolumetriaExamesNaoIdentificados() {
           <div className="flex items-start gap-2">
             <AlertTriangle className="h-4 w-4 text-orange-600 mt-0.5 flex-shrink-0" />
             <div className="text-sm text-orange-800 dark:text-orange-200">
-              <strong>Análise:</strong> Esta lista mostra TODOS os exames zerados. Os que estão "Na tabela De Para" 
-              deveriam ter recebido valores, mas não receberam - isso indica problema na aplicação do De Para. 
-              Os "Não identificados" precisam ser adicionados na tabela De Para.
+              <strong>Análise:</strong> Esta lista mostra exames fora do padrão sem quantidade (modalidade US excluída). 
+              Os que estão "Na tabela De Para" deveriam ter recebido valores, mas não receberam - isso indica problema 
+              na aplicação do De Para. Os "Não identificados" precisam ser adicionados na tabela De Para.
             </div>
           </div>
         </div>
