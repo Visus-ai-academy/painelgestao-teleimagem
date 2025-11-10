@@ -64,11 +64,12 @@ serve(async (req) => {
       }
     );
 
-    const { data: stagingData, uploadId, arquivo_fonte = 'volumetria_padrao' } = await req.json();
+    const { data: stagingData, uploadId, arquivo_fonte = 'volumetria_padrao', periodo } = await req.json();
     
     console.log(`🚀 PROCESSAMENTO INICIADO - Dados recebidos:`);
     console.log(`📋 Upload ID: ${uploadId}`);
     console.log(`📋 Arquivo fonte: ${arquivo_fonte}`);
+    console.log(`📋 Período recebido:`, periodo);
     console.log(`📋 Registros para processar: ${stagingData?.length || 0}`);
 
     if (!stagingData || !Array.isArray(stagingData)) {
@@ -85,37 +86,28 @@ serve(async (req) => {
       const registrosRejeitados: RejeicaoRecord[] = [];
       const BATCH_SIZE = 50; // Reduzir para evitar timeouts
 
-      // Determinar período de referência dinamicamente
-      let dataReferencia: string;
-      let periodoReferencia: string;
+      // Determinar período de referência usando o período enviado pelo frontend
+      let periodoReferenciaDb: string; // Formato YYYY-MM para banco de dados
       
-      const agora = new Date();
-      const anoAtual = agora.getFullYear();
-      const mesAtual = agora.getMonth() + 1;
-      
-      if (arquivo_fonte.includes('jun') || arquivo_fonte.includes('junho')) {
-        periodoReferencia = 'jun/25';
-        dataReferencia = '2025-06-01';
-      } else if (arquivo_fonte.includes('mai') || arquivo_fonte.includes('maio')) {
-        periodoReferencia = 'mai/25';
-        dataReferencia = '2025-05-01';
-      } else if (arquivo_fonte.includes('jul') || arquivo_fonte.includes('julho')) {
-        periodoReferencia = 'jul/25';
-        dataReferencia = '2025-07-01';
-      } else if (arquivo_fonte.includes('ago') || arquivo_fonte.includes('agosto')) {
-        periodoReferencia = 'ago/25';
-        dataReferencia = '2025-08-01';
-      } else if (arquivo_fonte.includes('retroativo')) {
-        const meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
-        periodoReferencia = `${meses[mesAtual - 1]}/25`;
-        dataReferencia = `${anoAtual}-${mesAtual.toString().padStart(2, '0')}-01`;
+      if (periodo && periodo.ano && periodo.mes) {
+        // Usar período enviado pelo frontend
+        periodoReferenciaDb = `${periodo.ano}-${periodo.mes.toString().padStart(2, '0')}`;
+        console.log(`📅 PERÍODO RECEBIDO DO FRONTEND: ${periodoReferenciaDb}`);
       } else {
-        const meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
-        periodoReferencia = `${meses[mesAtual - 1]}/25`;
-        dataReferencia = `${anoAtual}-${mesAtual.toString().padStart(2, '0')}-01`;
+        // Fallback: usar mês atual do servidor
+        const agora = new Date();
+        const anoAtual = agora.getFullYear();
+        const mesAtual = agora.getMonth() + 1;
+        periodoReferenciaDb = `${anoAtual}-${mesAtual.toString().padStart(2, '0')}`;
+        console.warn(`⚠️ PERÍODO NÃO ENVIADO - Usando mês atual do servidor: ${periodoReferenciaDb}`);
       }
 
-      console.log(`📋 PERÍODO DETERMINADO: ${periodoReferencia} (${dataReferencia})`);
+      // Converter para formato usado nas edge functions de regras (mmm/YY)
+      const [ano, mes] = periodoReferenciaDb.split('-');
+      const meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+      const periodoReferenciaEdge = `${meses[parseInt(mes) - 1]}/${ano.slice(-2)}`;
+
+      console.log(`📋 PERÍODO DE REFERÊNCIA - DB: ${periodoReferenciaDb} | Edge: ${periodoReferenciaEdge}`);
 
       // Processar em batches menores
       for (let batchStart = 0; batchStart < stagingData.length; batchStart += BATCH_SIZE) {
@@ -145,13 +137,12 @@ serve(async (req) => {
             continue; // Pular este registro
           }
           
-          // ✅ ACEITAR DEMAIS REGISTROS - Validações desabilitadas
+          // ✅ ACEITAR DEMAIS REGISTROS - Gravar com periodo_referencia correto
           const recordToInsert = {
             ...record,
-            data_referencia: dataReferencia,
+            periodo_referencia: periodoReferenciaDb,
             arquivo_fonte: arquivo_fonte,
             lote_upload: loteUpload,
-            periodo_referencia: periodoReferencia,
             processamento_pendente: false,
             controle_origem_id: null,
             created_by: null,
@@ -271,7 +262,7 @@ serve(async (req) => {
           { 
             body: { 
               arquivo_fonte: arquivo_fonte,
-              periodo_referencia: periodoReferencia,
+              periodo_referencia: periodoReferenciaEdge, // Formato mmm/YY para edge functions
               aplicar_todos_arquivos: false // Aplicar apenas no arquivo atual
             } 
           }
@@ -307,7 +298,7 @@ serve(async (req) => {
       }
 
       // Variável para compatibilidade com código existente
-      const regrasExclusao = sistemaSucesso ? regrasValidadas : 0;
+      const regrasExclusao = sistemaSucesso ? totalCorrecoes : 0;
 
       // Atualizar status final
       await supabaseClient
@@ -329,7 +320,8 @@ serve(async (req) => {
             debug_info: {
               arquivo_fonte,
               lote_upload,
-              periodo_referencia: periodoReferencia
+              periodo_referencia_db: periodoReferenciaDb,
+              periodo_referencia_edge: periodoReferenciaEdge
             }
           }
         })
