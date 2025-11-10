@@ -659,36 +659,25 @@ serve(async (req) => {
         console.warn(`⚠️ ${nomeFantasia}: Erro RPC:`, e?.message || e);
       }
 
-      // Aplicação de franquia, portal e integração: se houver valor nos parâmetros, aplicar sempre
+      // Aplicar valores de Portal e Integração: se há valor no campo, cobrar sempre
       if (parametros) {
-        const hasFranquiaValue = (Number(parametros.valor_franquia) > 0) || (Number(parametros.valor_acima_franquia) > 0);
-        const hasPortalValue = Number(parametros.valor_portal_laudos) > 0;
-        const hasIntegracaoValue = Number(parametros.valor_integracao) > 0;
-
-        const aplicarFranquiaEfetivo = Boolean(parametros.aplicar_franquia) || hasFranquiaValue;
-        const aplicarPortalEfetivo = Boolean(parametros.portal_laudos) || hasPortalValue;
-        const aplicarIntegracaoEfetivo = Boolean(parametros.cobrar_integracao) || hasIntegracaoValue;
-
-        if (!aplicarFranquiaEfetivo) {
-          console.log(`📋 ${nomeFantasia}: Franquia DESABILITADA (sem valor e flag falsa)`);
+        // Franquia: respeitar flag aplicar_franquia (tem lógica complexa de volume)
+        if (!parametros.aplicar_franquia) {
+          console.log(`📋 ${nomeFantasia}: Franquia DESABILITADA por parâmetro`);
           valorFranquia = 0;
-          detalhesFranquia = { tipo: 'desabilitado', valor_aplicado: 0, motivo: 'Sem franquia configurada' };
+          detalhesFranquia = { tipo: 'desabilitado', valor_aplicado: 0, motivo: 'Franquia desabilitada' };
         }
-
-        if (!aplicarPortalEfetivo) {
-          console.log(`📋 ${nomeFantasia}: Portal DESABILITADO (sem valor e flag falsa)`);
-          valorPortalLaudos = 0;
-        } else if ((valorPortalLaudos ?? 0) === 0 && hasPortalValue) {
-          // Fallback: quando RPC não retornar portal mas há valor no parâmetro
-          valorPortalLaudos = Number(parametros.valor_portal_laudos) || 0;
+        
+        // Portal: se há valor no parâmetro, usar (ignorar flag portal_laudos)
+        if ((valorPortalLaudos ?? 0) === 0 && Number(parametros.valor_portal_laudos) > 0) {
+          valorPortalLaudos = Number(parametros.valor_portal_laudos);
+          console.log(`📋 ${nomeFantasia}: Portal aplicado do parâmetro: R$ ${valorPortalLaudos.toFixed(2)}`);
         }
-
-        if (!aplicarIntegracaoEfetivo) {
-          console.log(`📋 ${nomeFantasia}: Integração DESABILITADA (sem valor e flag falsa)`);
-          valorIntegracao = 0;
-        } else if ((valorIntegracao ?? 0) === 0 && hasIntegracaoValue) {
-          // Fallback: quando RPC não retornar integração mas há valor no parâmetro
-          valorIntegracao = Number(parametros.valor_integracao) || 0;
+        
+        // Integração: se há valor no parâmetro, usar (ignorar flag cobrar_integracao)
+        if ((valorIntegracao ?? 0) === 0 && Number(parametros.valor_integracao) > 0) {
+          valorIntegracao = Number(parametros.valor_integracao);
+          console.log(`📋 ${nomeFantasia}: Integração aplicada do parâmetro: R$ ${valorIntegracao.toFixed(2)}`);
         }
       } else {
         console.log(`📋 ${nomeFantasia}: Sem parâmetros encontrados`);
