@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CorrigirContratosDuplicados } from "@/components/CorrigirContratosDuplicados";
+import { ExcluirPrecoEspecifico } from "@/components/ExcluirPrecoEspecifico";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -793,10 +794,61 @@ export default function ContratosClientes() {
         console.warn('Aviso: não foi possível sincronizar parâmetros de faturamento:', syncErr);
       }
 
+      // ✅ SINCRONIZAR PREÇOS: Atualizar precos_servicos com os valores editados no contrato
+      try {
+        if (precosCliente.length > 0) {
+          console.log('🔄 Sincronizando preços do contrato para precos_servicos...');
+          
+          for (const preco of precosCliente) {
+            // Buscar o preço existente em precos_servicos
+            const { data: precoExistente, error: searchError } = await supabase
+              .from('precos_servicos')
+              .select('id')
+              .eq('cliente_id', contratoEditando.clienteId)
+              .eq('modalidade', preco.modalidade)
+              .eq('especialidade', preco.especialidade)
+              .eq('categoria', preco.categoria)
+              .eq('prioridade', preco.prioridade)
+              .eq('volume_inicial', preco.volume_inicial || 0)
+              .eq('volume_final', preco.volume_final || 999999)
+              .maybeSingle();
+
+            if (searchError) {
+              console.warn('Erro ao buscar preço:', searchError);
+              continue;
+            }
+
+            // Atualizar o preço em precos_servicos
+            if (precoExistente?.id) {
+              await supabase
+                .from('precos_servicos')
+                .update({
+                  valor_base: Number(preco.valor_base || 0),
+                  valor_urgencia: Number(preco.valor_urgencia || 0),
+                  considera_prioridade_plantao: preco.considera_prioridade_plantao || false,
+                  ativo: preco.ativo !== false,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', precoExistente.id);
+              
+              console.log(`✅ Preço atualizado: ${preco.modalidade}/${preco.especialidade}/${preco.categoria}/${preco.prioridade}`);
+            }
+          }
+          
+          console.log('✅ Sincronização de preços concluída!');
+        }
+      } catch (syncPrecosErr) {
+        console.error('❌ Erro ao sincronizar preços:', syncPrecosErr);
+        toast({
+          title: "Aviso",
+          description: "Contrato atualizado, mas alguns preços podem não ter sido sincronizados.",
+          variant: "default",
+        });
+      }
 
       toast({
         title: "Contrato atualizado",
-        description: "As alterações foram salvas com sucesso.",
+        description: "As alterações foram salvas e os preços sincronizados com sucesso.",
       });
 
       setShowEditarContrato(false);
@@ -917,6 +969,9 @@ export default function ContratosClientes() {
       
       {/* Seção de Correção de Contratos Duplicados */}
       <CorrigirContratosDuplicados />
+      
+      {/* Seção de Exclusão de Preço Específico */}
+      <ExcluirPrecoEspecifico />
       
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Contratos Clientes</h1>
