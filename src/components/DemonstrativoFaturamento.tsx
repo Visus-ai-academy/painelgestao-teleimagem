@@ -1231,47 +1231,25 @@ export default function DemonstrativoFaturamento() {
       return;
     }
 
-    // Log de debug para verificar os valores
-    if (clientesFiltrados.length > 0) {
-      console.log('📊 Exportando Excel - Amostra do primeiro cliente:', {
-        nome: clientesFiltrados[0].nome,
-        valor_exames: clientesFiltrados[0].valor_exames,
-        valor_franquia: clientesFiltrados[0].valor_franquia,
-        valor_integracao: clientesFiltrados[0].valor_integracao,
-        valor_portal: clientesFiltrados[0].valor_portal,
-        valor_impostos: clientesFiltrados[0].valor_impostos,
-        valor_liquido: clientesFiltrados[0].valor_liquido,
-        valor_bruto: clientesFiltrados[0].valor_bruto
-      });
-    }
-
-    const dados = clientesFiltrados.map((c) => {
-      const valorExames = Number(c.valor_exames ?? 0);
-      const valorFranquia = Number(c.valor_franquia ?? 0);
-      const valorIntegracao = Number(c.valor_integracao ?? 0);
-      const valorPortal = Number(c.valor_portal ?? 0);
-      const valorImpostos = Number(c.valor_impostos ?? 0);
-      const valorBrutoCalc = Number(c.valor_bruto ?? (valorExames + valorFranquia + valorIntegracao + valorPortal));
-      const valorLiquidoCalc = valorBrutoCalc - valorImpostos;
-
-      return {
-        "Nome do Cliente": c.nome,
-        "Quantidade de Exames": c.total_exames,
-        "Valor Total Exames": valorExames,
-        "Valor Franquia": valorFranquia,
-        "Valor Integração": valorIntegracao,
-        "Valor Portal Laudos": valorPortal,
-        "Impostos": valorImpostos,
-        "Valor Líquido": Number(valorLiquidoCalc.toFixed(2)),
-      };
-    });
+    // ✅ Usar EXATAMENTE os valores que estão no demonstrativo visível, sem recálculos
+    const dados = clientesFiltrados.map((c) => ({
+      "Nome do Cliente": c.nome,
+      "Quantidade de Exames": c.total_exames || 0,
+      "Valor Total Exames": Number(c.valor_exames || 0),
+      "Valor Franquia": Number(c.valor_franquia || 0),
+      "Valor Integração": Number(c.valor_integracao || 0),
+      "Valor Portal Laudos": Number(c.valor_portal || 0),
+      "Valor Bruto": Number(c.valor_bruto || 0),
+      "Impostos": Number(c.valor_impostos || 0),
+      "Valor Líquido": Number(c.valor_liquido || 0),
+    }));
 
     const ws = XLSX.utils.json_to_sheet(dados);
     
     // Formatar colunas de valores como moeda
     const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
     for (let R = range.s.r + 1; R <= range.e.r; ++R) {
-      for (let C = 2; C <= 7; ++C) { // Colunas de valor (C a H)
+      for (let C = 2; C <= 8; ++C) { // Colunas de valor (C a I)
         const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
         if (ws[cellAddress] && typeof ws[cellAddress].v === 'number') {
           ws[cellAddress].z = 'R$ #,##0.00';
@@ -1287,6 +1265,7 @@ export default function DemonstrativoFaturamento() {
       { wch: 16 }, // Valor Franquia
       { wch: 18 }, // Valor Integração
       { wch: 20 }, // Valor Portal Laudos
+      { wch: 16 }, // Valor Bruto
       { wch: 14 }, // Impostos
       { wch: 16 }, // Valor Líquido
     ];
