@@ -706,13 +706,29 @@ serve(async (req: Request) => {
       // 3) Valor bruto = exames + adicionais
       valorBruto = valorExames + valorFranquia + valorPortal + valorIntegracao;
       
-      // Buscar parâmetros do cliente para verificar se é Simples Nacional
+      // Buscar parâmetros do cliente para verificar adicionais e regime
       const { data: parametros } = await supabase
         .from('parametros_faturamento')
-        .select('simples')
+        .select('simples, aplicar_franquia, portal_laudos, cobrar_integracao')
         .eq('cliente_id', cliente_id)
         .eq('ativo', true)
         .maybeSingle();
+      
+      // Respeitar flags dos parâmetros: só aplica se habilitado
+      if (parametros) {
+        if (!parametros.aplicar_franquia) {
+          valorFranquia = 0;
+        }
+        if (!parametros.portal_laudos) {
+          valorPortal = 0;
+        }
+        if (!parametros.cobrar_integracao) {
+          valorIntegracao = 0;
+        }
+      }
+
+      // Recalcular valor bruto após ajustes
+      valorBruto = valorExames + valorFranquia + valorPortal + valorIntegracao;
       
       // Calcular impostos APENAS se NÃO for Simples Nacional
       if (parametros && !parametros.simples) {

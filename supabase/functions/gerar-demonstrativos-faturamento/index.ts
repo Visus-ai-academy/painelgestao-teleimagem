@@ -49,6 +49,8 @@ serve(async (req) => {
         ativo,
         parametros_faturamento(
           id,
+          status,
+          ativo,
           aplicar_franquia,
           valor_franquia,
           volume_franquia,
@@ -92,7 +94,7 @@ serve(async (req) => {
     const clientesProcessados = new Set<string>(); // Track by nome_fantasia to avoid duplicates
 
     for (const cliente of clientes) {
-      const parametros = cliente.parametros_faturamento?.[0];
+      const parametros = (cliente.parametros_faturamento || []).find((p: any) => p?.ativo === true || p?.status === 'A' || p?.status === 'Ativo') || cliente.parametros_faturamento?.[0];
       const contrato = cliente.contratos_clientes?.[0];
       const tipoFaturamento = contrato?.tipo_faturamento || 'CO-FT';
 
