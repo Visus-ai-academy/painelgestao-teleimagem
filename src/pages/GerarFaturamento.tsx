@@ -51,7 +51,7 @@ import { ControleFechamentoFaturamento } from '@/components/ControleFechamentoFa
 import { ExamesValoresZerados } from "@/components/ExamesValorezrados";
 import { DiagnosticoPrecosFaturamento } from "@/components/DiagnosticoPrecosFaturamento";
 import FaturamentoComparativo from "@/components/faturamento/FaturamentoComparativo";
-import { AuditoriaFranquias } from "@/components/AuditoriaFranquias";
+
 
 
 import { generatePDF, downloadPDF, type FaturamentoData } from "@/lib/pdfUtils";
@@ -64,7 +64,7 @@ export default function GerarFaturamento() {
   
   // Ensure activeTab never gets set to removed values
   const safeSetActiveTab = (value: string) => {
-    const validTabs = ["gerar", "demonstrativo", "relatorios", "analise", "fechamento", "comparativo", "auditoria"];
+    const validTabs = ["gerar", "demonstrativo", "relatorios", "analise", "fechamento", "comparativo"];
     if (validTabs.includes(value)) {
       setActiveTab(value);
     } else {
@@ -1960,10 +1960,6 @@ export default function GerarFaturamento() {
             <FileSpreadsheet className="h-4 w-4" />
             Comparativo
           </TabsTrigger>
-          <TabsTrigger value="auditoria" className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4" />
-            Auditoria
-          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="demonstrativo" className="space-y-6">
@@ -2754,9 +2750,6 @@ export default function GerarFaturamento() {
           <DiagnosticoPrecosFaturamento />
         </TabsContent>
 
-        <TabsContent value="auditoria" className="space-y-6 mt-6">
-          <AuditoriaFranquias />
-        </TabsContent>
 
           </Tabs>
           

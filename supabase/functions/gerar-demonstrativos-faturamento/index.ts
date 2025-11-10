@@ -717,8 +717,8 @@ serve(async (req) => {
           const volumeFranquia = parametros.volume_franquia || 0;
           const valorFranquiaBase = Number(parametros.valor_franquia || 0);
           const valorAcimaFranquia = Number(parametros.valor_acima_franquia || 0);
-          const frequenciaContinua = parametros.frequencia_continua;
-          const frequenciaPorVolume = parametros.frequencia_por_volume;
+          const frequenciaContinua = parametros.frequencia_continua === true;
+          const frequenciaPorVolume = parametros.frequencia_por_volume === true;
           
           console.log(`📋 ${nomeFantasia}: Aplica franquia = ${parametros.aplicar_franquia}`);
           console.log(`📋 ${nomeFantasia}: Freq contínua = ${frequenciaContinua}`);
@@ -777,8 +777,8 @@ serve(async (req) => {
             }
           } else {
             // Frequência Contínua = NÃO
-            if (frequenciaPorVolume === true || frequenciaPorVolume === null || frequenciaPorVolume === undefined) {
-              // Frequência por Volume = SIM ou vazio
+            if (frequenciaPorVolume === true) {
+              // Frequência por Volume = SIM
               if (totalExames < volumeFranquia) {
                 // Volume abaixo do threshold → cobra franquia
                 valorFranquia = valorFranquiaBase;
