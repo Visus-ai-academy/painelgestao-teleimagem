@@ -112,8 +112,72 @@ serve(async (req: Request) => {
       volumetriaMap.set(key, item);
     });
 
-    // Removido pattern-based search - cada cliente busca apenas seus próprios dados via aliases
+    // Pattern-based search for grouped clients
     const nomeFantasia = cliente.nome_fantasia || cliente.nome;
+    let padroesBusca: string[] = [];
+    
+    if (nomeFantasia === 'PRN') {
+      padroesBusca = ['PRN%'];
+    } else if (['CEDI-RJ', 'CEDI-RO'].includes(nomeFantasia)) {
+      // CEDIDIAG NÃO está nesta lista - apenas CEDI-RJ e CEDI-RO agrupam com CEDI%
+      padroesBusca = ['CEDI%'];
+    } else if (nomeFantasia.includes('AKCPALMAS') || nomeFantasia.includes('AKC')) {
+      padroesBusca = ['AKC%', 'AKCPALMAS%'];
+    }
+    
+    if (padroesBusca.length > 0) {
+      for (const padrao of padroesBusca) {
+        const { data: volEmp } = await supabase
+          .from('volumetria_mobilemed')
+          .select(`
+            id,
+            "DATA_REALIZACAO",
+            "DATA_LAUDO",
+            "NOME_PACIENTE",
+            "MEDICO",
+            "ESTUDO_DESCRICAO",
+            "MODALIDADE",
+            "ESPECIALIDADE",
+            "CATEGORIA",
+            "PRIORIDADE",
+            "ACCESSION_NUMBER",
+            "EMPRESA",
+            "Cliente_Nome_Fantasia",
+            "VALORES",
+            tipo_faturamento
+          `)
+          .eq('periodo_referencia', periodo)
+          .ilike('EMPRESA', padrao);
+        
+        const { data: volFant } = await supabase
+          .from('volumetria_mobilemed')
+          .select(`
+            id,
+            "DATA_REALIZACAO",
+            "DATA_LAUDO",
+            "NOME_PACIENTE",
+            "MEDICO",
+            "ESTUDO_DESCRICAO",
+            "MODALIDADE",
+            "ESPECIALIDADE",
+            "CATEGORIA",
+            "PRIORIDADE",
+            "ACCESSION_NUMBER",
+            "EMPRESA",
+            "Cliente_Nome_Fantasia",
+            "VALORES",
+            tipo_faturamento
+          `)
+          .eq('periodo_referencia', periodo)
+          .ilike('Cliente_Nome_Fantasia', padrao);
+        
+        [...(volEmp || []), ...(volFant || [])].forEach(item => {
+          const key = item.id ? item.id.toString() : `pattern_${item.EMPRESA}_${item.VALORES}_${Math.random()}`;
+          volumetriaMap.set(key, item);
+        });
+      }
+      console.log(`📊 ${nomeFantasia}: Pattern search completado com ${volumetriaMap.size} registros únicos`);
+    }
 
     let volumetria = Array.from(volumetriaMap.values());
     console.log('📊 Volumetria encontrada:', volumetria?.length || 0, 'registros (antes dos filtros)');
