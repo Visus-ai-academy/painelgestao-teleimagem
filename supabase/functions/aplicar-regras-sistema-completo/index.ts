@@ -50,279 +50,158 @@ serve(async (req) => {
       );
     }
 
-    console.log(`🎯 NOVA ABORDAGEM: Aplicação de regras sistema completo`);
-    console.log(`📁 Arquivos a processar: ${arquivosParaProcessar.join(', ')}`);
+    console.log(`🎯 Aplicação de regras sistema completo`);
+    console.log(`📁 Arquivos: ${arquivosParaProcessar.join(', ')}`);
     
     const statusRegras: StatusRegra[] = [];
     let totalProcessados = 0;
     let totalCorrigidos = 0;
 
-    // Buscar dados das tabelas de referência uma vez só
-    const { data: cadastroExames } = await supabase
-      .from('cadastro_exames')
-      .select('nome, categoria, especialidade')
-      .eq('ativo', true);
+    // Carregar tabelas de referência
+    const [cadastroRes, prioridadeRes, valoresRes] = await Promise.all([
+      supabase.from('cadastro_exames').select('nome, categoria, especialidade').eq('ativo', true),
+      supabase.from('valores_prioridade_de_para').select('prioridade_original, nome_final').eq('ativo', true),
+      supabase.from('valores_referencia_de_para').select('estudo_descricao, valores').eq('ativo', true)
+    ]);
 
-    const { data: deParaPrioridades } = await supabase
-      .from('valores_prioridade_de_para')
-      .select('prioridade_original, nome_final')
-      .eq('ativo', true);
+    const cadastroExames = cadastroRes.data || [];
+    const deParaPrioridades = prioridadeRes.data || [];
+    const deParaValores = valoresRes.data || [];
 
-    const { data: deParaValores } = await supabase
-      .from('valores_referencia_de_para')
-      .select('estudo_descricao, valores')
-      .eq('ativo', true);
+    console.log(`📋 Referências: ${cadastroExames.length} exames, ${deParaPrioridades.length} prioridades, ${deParaValores.length} valores`);
 
-    console.log(`📋 Cadastro exames carregado: ${cadastroExames?.length || 0} registros`);
-    console.log(`📋 De-para prioridades: ${deParaPrioridades?.length || 0} registros`);
-    console.log(`📋 De-para valores: ${deParaValores?.length || 0} registros`);
+    // Criar mapas
+    const mapaCadastro = new Map(
+      cadastroExames.map(e => [e.nome?.toUpperCase().trim(), { categoria: e.categoria, especialidade: e.especialidade }])
+    );
+    const mapaPrioridades = new Map(
+      deParaPrioridades.map(p => [p.prioridade_original?.toUpperCase().trim(), p.nome_final])
+    );
+    const mapaValores = new Map(
+      deParaValores.map(v => [v.estudo_descricao?.toUpperCase().trim(), v.valores])
+    );
 
-    // Criar mapas para busca eficiente
-    const mapaCategoriasEspecialidades = new Map();
-    cadastroExames?.forEach(exame => {
-      if (exame.nome) {
-        mapaCategoriasEspecialidades.set(exame.nome.toUpperCase().trim(), {
-          categoria: exame.categoria,
-          especialidade: exame.especialidade
-        });
-      }
-    });
-
-    const mapaPrioridades = new Map();
-    deParaPrioridades?.forEach(dp => {
-      if (dp.prioridade_original) {
-        mapaPrioridades.set(dp.prioridade_original.toUpperCase().trim(), dp.nome_final);
-      }
-    });
-
-    const mapaValores = new Map();
-    deParaValores?.forEach(dv => {
-      if (dv.estudo_descricao) {
-        mapaValores.set(dv.estudo_descricao.toUpperCase().trim(), dv.valores);
-      }
-    });
-
-    // Processar cada arquivo
+    // Processar arquivos
     for (const arquivo of arquivosParaProcessar) {
-      console.log(`\n🔄 Processando arquivo: ${arquivo}`);
+      console.log(`\n🔄 ${arquivo}`);
       
-      // Aplicar agrupamento automático de clientes (inclui CEMVALENCA, DIAGNOSTICA e mapeamento geral)
-      try {
-        console.log('🔗 Aplicando agrupamento automático de clientes...');
-        const { data: agrupamentoResult, error: agrupamentoError } = await supabase.functions.invoke(
-          'aplicar-agrupamento-clientes'
-        );
-        
-        if (agrupamentoError) {
-          console.warn('⚠️ Erro no agrupamento automático:', agrupamentoError);
-        } else {
-          console.log('✅ Agrupamento automático concluído:', agrupamentoResult);
-        }
-      } catch (e) {
-        console.warn('⚠️ Agrupamento automático falhou:', e);
-      }
-
-      // Buscar TODOS os registros que precisam de correção
       const { data: registros, error: errorFetch } = await supabase
         .from('volumetria_mobilemed')
         .select('id, "ESTUDO_DESCRICAO", "CATEGORIA", "ESPECIALIDADE", "PRIORIDADE", "VALORES", "MODALIDADE"')
         .eq('arquivo_fonte', arquivo);
 
       if (errorFetch) {
-        console.error(`❌ Erro ao buscar registros do ${arquivo}:`, errorFetch);
+        console.error(`❌ Erro: ${errorFetch.message}`);
         continue;
       }
 
-      console.log(`📊 Registros encontrados no ${arquivo}: ${registros?.length || 0}`);
+      console.log(`📊 ${registros?.length || 0} registros`);
 
-      let correcoesModalidades = 0;
-      let correcoesEspecialidades = 0;
-      let correcoesCategorias = 0;
-      let correcoesPrioridades = 0;
-      let correcoesValores = 0;
-      let corrrecoesTipificacao = 0;
+      let stats = { modalidades: 0, especialidades: 0, categorias: 0, prioridades: 0, valores: 0 };
 
-      // Processar registros em lotes de 100
-      const loteSize = 100;
+      const loteSize = 50;
       for (let i = 0; i < (registros?.length || 0); i += loteSize) {
         const lote = registros!.slice(i, i + loteSize);
         
-        for (const registro of lote) {
-          const updates: any = {};
-          let needsUpdate = false;
+        for (const reg of lote) {
+          const upd: any = {};
+          let changed = false;
 
-          // 1. CORREÇÕES DE MODALIDADES
-          if (registro.MODALIDADE === 'BMD') {
-            updates.MODALIDADE = 'DO';
-            needsUpdate = true;
-            correcoesModalidades++;
-          }
-          if (registro.MODALIDADE === 'CR' || registro.MODALIDADE === 'DX') {
-            // Verificar se é mamografia
-            if (registro.ESTUDO_DESCRICAO?.toLowerCase().includes('mamografia') || 
-                registro.ESTUDO_DESCRICAO?.toLowerCase().includes('mamogra')) {
-              updates.MODALIDADE = 'MG';
-            } else {
-              updates.MODALIDADE = 'RX';
-            }
-            needsUpdate = true;
-            correcoesModalidades++;
+          // Modalidades
+          if (reg.MODALIDADE === 'BMD') {
+            upd.MODALIDADE = 'DO';
+            changed = true;
+            stats.modalidades++;
+          } else if (reg.MODALIDADE === 'CR' || reg.MODALIDADE === 'DX') {
+            const desc = reg.ESTUDO_DESCRICAO?.toLowerCase() || '';
+            upd.MODALIDADE = (desc.includes('mamografia') || desc.includes('mamogra')) ? 'MG' : 'RX';
+            changed = true;
+            stats.modalidades++;
           }
 
-          // 2. ESPECIALIDADES PROBLEMÁTICAS
-          if (registro.ESPECIALIDADE === 'ONCO MEDICINA INTERNA') {
-            updates.ESPECIALIDADE = 'MEDICINA INTERNA';
-            needsUpdate = true;
-            correcoesEspecialidades++;
+          // Especialidades diretas
+          const espMap: Record<string, string> = {
+            'ONCO MEDICINA INTERNA': 'MEDICINA INTERNA',
+            'CT': 'MEDICINA INTERNA',
+            'Colunas': 'MUSCULO ESQUELETICO'
+          };
+          if (reg.ESPECIALIDADE && espMap[reg.ESPECIALIDADE]) {
+            upd.ESPECIALIDADE = espMap[reg.ESPECIALIDADE];
+            changed = true;
+            stats.especialidades++;
           }
-          if (registro.ESPECIALIDADE === 'CT') {
-            updates.ESPECIALIDADE = 'MEDICINA INTERNA';
-            needsUpdate = true;
-            correcoesEspecialidades++;
-          }
-          if (registro.ESPECIALIDADE === 'Colunas') {
-            updates.ESPECIALIDADE = 'MUSCULO ESQUELETICO';
-            needsUpdate = true;
-            correcoesEspecialidades++;
-          }
-          // GERAL não deve mais existir - será corrigido via cadastro_exames abaixo
 
-          // 3. APLICAR CATEGORIAS E ESPECIALIDADES DO CADASTRO_EXAMES
-          // FONTE DA VERDADE: cadastro_exames SEMPRE sobrescreve quando há match
-          if (registro.ESTUDO_DESCRICAO) {
-            const dadosExame = mapaCategoriasEspecialidades.get(registro.ESTUDO_DESCRICAO.toUpperCase().trim());
-            if (dadosExame) {
-              // SEMPRE aplicar categoria do cadastro quando disponível
-              if (dadosExame.categoria && dadosExame.categoria !== registro.CATEGORIA) {
-                updates.CATEGORIA = dadosExame.categoria;
-                needsUpdate = true;
-                correcoesCategorias++;
+          // Cadastro exames (SEMPRE sobrescreve)
+          if (reg.ESTUDO_DESCRICAO) {
+            const dados = mapaCadastro.get(reg.ESTUDO_DESCRICAO.toUpperCase().trim());
+            if (dados) {
+              if (dados.categoria && dados.categoria !== reg.CATEGORIA) {
+                upd.CATEGORIA = dados.categoria;
+                changed = true;
+                stats.categorias++;
               }
-              // SEMPRE aplicar especialidade do cadastro quando disponível
-              if (dadosExame.especialidade && dadosExame.especialidade !== registro.ESPECIALIDADE) {
-                updates.ESPECIALIDADE = dadosExame.especialidade;
-                needsUpdate = true;
-                correcoesEspecialidades++;
+              if (dados.especialidade && dados.especialidade !== reg.ESPECIALIDADE) {
+                upd.ESPECIALIDADE = dados.especialidade;
+                changed = true;
+                stats.especialidades++;
               }
             } else {
-              // Categoria baseada na modalidade se não encontrou no cadastro
-              const modalidadeAtual = updates.MODALIDADE || registro.MODALIDADE;
-              if (!registro.CATEGORIA || registro.CATEGORIA === 'SC' || registro.CATEGORIA === '') {
-                switch (modalidadeAtual) {
-                  case 'MR':
-                    updates.CATEGORIA = 'RM';
-                    needsUpdate = true;
-                    correcoesCategorias++;
-                    break;
-                  case 'CT':
-                    updates.CATEGORIA = 'TC';
-                    needsUpdate = true;
-                    correcoesCategorias++;
-                    break;
-                  case 'RX':
-                    updates.CATEGORIA = 'RX';
-                    needsUpdate = true;
-                    correcoesCategorias++;
-                    break;
-                  case 'MG':
-                    updates.CATEGORIA = 'MG';
-                    needsUpdate = true;
-                    correcoesCategorias++;
-                    break;
-                  case 'DO':
-                    updates.CATEGORIA = 'DO';
-                    needsUpdate = true;
-                    correcoesCategorias++;
-                    break;
-                  default:
-                    if (!registro.CATEGORIA || registro.CATEGORIA === '') {
-                      updates.CATEGORIA = 'SC';
-                      needsUpdate = true;
-                    }
+              // Fallback categoria por modalidade
+              const mod = upd.MODALIDADE || reg.MODALIDADE;
+              if (!reg.CATEGORIA || reg.CATEGORIA === 'SC' || reg.CATEGORIA === '') {
+                const catMap: Record<string, string> = { 'MR': 'RM', 'CT': 'TC', 'RX': 'RX', 'MG': 'MG', 'DO': 'DO' };
+                if (catMap[mod]) {
+                  upd.CATEGORIA = catMap[mod];
+                  changed = true;
+                  stats.categorias++;
                 }
               }
             }
           }
 
-          // 4. DE-PARA PRIORIDADES
-          if (registro.PRIORIDADE) {
-            const novaPrioridade = mapaPrioridades.get(registro.PRIORIDADE.toUpperCase().trim());
-            if (novaPrioridade && novaPrioridade !== registro.PRIORIDADE) {
-              updates.PRIORIDADE = novaPrioridade;
-              needsUpdate = true;
-              correcoesPrioridades++;
+          // Prioridades
+          if (reg.PRIORIDADE) {
+            const novaPrio = mapaPrioridades.get(reg.PRIORIDADE.toUpperCase().trim());
+            if (novaPrio && novaPrio !== reg.PRIORIDADE) {
+              upd.PRIORIDADE = novaPrio;
+              changed = true;
+              stats.prioridades++;
             }
-            // Correção específica para AMBULATORIO
-            if (registro.PRIORIDADE === 'AMBULATORIO') {
-              updates.PRIORIDADE = 'ROTINA';
-              needsUpdate = true;
-              correcoesPrioridades++;
-            }
-          }
-
-          // 5. DE-PARA VALORES (apenas se valor for 0 ou null)
-          if ((!registro.VALORES || registro.VALORES === 0) && registro.ESTUDO_DESCRICAO) {
-            const novoValor = mapaValores.get(registro.ESTUDO_DESCRICAO.toUpperCase().trim());
-            if (novoValor && novoValor > 0) {
-              updates.VALORES = novoValor;
-              needsUpdate = true;
-              correcoesValores++;
+            if (reg.PRIORIDADE === 'AMBULATORIO') {
+              upd.PRIORIDADE = 'ROTINA';
+              changed = true;
+              stats.prioridades++;
             }
           }
 
-          // Tipificação de faturamento removida - deve ser feita por regras específicas de negócio
-
-          // Aplicar as atualizações se necessário
-          if (needsUpdate) {
-            updates.updated_at = new Date().toISOString();
-            
-            const { error: updateError } = await supabase
-              .from('volumetria_mobilemed')
-              .update(updates)
-              .eq('id', registro.id);
-
-            if (updateError) {
-              console.error(`❌ Erro ao atualizar registro ${registro.id}:`, updateError);
+          // Valores
+          if ((!reg.VALORES || reg.VALORES === 0) && reg.ESTUDO_DESCRICAO) {
+            const novoVal = mapaValores.get(reg.ESTUDO_DESCRICAO.toUpperCase().trim());
+            if (novoVal && novoVal > 0) {
+              upd.VALORES = novoVal;
+              changed = true;
+              stats.valores++;
             }
+          }
+
+          if (changed) {
+            upd.updated_at = new Date().toISOString();
+            const { error } = await supabase.from('volumetria_mobilemed').update(upd).eq('id', reg.id);
+            if (error) console.error(`❌ Erro ID ${reg.id}: ${error.message}`);
           }
         }
       }
 
-      const totalCorrecoesList = [
-        correcoesModalidades,
-        correcoesEspecialidades, 
-        correcoesCategorias,
-        correcoesPrioridades,
-        correcoesValores,
-        corrrecoesTipificacao
-      ];
-
-      const totalCorrecoesArquivo = totalCorrecoesList.reduce((sum, count) => sum + count, 0);
-      totalCorrigidos += totalCorrecoesArquivo;
+      const totalCorrecoes = Object.values(stats).reduce((a, b) => a + b, 0);
+      totalCorrigidos += totalCorrecoes;
 
       statusRegras.push({
-        regra: `Aplicação Completa de Regras - ${arquivo}`,
+        regra: `Regras - ${arquivo}`,
         aplicada: true,
-        detalhes: {
-          registros_processados: registros?.length || 0,
-          correções_modalidades: correcoesModalidades,
-          correções_especialidades: correcoesEspecialidades,
-          correções_categorias: correcoesCategorias,
-          correções_prioridades: correcoesPrioridades,
-          correções_valores: correcoesValores,
-          correções_tipificacao: corrrecoesTipificacao,
-          total_correções: totalCorrecoesArquivo
-        }
+        detalhes: { registros_processados: registros?.length || 0, ...stats, total_correções: totalCorrecoes }
       });
 
-      console.log(`✅ ${arquivo} processado: ${totalCorrecoesArquivo} correções aplicadas`);
-      console.log(`   - Modalidades: ${correcoesModalidades}`);
-      console.log(`   - Especialidades: ${correcoesEspecialidades}`);
-      console.log(`   - Categorias: ${correcoesCategorias}`);
-      console.log(`   - Prioridades: ${correcoesPrioridades}`);
-      console.log(`   - Valores: ${correcoesValores}`);
-      console.log(`   - Tipificação: ${corrrecoesTipificacao}`);
-
+      console.log(`✅ ${totalCorrecoes} correções: M:${stats.modalidades} E:${stats.especialidades} C:${stats.categorias} P:${stats.prioridades} V:${stats.valores}`);
       totalProcessados += registros?.length || 0;
     }
 
