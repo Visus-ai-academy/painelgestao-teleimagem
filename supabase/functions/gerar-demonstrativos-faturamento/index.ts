@@ -727,11 +727,6 @@ serve(async (req) => {
             }
           }
 
-          // Segurança adicional: volume 0 com frequências desativadas jamais aplica franquia
-          if (!frequenciaContinua && !frequenciaPorVolume && volumeFranquia <= 0) {
-            valorCalculado = 0;
-            regra = 'volume_zero_sem_frequencia';
-          }
 
           // Se o valor retornado pela RPC divergir da regra, priorizar a regra
           if (valorFranquia !== valorCalculado) {
