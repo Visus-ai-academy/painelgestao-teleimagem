@@ -17,7 +17,8 @@ import {
   Users,
   Calendar,
   FileText,
-  AlertTriangle
+  AlertTriangle,
+  Trash2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -1237,6 +1238,31 @@ export default function DemonstrativoFaturamento() {
     vencido: clientesFiltrados.filter(c => c.status_pagamento === 'vencido').length,
   };
 
+  const limparCache = () => {
+    if (confirm('Isso irá limpar todos os dados em cache do demonstrativo. Deseja continuar?')) {
+      // Limpar apenas chaves relacionadas ao demonstrativo
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key?.startsWith('demonstrativos_completos_') || key === 'periodoFaturamentoSelecionado') {
+          keysToRemove.push(key);
+        }
+      }
+      
+      keysToRemove.forEach(key => localStorage.removeItem(key));
+      
+      toast({
+        title: "Cache limpo",
+        description: "Todos os dados em cache foram removidos com sucesso.",
+      });
+      
+      // Recarregar a página após 500ms
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
+    }
+  };
+
   const exportarExcel = () => {
     if (clientesFiltrados.length === 0) {
       toast({ title: "Sem dados", description: "Nenhum cliente para exportar.", variant: "destructive" });
@@ -1337,6 +1363,15 @@ export default function DemonstrativoFaturamento() {
               )}
             </SelectContent>
           </Select>
+          <Button
+            onClick={limparCache}
+            variant="outline"
+            size="sm"
+            className="gap-2"
+          >
+            <Trash2 className="h-4 w-4" />
+            Limpar Cache
+          </Button>
         </div>
         <Button
           onClick={exportarExcel}
