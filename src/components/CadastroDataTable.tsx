@@ -18,6 +18,7 @@ interface CadastroDataTableProps {
 export function CadastroDataTable({ data, loading, error, type, title }: CadastroDataTableProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [columnFilters, setColumnFilters] = useState<Record<string, string>>({});
+  const [useExactMatch, setUseExactMatch] = useState(false);
 
   // Infinite scroll controls
   const INITIAL_BATCH = 200;
@@ -204,8 +205,16 @@ export function CadastroDataTable({ data, loading, error, type, title }: Cadastr
     Object.entries(columnFilters).forEach(([columnKey, filterValue]) => {
       if (filterValue) {
         filtered = filtered.filter(item => {
-          const value = getCellValue(item, columnKey);
-          return value.toString().toLowerCase().includes(filterValue.toLowerCase());
+          const value = getCellValue(item, columnKey).toString().toLowerCase();
+          const filter = filterValue.toLowerCase().trim();
+          
+          // Se filtro exato está ativo, usar match exato
+          if (useExactMatch) {
+            return value === filter;
+          }
+          
+          // Caso contrário, buscar por substring mas priorizando matches que começam com o termo
+          return value.includes(filter);
         });
       }
     });
@@ -230,6 +239,7 @@ export function CadastroDataTable({ data, loading, error, type, title }: Cadastr
   const clearAllFilters = () => {
     setSearchTerm('');
     setColumnFilters({});
+    setUseExactMatch(false);
   };
 
   // Verificar se há filtros ativos
@@ -282,8 +292,8 @@ export function CadastroDataTable({ data, loading, error, type, title }: Cadastr
       </div>
       
       {/* Campo de pesquisa global e botão limpar filtros */}
-      <div className="flex gap-2">
-        <div className="relative flex-1">
+      <div className="flex gap-2 flex-wrap">
+        <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
           <Input
             placeholder="Pesquisar em todas as colunas..."
@@ -292,11 +302,22 @@ export function CadastroDataTable({ data, loading, error, type, title }: Cadastr
             className="pl-10"
           />
         </div>
+        <div className="flex items-center gap-2">
+          <label className="flex items-center gap-2 text-sm whitespace-nowrap cursor-pointer">
+            <input
+              type="checkbox"
+              checked={useExactMatch}
+              onChange={(e) => setUseExactMatch(e.target.checked)}
+              className="rounded border-gray-300"
+            />
+            <span>Busca exata</span>
+          </label>
+        </div>
         {hasActiveFilters && (
           <Button
             variant="outline"
             onClick={clearAllFilters}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 whitespace-nowrap"
           >
             <X className="h-4 w-4" />
             Limpar Filtros
