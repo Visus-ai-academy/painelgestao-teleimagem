@@ -110,12 +110,13 @@ serve(async (req) => {
     }
     console.log('🧭 Índices detectados:', indices)
 
-    // Normalização de nomes de clientes (espelha regras do banco)
+    // NORMALIZAÇÃO SIMPLIFICADA - NÃO remove prefixos/sufixos (_PL, _RX, NL_, etc)
+    // pois são parte do nome fantasia real dos clientes
     const normalizeClientName = (input: any): string => {
       let s = String(input ?? '').toUpperCase().trim()
       // Remover acentos
       s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-      // Mapeamentos específicos
+      // Mapeamentos específicos conhecidos (casos excepcionais)
       switch (s) {
         case 'INTERCOR2': s = 'INTERCOR'; break
         case 'P-HADVENTISTA': s = 'HADVENTISTA'; break
@@ -132,19 +133,9 @@ serve(async (req) => {
         case 'CEDI_UNIMED': s = 'CEDIDIAG'; break
         default: break
       }
-      // Remover prefixos e sufixos comuns
-      const removeSuffix = (str: string, suffix: string) => str.endsWith(suffix) ? str.slice(0, -suffix.length) : str
-      const removePrefix = (str: string, prefix: string) => str.startsWith(prefix) ? str.slice(prefix.length) : str
-      s = removeSuffix(s, '- TELE')
-      s = removeSuffix(s, '-CT')
-      s = removeSuffix(s, '-MR')
-      s = removeSuffix(s, '_PLANTAO')
-      s = removeSuffix(s, '_PLANTÃO')
-      s = removeSuffix(s, '_RMX')
-      s = removePrefix(s, 'P-')
-      s = removePrefix(s, 'P_')
-      s = removePrefix(s, 'NL_')
-      // Remover pontos e normalizar espaços
+      // IMPORTANTE: NÃO remover prefixos NL_, NC_ nem sufixos _PL, _RX
+      // pois são parte do nome fantasia real
+      // Apenas normalizar espaços e pontos
       s = s.replace(/\./g, ' ')
       s = s.replace(/\s+/g, ' ').trim()
       return s.trim().toUpperCase()
@@ -166,58 +157,25 @@ serve(async (req) => {
 
     const clientesMap = new Map<string, string>()
     
-    // Primeiro passo: adicionar todas as variantes normalizadas
+    // Estratégia SIMPLIFICADA: adicionar variantes RAW e NORMALIZADAS
+    // PRIORIDADE: nome_fantasia > nome_mobilemed > nome
     clientesData.forEach((cliente: any) => {
-      const addNormalized = (k?: string | null) => {
+      const addMapping = (k?: string | null) => {
         if (!k) return
-        const str = String(k)
-        const keyNorm = normalizeClientName(str)
-        
-        const normalizedVariants = [
-          keyNorm,
-          fingerprint(keyNorm),
-          stripTrailingDigits(keyNorm),
-          fingerprint(stripTrailingDigits(keyNorm)),
-        ]
-        
-        for (const v of normalizedVariants) {
-          if (v && !clientesMap.has(v)) {
-            clientesMap.set(v, cliente.id)
-          }
+        const raw = String(k).toUpperCase().trim()
+        const normalized = normalizeClientName(raw)
+        if (raw) {
+          clientesMap.set(raw, cliente.id)  // Variante RAW (exata)
+        }
+        if (normalized && normalized !== raw) {
+          clientesMap.set(normalized, cliente.id)  // Variante normalizada
         }
       }
       
-      addNormalized(cliente.nome)
-      addNormalized(cliente.nome_mobilemed)
-      addNormalized(cliente.nome_fantasia)
-    })
-    
-    // Segundo passo: adicionar variantes RAW (sobrescrevem normalizadas se houver colisão)
-    // Isso garante que nomes exatos como "RADIOCOR" tenham prioridade sobre "NL_RADIOCOR" normalizado
-    clientesData.forEach((cliente: any) => {
-      const addRaw = (k?: string | null) => {
-        if (!k) return
-        const str = String(k)
-        const raw = str.toUpperCase().trim()
-        
-        const rawVariants = [
-          raw,
-          fingerprint(raw),
-          stripTrailingDigits(raw),
-          fingerprint(stripTrailingDigits(raw)),
-        ]
-        
-        for (const v of rawVariants) {
-          if (v) {
-            clientesMap.set(v, cliente.id) // Sempre sobrescreve
-          }
-        }
-      }
-      
-      // PRIORIDADE: nome_fantasia > nome_mobilemed > nome
-      addRaw(cliente.nome)
-      addRaw(cliente.nome_mobilemed)
-      addRaw(cliente.nome_fantasia)
+      // Adicionar na ordem de prioridade (último sobrescreve)
+      addMapping(cliente.nome)
+      addMapping(cliente.nome_mobilemed)
+      addMapping(cliente.nome_fantasia) // Maior prioridade
     })
 
     console.log(`📋 ${clientesData.length} clientes carregados`)
@@ -292,8 +250,11 @@ serve(async (req) => {
 
         // Aceitar preços vazios (serão tratados como 0)
 
-        // Buscar cliente (com normalização e mapeamento de nomes)
-        const clienteNomeBuscaRaw = clienteNome.toUpperCase()
+        // Armazenar nome original do Excel SEM normalização
+        const clienteNomeOriginal = String(clienteNome || '').trim()
+        
+        // Buscar cliente (com normalização apenas para matching)
+        const clienteNomeBuscaRaw = clienteNome.toUpperCase().trim()
         let clienteNomeBusca = normalizeClientName(clienteNomeBuscaRaw)
         
         // Verificar se existe mapeamento para o nome (raw e normalizado)
@@ -303,25 +264,11 @@ serve(async (req) => {
           console.log(`🔄 Mapeamento aplicado: "${clienteNome}" → "${nomeMapeado}"`)
         }
         
-        // Tentar múltiplas chaves de matching (inclui fingerprint e remoção de dígitos finais)
-        const fpNorm = fingerprint(clienteNomeBusca)
-        const fpRaw = fingerprint(clienteNomeBuscaRaw)
-        const strippedNorm = stripTrailingDigits(clienteNomeBusca)
-        const strippedRaw = stripTrailingDigits(clienteNomeBuscaRaw)
-        const fpStrippedNorm = fingerprint(strippedNorm)
-        const fpStrippedRaw = fingerprint(strippedRaw)
-
-        // IMPORTANTE: Buscar primeiro pelo nome EXATO (RAW) antes de tentar normalizações
-        // Isso evita que "RADIOCOR" seja mapeado para "NL_RADIOCOR" por engano
-        const clienteId =
-          clientesMap.get(clienteNomeBuscaRaw) ||       // 1. Nome EXATO do arquivo (prioridade máxima)
-          clientesMap.get(clienteNomeBusca) ||          // 2. Nome normalizado
-          clientesMap.get(fpRaw) ||                     // 3. Fingerprint do RAW
-          clientesMap.get(fpNorm) ||                    // 4. Fingerprint do normalizado
-          clientesMap.get(strippedRaw) ||               // 5. RAW sem dígitos finais
-          clientesMap.get(strippedNorm) ||              // 6. Normalizado sem dígitos finais
-          clientesMap.get(fpStrippedRaw) ||             // 7. Fingerprint do RAW stripped
-          clientesMap.get(fpStrippedNorm)               // 8. Fingerprint do normalizado stripped
+        // Buscar cliente_id usando APENAS match exato e normalizado (sem fingerprint pesado)
+        const clienteId = 
+          clientesMap.get(clienteNomeBuscaRaw) ||  // 1. Nome EXATO do arquivo (prioridade)
+          clientesMap.get(clienteNomeBusca)        // 2. Nome normalizado (casos mapeados)
+        
         if (!clienteId) {
           observacoesRow += `Cliente não localizado: ${clienteNome}. `
         }
@@ -339,9 +286,10 @@ serve(async (req) => {
         preco = Math.round(preco * 100) / 100
 
         // Preparar registro para inserção (SEM deduplicação - aceitar todos os registros)
-        // IMPORTANTE: Manter o nome EXATO do arquivo Excel (clienteNomeOriginal) sem normalização
+        // CRÍTICO: Salvar o nome EXATO do arquivo Excel no campo cliente_nome
         registrosParaInserir.push({
           cliente_id: clienteId || null,
+          cliente_nome: clienteNomeOriginal, // Nome EXATO do Excel sem qualquer normalização
           modalidade: modalidadeFinal,
           especialidade: especialidadeFinal,
           categoria: categoria && categoria.trim() !== '' ? categoria : null,
@@ -356,8 +304,8 @@ serve(async (req) => {
           aplicar_incremental: true,
           ativo: true,
           observacoes: observacoesRow || null,
-          descricao: clienteId ? null : `Cliente original: ${clienteNomeOriginal}`, // Usar nome ORIGINAL do arquivo
-          linha_arquivo: i + 1  // Adicionar número da linha do Excel (1-indexed)
+          descricao: clienteId ? null : `Cliente original: ${clienteNomeOriginal}`,
+          linha_arquivo: i + 1
         })
 
         registrosProcessados++

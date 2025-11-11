@@ -2821,6 +2821,7 @@ export type Database = {
           categoria: string
           categoria_exame_id: string | null
           cliente_id: string | null
+          cliente_nome: string | null
           codigo_servico: string | null
           considera_prioridade_plantao: boolean | null
           created_at: string
@@ -2849,6 +2850,7 @@ export type Database = {
           categoria: string
           categoria_exame_id?: string | null
           cliente_id?: string | null
+          cliente_nome?: string | null
           codigo_servico?: string | null
           considera_prioridade_plantao?: boolean | null
           created_at?: string
@@ -2877,6 +2879,7 @@ export type Database = {
           categoria?: string
           categoria_exame_id?: string | null
           cliente_id?: string | null
+          cliente_nome?: string | null
           codigo_servico?: string | null
           considera_prioridade_plantao?: boolean | null
           created_at?: string
