@@ -165,38 +165,59 @@ serve(async (req) => {
     }
 
     const clientesMap = new Map<string, string>()
+    
+    // Primeiro passo: adicionar todas as variantes normalizadas
     clientesData.forEach((cliente: any) => {
-      const add = (k?: string | null, priority: number = 0) => {
+      const addNormalized = (k?: string | null) => {
         if (!k) return
         const str = String(k)
         const keyNorm = normalizeClientName(str)
-        const raw = str.toUpperCase().trim()
-        const variants = new Set<string>([
+        
+        const normalizedVariants = [
           keyNorm,
-          raw,
           fingerprint(keyNorm),
-          fingerprint(raw),
           stripTrailingDigits(keyNorm),
-          stripTrailingDigits(raw),
           fingerprint(stripTrailingDigits(keyNorm)),
-          fingerprint(stripTrailingDigits(raw)),
-        ])
-        for (const v of variants) {
-          if (v) {
-            // Só sobrescrever se não existir ou se a nova prioridade for maior
-            const existing = clientesMap.get(v)
-            if (!existing || priority > 0) {
-              clientesMap.set(v, cliente.id)
-            }
+        ]
+        
+        for (const v of normalizedVariants) {
+          if (v && !clientesMap.has(v)) {
+            clientesMap.set(v, cliente.id)
           }
         }
       }
-      // PRIORIDADE: nome_fantasia é a referência principal (priority 2)
-      // nome_mobilemed é secundário (priority 1)
-      // nome é terciário (priority 0)
-      add(cliente.nome, 0)
-      add(cliente.nome_mobilemed, 1)
-      add(cliente.nome_fantasia, 2)
+      
+      addNormalized(cliente.nome)
+      addNormalized(cliente.nome_mobilemed)
+      addNormalized(cliente.nome_fantasia)
+    })
+    
+    // Segundo passo: adicionar variantes RAW (sobrescrevem normalizadas se houver colisão)
+    // Isso garante que nomes exatos como "RADIOCOR" tenham prioridade sobre "NL_RADIOCOR" normalizado
+    clientesData.forEach((cliente: any) => {
+      const addRaw = (k?: string | null) => {
+        if (!k) return
+        const str = String(k)
+        const raw = str.toUpperCase().trim()
+        
+        const rawVariants = [
+          raw,
+          fingerprint(raw),
+          stripTrailingDigits(raw),
+          fingerprint(stripTrailingDigits(raw)),
+        ]
+        
+        for (const v of rawVariants) {
+          if (v) {
+            clientesMap.set(v, cliente.id) // Sempre sobrescreve
+          }
+        }
+      }
+      
+      // PRIORIDADE: nome_fantasia > nome_mobilemed > nome
+      addRaw(cliente.nome)
+      addRaw(cliente.nome_mobilemed)
+      addRaw(cliente.nome_fantasia)
     })
 
     console.log(`📋 ${clientesData.length} clientes carregados`)
@@ -290,15 +311,17 @@ serve(async (req) => {
         const fpStrippedNorm = fingerprint(strippedNorm)
         const fpStrippedRaw = fingerprint(strippedRaw)
 
+        // IMPORTANTE: Buscar primeiro pelo nome EXATO (RAW) antes de tentar normalizações
+        // Isso evita que "RADIOCOR" seja mapeado para "NL_RADIOCOR" por engano
         const clienteId =
-          clientesMap.get(clienteNomeBusca) ||
-          clientesMap.get(clienteNomeBuscaRaw) ||
-          clientesMap.get(fpNorm) ||
-          clientesMap.get(fpRaw) ||
-          clientesMap.get(strippedNorm) ||
-          clientesMap.get(strippedRaw) ||
-          clientesMap.get(fpStrippedNorm) ||
-          clientesMap.get(fpStrippedRaw)
+          clientesMap.get(clienteNomeBuscaRaw) ||       // 1. Nome EXATO do arquivo (prioridade máxima)
+          clientesMap.get(clienteNomeBusca) ||          // 2. Nome normalizado
+          clientesMap.get(fpRaw) ||                     // 3. Fingerprint do RAW
+          clientesMap.get(fpNorm) ||                    // 4. Fingerprint do normalizado
+          clientesMap.get(strippedRaw) ||               // 5. RAW sem dígitos finais
+          clientesMap.get(strippedNorm) ||              // 6. Normalizado sem dígitos finais
+          clientesMap.get(fpStrippedRaw) ||             // 7. Fingerprint do RAW stripped
+          clientesMap.get(fpStrippedNorm)               // 8. Fingerprint do normalizado stripped
         if (!clienteId) {
           observacoesRow += `Cliente não localizado: ${clienteNome}. `
         }
