@@ -235,7 +235,8 @@ serve(async (req) => {
 
         // Mapear campos do Excel baseado nos headers detectados
         const get = (idx: number) => (idx >= 0 ? row[idx] : undefined)
-        const clienteNome = String(get(indices.cliente) ?? '').trim()
+        const clienteNomeOriginal = String(get(indices.cliente) ?? '').trim() // Nome EXATO do arquivo
+        const clienteNome = clienteNomeOriginal // Usar para display
         const modalidade = String(get(indices.modalidade) ?? '').trim()
         const especialidade = String(get(indices.especialidade) ?? '').trim()
         const prioridade = String(get(indices.prioridade) ?? '').trim()
@@ -315,6 +316,7 @@ serve(async (req) => {
         preco = Math.round(preco * 100) / 100
 
         // Preparar registro para inserção (SEM deduplicação - aceitar todos os registros)
+        // IMPORTANTE: Manter o nome EXATO do arquivo Excel (clienteNomeOriginal) sem normalização
         registrosParaInserir.push({
           cliente_id: clienteId || null,
           modalidade: modalidadeFinal,
@@ -331,7 +333,7 @@ serve(async (req) => {
           aplicar_incremental: true,
           ativo: true,
           observacoes: observacoesRow || null,
-          descricao: clienteId ? null : `Cliente original: ${clienteNome}`,
+          descricao: clienteId ? null : `Cliente original: ${clienteNomeOriginal}`, // Usar nome ORIGINAL do arquivo
           linha_arquivo: i + 1  // Adicionar número da linha do Excel (1-indexed)
         })
 

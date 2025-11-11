@@ -323,7 +323,7 @@ serve(async (req) => {
         console.log(`🔍 RADI-IMAGEM (Plantão MI Equipe2 + Cardio + Mamas): ${antesFiltro} → ${volumetria.length} registros (removidos ${antesFiltro - volumetria.length})`);
       }
       
-      // RADMED: CT ou MR com MEDICINA INTERNA ou MUSCULO ESQUELETICO + NEURO
+      // RADMED: Excluir médico "Rodrigo Vaz de Lima" + CT ou MR com MEDICINA INTERNA ou MUSCULO ESQUELETICO + NEURO
       if (nomeUpper.includes('RADMED') && volumetria.length > 0) {
         const antesFiltro = volumetria.length;
         
@@ -331,6 +331,12 @@ serve(async (req) => {
           const prioridade = (vol.PRIORIDADE || '').toString().toUpperCase();
           const especialidade = (vol.ESPECIALIDADE || '').toString().toUpperCase();
           const modalidade = (vol.MODALIDADE || '').toString().toUpperCase();
+          const medico = (vol.MEDICO || '').toString().toUpperCase();
+          
+          // Excluir todos os exames do médico "Rodrigo Vaz de Lima"
+          if (medico.includes('RODRIGO VAZ') || medico.includes('RODRIGO VAZ DE LIMA')) {
+            return false;
+          }
           
           // Plantão sempre fatura
           if (prioridade === 'PLANTÃO' || prioridade === 'PLANTAO') {
@@ -345,7 +351,7 @@ serve(async (req) => {
           
           return isCTouMR && (isMedicinaInterna || isMusculoEsqueletico || isNeuro);
         });
-        console.log(`🔍 RADMED: ${antesFiltro} → ${volumetria.length} registros (removidos ${antesFiltro - volumetria.length})`);
+        console.log(`🔍 RADMED (excluído Rodrigo Vaz de Lima): ${antesFiltro} → ${volumetria.length} registros (removidos ${antesFiltro - volumetria.length})`);
       }
       
       // CEMVALENCA_RX: Only RX modality
