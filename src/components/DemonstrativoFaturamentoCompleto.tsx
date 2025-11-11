@@ -246,9 +246,17 @@ export function DemonstrativoFaturamentoCompleto({
         const ids = chunk.map(c => c.id);
         console.log(`🚚 Processando lote ${i / chunkSize + 1} (${ids.length} clientes)`);
 
-        const { data, error } = await supabase.functions.invoke('gerar-demonstrativos-faturamento', {
-          body: { periodo, clientes: ids }
-        });
+        let data: any, error: any;
+        try {
+          const resp: any = await Promise.race([
+            supabase.functions.invoke('gerar-demonstrativos-faturamento', { body: { periodo, clientes: ids } }),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout ao processar lote')), 120000))
+          ]);
+          data = (resp as any)?.data;
+          error = (resp as any)?.error;
+        } catch (e: any) {
+          error = e;
+        }
 
         if (error) {
           console.error('❌ Erro no lote:', error);
@@ -280,48 +288,7 @@ export function DemonstrativoFaturamentoCompleto({
       setDemonstrativos(dedupedDemonstrativos);
       setResumo(resumoAgregado);
 
-      // 💾 Gravar demonstrativos no banco de dados
-      try {
-        const recordsToInsert = dedupedDemonstrativos.map((demo: DemonstrativoCliente) => ({
-          cliente_id: demo.cliente_id,
-          cliente_nome: demo.cliente_nome,
-          periodo_referencia: periodo,
-          total_exames: demo.total_exames || 0,
-          valor_exames: demo.valor_exames || 0,
-          valor_franquia: demo.valor_franquia || 0,
-          valor_portal_laudos: demo.valor_portal_laudos || 0,
-          valor_integracao: demo.valor_integracao || 0,
-          valor_bruto_total: demo.valor_bruto || 0,
-          valor_total_impostos: demo.valor_impostos || 0,
-          valor_liquido: demo.valor_total || 0,
-          detalhes_exames: demo.detalhes_exames || [],
-          detalhes_franquia: demo.detalhes_franquia || {},
-          parametros_utilizados: demo.detalhes_tributacao || {},
-          status: 'calculado'
-        }));
-
-        const { error: insertError } = await supabase
-          .from('demonstrativos_faturamento_calculados')
-          .upsert(recordsToInsert, {
-            onConflict: 'cliente_nome,periodo_referencia',
-            ignoreDuplicates: false
-          });
-
-        if (insertError) {
-          console.error('❌ Erro ao gravar demonstrativos no banco:', insertError);
-          toast({
-            title: '⚠️ Aviso',
-            description: 'Demonstrativos gerados mas não foram salvos no banco. Verifique os logs.',
-            variant: 'destructive'
-          });
-        } else {
-          console.log('✅ Demonstrativos gravados no banco com sucesso');
-        }
-      } catch (dbError: any) {
-        console.error('❌ Erro ao gravar no banco:', dbError);
-      }
-
-      // Persistir também no localStorage (cache local)
+      // Cache local imediato (não bloqueia UI)
       try {
         const dadosParaSalvar = {
           demonstrativos: dedupedDemonstrativos,
@@ -335,6 +302,7 @@ export function DemonstrativoFaturamentoCompleto({
         console.warn('Não foi possível salvar demonstrativos completos no localStorage:', e);
       }
 
+      // Atualizar status/parent e exibir sucesso antes de gravar no banco
       if (onStatusChange) onStatusChange('concluido');
       if (onDemonstrativosGerados) onDemonstrativosGerados({ demonstrativos: dedupedDemonstrativos, resumo: resumoAgregado });
 
@@ -342,6 +310,48 @@ export function DemonstrativoFaturamentoCompleto({
         title: 'Demonstrativos gerados com sucesso!',
         description: `${dedupedDemonstrativos.length} clientes processados em ${Math.ceil(clientes.length / chunkSize)} lote(s)`
       });
+
+      // 💾 Gravar demonstrativos no banco de dados em segundo plano (chunked)
+      (async () => {
+        try {
+          const records = dedupedDemonstrativos.map((demo: DemonstrativoCliente) => ({
+            cliente_id: demo.cliente_id,
+            cliente_nome: demo.cliente_nome,
+            periodo_referencia: periodo,
+            total_exames: demo.total_exames || 0,
+            valor_exames: demo.valor_exames || 0,
+            valor_franquia: demo.valor_franquia || 0,
+            valor_portal_laudos: demo.valor_portal_laudos || 0,
+            valor_integracao: demo.valor_integracao || 0,
+            valor_bruto_total: demo.valor_bruto || 0,
+            valor_total_impostos: demo.valor_impostos || 0,
+            valor_liquido: demo.valor_total || 0,
+            detalhes_exames: demo.detalhes_exames || [],
+            detalhes_franquia: demo.detalhes_franquia || {},
+            parametros_utilizados: demo.detalhes_tributacao || {},
+            status: 'calculado'
+          }));
+
+          const batchSize = 50;
+          for (let i = 0; i < records.length; i += batchSize) {
+            const slice = records.slice(i, i + batchSize);
+            const { error: insertError } = await supabase
+              .from('demonstrativos_faturamento_calculados')
+              .upsert(slice, {
+                onConflict: 'cliente_nome,periodo_referencia',
+                ignoreDuplicates: false
+              });
+
+            if (insertError) {
+              console.error(`❌ Erro ao gravar demonstrativos no banco (lote ${i / batchSize + 1}):`, insertError);
+            }
+          }
+
+          console.log('✅ Demonstrativos gravados no banco com sucesso (em lotes)');
+        } catch (dbError: any) {
+          console.error('❌ Erro ao gravar no banco:', dbError);
+        }
+      })();
 
       if (allAlertas.length > 0) {
         setTimeout(() => {
