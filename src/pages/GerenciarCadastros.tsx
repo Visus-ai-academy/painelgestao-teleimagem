@@ -212,11 +212,24 @@ export default function GerenciarCadastros() {
     console.log('🔄 Iniciando upload de preços de clientes:', file.name);
     
     try {
-      const formData = new FormData();
-      formData.append('file', file);
+      // 1. Fazer upload do arquivo para o storage primeiro
+      const fileName = `precos_servicos_${Date.now()}_${file.name}`;
+      console.log('📁 Fazendo upload para storage:', fileName);
+      
+      const { error: uploadError } = await supabase.storage
+        .from('uploads')
+        .upload(fileName, file);
 
+      if (uploadError) {
+        console.error('❌ Erro no upload para storage:', uploadError);
+        throw new Error(`Erro no upload: ${uploadError.message}`);
+      }
+
+      console.log('✅ Arquivo enviado para storage. Processando...');
+
+      // 2. Chamar edge function com o caminho do arquivo
       const { data, error } = await supabase.functions.invoke('processar-precos-servicos', {
-        body: formData
+        body: { fileName }
       });
 
       if (error) {

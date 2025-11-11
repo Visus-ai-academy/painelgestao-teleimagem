@@ -18,15 +18,26 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const formData = await req.formData()
-    const file = formData.get('file') as File
+    // Buscar arquivo do storage ao invés de FormData
+    const { fileName } = await req.json()
     
-    if (!file) {
-      throw new Error('Nenhum arquivo foi enviado')
+    if (!fileName) {
+      throw new Error('Nome do arquivo não foi fornecido')
     }
 
-    console.log(`📁 Processando arquivo: ${file.name}`)
-    console.log(`📊 Tamanho: ${file.size} bytes`)
+    console.log(`📁 Buscando arquivo do storage: ${fileName}`)
+
+    // Baixar arquivo do storage
+    const { data: fileData, error: downloadError } = await supabaseClient.storage
+      .from('uploads')
+      .download(fileName)
+
+    if (downloadError || !fileData) {
+      console.error('❌ Erro ao baixar arquivo:', downloadError)
+      throw new Error(`Erro ao baixar arquivo: ${downloadError?.message || 'Arquivo não encontrado'}`)
+    }
+
+    console.log(`📊 Tamanho: ${fileData.size} bytes`)
 
     // 1. Limpar uploads antigos travados
     await supabaseClient
@@ -43,10 +54,10 @@ serve(async (req) => {
     const { data: logEntry, error: logError } = await supabaseClient
       .from('upload_logs')
       .insert({
-        filename: file.name,
+        filename: fileName,
         file_type: 'precos_servicos',
         status: 'processing',
-        file_size: file.size,
+        file_size: fileData.size,
         uploader: 'authenticated_user'
       })
       .select()
@@ -60,7 +71,7 @@ serve(async (req) => {
     console.log(`✅ Log criado: ${logEntry.id}`)
 
     // 2. Processar arquivo Excel
-    const arrayBuffer = await file.arrayBuffer()
+    const arrayBuffer = await fileData.arrayBuffer()
     const workbook = XLSX.read(arrayBuffer, { type: 'array' })
     const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
     const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 })
