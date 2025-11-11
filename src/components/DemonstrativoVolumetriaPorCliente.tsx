@@ -181,17 +181,15 @@ export function DemonstrativoVolumetriaPorCliente({ periodo: periodoInicial }: D
 
       // Buscar dados agrupados por cliente com todas as combinações
       // Primeiro tentar por periodo_referencia, se não encontrar tentar por DATA_REALIZACAO
-      let query = supabase
+      let queryRef = supabase
         .from('volumetria_mobilemed')
         .select('EMPRESA, MODALIDADE, ESPECIALIDADE, PRIORIDADE, CATEGORIA, VALORES, unidade_origem, DATA_REALIZACAO, periodo_referencia')
-        .not('arquivo_fonte', 'in', '("volumetria_onco_padrao")');
-
-      // Tentar buscar por periodo_referencia primeiro
-      const queryRef = query.eq('periodo_referencia', periodo);
+        .not('arquivo_fonte', 'in', '("volumetria_onco_padrao")')
+        .eq('periodo_referencia', periodo);
       
       // Aplicar filtro de clientes se necessário
       if (clientesFiltrados && clientesFiltrados.length > 0) {
-        queryRef.in('EMPRESA', clientesFiltrados);
+        queryRef = queryRef.in('EMPRESA', clientesFiltrados);
       }
 
       let { data: volumetriaData, error: volumetriaError } = await queryRef;
