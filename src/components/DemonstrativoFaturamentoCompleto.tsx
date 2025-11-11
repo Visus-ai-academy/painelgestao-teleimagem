@@ -209,7 +209,7 @@ export function DemonstrativoFaturamentoCompleto({
       }
 
       // Processar em lotes
-      const chunkSize = 12; // balanceado para evitar CPU Time exceeded
+      const chunkSize = 6; // reduzido para evitar WORKER_LIMIT (CPU/Memory exceeded)
       const allDemonstrativos: any[] = [];
       const allAlertas: string[] = [];
       let resumoAgregado: any = {
