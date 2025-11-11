@@ -218,22 +218,26 @@ serve(async (req) => {
       // Apply client-specific filters for NC-FT clients
       const nomeUpper = nomeFantasia.toUpperCase();
       
-      // CEDIDIAG: Only MEDICINA INTERNA, exclude specific doctors
+      // CEDIDIAG (inclui CEDI-RJ, CEDI-RO, CEDI-UNIMED): Only MEDICINA INTERNA, exclude Dr. Rodrigo Vaz de Lima
       if (nomeUpper === 'CEDIDIAG' && volumetria.length > 0) {
         const antesFiltroCedi = volumetria.length;
         volumetria = volumetria.filter(vol => {
           const especialidade = (vol.ESPECIALIDADE || '').toString().toUpperCase();
-          const medico = (vol.MEDICO || '').toString();
+          const medico = (vol.MEDICO || '').toString().toUpperCase();
+          
+          // Excluir todos os exames do médico "Dr. Rodrigo Vaz de Lima"
+          const isExcludedDoctor = medico.includes('RODRIGO VAZ') || medico.includes('RODRIGO VAZ DE LIMA');
+          if (isExcludedDoctor) {
+            return false;
+          }
           
           const isMedicinaInterna = especialidade.includes('MEDICINA INTERNA');
-          const isExcludedDoctor = medico.includes('Rodrigo Vaz') || medico.includes('Rodrigo Lima');
-          
-          return isMedicinaInterna && !isExcludedDoctor;
+          return isMedicinaInterna;
         });
-        console.log(`🔍 CEDIDIAG: ${antesFiltroCedi} → ${volumetria.length} registros (removidos ${antesFiltroCedi - volumetria.length})`);
+        console.log(`🔍 CEDIDIAG (excluído Rodrigo Vaz de Lima): ${antesFiltroCedi} → ${volumetria.length} registros (removidos ${antesFiltroCedi - volumetria.length})`);
       }
       
-      // CBU: Only specific modalities/specialties OR plantão
+      // CBU: Only specific modalities/specialties OR plantão, exclude Dr. Rodrigo Vaz de Lima
       if (nomeUpper.includes('CBU') && volumetria.length > 0) {
         const antesFiltro = volumetria.length;
         const examesTotaisAntes = volumetria.reduce((acc, vol) => acc + (Number(vol.VALORES) || 0), 0);
@@ -242,6 +246,12 @@ serve(async (req) => {
           const prioridade = (vol.PRIORIDADE || '').toString().toUpperCase();
           const especialidade = (vol.ESPECIALIDADE || '').toString().toUpperCase();
           const modalidade = (vol.MODALIDADE || '').toString().toUpperCase();
+          const medico = (vol.MEDICO || '').toString().toUpperCase();
+          
+          // Excluir todos os exames do médico "Dr. Rodrigo Vaz de Lima"
+          if (medico.includes('RODRIGO VAZ') || medico.includes('RODRIGO VAZ DE LIMA')) {
+            return false;
+          }
           
           // Plantão sempre fatura
           if (prioridade === 'PLANTÃO' || prioridade === 'PLANTAO') {
