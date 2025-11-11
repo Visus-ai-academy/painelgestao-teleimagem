@@ -155,7 +155,7 @@ serve(async (req) => {
 
     const clientesMap = new Map<string, string>()
     clientesData.forEach((cliente: any) => {
-      const add = (k?: string | null) => {
+      const add = (k?: string | null, priority: number = 0) => {
         if (!k) return
         const str = String(k)
         const keyNorm = normalizeClientName(str)
@@ -171,12 +171,21 @@ serve(async (req) => {
           fingerprint(stripTrailingDigits(raw)),
         ])
         for (const v of variants) {
-          if (v) clientesMap.set(v, cliente.id)
+          if (v) {
+            // Só sobrescrever se não existir ou se a nova prioridade for maior
+            const existing = clientesMap.get(v)
+            if (!existing || priority > 0) {
+              clientesMap.set(v, cliente.id)
+            }
+          }
         }
       }
-      add(cliente.nome)
-      add(cliente.nome_fantasia)
-      add(cliente.nome_mobilemed)
+      // PRIORIDADE: nome_fantasia é a referência principal (priority 2)
+      // nome_mobilemed é secundário (priority 1)
+      // nome é terciário (priority 0)
+      add(cliente.nome, 0)
+      add(cliente.nome_mobilemed, 1)
+      add(cliente.nome_fantasia, 2)
     })
 
     console.log(`📋 ${clientesData.length} clientes carregados`)
