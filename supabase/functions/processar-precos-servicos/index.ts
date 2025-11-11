@@ -311,7 +311,6 @@ serve(async (req) => {
           categoria: categoria && categoria.trim() !== '' ? categoria : null,
           prioridade: prioridadeFinal,
           valor_base: preco,
-          valor_urgencia: preco,
           volume_inicial: volInicial,
           volume_final: volFinal,
           volume_total: condVolume,
