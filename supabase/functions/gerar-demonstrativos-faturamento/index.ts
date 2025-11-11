@@ -782,23 +782,32 @@ serve(async (req) => {
         simples: parametros?.simples
       });
 
-      // Clientes Simples Nacional NÃO têm retenção de impostos (IGUAL RELATÓRIO)
-      if (parametros && !parametros.simples) {
+      // Clientes Simples Nacional NÃO têm retenção de impostos
+      // Se não há parâmetros OU se o cliente é Simples Nacional
+      const isSimples = parametros?.simples === true;
+      
+      if (!isSimples) {
+        // Regime Normal: aplicar impostos federais (PIS, COFINS, CSLL, IRRF)
         const pis = valorBruto * 0.0065;
         const cofins = valorBruto * 0.03;
         const csll = valorBruto * 0.01;
         const irrf = valorBruto * 0.015;
         
-        // ISS específico do cliente
-        if (parametros.percentual_iss) {
+        // ISS específico do cliente (se houver)
+        if (parametros?.percentual_iss) {
           valorISS = valorBruto * (parametros.percentual_iss / 100);
-          if (parametros.impostos_ab_min) {
+          if (parametros?.impostos_ab_min) {
             valorISS = Math.max(valorISS, parametros.impostos_ab_min);
           }
         }
         
         valorIRRF = pis + cofins + csll + irrf;
-        console.log(`💰 ${nomeFantasia}: Regime NORMAL - ISS: ${valorISS}, Federais: ${valorIRRF}`);
+        
+        if (!parametros) {
+          console.log(`⚠️ ${nomeFantasia}: SEM parâmetros cadastrados - aplicando Regime NORMAL por padrão - ISS: ${valorISS}, Federais: ${valorIRRF}`);
+        } else {
+          console.log(`💰 ${nomeFantasia}: Regime NORMAL - ISS: ${valorISS}, Federais: ${valorIRRF}`);
+        }
       } else {
         console.log(`💰 ${nomeFantasia}: Simples Nacional - SEM retenção`);
       }
@@ -829,7 +838,7 @@ serve(async (req) => {
         detalhes_exames: detalhesExames,
         detalhes_tributacao: {
           simples_nacional: parametros?.simples || false,
-          percentual_iss: parametros?.percentual_iss,
+          percentual_iss: parametros?.percentual_iss || 0,
           valor_iss: valorISS,
           valor_irrf: valorIRRF,
           base_calculo: valorBruto,
