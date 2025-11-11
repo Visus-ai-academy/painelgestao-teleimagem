@@ -130,7 +130,8 @@ export function CadastroDataTable({ data, loading, error, type, title }: Cadastr
   const getCellValue = (item: any, key: string) => {
     switch (key) {
       case 'cliente_nome':
-        return item.clientes?.nome_fantasia || item.clientes?.nome || item.cliente_nome || 'Regra Geral';
+        // Priorizar cliente_nome da própria tabela (sempre correto), depois nome_fantasia
+        return item.cliente_nome || item.clientes?.nome_fantasia || item.clientes?.nome || 'Regra Geral';
       case 'medico_nome':
         return item.medicos?.nome || item.medico_nome || 'Regra Geral';
       case 'categoria':
