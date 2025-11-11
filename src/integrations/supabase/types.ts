@@ -4529,46 +4529,19 @@ export type Database = {
           valor_total: number
         }[]
       }
-      calcular_preco_exame:
-        | {
-            Args: {
-              p_categoria: string
-              p_cliente_id: string
-              p_especialidade: string
-              p_modalidade: string
-              p_periodo: string
-              p_prioridade: string
-              p_volume_total: number
-            }
-            Returns: {
-              detalhes_calculo: Json
-              faixa_volume: string
-              valor_unitario: number
-            }[]
-          }
-        | {
-            Args: {
-              p_categoria?: string
-              p_cliente_id: string
-              p_especialidade: string
-              p_is_plantao?: boolean
-              p_modalidade: string
-              p_prioridade?: string
-              p_volume_total?: number
-            }
-            Returns: number
-          }
-        | {
-            Args: {
-              p_categoria: string
-              p_cliente: string
-              p_especialidade: string
-              p_modalidade: string
-              p_periodo: string
-              p_prioridade: string
-            }
-            Returns: number
-          }
+      calcular_preco_exame: {
+        Args: {
+          p_categoria: string
+          p_cliente_id: string
+          p_cond_volume?: string
+          p_especialidade: string
+          p_modalidade: string
+          p_periodo?: string
+          p_prioridade: string
+          p_volume_total?: number
+        }
+        Returns: number
+      }
       calcular_volume_total: {
         Args: {
           p_categoria?: string

@@ -497,93 +497,76 @@ serve(async (req) => {
 
       const norm = (s: any) => (s ?? '').toString().trim().toUpperCase();
       
-      // Calculate total volume for price range selection (IGUAL RELATÓRIO)
-      const volumeTotal = volumetria.reduce((sum, v) => sum + (Number(v.VALORES) || 0), 0);
-      
-      // Função para buscar preço POR EXAME (IGUAL RELATÓRIO)
-      const buscarPreco = (exame: any) => {
-        if (!precosCliente || precosCliente.length === 0) return 0;
-
-        const modalidadeN = norm(exame.MODALIDADE);
-        const especialidadeN = norm(exame.ESPECIALIDADE);
-        const categoriaN = norm(exame.CATEGORIA || 'SC');
-        const prioridadeN = norm(exame.PRIORIDADE || '');
-
-        let pool: any[] = [];
-
-        // 1) Match EXATO com categoria
-        let candidatos = (precosCliente || []).filter((p: any) =>
-          (p.ativo ?? true) === true &&
-          norm(p.modalidade) === modalidadeN &&
-          norm(p.especialidade) === especialidadeN &&
-          norm(p.categoria || 'SC') === categoriaN
-        );
-
-        if (candidatos.length === 0) {
-          // 2) Fallback: ignorar categoria (modalidade+especialidade)
-          candidatos = (precosCliente || []).filter((p: any) =>
-            (p.ativo ?? true) === true &&
-            norm(p.modalidade) === modalidadeN &&
-            norm(p.especialidade) === especialidadeN
-          );
+      // Buscar COND_VOLUME do contrato do cliente
+      let condVolume = 'MOD/ESP/CAT'; // Padrão
+      try {
+        const { data: contratoData } = await supabase
+          .from('contratos_clientes')
+          .select('cond_volume')
+          .eq('cliente_id', cliente.id)
+          .maybeSingle();
+        
+        if (contratoData?.cond_volume) {
+          condVolume = contratoData.cond_volume;
+          console.log(`📋 ${nomeFantasia}: COND. VOLUME = ${condVolume}`);
         }
+      } catch (e) {
+        console.warn(`⚠️ ${nomeFantasia}: Erro ao buscar cond_volume, usando padrão`, e);
+      }
 
-        if (candidatos.length === 0) {
-          // 3) Fallback: somente modalidade
-          candidatos = (precosCliente || []).filter((p: any) =>
-            (p.ativo ?? true) === true &&
-            norm(p.modalidade) === modalidadeN
-          );
+      // Função para buscar preço POR EXAME usando RPC calcular_preco_exame
+      const buscarPreco = async (exame: any) => {
+        try {
+          const { data: precoData, error: precoErr } = await supabase
+            .rpc('calcular_preco_exame', {
+              p_cliente_id: cliente.id,
+              p_modalidade: exame.MODALIDADE || '',
+              p_especialidade: exame.ESPECIALIDADE || '',
+              p_categoria: exame.CATEGORIA || 'N/A',
+              p_prioridade: exame.PRIORIDADE || 'ROTINA',
+              p_volume_total: 0, // Será calculado pela função baseado em cond_volume
+              p_cond_volume: condVolume,
+              p_periodo: periodo
+            });
+
+          if (precoErr) {
+            console.error(`❌ Erro RPC calcular_preco_exame:`, precoErr);
+            return 0;
+          }
+
+          return Number(precoData) || 0;
+        } catch (e) {
+          console.error(`❌ Erro ao calcular preço:`, e);
+          return 0;
         }
-
-        if (candidatos.length === 0) return 0;
-
-        // Preferência por cliente
-        let candidatosCliente = candidatos.filter((p: any) => p.cliente_id === cliente.id);
-        if (candidatosCliente.length === 0) candidatosCliente = candidatos.filter((p: any) => !p.cliente_id);
-
-        // Filtro por prioridade (preferência), com fallback
-        const priMatch = candidatosCliente.filter((p: any) => norm(p.prioridade || '') === prioridadeN);
-        pool = priMatch.length > 0 ? priMatch : candidatosCliente;
-
-        // Selecionar faixa por volume do período (IGUAL RELATÓRIO)
-        const porFaixa = pool
-          .filter((p: any) =>
-            (p.volume_inicial == null || volumeTotal >= p.volume_inicial) &&
-            (p.volume_final == null || volumeTotal <= p.volume_final)
-          )
-          .sort((a: any, b: any) => (b.volume_inicial || 0) - (a.volume_inicial || 0));
-
-        const selecionado = porFaixa[0] || pool[0];
-        if (!selecionado) return 0;
-
-        // ✅ USAR SEMPRE valor_base da linha encontrada (a prioridade já foi considerada na seleção)
-        const valor = Number(selecionado.valor_base) || 0;
-        return valor;
       };
 
-      // Calcular valores POR EXAME (IGUAL RELATÓRIO)
-      const examesCalculados = volumetria.map(v => {
-        if (v.tipo_faturamento === 'NC-NF' || v.tipo_faturamento === 'EXCLUSAO') {
-          return null;
-        }
-        
-        const valorUnitario = buscarPreco(v);
-        const quantidade = Number(v.VALORES) || 1;
-        
-        return {
-          modalidade: v.MODALIDADE || '',
-          especialidade: v.ESPECIALIDADE || '',
-          categoria: v.CATEGORIA || '',
-          prioridade: v.PRIORIDADE || '',
-          quantidade: quantidade,
-          valor_unitario: valorUnitario,
-          valor_total: valorUnitario * quantidade
-        };
-      }).filter(e => e !== null);
+      // Calcular valores POR EXAME usando a função SQL
+      const examesCalculados = await Promise.all(
+        volumetria.map(async (v) => {
+          if (v.tipo_faturamento === 'NC-NF' || v.tipo_faturamento === 'EXCLUSAO') {
+            return null;
+          }
+          
+          const valorUnitario = await buscarPreco(v);
+          const quantidade = Number(v.VALORES) || 1;
+          
+          return {
+            modalidade: v.MODALIDADE || '',
+            especialidade: v.ESPECIALIDADE || '',
+            categoria: v.CATEGORIA || '',
+            prioridade: v.PRIORIDADE || '',
+            quantidade: quantidade,
+            valor_unitario: valorUnitario,
+            valor_total: valorUnitario * quantidade
+          };
+        })
+      );
+      
+      const examesCalculadosValidos = examesCalculados.filter(e => e !== null);
 
-      // Calcular valor total dos exames (IGUAL RELATÓRIO)
-      valorExamesCalculado = examesCalculados.reduce((sum, e: any) => sum + e.valor_total, 0);
+      // Calcular valor total dos exames
+      valorExamesCalculado = examesCalculadosValidos.reduce((sum, e: any) => sum + e.valor_total, 0);
 
       // Agrupar para o detalhamento (soma dos valores já calculados)
       const gruposDetalhes: Record<string, {
@@ -596,7 +579,7 @@ serve(async (req) => {
         valor_unitario: number;
       }> = {};
 
-      for (const exame of examesCalculados) {
+      for (const exame of examesCalculadosValidos) {
         const key = `${exame.modalidade}|${exame.especialidade}|${exame.categoria}|${exame.prioridade}`;
         
         if (!gruposDetalhes[key]) {

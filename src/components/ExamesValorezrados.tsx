@@ -126,7 +126,8 @@ export function ExamesValoresZerados() {
               p_prioridade: combinacao.prioridade,
               p_categoria: combinacao.categoria,
               p_volume_total: combinacao.quantidade_total,
-              p_is_plantao: (combinacao.prioridade || '').toUpperCase().includes('PLANT')
+              p_cond_volume: 'MOD/ESP/CAT', // Padrão
+              p_periodo: periodo
             });
 
             const valorPreco = typeof precoCalculado === 'number' ? precoCalculado : 0;

@@ -835,7 +835,8 @@ export default function DemonstrativoFaturamento() {
                     p_prioridade: combinacao.config.prioridade,
                     p_categoria: combinacao.config.categoria,
                     p_volume_total: volumeRef,
-                    p_is_plantao: combinacao.config.is_plantao
+                    p_cond_volume: 'MOD/ESP/CAT', // Padrão
+                    p_periodo: periodo
                   });
                   
                   const valorPreco = typeof precoCalculado === 'number' ? precoCalculado : 0;
