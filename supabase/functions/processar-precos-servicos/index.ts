@@ -250,9 +250,6 @@ serve(async (req) => {
 
         // Aceitar preços vazios (serão tratados como 0)
 
-        // Armazenar nome original do Excel SEM normalização
-        const clienteNomeOriginal = String(clienteNome || '').trim()
-        
         // Buscar cliente (com normalização apenas para matching)
         const clienteNomeBuscaRaw = clienteNome.toUpperCase().trim()
         let clienteNomeBusca = normalizeClientName(clienteNomeBuscaRaw)
