@@ -2312,7 +2312,14 @@ export default function GerarFaturamento() {
                     periodo={periodoSelecionado}
                     renderMode="button-only"
                     onResetarStatus={resetarTodosStatus}
-                    onStatusChange={handleStatusDemonstrativo}
+                    onStatusChange={(status) => {
+                      handleStatusDemonstrativo(status);
+                      // Reset demonstrativo gerado quando inicia processamento
+                      if (status === 'processando') {
+                        setDemonstrativoGerado(false);
+                        localStorage.removeItem('demonstrativoGerado');
+                      }
+                    }}
                     onDemonstrativosGerados={(dados) => {
                       console.log('🔄 Callback onDemonstrativosGerados recebido:');
                       console.log('📊 Dados completos:', dados);
