@@ -323,7 +323,7 @@ serve(async (req) => {
         console.log(`🔍 RADI-IMAGEM (Plantão MI Equipe2 + Cardio + Mamas): ${antesFiltro} → ${volumetria.length} registros (removidos ${antesFiltro - volumetria.length})`);
       }
       
-      // RADMED: Similar to CBU
+      // RADMED: CT ou MR com MEDICINA INTERNA ou MUSCULO ESQUELETICO + NEURO
       if (nomeUpper.includes('RADMED') && volumetria.length > 0) {
         const antesFiltro = volumetria.length;
         
@@ -337,12 +337,13 @@ serve(async (req) => {
             return true;
           }
           
-          // Apenas CT com MEDICINA INTERNA ou MUSCULO ESQUELETICO faturam
-          const isCT = modalidade === 'CT';
+          // CT ou MR (RM) com MEDICINA INTERNA, MUSCULO ESQUELETICO ou NEURO faturam
+          const isCTouMR = modalidade === 'CT' || modalidade === 'MR' || modalidade === 'RM';
           const isMedicinaInterna = especialidade.includes('MEDICINA INTERNA');
           const isMusculoEsqueletico = especialidade.includes('MUSCULO ESQUELETICO');
+          const isNeuro = especialidade.includes('NEURO');
           
-          return isCT && (isMedicinaInterna || isMusculoEsqueletico);
+          return isCTouMR && (isMedicinaInterna || isMusculoEsqueletico || isNeuro);
         });
         console.log(`🔍 RADMED: ${antesFiltro} → ${volumetria.length} registros (removidos ${antesFiltro - volumetria.length})`);
       }
