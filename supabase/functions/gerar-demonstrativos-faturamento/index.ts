@@ -101,8 +101,9 @@ serve(async (req) => {
       const contrato = cliente.contratos_clientes?.[0];
       const tipoFaturamento = contrato?.tipo_faturamento || 'CO-FT';
 
-      // Pular clientes que não devem gerar faturamento
-      const tiposNaoFaturados = ['NC-NF', 'CO-NF', 'NC1-NF'];
+      // Pular clientes que não devem gerar faturamento NEM demonstrativo
+      // NC1-NF DEVE gerar demonstrativo e relatório (mas não envia email/NF)
+      const tiposNaoFaturados = ['NC-NF', 'CO-NF'];
       if (tiposNaoFaturados.includes(tipoFaturamento)) {
         console.log(`⚠️ Cliente ${cliente.nome} pulado - Tipo faturamento: ${tipoFaturamento} (não gera demonstrativo)`);
         continue;
