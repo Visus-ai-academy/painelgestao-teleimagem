@@ -156,10 +156,14 @@ serve(async (req) => {
     }
 
     const clientesMap = new Map<string, string>()
+    const clientesNomeOficialMap = new Map<string, string>() // Mapa para nome_fantasia oficial
     
     // Estratégia SIMPLIFICADA: adicionar variantes RAW e NORMALIZADAS
     // PRIORIDADE: nome_fantasia > nome_mobilemed > nome
     clientesData.forEach((cliente: any) => {
+      const nomeOficial = cliente.nome_fantasia || cliente.nome // Nome oficial para uso
+      clientesNomeOficialMap.set(cliente.id, nomeOficial)
+      
       const addMapping = (k?: string | null) => {
         if (!k) return
         const raw = String(k).toUpperCase().trim()
@@ -283,10 +287,12 @@ serve(async (req) => {
         preco = Math.round(preco * 100) / 100
 
         // Preparar registro para inserção (SEM deduplicação - aceitar todos os registros)
-        // CRÍTICO: Salvar o nome EXATO do arquivo Excel no campo cliente_nome
+        // CRÍTICO: Usar nome_fantasia oficial quando cliente_id encontrado, senão usar nome do Excel
+        const clienteNomeFinal = clienteId ? clientesNomeOficialMap.get(clienteId) || clienteNomeOriginal : clienteNomeOriginal
+        
         registrosParaInserir.push({
           cliente_id: clienteId || null,
-          cliente_nome: clienteNomeOriginal, // Nome EXATO do Excel sem qualquer normalização
+          cliente_nome: clienteNomeFinal, // Nome oficial do cadastro (nome_fantasia) quando cliente encontrado
           modalidade: modalidadeFinal,
           especialidade: especialidadeFinal,
           categoria: categoria && categoria.trim() !== '' ? categoria : null,
