@@ -176,6 +176,13 @@ export default function GerarFaturamento() {
   useEffect(() => {
     verificarDemonstrativoGerado();
   }, [verificarDemonstrativoGerado]);
+  
+  // Re-verificar demonstrativo quando voltar para a aba "gerar"
+  useEffect(() => {
+    if (activeTab === 'gerar') {
+      verificarDemonstrativoGerado();
+    }
+  }, [activeTab, verificarDemonstrativoGerado]);
 
   // Estado para arquivo de faturamento
   const [arquivoFaturamento, setArquivoFaturamento] = useState<File | null>(null);

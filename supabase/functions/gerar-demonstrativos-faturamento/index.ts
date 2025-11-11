@@ -336,6 +336,11 @@ serve(async (req) => {
       // RADMED: Excluir médico "Rodrigo Vaz de Lima" + CT ou MR com MEDICINA INTERNA ou MUSCULO ESQUELETICO + NEURO
       if (nomeUpper.includes('RADMED') && volumetria.length > 0) {
         const antesFiltro = volumetria.length;
+        const examesTotaisAntes = volumetria.reduce((acc, vol) => acc + (Number(vol.VALORES) || 0), 0);
+        
+        // Debug: listar médicos únicos antes do filtro
+        const medicosUnicos = [...new Set(volumetria.map(v => (v.MEDICO || '').toString()))];
+        console.log(`🔍 RADMED: Médicos únicos na volumetria (${medicosUnicos.length}):`, medicosUnicos.slice(0, 10));
         
         volumetria = volumetria.filter(vol => {
           const prioridade = (vol.PRIORIDADE || '').toString().toUpperCase();
@@ -343,8 +348,17 @@ serve(async (req) => {
           const modalidade = (vol.MODALIDADE || '').toString().toUpperCase();
           const medico = (vol.MEDICO || '').toString().toUpperCase();
           
-          // Excluir todos os exames do médico "Rodrigo Vaz de Lima"
-          if (medico.includes('RODRIGO VAZ') || medico.includes('RODRIGO VAZ DE LIMA')) {
+          // Excluir todos os exames do médico "Rodrigo Vaz de Lima" e variações
+          const isRodrigoVaz = 
+            medico.includes('RODRIGO VAZ') || 
+            medico.includes('RODRIGO VAZ DE LIMA') ||
+            medico.includes('DR. RODRIGO') ||
+            medico.includes('DR RODRIGO') ||
+            (medico.includes('RODRIGO') && medico.includes('LIMA')) ||
+            (medico.includes('VAZ') && medico.includes('LIMA'));
+          
+          if (isRodrigoVaz) {
+            console.log(`❌ RADMED: Excluindo exame do médico: ${vol.MEDICO}`);
             return false;
           }
           
@@ -361,7 +375,9 @@ serve(async (req) => {
           
           return isCTouMR && (isMedicinaInterna || isMusculoEsqueletico || isNeuro);
         });
-        console.log(`🔍 RADMED (excluído Rodrigo Vaz de Lima): ${antesFiltro} → ${volumetria.length} registros (removidos ${antesFiltro - volumetria.length})`);
+        
+        const examesTotaisDepois = volumetria.reduce((acc, vol) => acc + (Number(vol.VALORES) || 0), 0);
+        console.log(`🔍 RADMED (excluído Rodrigo Vaz de Lima): ${antesFiltro} → ${volumetria.length} registros | Exames: ${examesTotaisAntes} → ${examesTotaisDepois} (removidos ${examesTotaisAntes - examesTotaisDepois})`);
       }
       
       // CEMVALENCA_RX: Only RX modality
