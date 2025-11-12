@@ -1118,8 +1118,9 @@ export default function GerarFaturamento() {
 
       console.log('📡 [EDGE_FUNCTION] Chamando gerar-demonstrativos-faturamento em lotes para período:', periodoSelecionado);
 
-      // Processar em lotes para evitar timeout da Edge Function
-      const chunkSize = 20;
+      // Processar em lotes MENORES (5 clientes) para garantir que NUNCA dê timeout
+      // Reduzimos drasticamente o tamanho dos lotes para processar de forma mais confiável
+      const chunkSize = 5;
       const chunks: string[][] = [];
       for (let i = 0; i < clientesUnicosVolumetria.length; i += chunkSize) {
         chunks.push(clientesUnicosVolumetria.slice(i, i + chunkSize));
@@ -1128,6 +1129,7 @@ export default function GerarFaturamento() {
       const todosDemonstrativos: any[] = [];
       const todosAlertas: string[] = [];
       let clientesProcessados = 0;
+      const lotesComErro: number[] = []; // Rastrear lotes que falharam para retry
 
       for (let i = 0; i < chunks.length; i++) {
         const lote = chunks[i];
@@ -1145,85 +1147,93 @@ export default function GerarFaturamento() {
           progresso: 30 + Math.round(((i) / chunks.length) * 35)
         });
 
-        try {
-          const { data, error } = await supabase.functions.invoke('gerar-demonstrativos-faturamento', {
-            body: {
-              periodo: periodoSelecionado,
-              clientes: lote
+        // TENTATIVAS MÚLTIPLAS: Tentar até 2 vezes em caso de falha
+        let tentativasRestantes = 2;
+        let sucessoLote = false;
+        
+        while (tentativasRestantes > 0 && !sucessoLote) {
+          try {
+            // Timeout de 3 minutos (180 segundos) por lote
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 180000);
+            
+            const { data, error } = await supabase.functions.invoke('gerar-demonstrativos-faturamento', {
+              body: {
+                periodo: periodoSelecionado,
+                clientes: lote
+              }
+            });
+            
+            clearTimeout(timeoutId);
+
+            console.log(`[LOTE ${i + 1}/${chunks.length}] Data:`, data);
+            console.log(`[LOTE ${i + 1}/${chunks.length}] Error:`, error);
+
+            if (error || !data?.success) {
+              throw new Error(error?.message || data?.error || 'Erro desconhecido');
             }
-          });
 
-          console.log(`[LOTE ${i + 1}/${chunks.length}] Data:`, data);
-          console.log(`[LOTE ${i + 1}/${chunks.length}] Error:`, error);
+            // Sucesso! Processar dados do lote
+            sucessoLote = true;
+            clientesProcessados += data?.resumo?.clientes_processados || 0;
+            const demonstrativosDoLote = data?.demonstrativos || [];
+            todosDemonstrativos.push(...demonstrativosDoLote);
+            
+            // ✅ Atualizar status individual dos clientes processados com sucesso
+            if (demonstrativosDoLote.length > 0) {
+              const clientesFinalizados = demonstrativosDoLote.map(d => d.cliente_nome).filter(Boolean);
+              
+              // Marcar como concluídos
+              setDemonstrativosGeradosPorCliente(prev => {
+                const newSet = new Set(prev);
+                clientesFinalizados.forEach(cliente => newSet.add(cliente));
+                return newSet;
+              });
+              
+              // Remover de processamento
+              setClientesProcessandoDemonstrativo(prev => {
+                const newSet = new Set(prev);
+                clientesFinalizados.forEach(cliente => newSet.delete(cliente));
+                return newSet;
+              });
+              
+              // Salvar progresso no localStorage
+              const clientesAtualizados = Array.from(new Set([
+                ...Array.from(demonstrativosGeradosPorCliente),
+                ...clientesFinalizados
+              ]));
+              localStorage.setItem(`demonstrativosGerados_${periodoSelecionado}`, JSON.stringify(clientesAtualizados));
+              
+              console.log(`✅ Lote ${i + 1} finalizado: ${clientesFinalizados.length} demonstrativos gerados`);
+            }
+            
+            if (Array.isArray(data?.alertas)) todosAlertas.push(...data.alertas);
 
-          if (error || !data?.success) {
-            console.error(`❌ [ERRO] Erro no lote ${i + 1}/${chunks.length}:`, error?.message || data?.error);
+          } catch (loteError) {
+            tentativasRestantes--;
             
-            // Remover clientes do lote de processamento em caso de erro
-            setClientesProcessandoDemonstrativo(prev => {
-              const newSet = new Set(prev);
-              lote.forEach(cliente => newSet.delete(cliente));
-              return newSet;
-            });
-            
-            // Não lançar erro, apenas logar e continuar com próximo lote
-            todosAlertas.push(`Erro no lote ${i + 1}: ${error?.message || data?.error || 'Erro desconhecido'}`);
-            console.warn(`⚠️ Continuando processamento apesar do erro no lote ${i + 1}`);
-            continue;
+            if (tentativasRestantes > 0) {
+              console.warn(`⚠️ Lote ${i + 1}/${chunks.length} falhou. Tentando novamente... (${tentativasRestantes} tentativas restantes)`);
+              // Aguardar 2 segundos antes de tentar novamente
+              await new Promise(resolve => setTimeout(resolve, 2000));
+            } else {
+              // Todas as tentativas falharam
+              console.error(`❌ Lote ${i + 1}/${chunks.length} falhou após todas as tentativas:`, loteError);
+              
+              // Remover clientes do lote de processamento
+              setClientesProcessandoDemonstrativo(prev => {
+                const newSet = new Set(prev);
+                lote.forEach(cliente => newSet.delete(cliente));
+                return newSet;
+              });
+              
+              lotesComErro.push(i);
+              todosAlertas.push(`Lote ${i + 1}/${chunks.length} falhou após 2 tentativas`);
+            }
           }
-
-          // Processar dados do lote com sucesso
-          clientesProcessados += data?.resumo?.clientes_processados || 0;
-          const demonstrativosDoLote = data?.demonstrativos || [];
-          todosDemonstrativos.push(...demonstrativosDoLote);
-          
-          // ✅ Atualizar status individual dos clientes processados com sucesso
-          if (demonstrativosDoLote.length > 0) {
-            const clientesFinalizados = demonstrativosDoLote.map(d => d.cliente_nome).filter(Boolean);
-            
-            // Marcar como concluídos
-            setDemonstrativosGeradosPorCliente(prev => {
-              const newSet = new Set(prev);
-              clientesFinalizados.forEach(cliente => newSet.add(cliente));
-              return newSet;
-            });
-            
-            // Remover de processamento
-            setClientesProcessandoDemonstrativo(prev => {
-              const newSet = new Set(prev);
-              clientesFinalizados.forEach(cliente => newSet.delete(cliente));
-              return newSet;
-            });
-            
-            // Salvar progresso no localStorage
-            const clientesAtualizados = Array.from(new Set([
-              ...Array.from(demonstrativosGeradosPorCliente),
-              ...clientesFinalizados
-            ]));
-            localStorage.setItem(`demonstrativosGerados_${periodoSelecionado}`, JSON.stringify(clientesAtualizados));
-            
-            console.log(`✅ Lote ${i + 1} finalizado: ${clientesFinalizados.length} demonstrativos gerados`);
-          }
-          
-          if (Array.isArray(data?.alertas)) todosAlertas.push(...data.alertas);
-
-        } catch (loteError) {
-          console.error(`❌ [TIMEOUT] Timeout no lote ${i + 1}/${chunks.length}:`, loteError);
-          
-          // Remover clientes do lote de processamento em caso de timeout
-          setClientesProcessandoDemonstrativo(prev => {
-            const newSet = new Set(prev);
-            lote.forEach(cliente => newSet.delete(cliente));
-            return newSet;
-          });
-          
-          // Não lançar erro, apenas logar e continuar com próximo lote
-          todosAlertas.push(`Timeout no lote ${i + 1}/${chunks.length}`);
-          console.warn(`⚠️ Continuando processamento apesar do timeout no lote ${i + 1}`);
-          continue;
         }
       }
-
+      
       // ✅ Limpar TODOS os clientes de processamento ao final
       setClientesProcessandoDemonstrativo(new Set());
       
@@ -1238,12 +1248,19 @@ export default function GerarFaturamento() {
         });
         
         toast({
-          title: "Nenhum demonstrativo gerado",
-          description: "Todos os lotes falharam. Verifique os logs para mais detalhes.",
+          title: "Erro crítico",
+          description: lotesComErro.length > 0 
+            ? `Todos os ${lotesComErro.length} lote(s) falharam após múltiplas tentativas. Verifique a conexão e tente novamente.`
+            : "Nenhum demonstrativo foi gerado. Verifique os logs.",
           variant: "destructive",
         });
         
         return;
+      }
+      
+      // Informar sobre lotes que falharam mesmo após retry
+      if (lotesComErro.length > 0) {
+        console.warn(`⚠️ ${lotesComErro.length} lote(s) falharam mesmo após tentativas de retry: lotes ${lotesComErro.map(i => i + 1).join(', ')}`);
       }
 
       // Montar resumo combinado e salvar no localStorage

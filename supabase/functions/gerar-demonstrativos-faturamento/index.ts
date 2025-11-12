@@ -120,20 +120,21 @@ serve(async (req) => {
       }
       clientesProcessados.add(nomeFantasia);
 
-      // Buscar volumetria usando multiple search strategies
+      // Buscar volumetria usando multiple search strategies - OTIMIZADO
       const aliasSet = new Set<string>([
         cliente.nome?.trim(),
         cliente.nome_fantasia?.trim() || cliente.nome?.trim(),
         cliente.nome_mobilemed?.trim() || cliente.nome?.trim()
       ].filter(Boolean));
 
-      // Add sibling clients with same nome_fantasia
+      // Add sibling clients with same nome_fantasia - OTIMIZADO
       if (cliente.nome_fantasia) {
         const { data: siblings } = await supabase
           .from('clientes')
           .select('nome, nome_mobilemed')
           .eq('nome_fantasia', cliente.nome_fantasia)
-          .eq('ativo', true);
+          .eq('ativo', true)
+          .limit(10); // Limitar para evitar queries muito grandes
         (siblings || []).forEach((s: any) => {
           if (s?.nome) aliasSet.add(s.nome.trim());
           if (s?.nome_mobilemed) aliasSet.add(s.nome_mobilemed.trim());
@@ -142,71 +143,54 @@ serve(async (req) => {
 
       const nomesBusca = Array.from(aliasSet);
 
-      // ✅ FIX 1: Include ID in volumetria queries to prevent data loss
-      const { data: volumetriaEmpresa } = await supabase
+      // ✅ OTIMIZADO: Busca única de volumetria com OR combinado
+      const { data: volumetriaCombinada } = await supabase
         .from('volumetria_mobilemed')
         .select('id, EMPRESA, Cliente_Nome_Fantasia, MODALIDADE, ESPECIALIDADE, CATEGORIA, PRIORIDADE, VALORES, ESTUDO_DESCRICAO, MEDICO, tipo_faturamento')
         .eq('periodo_referencia', periodo)
-        .in('EMPRESA', nomesBusca);
+        .or(
+          nomesBusca.map(nome => `EMPRESA.eq.${nome},Cliente_Nome_Fantasia.eq.${nome}`).join(',')
+        );
 
-      const fantasiaBusca = cliente.nome_fantasia ? [cliente.nome_fantasia] : [];
-      const { data: volumetriaFantasia } = fantasiaBusca.length > 0
-        ? await supabase
-            .from('volumetria_mobilemed')
-            .select('id, EMPRESA, Cliente_Nome_Fantasia, MODALIDADE, ESPECIALIDADE, CATEGORIA, PRIORIDADE, VALORES, ESTUDO_DESCRICAO, MEDICO, tipo_faturamento')
-            .eq('periodo_referencia', periodo)
-            .in('Cliente_Nome_Fantasia', fantasiaBusca)
-        : { data: [] };
-
-      // ✅ FIX 2: Proper deduplication using ID to prevent exam loss
+      // ✅ Deduplicação por ID
       const volumetriaMap = new Map();
-      [...(volumetriaEmpresa || []), ...(volumetriaFantasia || [])].forEach(item => {
+      (volumetriaCombinada || []).forEach(item => {
         const key = item.id ? item.id.toString() : `fallback_${item.EMPRESA}_${item.VALORES}_${Math.random()}`;
         volumetriaMap.set(key, item);
       });
       let volumetria = Array.from(volumetriaMap.values());
 
-      // Log para debug - contagem de exames ANTES dos filtros
+      // Log REDUZIDO para debug - apenas contagem
       const examesTotaisAntesFiltros = volumetria.reduce((acc, vol) => acc + (Number(vol.VALORES) || 0), 0);
       console.log(`📊 ${cliente.nome_fantasia}: ${volumetria.length} registros, ${examesTotaisAntesFiltros} exames (antes filtros)`);
 
-      // Pattern-based search apenas para clientes que precisam (se aplicável)
-      // nomeFantasia já foi declarado acima (linha 107)
+      // Pattern-based search SIMPLIFICADO - apenas para casos específicos
+      const nomeFantasia = cliente.nome_fantasia || cliente.nome;
       let padroesBusca: string[] = [];
       
-      // PRN pode precisar de pattern search se não estiver agrupado na volumetria
+      // Apenas casos essenciais que precisam de pattern search
       if (nomeFantasia === 'PRN') {
         padroesBusca = ['PRN%'];
-      } else if (nomeFantasia.includes('AKCPALMAS') || nomeFantasia.includes('AKC')) {
-        padroesBusca = ['AKC%', 'AKCPALMAS%'];
+      } else if (nomeFantasia.includes('AKC')) {
+        padroesBusca = ['AKC%'];
       }
-      // CEDIDIAG removido - agrupamento já feito na volumetria (CEDI-RJ e CEDI-RO já vêm como CEDIDIAG)
       
       if (padroesBusca.length > 0) {
-        for (const padrao of padroesBusca) {
-          const { data: volEmp } = await supabase
-            .from('volumetria_mobilemed')
-            .select('id, *')
-            .eq('periodo_referencia', periodo)
-            .ilike('EMPRESA', padrao);
-          
-          const { data: volFant } = await supabase
-            .from('volumetria_mobilemed')
-            .select('id, *')
-            .eq('periodo_referencia', periodo)
-            .ilike('Cliente_Nome_Fantasia', padrao);
-          
-          [...(volEmp || []), ...(volFant || [])].forEach(item => {
-            const key = item.id ? item.id.toString() : `pattern_${item.EMPRESA}_${item.VALORES}_${Math.random()}`;
-            volumetriaMap.set(key, item);
-          });
-        }
+        // Busca única com todos os padrões
+        const { data: volPattern } = await supabase
+          .from('volumetria_mobilemed')
+          .select('id, *')
+          .eq('periodo_referencia', periodo)
+          .or(
+            padroesBusca.map(p => `EMPRESA.ilike.${p},Cliente_Nome_Fantasia.ilike.${p}`).join(',')
+          );
+        
+        (volPattern || []).forEach(item => {
+          const key = item.id ? item.id.toString() : `pattern_${item.EMPRESA}_${item.VALORES}_${Math.random()}`;
+          volumetriaMap.set(key, item);
+        });
         
         volumetria = Array.from(volumetriaMap.values());
-        
-        // Log pós-pattern search
-        const examesAposPattern = volumetria.reduce((acc, vol) => acc + (Number(vol.VALORES) || 0), 0);
-        console.log(`📊 ${nomeFantasia}: ${volumetria.length} registros, ${examesAposPattern} exames (após pattern search)`);
       }
 
       // CRITICAL: Filter out NC-NF and EXCLUSAO records FIRST
@@ -942,41 +926,16 @@ serve(async (req) => {
       console.error('❌ Erro ao gravar no banco:', dbError);
     }
 
-    // Generate reports automatically
-    let relatoriosGerados = 0;
-    let relatoriosComErro = 0;
-
-    for (const demonstrativo of demonstrativos) {
-      try {
-        const { error: pdfError } = await supabase.functions.invoke('gerar-relatorio-faturamento', {
-          body: {
-            cliente_id: demonstrativo.cliente_id,
-            periodo: demonstrativo.periodo,
-            demonstrativo_data: demonstrativo
-          }
-        });
-
-        if (pdfError) {
-          console.error(`Erro ao gerar PDF para cliente ${demonstrativo.cliente_nome}:`, pdfError);
-          relatoriosComErro++;
-        } else {
-          relatoriosGerados++;
-        }
-      } catch (error) {
-        console.error(`Erro ao gerar relatório para ${demonstrativo.cliente_nome}:`, error);
-        relatoriosComErro++;
-      }
-    }
+    // ✅ OTIMIZAÇÃO CRÍTICA: Não gerar relatórios PDF aqui!
+    // A geração de PDFs é LENTA e deve ser feita separadamente pelo botão "Gerar Relatórios"
+    // Isso elimina o timeout da edge function e torna o processo muito mais rápido
+    console.log(`✅ Demonstrativos salvos. PDFs serão gerados separadamente pelo usuário.`);
 
     return new Response(
       JSON.stringify({
         success: true,
         demonstrativos,
-        resumo: {
-          ...resumo,
-          relatorios_gerados: relatoriosGerados,
-          relatorios_com_erro: relatoriosComErro
-        }
+        resumo
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
