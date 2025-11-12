@@ -320,6 +320,14 @@ export async function processVolumetriaFile(
             continue;
           }
 
+          // REGRA: Excluir exames com modalidade US
+          const modalidadeRaw = row['MODALIDADE'];
+          if (modalidadeRaw && String(modalidadeRaw).trim().toUpperCase() === 'US') {
+            console.log(`Exame com modalidade US excluído: ${empresa} - ${nomePaciente}`);
+            totalErrors++; // Contar como processado mas não inserido
+            continue;
+          }
+
           // REGRA: Excluir clientes com "_local" no nome (maiúscula ou minúscula)
           if (empresa.toLowerCase().includes('_local')) {
             console.log(`Cliente com _local excluído: ${empresa}`);
