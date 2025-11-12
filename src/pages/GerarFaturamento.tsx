@@ -63,7 +63,7 @@ export default function GerarFaturamento() {
   
   // Ensure activeTab never gets set to removed values
   const safeSetActiveTab = (value: string) => {
-    const validTabs = ["gerar", "demonstrativo", "relatorios", "analise", "fechamento", "comparativo"];
+    const validTabs = ["gerar", "demonstrativo", "relatorios", "fechamento", "comparativo"];
     if (validTabs.includes(value)) {
       setActiveTab(value);
     } else {
@@ -2121,7 +2121,7 @@ export default function GerarFaturamento() {
       </div>
 
       <Tabs value={activeTab} onValueChange={safeSetActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="gerar" className="flex items-center gap-2">
             <Send className="h-4 w-4" />
             Gerar
@@ -2133,10 +2133,6 @@ export default function GerarFaturamento() {
           <TabsTrigger value="relatorios" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
             Relatórios
-          </TabsTrigger>
-          <TabsTrigger value="analise" className="flex items-center gap-2">
-            <Search className="h-4 w-4" />
-            Análise
           </TabsTrigger>
           <TabsTrigger value="fechamento" className="flex items-center gap-2">
             <Clock className="h-4 w-4" />
@@ -2928,28 +2924,6 @@ export default function GerarFaturamento() {
             </Card>
           )}
 
-        </TabsContent>
-
-        <TabsContent value="analise" className="space-y-6">
-          {/* Verificação de Dados - Movido da aba Demonstrativo */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-yellow-600" />
-                Verificação de Dados
-              </CardTitle>
-              <CardDescription>
-                Diagnóstico de possíveis problemas nos dados de faturamento
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <VolumetriaStatusPanel />
-            </CardContent>
-          </Card>
-          
-          <ExamesValoresZerados />
-          
-          <DiagnosticoPrecosFaturamento />
         </TabsContent>
 
 
