@@ -242,11 +242,26 @@ serve(async (req) => {
         let cliente_id = null;
         const nomeEmpresaNormalizado = normalizarNome(nomeEmpresa.toString());
         
-        // Tentar várias formas de buscar o cliente
+        // Tentar várias formas de buscar o cliente pelo NOME_MOBILEMED
         cliente_id = clienteMap.get(nomeEmpresa.toString().toLowerCase().trim()) ||
                      clienteMap.get(nomeEmpresaNormalizado) ||
                      clienteMap.get(nomeEmpresa.toString()) ||
                      null;
+
+        // Se não encontrou pelo nome mobilemed, tentar pelo nome fantasia
+        if (!cliente_id) {
+          const nomeFantasiaArquivo = findColumnValue(row, COLUMN_MAPPING.nomeFantasia);
+          if (nomeFantasiaArquivo) {
+            const nomeFantasiaNormalizado = normalizarNome(nomeFantasiaArquivo.toString());
+            cliente_id = clienteMap.get(nomeFantasiaArquivo.toString().toLowerCase().trim()) ||
+                        clienteMap.get(nomeFantasiaNormalizado) ||
+                        clienteMap.get(nomeFantasiaArquivo.toString()) ||
+                        null;
+            if (cliente_id) {
+              console.log(`Cliente encontrado pelo Nome Fantasia: ${nomeFantasiaArquivo} -> ID: ${cliente_id}`);
+            }
+          }
+        }
 
         if (cliente_id) {
           console.log(`Cliente encontrado: ${nomeEmpresa} -> ID: ${cliente_id}`);
