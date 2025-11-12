@@ -125,22 +125,6 @@ export function AdicionaisMedicos({ periodoSelecionado, periodoBloqueado }: Adic
     handleAdicionalChange(medicoIndex, adicionalIndex, 'data', undefined);
   };
 
-  const formatarValorMonetario = (valor: string): string => {
-    // Remove tudo que não é número
-    const apenasNumeros = valor.replace(/\D/g, '');
-    
-    if (!apenasNumeros) return '';
-    
-    // Converte para número e divide por 100 para ter os centavos
-    const numero = parseFloat(apenasNumeros) / 100;
-    
-    // Formata como moeda brasileira
-    return numero.toLocaleString('pt-BR', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    });
-  };
-
   const handleValorChange = (medicoIndex: number, adicionalIndex: number, valor: string) => {
     // Remove tudo que não é número
     const apenasNumeros = valor.replace(/\D/g, '');
@@ -153,8 +137,20 @@ export function AdicionaisMedicos({ periodoSelecionado, periodoBloqueado }: Adic
     // Converte para número com centavos
     const numero = parseFloat(apenasNumeros) / 100;
     
-    // Salva como string do número puro para cálculos
-    handleAdicionalChange(medicoIndex, adicionalIndex, 'valor', numero.toString());
+    // Salva como string formatada para exibição e cálculos
+    handleAdicionalChange(medicoIndex, adicionalIndex, 'valor', numero.toFixed(2));
+  };
+
+  const formatarValorParaExibicao = (valor: string): string => {
+    if (!valor) return '';
+    
+    const numero = parseFloat(valor);
+    if (isNaN(numero)) return '';
+    
+    return numero.toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
   };
 
   const adicionarNovoAdicional = (medicoIndex: number) => {
@@ -371,7 +367,7 @@ export function AdicionaisMedicos({ periodoSelecionado, periodoBloqueado }: Adic
                               <Input
                                 type="text"
                                 placeholder="0,00"
-                                value={adicional.valor ? formatarValorMonetario(adicional.valor) : ''}
+                                value={adicional.valor ? formatarValorParaExibicao(adicional.valor) : ''}
                                 onChange={(e) => handleValorChange(medicoIndexOriginal, adicionalIndex, e.target.value)}
                                 disabled={periodoBloqueado}
                                 className="pl-10 text-right"
