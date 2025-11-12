@@ -18,39 +18,32 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Buscar arquivo do storage ao invés de FormData
     const { fileName } = await req.json()
     
     if (!fileName) {
       throw new Error('Nome do arquivo não foi fornecido')
     }
 
-    console.log(`📁 Buscando arquivo do storage: ${fileName}`)
+    console.log(`📁 Iniciando processamento: ${fileName}`)
 
-    // Baixar arquivo do storage
+    // Baixar arquivo
     const { data: fileData, error: downloadError } = await supabaseClient.storage
       .from('uploads')
       .download(fileName)
 
     if (downloadError || !fileData) {
-      console.error('❌ Erro ao baixar arquivo:', downloadError)
       throw new Error(`Erro ao baixar arquivo: ${downloadError?.message || 'Arquivo não encontrado'}`)
     }
 
-    console.log(`📊 Tamanho: ${fileData.size} bytes`)
-
-    // 1. Limpar uploads antigos travados
+    // Limpar uploads travados antigos
     await supabaseClient
       .from('upload_logs')
       .delete()
       .eq('file_type', 'precos_servicos')
       .eq('status', 'processing')
-      .lt('created_at', new Date(Date.now() - 5 * 60 * 1000).toISOString()) // Mais de 5 minutos
+      .lt('created_at', new Date(Date.now() - 5 * 60 * 1000).toISOString())
 
-    // 1.1. Replace strategy: a exclusão será feita por cliente após o parse do arquivo
-    // (remoção global da tabela foi desativada)
-
-    // 2. Criar log de processamento
+    // Criar log
     const { data: logEntry, error: logError } = await supabaseClient
       .from('upload_logs')
       .insert({
@@ -64,477 +57,332 @@ serve(async (req) => {
       .single()
 
     if (logError) {
-      console.error('❌ Erro ao criar log:', logError)
       throw new Error(`Erro ao criar log: ${logError.message}`)
     }
 
-    console.log(`✅ Log criado: ${logEntry.id}`)
+    console.log(`✅ Processamento iniciado - Log ID: ${logEntry.id}`)
 
-    // 2. Processar arquivo Excel
-    const arrayBuffer = await fileData.arrayBuffer()
-    const workbook = XLSX.read(arrayBuffer, { type: 'array' })
-    const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
-    const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 })
-    
-    console.log(`📋 Total de linhas no Excel: ${jsonData.length}`)
-    console.log(`🏷️ Headers originais: ${JSON.stringify(jsonData[0])}`)
-
-    // 🧭 Mapear índices por header para suportar variações de templates
-    const normalizeHeader = (s: any) => {
-      const normalized = String(s ?? '')
-        .toUpperCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^A-Z0-9]/g, '') // remove spaces, underscores, punctuation for robust matching
-        .trim()
-      return normalized
-    }
-    
-    const headers = (jsonData[0] as any[]).map(normalizeHeader)
-    console.log(`🏷️ Headers normalizados: ${JSON.stringify(headers)}`)
-    
-    const findIndex = (...candidates: string[]) => {
-      for (const c of candidates) {
-        const normalized = normalizeHeader(c)
-        const idx = headers.indexOf(normalized)
-        if (idx !== -1) {
-          console.log(`✅ Header encontrado: "${c}" (normalizado: "${normalized}") na posição ${idx}`)
-          return idx
-        }
-      }
-      console.log(`❌ Nenhum dos candidatos encontrado: [${candidates.join(', ')}]`)
-      return -1
-    }
-    
-    const indices = {
-      cliente: findIndex(
-        'CLIENTE', 'NOME DO CLIENTE', 'CLIENTE NOME', 'CLIENTE FANTASIA', 'NOME FANTASIA',
-        'CLIENTE/UNIDADE', 'CLIENTE_UNIDADE', 'UNIDADE', 'EMPRESA', 'CLINICA', 'CLÍNICA', 'HOSPITAL', 'PARCEIRO'
-      ),
-      modalidade: findIndex('MODALIDADE'),
-      especialidade: findIndex('ESPECIALIDADE'),
-      prioridade: findIndex('PRIORIDADE'),
-      categoria: findIndex('CATEGORIA'),
-      valor: findIndex('VALOR', 'PRECO', 'PREÇO'),
-      volInicial: findIndex('VOL INICIAL', 'VOLUME INICIAL'),
-      volFinal: findIndex('VOL FINAL', 'VOLUME FINAL'),
-      condVolume: findIndex('VOLUME TOTAL', 'VOLUMETOTAL', 'COND. VOLUME', 'COND VOLUME', 'CONDVOLUME'),
-      consideraPlantao: findIndex('CONSIDERA PLANTAO', 'CONSIDERA PLANTAO?', 'PLANTAO', 'PLANTÃO')
-    }
-    console.log('🧭 Índices detectados:', indices)
-    
-    // Log específico para cond_volume
-    if (indices.condVolume >= 0) {
-      console.log(`✅✅✅ COLUNA COND_VOLUME ENCONTRADA NA POSIÇÃO ${indices.condVolume}`)
-      console.log(`📊 Exemplo de valores (primeiras 3 linhas):`)
-      for (let i = 1; i <= Math.min(3, jsonData.length - 1); i++) {
-        const row = jsonData[i] as any[]
-        const valor = row[indices.condVolume]
-        console.log(`   Linha ${i + 1}: "${valor}"`)
-      }
-    } else {
-      console.log(`❌❌❌ COLUNA COND_VOLUME NÃO ENCONTRADA!`)
-      console.log(`🔍 Headers disponíveis no arquivo:`)
-      (jsonData[0] as any[]).forEach((h: any, idx: number) => {
-        console.log(`   [${idx}] "${h}" → normalizado: "${normalizeHeader(h)}"`)
-      })
-    }
-
-    // NORMALIZAÇÃO SIMPLIFICADA - NÃO remove prefixos/sufixos (_PL, _RX, NL_, etc)
-    // pois são parte do nome fantasia real dos clientes
-    const normalizeClientName = (input: any): string => {
-      let s = String(input ?? '').toUpperCase().trim()
-      // Remover acentos
-      s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-      // Mapeamentos específicos conhecidos (casos excepcionais)
-      switch (s) {
-        case 'INTERCOR2': s = 'INTERCOR'; break
-        case 'P-HADVENTISTA': s = 'HADVENTISTA'; break
-        case 'P-UNIMED_CARUARU': s = 'UNIMED_CARUARU'; break
-        case 'PRN - MEDIMAGEM CAMBORIU': s = 'MEDIMAGEM_CAMBORIU'; break
-        case 'PRN': s = 'MEDIMAGEM_CAMBORIU'; break
-        case 'UNIMAGEM_CENTRO': s = 'UNIMAGEM_ATIBAIA'; break
-        case 'VIVERCLIN 2': s = 'VIVERCLIN'; break
-        case 'CEDI-RJ':
-        case 'CEDI-RO':
-        case 'CEDI-UNIMED':
-        case 'CEDI_RJ':
-        case 'CEDI_RO':
-        case 'CEDI_UNIMED': s = 'CEDIDIAG'; break
-        default: break
-      }
-      // IMPORTANTE: NÃO remover prefixos NL_, NC_ nem sufixos _PL, _RX
-      // pois são parte do nome fantasia real
-      // Apenas normalizar espaços e pontos
-      s = s.replace(/\./g, ' ')
-      s = s.replace(/\s+/g, ' ').trim()
-      return s.trim().toUpperCase()
-    }
-
-    // Normalização de valores de cond_volume (aceita sinônimos e variações)
-    const normalizeCondVolume = (input: any): 'MOD' | 'MOD/ESP' | 'MOD/ESP/CAT' | 'TOTAL' | null => {
-      if (input == null) return null
-      // Se vier número (ex: 1000) interpretamos como regime TOTAL
-      if (typeof input === 'number') return 'TOTAL'
-      const raw = String(input).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-      // Se for string numérica pura, também considerar TOTAL
-      if (/^\s*\d+(?:[\.,]\d+)?\s*$/.test(raw)) return 'TOTAL'
-      const token = raw.replace(/[^A-Z/]/g, '').replace(/\s+/g, '')
-      // Mapear sinônimos
-      if (token === 'MOD' || token === 'MODALIDADE') return 'MOD'
-      if (token === 'MODESP' || token === 'MOD/ESP' || token === 'MODALIDADE/ESPECIALIDADE' || token === 'MODALIDADEESPECIALIDADE') return 'MOD/ESP'
-      if (token === 'MODESPCAT' || token === 'MOD/ESP/CAT' || token === 'MODALIDADE/ESPECIALIDADE/CATEGORIA' || token === 'MODALIDADEESPECIALIDADECATEGORIA') return 'MOD/ESP/CAT'
-      if (token === 'TOTAL' || token === 'VOLUMETOTAL' || token === 'TODOS' || token === 'GERAL') return 'TOTAL'
-      // Valores como 'VOLUME TOTAL' inseridos por engano como valor da célula
-      if (token === 'VOLUME' || token === 'VOLUMETOTAL') return 'TOTAL'
-      return null
-    }
-
-
-    // 3. Buscar todos os clientes uma vez para melhor performance
-    const { data: clientesData, error: clientesError } = await supabaseClient
-      .from('clientes')
-      .select('id, nome, nome_mobilemed, nome_fantasia')
-      .eq('ativo', true)
-
-    if (clientesError) {
-      throw new Error(`Erro ao buscar clientes: ${clientesError.message}`)
-    }
-
-    const clientesMap = new Map<string, string>()
-    const clientesNomeOficialMap = new Map<string, string>() // Mapa para nome_fantasia oficial
-    
-    // Estratégia SIMPLIFICADA: adicionar variantes RAW e NORMALIZADAS
-    // PRIORIDADE: nome_fantasia > nome_mobilemed > nome
-    clientesData.forEach((cliente: any) => {
-      const nomeOficial = cliente.nome_fantasia || cliente.nome // Nome oficial para uso
-      clientesNomeOficialMap.set(cliente.id, nomeOficial)
-      
-      const addMapping = (k?: string | null) => {
-        if (!k) return
-        const raw = String(k).toUpperCase().trim()
-        const normalized = normalizeClientName(raw)
-        if (raw) {
-          clientesMap.set(raw, cliente.id)  // Variante RAW (exata)
-        }
-        if (normalized && normalized !== raw) {
-          clientesMap.set(normalized, cliente.id)  // Variante normalizada
-        }
-      }
-      
-      // Adicionar na ordem de prioridade (último sobrescreve)
-      addMapping(cliente.nome)
-      addMapping(cliente.nome_mobilemed)
-      addMapping(cliente.nome_fantasia) // Maior prioridade
-    })
-
-    console.log(`📋 ${clientesData.length} clientes carregados`)
-
-    // 3.1. Buscar mapeamentos de nomes de clientes
-    const { data: mapeamentosData, error: mapeamentosError } = await supabaseClient
-      .from('mapeamento_nomes_clientes')
-      .select('nome_arquivo, nome_sistema')
-      .eq('ativo', true)
-
-    if (mapeamentosError) {
-      console.warn('⚠️ Erro ao buscar mapeamentos de nomes:', mapeamentosError.message)
-    }
-
-    // Criar mapa de mapeamentos
-    const mapeamentosMap = new Map()
-    if (mapeamentosData) {
-      mapeamentosData.forEach(mapeamento => {
-        mapeamentosMap.set(mapeamento.nome_arquivo.toUpperCase().trim(), mapeamento.nome_sistema.toUpperCase().trim())
-      })
-      console.log(`🔄 ${mapeamentosData.length} mapeamentos de nomes carregados`)
-    }
-
-    // 4. Processar dados do Excel
-    const registrosParaInserir: any[] = []
-    const erros: string[] = []
-    let registrosProcessados = 0
-
-    for (let i = 1; i < jsonData.length; i++) {
+    // PROCESSAR EM BACKGROUND
+    const processarEmBackground = async () => {
       try {
-        const row = jsonData[i] as any[]
+        // Parse Excel
+        const arrayBuffer = await fileData.arrayBuffer()
+        const workbook = XLSX.read(arrayBuffer, { type: 'array' })
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
+        const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 })
         
-        if (!row) {
-          erros.push(`Linha ${i + 1}: linha vazia`)
-        }
+        console.log(`📋 Total de linhas: ${jsonData.length}`)
 
-        // Mapear campos do Excel baseado nos headers detectados
-        const get = (idx: number) => (idx >= 0 ? row[idx] : undefined)
-        const clienteNomeOriginal = String(get(indices.cliente) ?? '').trim() // Nome EXATO do arquivo
-        const clienteNome = clienteNomeOriginal // Usar para display
-        const modalidade = String(get(indices.modalidade) ?? '').trim()
-        const especialidade = String(get(indices.especialidade) ?? '').trim()
-        const prioridade = String(get(indices.prioridade) ?? '').trim()
-        let categoria = String(get(indices.categoria) ?? '').trim()
-        const precoStr = String(get(indices.valor) ?? '').trim()
-        const volInicial = get(indices.volInicial) != null && String(get(indices.volInicial)).trim() !== '' ? parseInt(String(get(indices.volInicial))) || null : null
-        const volFinal = get(indices.volFinal) != null && String(get(indices.volFinal)).trim() !== '' ? parseInt(String(get(indices.volFinal))) || null : null
-        // COND. VOLUME agora é TEXT (MOD, MOD/ESP, MOD/ESP/CAT, TOTAL)
-        const condVolumeRaw = get(indices.condVolume)
-        const condVolume = normalizeCondVolume(condVolumeRaw)
-        const consideraPlantao = ['sim','s','true','1','x'].includes(String(get(indices.consideraPlantao) ?? '').toLowerCase())
-        let observacoesRow = ''
-        
-        // Log detalhado do cond_volume nas primeiras linhas
-        if (i <= 5) {
-          console.log(`📊 Linha ${i + 1} - COND_VOLUME: raw="${condVolumeRaw}", normalizado="${condVolume}"`)
+        // Normalizar headers
+        const normalizeHeader = (s: any) => {
+          return String(s ?? '')
+            .toUpperCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^A-Z0-9]/g, '')
+            .trim()
         }
         
-        // Tratar categoria vazia ou "Normal" como "N/A"
-        if (!categoria || categoria === 'Normal' || categoria === '') {
-          categoria = 'N/A'
-        }
-
-        // Log para debug das primeiras linhas
-        if (i <= 5) {
-          console.log(`🔍 Linha ${i + 1}: Cliente="${clienteNome}", Modal="${modalidade}", Espec="${especialidade}", Prior="${prioridade}", Preço="${precoStr}"`)
-        }
-
-        // Validação removida - aceitar todos os registros mesmo sem cliente válido
-
-        // Aceitar modalidade vazia
-        const modalidadeFinal = modalidade || 'N/A'
-
-        // Aceitar especialidade vazia  
-        const especialidadeFinal = especialidade || 'N/A'
-
-        // Aceitar prioridade vazia
-        const prioridadeFinal = prioridade || 'N/A'
-
-        // Aceitar preços vazios (serão tratados como 0)
-
-        // Buscar cliente (com normalização apenas para matching)
-        const clienteNomeBuscaRaw = clienteNome.toUpperCase().trim()
-        let clienteNomeBusca = normalizeClientName(clienteNomeBuscaRaw)
+        const headers = (jsonData[0] as any[]).map(normalizeHeader)
         
-        // Verificar se existe mapeamento para o nome (raw e normalizado)
-        const nomeMapeado = mapeamentosMap.get(clienteNomeBuscaRaw) || mapeamentosMap.get(clienteNomeBusca)
-        if (nomeMapeado) {
-          clienteNomeBusca = normalizeClientName(nomeMapeado)
-          console.log(`🔄 Mapeamento aplicado: "${clienteNome}" → "${nomeMapeado}"`)
+        const findIndex = (...candidates: string[]) => {
+          for (const c of candidates) {
+            const normalized = normalizeHeader(c)
+            const idx = headers.indexOf(normalized)
+            if (idx !== -1) return idx
+          }
+          return -1
         }
         
-        // Buscar cliente_id usando APENAS match exato e normalizado (sem fingerprint pesado)
-        const clienteId = 
-          clientesMap.get(clienteNomeBuscaRaw) ||  // 1. Nome EXATO do arquivo (prioridade)
-          clientesMap.get(clienteNomeBusca)        // 2. Nome normalizado (casos mapeados)
-        
-        if (!clienteId) {
-          observacoesRow += `Cliente não localizado: ${clienteNome}. `
+        const indices = {
+          cliente: findIndex(
+            'CLIENTE', 'NOME DO CLIENTE', 'CLIENTE NOME', 'CLIENTE FANTASIA', 'NOME FANTASIA',
+            'CLIENTE/UNIDADE', 'CLIENTE_UNIDADE', 'UNIDADE', 'EMPRESA', 'CLINICA', 'CLÍNICA', 'HOSPITAL', 'PARCEIRO'
+          ),
+          modalidade: findIndex('MODALIDADE'),
+          especialidade: findIndex('ESPECIALIDADE'),
+          prioridade: findIndex('PRIORIDADE'),
+          categoria: findIndex('CATEGORIA'),
+          valor: findIndex('VALOR', 'PRECO', 'PREÇO'),
+          volInicial: findIndex('VOL INICIAL', 'VOLUME INICIAL'),
+          volFinal: findIndex('VOL FINAL', 'VOLUME FINAL'),
+          condVolume: findIndex('VOLUME TOTAL', 'VOLUMETOTAL', 'COND. VOLUME', 'COND VOLUME', 'CONDVOLUME'),
+          consideraPlantao: findIndex('CONSIDERA PLANTAO', 'CONSIDERA PLANTAO?', 'PLANTAO', 'PLANTÃO')
         }
 
-        // Limpar e converter preço
-        let preco = 0
-        if (precoStr) {
-          const precoLimpo = precoStr.replace(/[R$\s]/g, '').replace(/[^\d,.-]/g, '')
-          const precoConvertido = precoLimpo.includes(',') && !precoLimpo.includes('.') ? 
-            precoLimpo.replace(',', '.') : precoLimpo
-          preco = parseFloat(precoConvertido) || 0
+        // Funções auxiliares
+        const normalizeClientName = (input: any): string => {
+          let s = String(input ?? '').toUpperCase().trim()
+          s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+          
+          // Mapeamentos conhecidos
+          const mappings: Record<string, string> = {
+            'INTERCOR2': 'INTERCOR',
+            'P-HADVENTISTA': 'HADVENTISTA',
+            'P-UNIMED_CARUARU': 'UNIMED_CARUARU',
+            'PRN - MEDIMAGEM CAMBORIU': 'MEDIMAGEM_CAMBORIU',
+            'PRN': 'MEDIMAGEM_CAMBORIU',
+            'UNIMAGEM_CENTRO': 'UNIMAGEM_ATIBAIA',
+            'VIVERCLIN 2': 'VIVERCLIN',
+          }
+          
+          if (mappings[s]) s = mappings[s]
+          
+          // Normalizar CEDI
+          if (s.startsWith('CEDI')) s = 'CEDIDIAG'
+          
+          return s.replace(/\./g, ' ').replace(/\s+/g, ' ').trim()
         }
 
-        // Arredondar para 2 casas decimais (garantir 2 casas)
-        preco = Math.round(preco * 100) / 100
-
-        // Preparar registro para inserção (SEM deduplicação - aceitar todos os registros)
-        // CRÍTICO: Usar nome_fantasia oficial quando cliente_id encontrado, senão usar nome do Excel
-        const clienteNomeFinal = clienteId ? clientesNomeOficialMap.get(clienteId) || clienteNomeOriginal : clienteNomeOriginal
-        
-        // Log detalhado do que será salvo nas primeiras linhas
-        if (i <= 5) {
-          console.log(`💾 Linha ${i + 1} - Salvando: cond_volume="${condVolume}", considera_plantao=${consideraPlantao}`)
+        const normalizeCondVolume = (input: any): 'MOD' | 'MOD/ESP' | 'MOD/ESP/CAT' | 'TOTAL' | null => {
+          if (input == null) return null
+          if (typeof input === 'number') return 'TOTAL'
+          
+          const raw = String(input).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+          if (/^\s*\d+(?:[\.,]\d+)?\s*$/.test(raw)) return 'TOTAL'
+          
+          const token = raw.replace(/[^A-Z/]/g, '').replace(/\s+/g, '')
+          
+          if (token === 'MOD' || token === 'MODALIDADE') return 'MOD'
+          if (token === 'MODESP' || token === 'MOD/ESP' || token === 'MODALIDADE/ESPECIALIDADE' || token === 'MODALIDADEESPECIALIDADE') return 'MOD/ESP'
+          if (token === 'MODESPCAT' || token === 'MOD/ESP/CAT' || token === 'MODALIDADE/ESPECIALIDADE/CATEGORIA' || token === 'MODALIDADEESPECIALIDADECATEGORIA') return 'MOD/ESP/CAT'
+          if (token === 'TOTAL' || token === 'VOLUMETOTAL' || token === 'TODOS' || token === 'GERAL' || token === 'VOLUME') return 'TOTAL'
+          
+          return null
         }
+
+        // Buscar clientes
+        const { data: clientesData } = await supabaseClient
+          .from('clientes')
+          .select('id, nome, nome_mobilemed, nome_fantasia')
+          .eq('ativo', true)
+
+        const clientesMap = new Map<string, string>()
+        const clientesNomeOficialMap = new Map<string, string>()
         
-        registrosParaInserir.push({
-          cliente_id: clienteId || null,
-          cliente_nome: clienteNomeFinal, // Nome oficial do cadastro (nome_fantasia) quando cliente encontrado
-          modalidade: modalidadeFinal,
-          especialidade: especialidadeFinal,
-          categoria: categoria && categoria.trim() !== '' ? categoria : null,
-          prioridade: prioridadeFinal,
-          valor_base: preco,
-          volume_inicial: volInicial,
-          volume_final: volFinal,
-          cond_volume: condVolume, // ✅ CORRIGIDO: Salvar no campo correto
-          considera_prioridade_plantao: consideraPlantao,
-          tipo_preco: 'especial',
-          aplicar_legado: true,
-          aplicar_incremental: true,
-          ativo: true,
-          observacoes: observacoesRow || null,
-          descricao: clienteId ? null : `Cliente original: ${clienteNomeOriginal}`,
-          linha_arquivo: i + 1
+        clientesData?.forEach((cliente: any) => {
+          const nomeOficial = cliente.nome_fantasia || cliente.nome
+          clientesNomeOficialMap.set(cliente.id, nomeOficial)
+          
+          const addMapping = (k?: string | null) => {
+            if (!k) return
+            const raw = String(k).toUpperCase().trim()
+            const normalized = normalizeClientName(raw)
+            if (raw) clientesMap.set(raw, cliente.id)
+            if (normalized && normalized !== raw) clientesMap.set(normalized, cliente.id)
+          }
+          
+          addMapping(cliente.nome)
+          addMapping(cliente.nome_mobilemed)
+          addMapping(cliente.nome_fantasia)
         })
 
-        registrosProcessados++
+        // Buscar mapeamentos
+        const { data: mapeamentosData } = await supabaseClient
+          .from('mapeamento_nomes_clientes')
+          .select('nome_arquivo, nome_sistema')
+          .eq('ativo', true)
 
-      } catch (error) {
-        erros.push(`Linha ${i + 1}: ${error.message}`)
-      }
-    }
+        const mapeamentosMap = new Map()
+        mapeamentosData?.forEach(m => {
+          mapeamentosMap.set(m.nome_arquivo.toUpperCase().trim(), m.nome_sistema.toUpperCase().trim())
+        })
 
-    console.log(`📊 Total de linhas processadas: ${registrosProcessados}`)
-    console.log(`📦 Registros válidos para inserção: ${registrosParaInserir.length}`)
-    console.log(`❌ Erros de validação: ${erros.length}`)
+        // Processar linhas
+        const registrosParaInserir: any[] = []
+        const erros: string[] = []
 
-    // 4.1. Replace por cliente: apagar preços existentes apenas dos clientes presentes no arquivo
-    const clienteIdsAlvo = Array.from(new Set(registrosParaInserir.map((r: any) => r.cliente_id).filter((id: string | null): id is string => !!id)))
-    console.log(`🧹 Clientes alvo para replace: ${clienteIdsAlvo.length}`)
-    const DELETE_BATCH = 100
-    for (let i = 0; i < clienteIdsAlvo.length; i += DELETE_BATCH) {
-      const ids = clienteIdsAlvo.slice(i, i + DELETE_BATCH)
-      const { error: delErr } = await supabaseClient
-        .from('precos_servicos')
-        .delete()
-        .in('cliente_id', ids)
-      if (delErr) {
-        console.error(`❌ Erro ao remover preços existentes (lote ${Math.floor(i/DELETE_BATCH)+1}):`, delErr)
-      } else {
-        console.log(`✅ Removidos preços antigos de ${ids.length} cliente(s) (lote ${Math.floor(i/DELETE_BATCH)+1})`)
-      }
-    }
+        for (let i = 1; i < jsonData.length; i++) {
+          try {
+            const row = jsonData[i] as any[]
+            if (!row) continue
 
-    // 5. Inserir registros no banco em lotes com retry automático
-    let registrosInseridos = 0
-    let registrosComErro = 0
-    const BATCH_SIZE = 300 // Reduzido ainda mais para evitar timeouts
-    const MAX_RETRIES = 2
+            const get = (idx: number) => (idx >= 0 ? row[idx] : undefined)
+            
+            const clienteNomeOriginal = String(get(indices.cliente) ?? '').trim()
+            const modalidade = String(get(indices.modalidade) ?? '').trim()
+            const especialidade = String(get(indices.especialidade) ?? '').trim()
+            const prioridade = String(get(indices.prioridade) ?? '').trim()
+            let categoria = String(get(indices.categoria) ?? '').trim()
+            const precoStr = String(get(indices.valor) ?? '').trim()
+            const volInicial = get(indices.volInicial) != null && String(get(indices.volInicial)).trim() !== '' ? parseInt(String(get(indices.volInicial))) || null : null
+            const volFinal = get(indices.volFinal) != null && String(get(indices.volFinal)).trim() !== '' ? parseInt(String(get(indices.volFinal))) || null : null
+            const condVolumeRaw = get(indices.condVolume)
+            const condVolume = normalizeCondVolume(condVolumeRaw)
+            const consideraPlantao = ['sim','s','true','1','x'].includes(String(get(indices.consideraPlantao) ?? '').toLowerCase())
+            
+            if (!categoria || categoria === 'Normal') categoria = 'N/A'
 
-    for (let i = 0; i < registrosParaInserir.length; i += BATCH_SIZE) {
-      const lote = registrosParaInserir.slice(i, i + BATCH_SIZE)
-      const loteNum = Math.floor(i/BATCH_SIZE) + 1
-      const totalLotes = Math.ceil(registrosParaInserir.length / BATCH_SIZE)
-      
-      let tentativa = 0
-      let sucesso = false
-      
-      while (tentativa <= MAX_RETRIES && !sucesso) {
-        try {
-          if (tentativa > 0) {
-            console.log(`🔄 Tentativa ${tentativa + 1}/${MAX_RETRIES + 1} para lote ${loteNum}...`)
-          } else {
-            console.log(`📦 Inserindo lote ${loteNum}/${totalLotes} (${lote.length} registros)...`)
-          }
-          
-          const { error: insertError } = await supabaseClient
-            .from('precos_servicos')
-            .insert(lote)
-
-          if (insertError) {
-            if (insertError.code === '57014' && tentativa < MAX_RETRIES) {
-              // Timeout - tentar novamente após delay maior
-              console.warn(`⚠️ Timeout no lote ${loteNum}, aguardando para retry...`)
-              await new Promise(resolve => setTimeout(resolve, 2000))
-              tentativa++
-            } else {
-              console.error(`❌ Erro ao inserir lote ${loteNum}:`, insertError)
-              registrosComErro += lote.length
-              sucesso = true // Não tentar mais
+            // Buscar cliente
+            const clienteNomeBuscaRaw = clienteNomeOriginal.toUpperCase().trim()
+            let clienteNomeBusca = normalizeClientName(clienteNomeBuscaRaw)
+            
+            const nomeMapeado = mapeamentosMap.get(clienteNomeBuscaRaw) || mapeamentosMap.get(clienteNomeBusca)
+            if (nomeMapeado) {
+              clienteNomeBusca = normalizeClientName(nomeMapeado)
             }
-          } else {
-            registrosInseridos += lote.length
-            console.log(`✅ Lote ${loteNum}/${totalLotes} inserido (${registrosInseridos}/${registrosParaInserir.length})`)
-            sucesso = true
-          }
-          
-        } catch (error) {
-          if (tentativa < MAX_RETRIES) {
-            console.warn(`⚠️ Erro no lote ${loteNum}, tentando novamente...`)
-            await new Promise(resolve => setTimeout(resolve, 2000))
-            tentativa++
-          } else {
-            console.error(`❌ Erro final no lote ${loteNum}:`, error)
-            registrosComErro += lote.length
-            sucesso = true
+            
+            const clienteId = clientesMap.get(clienteNomeBuscaRaw) || clientesMap.get(clienteNomeBusca)
+            
+            let observacoes = ''
+            if (!clienteId) observacoes = `Cliente não localizado: ${clienteNomeOriginal}. `
+
+            // Converter preço
+            let preco = 0
+            if (precoStr) {
+              const precoLimpo = precoStr.replace(/[R$\s]/g, '').replace(/[^\d,.-]/g, '')
+              const precoConvertido = precoLimpo.includes(',') && !precoLimpo.includes('.') ? 
+                precoLimpo.replace(',', '.') : precoLimpo
+              preco = parseFloat(precoConvertido) || 0
+            }
+            preco = Math.round(preco * 100) / 100
+
+            const clienteNomeFinal = clienteId ? clientesNomeOficialMap.get(clienteId) || clienteNomeOriginal : clienteNomeOriginal
+            
+            registrosParaInserir.push({
+              cliente_id: clienteId || null,
+              cliente_nome: clienteNomeFinal,
+              modalidade: modalidade || 'N/A',
+              especialidade: especialidade || 'N/A',
+              categoria: categoria || null,
+              prioridade: prioridade || 'N/A',
+              valor_base: preco,
+              volume_inicial: volInicial,
+              volume_final: volFinal,
+              cond_volume: condVolume,
+              considera_prioridade_plantao: consideraPlantao,
+              tipo_preco: 'especial',
+              aplicar_legado: true,
+              aplicar_incremental: true,
+              ativo: true,
+              observacoes: observacoes || null,
+              descricao: clienteId ? null : `Cliente original: ${clienteNomeOriginal}`,
+              linha_arquivo: i + 1
+            })
+          } catch (error) {
+            erros.push(`Linha ${i + 1}: ${error.message}`)
           }
         }
+
+        console.log(`📊 ${registrosParaInserir.length} registros válidos`)
+
+        // Deletar preços existentes dos clientes no arquivo
+        const clienteIdsAlvo = Array.from(new Set(registrosParaInserir.map(r => r.cliente_id).filter((id): id is string => !!id)))
+        
+        for (let i = 0; i < clienteIdsAlvo.length; i += 100) {
+          const ids = clienteIdsAlvo.slice(i, i + 100)
+          await supabaseClient.from('precos_servicos').delete().in('cliente_id', ids)
+        }
+
+        // Inserir em lotes menores
+        let registrosInseridos = 0
+        let registrosComErro = 0
+        const BATCH_SIZE = 200
+        const MAX_RETRIES = 2
+
+        for (let i = 0; i < registrosParaInserir.length; i += BATCH_SIZE) {
+          const lote = registrosParaInserir.slice(i, i + BATCH_SIZE)
+          const loteNum = Math.floor(i/BATCH_SIZE) + 1
+          const totalLotes = Math.ceil(registrosParaInserir.length / BATCH_SIZE)
+          
+          let tentativa = 0
+          let sucesso = false
+          
+          while (tentativa <= MAX_RETRIES && !sucesso) {
+            try {
+              console.log(`📦 Lote ${loteNum}/${totalLotes} (${lote.length} registros)`)
+              
+              const { error: insertError } = await supabaseClient
+                .from('precos_servicos')
+                .insert(lote)
+
+              if (insertError) {
+                if (insertError.code === '57014' && tentativa < MAX_RETRIES) {
+                  await new Promise(resolve => setTimeout(resolve, 2000))
+                  tentativa++
+                } else {
+                  registrosComErro += lote.length
+                  sucesso = true
+                }
+              } else {
+                registrosInseridos += lote.length
+                console.log(`✅ Lote ${loteNum}/${totalLotes} inserido (${registrosInseridos}/${registrosParaInserir.length})`)
+                sucesso = true
+              }
+            } catch (error) {
+              if (tentativa < MAX_RETRIES) {
+                await new Promise(resolve => setTimeout(resolve, 2000))
+                tentativa++
+              } else {
+                registrosComErro += lote.length
+                sucesso = true
+              }
+            }
+          }
+          
+          // Pequeno delay entre lotes
+          if (i + BATCH_SIZE < registrosParaInserir.length) {
+            await new Promise(resolve => setTimeout(resolve, 150))
+          }
+        }
+
+        // Sincronizar com contratos
+        try {
+          await supabaseClient.rpc('sincronizar_precos_servicos_contratos')
+          await supabaseClient.rpc('atualizar_status_configuracao_contrato')
+        } catch (error) {
+          console.error('Erro ao sincronizar:', error)
+        }
+
+        // Validação de clientes
+        try {
+          await supabaseClient.rpc('aplicar_validacao_cliente_volumetria', { lote_upload_param: null })
+        } catch (error) {
+          console.error('Erro na validação:', error)
+        }
+
+        // Identificar duplicados
+        const { data: duplicados } = await supabaseClient.rpc('identificar_duplicados_precos_servicos')
+
+        // Finalizar log
+        const status = registrosInseridos > 0 ? 'success' : 'failed'
+        const errorDetails = erros.length > 0 ? erros.slice(0, 10).join('; ') : null
+
+        await supabaseClient
+          .from('upload_logs')
+          .update({
+            status: status,
+            records_processed: registrosInseridos,
+            error_count: erros.length + registrosComErro,
+            error_message: errorDetails
+          })
+          .eq('id', logEntry.id)
+
+        console.log(`🎉 Concluído: ${registrosInseridos} inseridos, ${erros.length + registrosComErro} erros`)
+
+      } catch (bgError) {
+        console.error('💥 Erro no background:', bgError.message)
+        
+        await supabaseClient
+          .from('upload_logs')
+          .update({
+            status: 'failed',
+            error_message: bgError.message
+          })
+          .eq('id', logEntry.id)
       }
-      
-      // Delay entre lotes para evitar sobrecarga
-      if (i + BATCH_SIZE < registrosParaInserir.length) {
-        await new Promise(resolve => setTimeout(resolve, 200))
-      }
     }
 
-    // 6. Sincronizar preços com contratos
-    try {
-      console.log('🔄 Sincronizando preços com contratos...')
-      await supabaseClient.rpc('sincronizar_precos_servicos_contratos')
-      console.log('✅ Preços sincronizados com contratos')
-      
-      console.log('🔄 Atualizando status dos contratos...')
-      await supabaseClient.rpc('atualizar_status_configuracao_contrato')
-      console.log('✅ Status dos contratos atualizados')
-    } catch (error) {
-      console.error('❌ Erro ao sincronizar preços com contratos:', error.message)
-    }
+    // Iniciar processamento em background
+    EdgeRuntime.waitUntil(processarEmBackground())
 
-    // 7. Aplicar validação/correlação automática de clientes
-    try {
-      console.log('🔄 Aplicando validação automática de clientes...')
-      const { data: validationResult, error: validationError } = await supabaseClient
-        .rpc('aplicar_validacao_cliente_volumetria', { lote_upload_param: null })
-
-      if (validationError) {
-        console.error('❌ Erro na validação automática:', validationError)
-      } else {
-        console.log('✅ Validação automática concluída:', validationResult)
-      }
-    } catch (error) {
-      console.error('❌ Erro ao executar validação automática:', error.message)
-    }
-
-    // 8. Finalizar log
-    const status = registrosInseridos > 0 ? 'success' : 'failed'
-    const errorDetails = erros.length > 0 ? erros.slice(0, 10).join('; ') : null
-
-    await supabaseClient
-      .from('upload_logs')
-      .update({
-        status: status,
-        records_processed: registrosInseridos,
-        error_count: erros.length + registrosComErro,
-        error_message: errorDetails
-      })
-      .eq('id', logEntry.id)
-
-    console.log(`🎉 Processamento concluído: ${registrosInseridos} sucessos, ${erros.length + registrosComErro} erros`)
-    
-    // Log dos primeiros erros para debug
-    if (erros.length > 0) {
-      console.log('🚨 Primeiros 10 erros encontrados:')
-      erros.slice(0, 10).forEach(erro => console.log(`   - ${erro}`))
-    }
-
-    // 8. Detectar duplicados após inserção
-    console.log('🔍 Identificando duplicados...')
-    const { data: duplicados, error: dupError } = await supabaseClient.rpc('identificar_duplicados_precos_servicos')
-    
-    if (dupError) {
-      console.error('❌ Erro ao identificar duplicados:', dupError)
-    } else if (duplicados && duplicados.length > 0) {
-      console.log(`⚠️ Encontrados ${duplicados.length} grupos de registros duplicados`)
-      duplicados.slice(0, 10).forEach((dup: any) => {
-        console.log(`   - ${dup.cliente_nome || 'SEM CLIENTE'} | ${dup.modalidade} | ${dup.especialidade} | ${dup.prioridade} | ${dup.categoria}: ${dup.total_duplicados} registros`)
-      })
-    } else {
-      console.log('✅ Nenhum duplicado encontrado')
-    }
-
-    // 9. Retornar resposta
+    // Retornar resposta imediata
     return new Response(
       JSON.stringify({
-        success: registrosInseridos > 0,
-        registros_processados: registrosInseridos,
-        registros_erro: erros.length + registrosComErro,
-        total_linhas: jsonData.length - 1,
-        total_duplicados: duplicados?.length || 0,
-        mensagem: `Processamento concluído. ${registrosInseridos} preços inseridos com sucesso. ${erros.length + registrosComErro} erros encontrados. ${duplicados?.length || 0} grupos duplicados detectados.`,
-        detalhes_erros: erros.slice(0, 10), // Primeiros 10 erros para debugging
-        detalhes_duplicados: duplicados?.slice(0, 20) || [] // Primeiros 20 duplicados
+        success: true,
+        mensagem: 'Processamento iniciado. Acompanhe o progresso na tela.',
+        log_id: logEntry.id,
+        file_name: fileName
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -543,14 +391,12 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('💥 Erro geral:', error.message)
+    console.error('💥 Erro ao iniciar:', error.message)
 
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message || 'Erro interno do servidor',
-        registros_processados: 0,
-        registros_erro: 0
+        error: error.message
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
