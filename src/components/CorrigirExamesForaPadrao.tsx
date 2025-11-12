@@ -1,16 +1,17 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useVolumetria } from "@/contexts/VolumetriaContext";
 
 export const CorrigirExamesForaPadrao = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [resultado, setResultado] = useState<any>(null);
   const { toast } = useToast();
+  const { refreshData } = useVolumetria();
 
   const handleCorrigir = async () => {
     setIsProcessing(true);
@@ -35,6 +36,10 @@ export const CorrigirExamesForaPadrao = () => {
           title: "✅ Correção concluída",
           description: `${data.registros_corrigidos} de ${data.registros_encontrados} registros corrigidos`,
         });
+        
+        // Atualizar dados em todos os componentes
+        console.log('🔄 Atualizando dados...');
+        await refreshData();
       } else {
         toast({
           title: "⚠️ Erro na correção",
