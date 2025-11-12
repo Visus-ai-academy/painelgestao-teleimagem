@@ -95,11 +95,12 @@ serve(async (req) => {
     const clientesProcessados = new Set<string>(); // Track by nome_fantasia to avoid duplicates
 
     for (const cliente of clientes) {
-      const parametros = Array.isArray(cliente.parametros_faturamento)
-        ? (cliente.parametros_faturamento.find((p: any) => p?.ativo === true || p?.status === 'A' || p?.status === 'Ativo') || cliente.parametros_faturamento[0])
-        : cliente.parametros_faturamento;
-      const contrato = cliente.contratos_clientes?.[0];
-      const tipoFaturamento = contrato?.tipo_faturamento || 'CO-FT';
+      try {
+        const parametros = Array.isArray(cliente.parametros_faturamento)
+          ? (cliente.parametros_faturamento.find((p: any) => p?.ativo === true || p?.status === 'A' || p?.status === 'Ativo') || cliente.parametros_faturamento[0])
+          : cliente.parametros_faturamento;
+        const contrato = cliente.contratos_clientes?.[0];
+        const tipoFaturamento = contrato?.tipo_faturamento || 'CO-FT';
 
       // Regras de faturamento:
       // - CO-NF DEVE gerar demonstrativo e relatório (mas não envia email/NF)
@@ -877,7 +878,14 @@ serve(async (req) => {
       } else {
         console.log(`⏭️ ${nomeFantasia} pulado (valores zerados): exames=${totalExames}, líquido=${valorLiquido}`);
       }
+      
+    } catch (clienteError: any) {
+      const clienteNome = cliente?.nome_fantasia || cliente?.nome || 'Cliente desconhecido';
+      console.error(`❌ ERRO ao processar cliente ${clienteNome}:`, clienteError);
+      console.error(`📋 Stack trace:`, clienteError.stack);
+      // Continue processing other clients instead of failing the entire batch
     }
+  }
 
     // ✅ FIX 4: Calculate summary correctly
     const resumo = {

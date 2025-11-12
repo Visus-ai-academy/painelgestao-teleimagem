@@ -259,9 +259,19 @@ export function DemonstrativoFaturamentoCompleto({
         }
 
         if (error) {
-          console.error('❌ Erro no lote:', error);
-          // continuar com os próximos lotes, mas avisar
-          toast({ title: 'Lote com erro ignorado', description: `Um lote falhou: ${error.message || 'Erro'}`, variant: 'destructive' });
+          const loteNumero = i / chunkSize + 1;
+          console.error(`❌ Erro no lote ${loteNumero}:`, error);
+          console.error('📋 IDs do lote com erro:', ids);
+          
+          // Tentar extrair mais detalhes do erro
+          const errorMessage = error.message || error.msg || 'Erro desconhecido';
+          const errorDetails = error.details || error.hint || '';
+          
+          toast({ 
+            title: `Lote ${loteNumero} com erro`, 
+            description: `${errorMessage}${errorDetails ? ` - ${errorDetails}` : ''}`, 
+            variant: 'destructive' 
+          });
           continue;
         }
         if (!data?.success) {
