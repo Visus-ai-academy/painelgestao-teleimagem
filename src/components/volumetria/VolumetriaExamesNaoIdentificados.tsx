@@ -256,13 +256,15 @@ export function VolumetriaExamesNaoIdentificados() {
           ))}
         </div>
         
-        <div className="mt-4 p-3 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-800">
+        <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
           <div className="flex items-start gap-2">
-            <AlertTriangle className="h-4 w-4 text-orange-600 mt-0.5 flex-shrink-0" />
-            <div className="text-sm text-orange-800 dark:text-orange-200">
-              <strong>Análise:</strong> Esta lista mostra exames fora do padrão sem quantidade (modalidade US excluída). 
-              Os que estão "Na tabela De Para" deveriam ter recebido valores, mas não receberam - isso indica problema 
-              na aplicação do De Para. Os "Não identificados" precisam ser adicionados na tabela De Para.
+            <AlertTriangle className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+            <div className="text-sm text-blue-800 dark:text-blue-200">
+              <strong>Análise:</strong> Esta lista mostra exames fora do padrão sem quantidade (modalidade US excluída).
+              <ul className="list-disc ml-4 mt-2 space-y-1">
+                <li><strong>"Na tabela De Para":</strong> Exames cadastrados que precisam ser corrigidos. Use o botão <strong>"Corrigir Exames Fora do Padrão"</strong> na aba Sistema de Regras para aplicar as correções automaticamente.</li>
+                <li><strong>"Não identificados":</strong> Exames que ainda não foram cadastrados. Adicione-os no cadastro de exames primeiro, depois execute a correção.</li>
+              </ul>
             </div>
           </div>
         </div>
