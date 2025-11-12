@@ -29,11 +29,17 @@ serve(async (req) => {
 
     while (true) {
       // Buscar registros com valores zerados em batch
-      const { data: registrosZerados, error: errorBusca } = await supabase
+      let query = supabase
         .from('volumetria_mobilemed')
         .select('id, ESTUDO_DESCRICAO')
-        .eq('arquivo_fonte', arquivo_fonte)
-        .eq('lote_upload', lote_upload || '')
+        .eq('arquivo_fonte', arquivo_fonte);
+      
+      // Adicionar filtro de lote_upload apenas se fornecido
+      if (lote_upload) {
+        query = query.eq('lote_upload', lote_upload);
+      }
+      
+      const { data: registrosZerados, error: errorBusca } = await query
         .or('VALORES.is.null,VALORES.eq.0')
         .range(offset, offset + batchSize - 1);
 
