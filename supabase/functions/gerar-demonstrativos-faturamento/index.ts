@@ -517,26 +517,29 @@ serve(async (req) => {
 
       const norm = (s: any) => (s ?? '').toString().trim().toUpperCase();
       
-      // Buscar COND_VOLUME do contrato do cliente
-      let condVolume = 'MOD/ESP/CAT'; // Padrão
-      try {
-        const { data: contratoData } = await supabase
-          .from('contratos_clientes')
-          .select('cond_volume')
-          .eq('cliente_id', cliente.id)
-          .maybeSingle();
-        
-        if (contratoData?.cond_volume) {
-          condVolume = contratoData.cond_volume;
-          console.log(`📋 ${nomeFantasia}: COND. VOLUME = ${condVolume}`);
-        }
-      } catch (e) {
-        console.warn(`⚠️ ${nomeFantasia}: Erro ao buscar cond_volume, usando padrão`, e);
-      }
-
+      // ✅ CORRIGIDO: Buscar cond_volume específico da linha de preço, não do contrato
       // Função para buscar preço POR EXAME usando RPC calcular_preco_exame
       const buscarPreco = async (exame: any) => {
         try {
+          // 1. Buscar o preço específico para obter o cond_volume daquela linha
+          const { data: precoRow, error: precoSearchErr } = await supabase
+            .from('precos_servicos')
+            .select('cond_volume')
+            .eq('cliente_id', cliente.id)
+            .eq('modalidade', exame.MODALIDADE || '')
+            .eq('especialidade', exame.ESPECIALIDADE || '')
+            .eq('ativo', true)
+            .order('volume_inicial', { ascending: false, nullsFirst: false })
+            .limit(1)
+            .maybeSingle();
+
+          // Usar cond_volume da linha de preço, ou padrão se não encontrado
+          let condVolumeEspecifico = 'MOD/ESP/CAT'; // Padrão
+          if (precoRow && precoRow.cond_volume) {
+            condVolumeEspecifico = precoRow.cond_volume;
+          }
+
+          // 2. Chamar RPC com o cond_volume específico desta linha de preço
           const { data: precoData, error: precoErr } = await supabase
             .rpc('calcular_preco_exame', {
               p_cliente_id: cliente.id,
@@ -545,7 +548,7 @@ serve(async (req) => {
               p_categoria: exame.CATEGORIA || 'N/A',
               p_prioridade: exame.PRIORIDADE || 'ROTINA',
               p_volume_total: 0, // Será calculado pela função baseado em cond_volume
-              p_cond_volume: condVolume,
+              p_cond_volume: condVolumeEspecifico,
               p_periodo: periodo
             });
 

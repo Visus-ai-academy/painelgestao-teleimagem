@@ -227,7 +227,8 @@ serve(async (req) => {
         const precoStr = String(get(indices.valor) ?? '').trim()
         const volInicial = get(indices.volInicial) != null && String(get(indices.volInicial)).trim() !== '' ? parseInt(String(get(indices.volInicial))) || null : null
         const volFinal = get(indices.volFinal) != null && String(get(indices.volFinal)).trim() !== '' ? parseInt(String(get(indices.volFinal))) || null : null
-        const condVolume = get(indices.condVolume) != null && String(get(indices.condVolume)).trim() !== '' ? parseInt(String(get(indices.condVolume))) || null : null
+        // COND. VOLUME agora é TEXT (MOD, MOD/ESP, MOD/ESP/CAT, TOTAL)
+        const condVolume = get(indices.condVolume) != null && String(get(indices.condVolume)).trim() !== '' ? String(get(indices.condVolume)).trim().toUpperCase() : null
         const consideraPlantao = ['sim','s','true','1','x'].includes(String(get(indices.consideraPlantao) ?? '').toLowerCase())
         let observacoesRow = ''
         
@@ -300,7 +301,7 @@ serve(async (req) => {
           valor_base: preco,
           volume_inicial: volInicial,
           volume_final: volFinal,
-          volume_total: condVolume,
+          cond_volume: condVolume, // ✅ CORRIGIDO: Salvar no campo correto
           considera_prioridade_plantao: consideraPlantao,
           tipo_preco: 'especial',
           aplicar_legado: true,

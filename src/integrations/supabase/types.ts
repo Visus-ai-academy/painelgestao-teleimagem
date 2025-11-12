@@ -2823,6 +2823,7 @@ export type Database = {
           cliente_id: string | null
           cliente_nome: string | null
           codigo_servico: string | null
+          cond_volume: string | null
           considera_prioridade_plantao: boolean | null
           created_at: string
           created_by: string | null
@@ -2852,6 +2853,7 @@ export type Database = {
           cliente_id?: string | null
           cliente_nome?: string | null
           codigo_servico?: string | null
+          cond_volume?: string | null
           considera_prioridade_plantao?: boolean | null
           created_at?: string
           created_by?: string | null
@@ -2881,6 +2883,7 @@ export type Database = {
           cliente_id?: string | null
           cliente_nome?: string | null
           codigo_servico?: string | null
+          cond_volume?: string | null
           considera_prioridade_plantao?: boolean | null
           created_at?: string
           created_by?: string | null
