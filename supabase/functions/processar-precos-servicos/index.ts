@@ -171,9 +171,25 @@ serve(async (req) => {
       return s.trim().toUpperCase()
     }
 
-    // Fingerprint para matching flexível (ignora espaços e pontuação)
-    const fingerprint = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, '')
-    const stripTrailingDigits = (s: string) => s.replace(/\d+$/,'')
+    // Normalização de valores de cond_volume (aceita sinônimos e variações)
+    const normalizeCondVolume = (input: any): 'MOD' | 'MOD/ESP' | 'MOD/ESP/CAT' | 'TOTAL' | null => {
+      if (input == null) return null
+      // Se vier número (ex: 1000) interpretamos como regime TOTAL
+      if (typeof input === 'number') return 'TOTAL'
+      const raw = String(input).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      // Se for string numérica pura, também considerar TOTAL
+      if (/^\s*\d+(?:[\.,]\d+)?\s*$/.test(raw)) return 'TOTAL'
+      const token = raw.replace(/[^A-Z/]/g, '').replace(/\s+/g, '')
+      // Mapear sinônimos
+      if (token === 'MOD' || token === 'MODALIDADE') return 'MOD'
+      if (token === 'MODESP' || token === 'MOD/ESP' || token === 'MODALIDADE/ESPECIALIDADE' || token === 'MODALIDADEESPECIALIDADE') return 'MOD/ESP'
+      if (token === 'MODESPCAT' || token === 'MOD/ESP/CAT' || token === 'MODALIDADE/ESPECIALIDADE/CATEGORIA' || token === 'MODALIDADEESPECIALIDADECATEGORIA') return 'MOD/ESP/CAT'
+      if (token === 'TOTAL' || token === 'VOLUMETOTAL' || token === 'TODOS' || token === 'GERAL') return 'TOTAL'
+      // Valores como 'VOLUME TOTAL' inseridos por engano como valor da célula
+      if (token === 'VOLUME' || token === 'VOLUMETOTAL') return 'TOTAL'
+      return null
+    }
+
 
     // 3. Buscar todos os clientes uma vez para melhor performance
     const { data: clientesData, error: clientesError } = await supabaseClient
@@ -259,13 +275,13 @@ serve(async (req) => {
         const volFinal = get(indices.volFinal) != null && String(get(indices.volFinal)).trim() !== '' ? parseInt(String(get(indices.volFinal))) || null : null
         // COND. VOLUME agora é TEXT (MOD, MOD/ESP, MOD/ESP/CAT, TOTAL)
         const condVolumeRaw = get(indices.condVolume)
-        const condVolume = condVolumeRaw != null && String(condVolumeRaw).trim() !== '' ? String(condVolumeRaw).trim().toUpperCase() : null
+        const condVolume = normalizeCondVolume(condVolumeRaw)
         const consideraPlantao = ['sim','s','true','1','x'].includes(String(get(indices.consideraPlantao) ?? '').toLowerCase())
         let observacoesRow = ''
         
         // Log detalhado do cond_volume nas primeiras linhas
         if (i <= 5) {
-          console.log(`📊 Linha ${i + 1} - COND_VOLUME: raw="${condVolumeRaw}", processado="${condVolume}"`)
+          console.log(`📊 Linha ${i + 1} - COND_VOLUME: raw="${condVolumeRaw}", normalizado="${condVolume}"`)
         }
         
         // Tratar categoria vazia ou "Normal" como "N/A"
