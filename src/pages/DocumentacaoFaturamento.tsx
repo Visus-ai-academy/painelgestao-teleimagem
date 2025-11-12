@@ -304,7 +304,7 @@ const DocumentacaoFaturamento = () => {
                   <div className="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-md">
                     <p className="text-sm font-medium">Exemplo:</p>
                     <p className="text-sm">
-                      Período referente a Janeiro/2025:
+                      Período referente a Dezembro/2024:
                       <br />
                       • Início: 08/12/2024
                       <br />
@@ -320,7 +320,7 @@ const DocumentacaoFaturamento = () => {
                 <h3 className="font-semibold">Dados Passados (Legado)</h3>
                 <div className="pl-4 border-l-2 border-primary/20">
                   <p className="text-sm">
-                    Períodos anteriores a <strong>Junho/2025</strong> são considerados "Dados Passados" e podem ter 
+                    Períodos anteriores a <strong>Outubro/2025</strong> são considerados "Dados Passados" e podem ter 
                     regras de processamento diferenciadas conforme configuração das regras de exclusão.
                   </p>
                 </div>

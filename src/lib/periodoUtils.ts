@@ -62,13 +62,13 @@ export function calcularPeriodoFaturamento(dataReferencia: Date = new Date()): P
 }
 
 /**
- * Verifica se um período é considerado "dados do passado" (anterior a junho/2025)
+ * Verifica se um período é considerado "dados do passado" (anterior a outubro/2025)
  */
 export function isDadosPassado(periodo: PeriodoFaturamento): boolean {
-  const junhoRef = new Date(2025, 5, 1); // Junho de 2025
+  const outubroRef = new Date(2025, 9, 1); // Outubro de 2025
   const periodoRef = new Date(periodo.anoReferencia, periodo.inicioPeriodo.getMonth(), 1);
   
-  return periodoRef < junhoRef;
+  return periodoRef < outubroRef;
 }
 
 /**
