@@ -477,12 +477,15 @@ export default function ContratosClientes() {
       }
       try {
         setLoadingPrecos(true);
+        console.log('🔍 Buscando preços para cliente_id:', clienteId);
         const { data, error } = await supabase
           .from('precos_servicos')
-          .select('modalidade, especialidade, categoria, prioridade, volume_inicial, volume_final, valor_base, valor_urgencia, considera_prioridade_plantao')
+          .select('id, modalidade, especialidade, categoria, prioridade, volume_inicial, volume_final, valor_base, valor_urgencia, considera_prioridade_plantao, ativo, cond_volume')
           .eq('cliente_id', clienteId)
+          .eq('ativo', true)
           .order('modalidade', { ascending: true });
         if (error) throw error;
+        console.log('✅ Preços encontrados:', data?.length || 0, 'registros');
         setPrecosCliente(data || []);
       } catch (e) {
         console.error('Erro ao carregar condições de preço:', e);
@@ -1726,15 +1729,16 @@ export default function ContratosClientes() {
                       </div>
                     ) : precosCliente.length > 0 ? (
                       <div className="w-full overflow-x-auto">
-                        <Table className="min-w-full">
+                          <Table className="min-w-full">
                           <TableHeader>
                             <TableRow>
                               <TableHead className="min-w-[100px]">Modalidade</TableHead>
                               <TableHead className="min-w-[120px]">Especialidade</TableHead>
                               <TableHead className="min-w-[100px]">Categoria</TableHead>
                               <TableHead className="min-w-[100px]">Prioridade</TableHead>
-                              <TableHead className="min-w-[100px]">Vol. Inicial</TableHead>
-                              <TableHead className="min-w-[100px]">Vol. Final</TableHead>
+                              <TableHead className="min-w-[80px]">Vol. Inicial</TableHead>
+                              <TableHead className="min-w-[80px]">Vol. Final</TableHead>
+                              <TableHead className="min-w-[100px]">Cond. Volume</TableHead>
                               <TableHead className="min-w-[120px]">Valor Base</TableHead>
                               <TableHead className="min-w-[120px]">Valor Urgência</TableHead>
                               <TableHead className="min-w-[80px]">Plantão</TableHead>
@@ -1748,8 +1752,9 @@ export default function ContratosClientes() {
                                 <TableCell>{preco.especialidade}</TableCell>
                                 <TableCell>{preco.categoria}</TableCell>
                                 <TableCell>{preco.prioridade}</TableCell>
-                                <TableCell>{preco.volume_inicial}</TableCell>
-                                <TableCell>{preco.volume_final}</TableCell>
+                                <TableCell>{preco.volume_inicial || 0}</TableCell>
+                                <TableCell>{preco.volume_final || 999999}</TableCell>
+                                <TableCell>{preco.cond_volume || 'MOD/ESP/CAT'}</TableCell>
                                 <TableCell>
                                   {showEditarContrato ? (
                                     <Input 
