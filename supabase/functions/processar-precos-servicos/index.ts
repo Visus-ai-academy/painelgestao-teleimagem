@@ -77,23 +77,35 @@ serve(async (req) => {
     const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 })
     
     console.log(`📋 Total de linhas no Excel: ${jsonData.length}`)
-    console.log(`🏷️ Headers: ${JSON.stringify(jsonData[0])}`)
+    console.log(`🏷️ Headers originais: ${JSON.stringify(jsonData[0])}`)
 
     // 🧭 Mapear índices por header para suportar variações de templates
-    const normalizeHeader = (s: any) => String(s ?? '')
-      .toUpperCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^A-Z0-9]/g, '') // remove spaces, underscores, punctuation for robust matching
-      .trim()
+    const normalizeHeader = (s: any) => {
+      const normalized = String(s ?? '')
+        .toUpperCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^A-Z0-9]/g, '') // remove spaces, underscores, punctuation for robust matching
+        .trim()
+      return normalized
+    }
+    
     const headers = (jsonData[0] as any[]).map(normalizeHeader)
+    console.log(`🏷️ Headers normalizados: ${JSON.stringify(headers)}`)
+    
     const findIndex = (...candidates: string[]) => {
       for (const c of candidates) {
-        const idx = headers.indexOf(normalizeHeader(c))
-        if (idx !== -1) return idx
+        const normalized = normalizeHeader(c)
+        const idx = headers.indexOf(normalized)
+        if (idx !== -1) {
+          console.log(`✅ Header encontrado: "${c}" (normalizado: "${normalized}") na posição ${idx}`)
+          return idx
+        }
       }
+      console.log(`❌ Nenhum dos candidatos encontrado: [${candidates.join(', ')}]`)
       return -1
     }
+    
     const indices = {
       cliente: findIndex(
         'CLIENTE', 'NOME DO CLIENTE', 'CLIENTE NOME', 'CLIENTE FANTASIA', 'NOME FANTASIA',
@@ -106,10 +118,27 @@ serve(async (req) => {
       valor: findIndex('VALOR', 'PRECO', 'PREÇO'),
       volInicial: findIndex('VOL INICIAL', 'VOLUME INICIAL'),
       volFinal: findIndex('VOL FINAL', 'VOLUME FINAL'),
-      condVolume: findIndex('COND. VOLUME', 'COND VOLUME', 'CONDVOLUME', 'VOLUME TOTAL', 'VOLUMETOTAL'),
+      condVolume: findIndex('VOLUME TOTAL', 'VOLUMETOTAL', 'COND. VOLUME', 'COND VOLUME', 'CONDVOLUME'),
       consideraPlantao: findIndex('CONSIDERA PLANTAO', 'CONSIDERA PLANTAO?', 'PLANTAO', 'PLANTÃO')
     }
     console.log('🧭 Índices detectados:', indices)
+    
+    // Log específico para cond_volume
+    if (indices.condVolume >= 0) {
+      console.log(`✅✅✅ COLUNA COND_VOLUME ENCONTRADA NA POSIÇÃO ${indices.condVolume}`)
+      console.log(`📊 Exemplo de valores (primeiras 3 linhas):`)
+      for (let i = 1; i <= Math.min(3, jsonData.length - 1); i++) {
+        const row = jsonData[i] as any[]
+        const valor = row[indices.condVolume]
+        console.log(`   Linha ${i + 1}: "${valor}"`)
+      }
+    } else {
+      console.log(`❌❌❌ COLUNA COND_VOLUME NÃO ENCONTRADA!`)
+      console.log(`🔍 Headers disponíveis no arquivo:`)
+      (jsonData[0] as any[]).forEach((h: any, idx: number) => {
+        console.log(`   [${idx}] "${h}" → normalizado: "${normalizeHeader(h)}"`)
+      })
+    }
 
     // NORMALIZAÇÃO SIMPLIFICADA - NÃO remove prefixos/sufixos (_PL, _RX, NL_, etc)
     // pois são parte do nome fantasia real dos clientes
@@ -229,9 +258,15 @@ serve(async (req) => {
         const volInicial = get(indices.volInicial) != null && String(get(indices.volInicial)).trim() !== '' ? parseInt(String(get(indices.volInicial))) || null : null
         const volFinal = get(indices.volFinal) != null && String(get(indices.volFinal)).trim() !== '' ? parseInt(String(get(indices.volFinal))) || null : null
         // COND. VOLUME agora é TEXT (MOD, MOD/ESP, MOD/ESP/CAT, TOTAL)
-        const condVolume = get(indices.condVolume) != null && String(get(indices.condVolume)).trim() !== '' ? String(get(indices.condVolume)).trim().toUpperCase() : null
+        const condVolumeRaw = get(indices.condVolume)
+        const condVolume = condVolumeRaw != null && String(condVolumeRaw).trim() !== '' ? String(condVolumeRaw).trim().toUpperCase() : null
         const consideraPlantao = ['sim','s','true','1','x'].includes(String(get(indices.consideraPlantao) ?? '').toLowerCase())
         let observacoesRow = ''
+        
+        // Log detalhado do cond_volume nas primeiras linhas
+        if (i <= 5) {
+          console.log(`📊 Linha ${i + 1} - COND_VOLUME: raw="${condVolumeRaw}", processado="${condVolume}"`)
+        }
         
         // Tratar categoria vazia ou "Normal" como "N/A"
         if (!categoria || categoria === 'Normal' || categoria === '') {
@@ -291,6 +326,11 @@ serve(async (req) => {
         // Preparar registro para inserção (SEM deduplicação - aceitar todos os registros)
         // CRÍTICO: Usar nome_fantasia oficial quando cliente_id encontrado, senão usar nome do Excel
         const clienteNomeFinal = clienteId ? clientesNomeOficialMap.get(clienteId) || clienteNomeOriginal : clienteNomeOriginal
+        
+        // Log detalhado do que será salvo nas primeiras linhas
+        if (i <= 5) {
+          console.log(`💾 Linha ${i + 1} - Salvando: cond_volume="${condVolume}", considera_plantao=${consideraPlantao}`)
+        }
         
         registrosParaInserir.push({
           cliente_id: clienteId || null,
