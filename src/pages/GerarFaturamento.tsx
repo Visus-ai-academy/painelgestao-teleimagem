@@ -51,8 +51,7 @@ import { ControleFechamentoFaturamento } from '@/components/ControleFechamentoFa
 import { ExamesValoresZerados } from "@/components/ExamesValorezrados";
 import { DiagnosticoPrecosFaturamento } from "@/components/DiagnosticoPrecosFaturamento";
 import FaturamentoComparativo from "@/components/faturamento/FaturamentoComparativo";
-
-
+import { MonitoramentoLotes, type LoteStatus } from "@/components/faturamento/MonitoramentoLotes";
 
 import { generatePDF, downloadPDF, type FaturamentoData } from "@/lib/pdfUtils";
 
@@ -135,6 +134,11 @@ export default function GerarFaturamento() {
   const [clientesProcessandoDemonstrativo, setClientesProcessandoDemonstrativo] = useState<Set<string>>(new Set());
   
   const [demonstrativoGerado, setDemonstrativoGerado] = useState(false);
+  
+  // Estados para monitoramento de lotes em tempo real
+  const [lotesMonitoramento, setLotesMonitoramento] = useState<LoteStatus[]>([]);
+  const [tempoInicioProcessamento, setTempoInicioProcessamento] = useState(0);
+  const [mostrarMonitoramento, setMostrarMonitoramento] = useState(false);
   
   // Verificar se há dados de faturamento processados para este período
   const verificarDemonstrativoGerado = useCallback(async () => {
@@ -1130,9 +1134,27 @@ export default function GerarFaturamento() {
       const todosAlertas: string[] = [];
       let clientesProcessados = 0;
       const lotesComErro: number[] = []; // Rastrear lotes que falharam para retry
+      
+      // 🎯 Inicializar monitoramento de lotes
+      setMostrarMonitoramento(true);
+      setTempoInicioProcessamento(Date.now());
+      const lotesIniciais: LoteStatus[] = chunks.map((lote, idx) => ({
+        numero: idx + 1,
+        total: chunks.length,
+        clientes: lote,
+        status: 'aguardando'
+      }));
+      setLotesMonitoramento(lotesIniciais);
 
       for (let i = 0; i < chunks.length; i++) {
         const lote = chunks[i];
+        
+        // 🎯 Atualizar status do lote para "processando"
+        setLotesMonitoramento(prev => prev.map((l, idx) => 
+          idx === i 
+            ? { ...l, status: 'processando', tempoInicio: Date.now() }
+            : l
+        ));
         
         // Marcar clientes do lote como processando
         setClientesProcessandoDemonstrativo(prev => {
@@ -1153,6 +1175,15 @@ export default function GerarFaturamento() {
         
         while (tentativasRestantes > 0 && !sucessoLote) {
           try {
+            // 🎯 Se está em retry, atualizar status
+            if (tentativasRestantes < 2) {
+              setLotesMonitoramento(prev => prev.map((l, idx) => 
+                idx === i 
+                  ? { ...l, status: 'retry', tentativasRestantes: tentativasRestantes }
+                  : l
+              ));
+            }
+            
             // Timeout de 3 minutos (180 segundos) por lote
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 180000);
@@ -1178,6 +1209,18 @@ export default function GerarFaturamento() {
             clientesProcessados += data?.resumo?.clientes_processados || 0;
             const demonstrativosDoLote = data?.demonstrativos || [];
             todosDemonstrativos.push(...demonstrativosDoLote);
+            
+            // 🎯 Atualizar status do lote para "concluido"
+            setLotesMonitoramento(prev => prev.map((l, idx) => 
+              idx === i 
+                ? { 
+                    ...l, 
+                    status: 'concluido', 
+                    tempoFim: Date.now(),
+                    demonstrativosGerados: demonstrativosDoLote.length
+                  }
+                : l
+            ));
             
             // ✅ Atualizar status individual dos clientes processados com sucesso
             if (demonstrativosDoLote.length > 0) {
@@ -1219,6 +1262,19 @@ export default function GerarFaturamento() {
             } else {
               // Todas as tentativas falharam
               console.error(`❌ Lote ${i + 1}/${chunks.length} falhou após todas as tentativas:`, loteError);
+              
+              // 🎯 Atualizar status do lote para "erro"
+              const mensagemErro = loteError instanceof Error ? loteError.message : 'Erro desconhecido';
+              setLotesMonitoramento(prev => prev.map((l, idx) => 
+                idx === i 
+                  ? { 
+                      ...l, 
+                      status: 'erro', 
+                      tempoFim: Date.now(),
+                      erro: mensagemErro
+                    }
+                  : l
+              ));
               
               // Remover clientes do lote de processamento
               setClientesProcessandoDemonstrativo(prev => {
@@ -1411,6 +1467,13 @@ export default function GerarFaturamento() {
       console.error('❌ [CATCH] Tipo do erro:', typeof error);
       console.error('❌ [CATCH] Stack trace:', error instanceof Error ? error.stack : 'N/A');
       
+      // 🎯 Marcar todos os lotes aguardando/processando como erro
+      setLotesMonitoramento(prev => prev.map(l => 
+        l.status === 'aguardando' || l.status === 'processando' || l.status === 'retry'
+          ? { ...l, status: 'erro' as const, erro: 'Processo interrompido', tempoFim: Date.now() }
+          : l
+      ));
+      
       // ✅ Limpar TODOS os estados de processamento em caso de erro
       setClientesProcessandoDemonstrativo(new Set());
       
@@ -1448,6 +1511,12 @@ export default function GerarFaturamento() {
     } finally {
       console.log('🏁 [FINALLY] Finalizando processo...');
       setProcessandoTodos(false);
+      // Manter monitoramento visível por 5 segundos após conclusão
+      setTimeout(() => {
+        if (!processandoTodos) {
+          setMostrarMonitoramento(false);
+        }
+      }, 5000);
     }
   };
 
@@ -2483,6 +2552,15 @@ export default function GerarFaturamento() {
                   </p>
                 </div>
               </div>
+
+              {/* Painel de Monitoramento em Tempo Real */}
+              {mostrarMonitoramento && (
+                <MonitoramentoLotes 
+                  lotes={lotesMonitoramento}
+                  tempoInicio={tempoInicioProcessamento}
+                  isProcessing={processandoTodos}
+                />
+              )}
 
               {/* Etapa 2: Gerar Relatórios */}
               <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
