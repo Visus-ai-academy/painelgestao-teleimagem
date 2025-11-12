@@ -691,12 +691,29 @@ serve(async (req: Request) => {
 
       // Se o valor líquido não foi fornecido, calcular com as alíquotas padrão
       if (liquidoInformado == null || isNaN(liquidoInformado) || liquidoInformado === 0) {
-        const pisLocal = valorBruto * 0.0065;
-        const cofinsLocal = valorBruto * 0.03;
-        const csllLocal = valorBruto * 0.01;
-        const irrfLocal = valorBruto * 0.015;
+        let pisLocal = valorBruto * 0.0065;
+        let cofinsLocal = valorBruto * 0.03;
+        let csllLocal = valorBruto * 0.01;
+        let irrfLocal = valorBruto * 0.015;
+        
+        // REGRA: Se IRRF < R$ 10,00, zerar IRRF
+        if (irrfLocal < 10) {
+          console.log(`⚠️ IRRF ${irrfLocal.toFixed(2)} < R$ 10,00 - zerado`);
+          irrfLocal = 0;
+        }
+        
+        // REGRA: Se (PIS + COFINS + CSLL) < R$ 10,00, zerar todos
+        const somaImpostosFederais = pisLocal + cofinsLocal + csllLocal;
+        if (somaImpostosFederais < 10) {
+          console.log(`⚠️ (PIS+COFINS+CSLL) ${somaImpostosFederais.toFixed(2)} < R$ 10,00 - zerados`);
+          pisLocal = 0;
+          cofinsLocal = 0;
+          csllLocal = 0;
+        }
+        
         totalImpostos = pisLocal + cofinsLocal + csllLocal + irrfLocal;
         valorLiquido = valorBruto - totalImpostos;
+        console.log(`💰 Impostos aplicados: PIS=${pisLocal.toFixed(2)} COFINS=${cofinsLocal.toFixed(2)} CSLL=${csllLocal.toFixed(2)} IRRF=${irrfLocal.toFixed(2)} Total=${totalImpostos.toFixed(2)}`);
       } else {
         valorLiquido = liquidoInformado;
         totalImpostos = valorBruto - valorLiquido;
@@ -758,12 +775,28 @@ serve(async (req: Request) => {
       
       // Calcular impostos APENAS se NÃO for Simples Nacional
       if (parametros && !parametros.simples) {
-        const pisLocal = valorBruto * 0.0065;
-        const cofinsLocal = valorBruto * 0.03;
-        const csllLocal = valorBruto * 0.01;
-        const irrfLocal = valorBruto * 0.015;
+        let pisLocal = valorBruto * 0.0065;
+        let cofinsLocal = valorBruto * 0.03;
+        let csllLocal = valorBruto * 0.01;
+        let irrfLocal = valorBruto * 0.015;
+        
+        // REGRA: Se IRRF < R$ 10,00, zerar IRRF
+        if (irrfLocal < 10) {
+          console.log(`⚠️ IRRF ${irrfLocal.toFixed(2)} < R$ 10,00 - zerado`);
+          irrfLocal = 0;
+        }
+        
+        // REGRA: Se (PIS + COFINS + CSLL) < R$ 10,00, zerar todos
+        const somaImpostosFederais = pisLocal + cofinsLocal + csllLocal;
+        if (somaImpostosFederais < 10) {
+          console.log(`⚠️ (PIS+COFINS+CSLL) ${somaImpostosFederais.toFixed(2)} < R$ 10,00 - zerados`);
+          pisLocal = 0;
+          cofinsLocal = 0;
+          csllLocal = 0;
+        }
+        
         totalImpostos = pisLocal + cofinsLocal + csllLocal + irrfLocal;
-        console.log(`💰 Cliente regime normal - Impostos calculados: ${totalImpostos}`);
+        console.log(`💰 Cliente regime normal - Impostos: PIS=${pisLocal.toFixed(2)} COFINS=${cofinsLocal.toFixed(2)} CSLL=${csllLocal.toFixed(2)} IRRF=${irrfLocal.toFixed(2)} Total=${totalImpostos.toFixed(2)}`);
       } else {
         totalImpostos = 0;
         console.log(`💰 Cliente Simples Nacional - SEM retenção de impostos`);
@@ -790,10 +823,26 @@ serve(async (req: Request) => {
             
             // Recalcular impostos APENAS se NÃO for Simples Nacional
             if (parametros && !parametros.simples) {
-              const pis2 = valorBruto * 0.0065;
-              const cofins2 = valorBruto * 0.03;
-              const csll2 = valorBruto * 0.01;
-              const irrf2 = valorBruto * 0.015;
+              let pis2 = valorBruto * 0.0065;
+              let cofins2 = valorBruto * 0.03;
+              let csll2 = valorBruto * 0.01;
+              let irrf2 = valorBruto * 0.015;
+              
+              // REGRA: Se IRRF < R$ 10,00, zerar IRRF
+              if (irrf2 < 10) {
+                console.log(`⚠️ IRRF ${irrf2.toFixed(2)} < R$ 10,00 - zerado (reconciliação)`);
+                irrf2 = 0;
+              }
+              
+              // REGRA: Se (PIS + COFINS + CSLL) < R$ 10,00, zerar todos
+              const soma2 = pis2 + cofins2 + csll2;
+              if (soma2 < 10) {
+                console.log(`⚠️ (PIS+COFINS+CSLL) ${soma2.toFixed(2)} < R$ 10,00 - zerados (reconciliação)`);
+                pis2 = 0;
+                cofins2 = 0;
+                csll2 = 0;
+              }
+              
               totalImpostos = pis2 + cofins2 + csll2 + irrf2;
             } else {
               totalImpostos = 0;

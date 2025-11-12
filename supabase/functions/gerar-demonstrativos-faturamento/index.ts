@@ -784,11 +784,26 @@ serve(async (req) => {
       // Se não há parâmetros, considerar Simples Nacional (sem retenção)
       
       if (parametros && !parametros.simples) {
-        // Regime Normal: aplicar impostos federais (PIS, COFINS, CSLL, IRRF)
-        const pis = valorBruto * 0.0065;
-        const cofins = valorBruto * 0.03;
-        const csll = valorBruto * 0.01;
-        const irrf = valorBruto * 0.015;
+        // Regime Normal: calcular impostos federais (PIS, COFINS, CSLL, IRRF)
+        let pis = valorBruto * 0.0065;
+        let cofins = valorBruto * 0.03;
+        let csll = valorBruto * 0.01;
+        let irrf = valorBruto * 0.015;
+        
+        // REGRA: Se IRRF < R$ 10,00, zerar IRRF
+        if (irrf < 10) {
+          console.log(`⚠️ ${nomeFantasia}: IRRF ${irrf.toFixed(2)} < R$ 10,00 - zerado`);
+          irrf = 0;
+        }
+        
+        // REGRA: Se (PIS + COFINS + CSLL) < R$ 10,00, zerar todos
+        const somaImpostosFederais = pis + cofins + csll;
+        if (somaImpostosFederais < 10) {
+          console.log(`⚠️ ${nomeFantasia}: (PIS+COFINS+CSLL) ${somaImpostosFederais.toFixed(2)} < R$ 10,00 - zerados`);
+          pis = 0;
+          cofins = 0;
+          csll = 0;
+        }
         
         // ISS específico do cliente
         if (parametros.percentual_iss) {
@@ -799,7 +814,7 @@ serve(async (req) => {
         }
         
         valorIRRF = pis + cofins + csll + irrf;
-        console.log(`💰 ${nomeFantasia}: Regime NORMAL - ISS: ${valorISS}, Federais: ${valorIRRF}`);
+        console.log(`💰 ${nomeFantasia}: Regime NORMAL - ISS: ${valorISS.toFixed(2)}, Federais: PIS=${pis.toFixed(2)} COFINS=${cofins.toFixed(2)} CSLL=${csll.toFixed(2)} IRRF=${irrf.toFixed(2)} Total=${valorIRRF.toFixed(2)}`);
       } else {
         if (!parametros) {
           console.log(`⚠️ ${nomeFantasia}: SEM parâmetros cadastrados - tratando como Simples Nacional (SEM retenção)`);
