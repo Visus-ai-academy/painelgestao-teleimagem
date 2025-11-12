@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CorrigirContratosDuplicados } from "@/components/CorrigirContratosDuplicados";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -965,9 +964,6 @@ export default function ContratosClientes() {
     <div className="space-y-6">
       {/* Seção de Sincronização de Parâmetros */}
       <SincronizarParametrosContratos />
-      
-      {/* Seção de Correção de Contratos Duplicados */}
-      <CorrigirContratosDuplicados />
       
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Contratos Clientes</h1>
