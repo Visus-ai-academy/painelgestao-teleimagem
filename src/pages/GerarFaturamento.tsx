@@ -1145,65 +1145,108 @@ export default function GerarFaturamento() {
           progresso: 30 + Math.round(((i) / chunks.length) * 35)
         });
 
-        const { data, error } = await supabase.functions.invoke('gerar-demonstrativos-faturamento', {
-          body: {
-            periodo: periodoSelecionado,
-            clientes: lote
+        try {
+          const { data, error } = await supabase.functions.invoke('gerar-demonstrativos-faturamento', {
+            body: {
+              periodo: periodoSelecionado,
+              clientes: lote
+            }
+          });
+
+          console.log(`[LOTE ${i + 1}/${chunks.length}] Data:`, data);
+          console.log(`[LOTE ${i + 1}/${chunks.length}] Error:`, error);
+
+          if (error || !data?.success) {
+            console.error(`❌ [ERRO] Erro no lote ${i + 1}/${chunks.length}:`, error?.message || data?.error);
+            
+            // Remover clientes do lote de processamento em caso de erro
+            setClientesProcessandoDemonstrativo(prev => {
+              const newSet = new Set(prev);
+              lote.forEach(cliente => newSet.delete(cliente));
+              return newSet;
+            });
+            
+            // Não lançar erro, apenas logar e continuar com próximo lote
+            todosAlertas.push(`Erro no lote ${i + 1}: ${error?.message || data?.error || 'Erro desconhecido'}`);
+            console.warn(`⚠️ Continuando processamento apesar do erro no lote ${i + 1}`);
+            continue;
           }
-        });
 
-        console.log(`[LOTE ${i + 1}/${chunks.length}] Data:`, data);
-        console.log(`[LOTE ${i + 1}/${chunks.length}] Error:`, error);
-
-        if (error || !data?.success) {
-          console.error('❌ [ERRO] Erro na edge function (lote):', error?.message || data?.error);
+          // Processar dados do lote com sucesso
+          clientesProcessados += data?.resumo?.clientes_processados || 0;
+          const demonstrativosDoLote = data?.demonstrativos || [];
+          todosDemonstrativos.push(...demonstrativosDoLote);
           
-          // Remover clientes do lote de processamento em caso de erro
+          // ✅ Atualizar status individual dos clientes processados com sucesso
+          if (demonstrativosDoLote.length > 0) {
+            const clientesFinalizados = demonstrativosDoLote.map(d => d.cliente_nome).filter(Boolean);
+            
+            // Marcar como concluídos
+            setDemonstrativosGeradosPorCliente(prev => {
+              const newSet = new Set(prev);
+              clientesFinalizados.forEach(cliente => newSet.add(cliente));
+              return newSet;
+            });
+            
+            // Remover de processamento
+            setClientesProcessandoDemonstrativo(prev => {
+              const newSet = new Set(prev);
+              clientesFinalizados.forEach(cliente => newSet.delete(cliente));
+              return newSet;
+            });
+            
+            // Salvar progresso no localStorage
+            const clientesAtualizados = Array.from(new Set([
+              ...Array.from(demonstrativosGeradosPorCliente),
+              ...clientesFinalizados
+            ]));
+            localStorage.setItem(`demonstrativosGerados_${periodoSelecionado}`, JSON.stringify(clientesAtualizados));
+            
+            console.log(`✅ Lote ${i + 1} finalizado: ${clientesFinalizados.length} demonstrativos gerados`);
+          }
+          
+          if (Array.isArray(data?.alertas)) todosAlertas.push(...data.alertas);
+
+        } catch (loteError) {
+          console.error(`❌ [TIMEOUT] Timeout no lote ${i + 1}/${chunks.length}:`, loteError);
+          
+          // Remover clientes do lote de processamento em caso de timeout
           setClientesProcessandoDemonstrativo(prev => {
             const newSet = new Set(prev);
             lote.forEach(cliente => newSet.delete(cliente));
             return newSet;
           });
           
-          throw new Error(error?.message || data?.error || 'Erro ao gerar demonstrativos');
+          // Não lançar erro, apenas logar e continuar com próximo lote
+          todosAlertas.push(`Timeout no lote ${i + 1}/${chunks.length}`);
+          console.warn(`⚠️ Continuando processamento apesar do timeout no lote ${i + 1}`);
+          continue;
         }
-
-        clientesProcessados += data?.resumo?.clientes_processados || 0;
-        const demonstrativosDoLote = data?.demonstrativos || [];
-        todosDemonstrativos.push(...demonstrativosDoLote);
-        
-        // ✅ Atualizar status individual dos clientes processados com sucesso
-        if (demonstrativosDoLote.length > 0) {
-          const clientesFinalizados = demonstrativosDoLote.map(d => d.cliente_nome).filter(Boolean);
-          
-          // Marcar como concluídos
-          setDemonstrativosGeradosPorCliente(prev => {
-            const newSet = new Set(prev);
-            clientesFinalizados.forEach(cliente => newSet.add(cliente));
-            return newSet;
-          });
-          
-          // Remover de processamento
-          setClientesProcessandoDemonstrativo(prev => {
-            const newSet = new Set(prev);
-            clientesFinalizados.forEach(cliente => newSet.delete(cliente));
-            return newSet;
-          });
-          
-          // Salvar progresso no localStorage
-          const clientesAtualizados = Array.from(new Set([
-            ...Array.from(demonstrativosGeradosPorCliente),
-            ...clientesFinalizados
-          ]));
-          localStorage.setItem(`demonstrativosGerados_${periodoSelecionado}`, JSON.stringify(clientesAtualizados));
-          
-          console.log(`✅ Lote ${i + 1} finalizado: ${clientesFinalizados.length} demonstrativos gerados`);
-        }
-        
-        if (Array.isArray(data?.alertas)) todosAlertas.push(...data.alertas);
       }
 
-      // Montar resumo combinado e salvar no localStorage para manter fluxo atual
+      // ✅ Limpar TODOS os clientes de processamento ao final
+      setClientesProcessandoDemonstrativo(new Set());
+      
+      // Verificar se há demonstrativos gerados (mesmo que alguns lotes falharam)
+      if (todosDemonstrativos.length === 0) {
+        console.warn('⚠️ Nenhum demonstrativo foi gerado com sucesso');
+        
+        setStatusProcessamento({
+          processando: false,
+          mensagem: 'Nenhum demonstrativo gerado',
+          progresso: 0
+        });
+        
+        toast({
+          title: "Nenhum demonstrativo gerado",
+          description: "Todos os lotes falharam. Verifique os logs para mais detalhes.",
+          variant: "destructive",
+        });
+        
+        return;
+      }
+
+      // Montar resumo combinado e salvar no localStorage
       const resumoCombinado = {
         total_clientes: clientesUnicosVolumetria.length,
         clientes_processados: clientesProcessados,
@@ -1272,11 +1315,27 @@ export default function GerarFaturamento() {
       }
 
       if (!demonstrativosSalvos) {
-        console.warn('⚠️ [TIMEOUT] Geração de demonstrativos não concluída dentro do tempo limite');
-        throw new Error('Timeout: A geração dos demonstrativos demorou mais que 1 minuto. Tente novamente.');
+        console.warn('⚠️ [TIMEOUT] Verificação de demonstrativos demorou, mas continuando...');
+        // Não lançar erro, verificar se há dados salvos e continuar
       }
 
-      // Marcar demonstrativo como gerado
+      // ✅ Verificar se há demonstrativos salvos mesmo que tenha dado timeout na verificação
+      const demonstrativosLocalStorage = localStorage.getItem(`demonstrativos_completos_${periodoSelecionado}`);
+      let temDemonstrativos = false;
+      
+      if (demonstrativosLocalStorage) {
+        try {
+          const dados = JSON.parse(demonstrativosLocalStorage);
+          if (dados.demonstrativos && dados.demonstrativos.length > 0) {
+            temDemonstrativos = true;
+            console.log(`✅ [CONFIRMADO] ${dados.demonstrativos.length} demonstrativos encontrados no localStorage`);
+          }
+        } catch (error) {
+          console.warn('⚠️ Erro ao verificar demonstrativos salvos:', error);
+        }
+      }
+
+      // Marcar demonstrativo como gerado se houver demonstrativos ou se foram gerados durante o processo
       setDemonstrativoGerado(true);
       localStorage.setItem('demonstrativoGerado', 'true');
 
@@ -1292,14 +1351,25 @@ export default function GerarFaturamento() {
       
       setStatusProcessamento({
         processando: false,
-        mensagem: 'Demonstrativo gerado com sucesso!',
+        mensagem: temDemonstrativos || todosDemonstrativos.length > 0 
+          ? 'Demonstrativo gerado com sucesso!' 
+          : 'Processamento concluído com alguns erros',
         progresso: 100
       });
 
+      // Mensagem específica sobre alertas e erros
+      let descricaoFinal = `Demonstrativos gerados para o período ${periodoSelecionado}`;
+      if (todosAlertas.length > 0) {
+        const errosCount = todosAlertas.filter(a => a.includes('Erro') || a.includes('Timeout')).length;
+        if (errosCount > 0) {
+          descricaoFinal += `. ${errosCount} lote(s) com erro/timeout.`;
+        }
+      }
+
       toast({
-        title: "Demonstrativo gerado!",
-        description: `Demonstrativos completos gerados com sucesso para o período ${periodoSelecionado}`,
-        variant: "default",
+        title: temDemonstrativos || todosDemonstrativos.length > 0 ? "Demonstrativo gerado!" : "Processamento concluído",
+        description: descricaoFinal,
+        variant: temDemonstrativos || todosDemonstrativos.length > 0 ? "default" : "destructive",
       });
 
       // ✅ Mostrar alertas se houver clientes inativos com volumetria
@@ -1324,16 +1394,39 @@ export default function GerarFaturamento() {
       console.error('❌ [CATCH] Tipo do erro:', typeof error);
       console.error('❌ [CATCH] Stack trace:', error instanceof Error ? error.stack : 'N/A');
       
+      // ✅ Limpar TODOS os estados de processamento em caso de erro
+      setClientesProcessandoDemonstrativo(new Set());
+      
+      // ✅ Mesmo com erro, verificar se há demonstrativos salvos
+      const demonstrativosLocalStorage = localStorage.getItem(`demonstrativos_completos_${periodoSelecionado}`);
+      let temDemonstrativos = false;
+      
+      if (demonstrativosLocalStorage) {
+        try {
+          const dados = JSON.parse(demonstrativosLocalStorage);
+          if (dados.demonstrativos && dados.demonstrativos.length > 0) {
+            temDemonstrativos = true;
+            setDemonstrativoGerado(true);
+            localStorage.setItem('demonstrativoGerado', 'true');
+            console.log(`✅ Apesar do erro, ${dados.demonstrativos.length} demonstrativos foram salvos`);
+          }
+        } catch (parseError) {
+          console.warn('⚠️ Erro ao verificar demonstrativos salvos:', parseError);
+        }
+      }
+      
       setStatusProcessamento({
         processando: false,
-        mensagem: 'Erro no processamento',
-        progresso: 0
+        mensagem: temDemonstrativos ? 'Processamento parcial concluído' : 'Erro no processamento',
+        progresso: temDemonstrativos ? 100 : 0
       });
 
       toast({
-        title: "Erro na geração",
-        description: error instanceof Error ? error.message : "Ocorreu um erro durante a geração do demonstrativo",
-        variant: "destructive",
+        title: temDemonstrativos ? "Processamento parcial" : "Erro na geração",
+        description: temDemonstrativos 
+          ? "Alguns demonstrativos foram gerados. Verifique a aba Demonstrativos." 
+          : (error instanceof Error ? error.message : "Ocorreu um erro durante a geração do demonstrativo"),
+        variant: temDemonstrativos ? "default" : "destructive",
       });
     } finally {
       console.log('🏁 [FINALLY] Finalizando processo...');
