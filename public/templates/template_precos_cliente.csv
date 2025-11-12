@@ -1,4 +1,4 @@
 CLIENTE,DT INÍCIO VIGÊNCIA,DT FIM VIGÊNCIA,MODALIDADE,ESPECIALIDADE,PRIORIDADE,CATEGORIA,PREÇO,VOL INICIAL,VOL FINAL,COND. VOLUME,CONSIDERA PLANTAO,TEM ADITIVO
-EXEMPLO CLIENTE LTDA,,,"Ressonância Magnética",Radiologia,Rotina,Normal,150.00,1,1000,,Não,Não
-EXEMPLO CLIENTE LTDA,,,"Tomografia Computadorizada",Radiologia,Urgente,Normal,180.00,1,500,,Sim,Não
-EXEMPLO CLIENTE LTDA,,,Ultrassonografia,Radiologia,Rotina,Normal,80.00,1,2000,,Não,Não
+EXEMPLO CLIENTE LTDA,,,"Ressonância Magnética",Radiologia,Rotina,Normal,150.00,1,1000,MOD/ESP/CAT,Não,Não
+EXEMPLO CLIENTE LTDA,,,"Tomografia Computadorizada",Radiologia,Urgente,Normal,180.00,1,500,MOD/ESP,Sim,Não
+EXEMPLO CLIENTE LTDA,,,Ultrassonografia,Radiologia,Rotina,Normal,80.00,1,2000,MOD,Não,Não

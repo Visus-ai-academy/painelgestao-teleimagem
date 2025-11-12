@@ -105,8 +105,8 @@ serve(async (req) => {
       valor: findIndex('VALOR', 'PRECO', 'PREÇO'),
       volInicial: findIndex('VOL INICIAL', 'VOLUME INICIAL'),
       volFinal: findIndex('VOL FINAL', 'VOLUME FINAL'),
-      condVolume: findIndex('VOLUME TOTAL', 'COND VOLUME', 'COND. VOLUME'),
-      consideraPlantao: findIndex('CONSIDERA PLANTAO', 'PLANTAO', 'CONSIDERA PLANTAO?')
+      condVolume: findIndex('COND. VOLUME', 'COND VOLUME', 'CONDVOLUME', 'VOLUME TOTAL', 'VOLUMETOTAL'),
+      consideraPlantao: findIndex('CONSIDERA PLANTAO', 'CONSIDERA PLANTAO?', 'PLANTAO', 'PLANTÃO')
     }
     console.log('🧭 Índices detectados:', indices)
 
