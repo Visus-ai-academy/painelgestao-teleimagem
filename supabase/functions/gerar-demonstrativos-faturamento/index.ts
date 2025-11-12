@@ -165,7 +165,6 @@ serve(async (req) => {
       console.log(`📊 ${cliente.nome_fantasia}: ${volumetria.length} registros, ${examesTotaisAntesFiltros} exames (antes filtros)`);
 
       // Pattern-based search SIMPLIFICADO - apenas para casos específicos
-      const nomeFantasia = cliente.nome_fantasia || cliente.nome;
       let padroesBusca: string[] = [];
       
       // Apenas casos essenciais que precisam de pattern search
