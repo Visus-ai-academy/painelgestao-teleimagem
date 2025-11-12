@@ -409,7 +409,7 @@ const RelatorioImplementacoes = () => {
     totalRegrasNegocio: regrasImplementadas.length,
     totalIntegracoes: 9,
     totalChavesAPI: 4,
-    periodo: "15 de Julho de 2025 até 30 de Setembro de 2025",
+    periodo: "15 de Julho de 2025 até 12 de Novembro de 2025",
     diasUteis: diasUteis
   };
 
