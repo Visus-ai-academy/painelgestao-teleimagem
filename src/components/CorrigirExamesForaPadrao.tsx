@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
@@ -9,7 +9,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export const CorrigirExamesForaPadrao = () => {
   const [isProcessing, setIsProcessing] = useState(false);
-  const [arquivoFonte, setArquivoFonte] = useState<string>("TODOS");
   const [resultado, setResultado] = useState<any>(null);
   const { toast } = useToast();
 
@@ -19,9 +18,8 @@ export const CorrigirExamesForaPadrao = () => {
 
     try {
       console.log('🔧 Iniciando correção de exames fora do padrão...');
-      console.log('📂 Arquivo fonte:', arquivoFonte);
 
-      const body = arquivoFonte === "TODOS" ? {} : { arquivo_fonte: arquivoFonte };
+      const body = { arquivo_fonte: 'fora_padrao' };
 
       const { data, error } = await supabase.functions.invoke(
         'corrigir-volumetria-fora-padrao',
@@ -65,27 +63,18 @@ export const CorrigirExamesForaPadrao = () => {
           Corrigir Exames Fora do Padrão
         </CardTitle>
         <CardDescription>
-          Aplica correções automáticas nos registros da volumetria consultando o cadastro de exames (categoria, especialidade e modalidade)
+          Corrige automaticamente os registros de exames fora do padrão aplicando categoria, especialidade e modalidade do cadastro de exames
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Arquivo para processar</label>
-          <Select value={arquivoFonte} onValueChange={setArquivoFonte} disabled={isProcessing}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="TODOS">Todos os arquivos</SelectItem>
-              <SelectItem value="padrao">Padrão</SelectItem>
-              <SelectItem value="fora_padrao">Fora do Padrão</SelectItem>
-              <SelectItem value="retroativo">Retroativo</SelectItem>
-              <SelectItem value="incremental">Incremental</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Esta correção processa apenas os registros do arquivo <strong>fora_padrao</strong> que não possuem categoria, especialidade ou modalidade corretas.
+          </AlertDescription>
+        </Alert>
 
-        <Button 
+        <Button
           onClick={handleCorrigir} 
           disabled={isProcessing}
           className="w-full"
