@@ -435,7 +435,7 @@ serve(async (req) => {
         console.log(`🔍 ${cliente.nome_fantasia || cliente.nome} (Cardio OU Plantão): ${antesFiltro} → ${volumetria.length} registros (removidos ${antesFiltro - volumetria.length})`);
       }
       
-      // RMPADUA: Plantão MI Equipe2 + Cardio
+      // RMPADUA: Plantão OU Medicina Interna OU Equipe 2 OU Cardio OU Neurobrain
       if (nomeUpper.includes('RMPADUA') && volumetria.length > 0) {
         const MEDICOS_EQUIPE_2 = ['Dr. Antonio Gualberto Chianca Filho', 'Dr. Daniel Chrispim', 'Dr. Efraim Da Silva Ferreira', 'Dr. Felipe Falcão de Sá', 'Dr. Guilherme N. Schincariol', 'Dr. Gustavo Andreis', 'Dr. João Carlos Dantas do Amaral', 'Dr. João Fernando Miranda Pompermayer', 'Dr. Leonardo de Paula Ribeiro Figueiredo', 'Dr. Raphael Sanfelice João', 'Dr. Thiago P. Martins', 'Dr. Virgílio Oliveira Barreto', 'Dra. Adriana Giubilei Pimenta', 'Dra. Aline Andrade Dorea', 'Dra. Camila Amaral Campos', 'Dra. Cynthia Mendes Vieira de Morais', 'Dra. Fernanda Gama Barbosa', 'Dra. Kenia Menezes Fernandes', 'Dra. Lara M. Durante Bacelar', 'Dr. Aguinaldo Cunha Zuppani', 'Dr. Alex Gueiros de Barros', 'Dr. Eduardo Caminha Nunes', 'Dr. Márcio D\'Andréa Rossi', 'Dr. Rubens Pereira Moura Filho', 'Dr. Wesley Walber da Silva', 'Dra. Luna Azambuja Satte Alam', 'Dra. Roberta Bertoldo Sabatini Treml', 'Dra. Thais Nogueira D. Gastaldi', 'Dra. Vanessa da Costa Maldonado'];
         const antesFiltro = volumetria.length;
@@ -443,26 +443,20 @@ serve(async (req) => {
         volumetria = volumetria.filter(vol => {
           const prioridade = (vol.PRIORIDADE || '').toString().toUpperCase();
           const especialidade = (vol.ESPECIALIDADE || '').toString().toUpperCase();
+          const categoria = (vol.CATEGORIA || '').toString().toUpperCase();
           const medico = (vol.MEDICO || '').toString();
           
+          // Aplicar OR lógico: qualquer uma das condições abaixo inclui o exame
           const isPlantao = prioridade === 'PLANTÃO' || prioridade === 'PLANTAO';
           const isMedicinaInterna = especialidade.includes('MEDICINA INTERNA');
           const isCardio = especialidade.includes('CARDIO');
+          const isNeurobrain = categoria.includes('NEUROBRAIN');
           const temMedicoEquipe2 = MEDICOS_EQUIPE_2.some(med => medico.includes(med));
           
-          // Regra 1: Plantão de Medicina Interna laudado pela Equipe 2
-          if (isPlantao && isMedicinaInterna && temMedicoEquipe2) {
-            return true;
-          }
-          
-          // Regra 2: Todos os exames de Cardio
-          if (isCardio) {
-            return true;
-          }
-          
-          return false;
+          // Retorna true se qualquer condição for verdadeira
+          return isPlantao || isMedicinaInterna || isCardio || isNeurobrain || temMedicoEquipe2;
         });
-        console.log(`🔍 RMPADUA (Plantão MI Equipe2 + Cardio): ${antesFiltro} → ${volumetria.length} registros (removidos ${antesFiltro - volumetria.length})`);
+        console.log(`🔍 RMPADUA (Plantão OU MI OU Equipe2 OU Cardio OU Neurobrain): ${antesFiltro} → ${volumetria.length} registros (removidos ${antesFiltro - volumetria.length})`);
       }
 
       // Calculate total exams (all remaining records are billable)
