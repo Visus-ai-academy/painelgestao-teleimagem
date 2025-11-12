@@ -15,7 +15,8 @@ import {
   Upload,
   User,
   KeyRound,
-  LogOut
+  LogOut,
+  BookOpen
 } from "lucide-react";
 
 import { NavLink, useLocation } from "react-router-dom";
@@ -93,6 +94,7 @@ const menuItems: MenuItem[] = [
       { title: "Gerar Faturamento", url: "/financeiro/gerar-faturamento", requiredRoles: ['manager', 'admin'] },
       { title: "Pagamento Médico", url: "/financeiro/pagamentos", requiredRoles: ['admin'] },
       { title: "Régua de Cobrança", url: "/financeiro/regua-cobranca", requiredRoles: ['manager', 'admin'] },
+      { title: "Documentação", url: "/financeiro/documentacao", requiredRoles: ['manager', 'admin'] },
       { title: "Fluxo de Caixa", url: "/financeiro/fluxo-caixa", requiredRoles: ['admin'] },
       { title: "DRE", url: "/financeiro/dre", requiredRoles: ['admin'] },
     ]

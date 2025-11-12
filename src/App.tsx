@@ -55,6 +55,7 @@ import NotFound from "./pages/NotFound";
 import LimparDados from "./pages/LimparDados";
 import RelatorioExclusoes from "./pages/RelatorioExclusoes";
 import LimparDadosCompleto from "./components/LimparDadosCompleto";
+import DocumentacaoFaturamento from "./pages/DocumentacaoFaturamento";
 
 const queryClient = new QueryClient();
 
@@ -206,6 +207,15 @@ const App = () => {
                 <Layout>
                   <RoleProtectedRoute requiredRoles={['admin']}>
                     <PagamentosMedicos />
+                  </RoleProtectedRoute>
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/financeiro/documentacao" element={
+              <ProtectedRoute>
+                <Layout>
+                  <RoleProtectedRoute requiredRoles={['manager', 'admin']}>
+                    <DocumentacaoFaturamento />
                   </RoleProtectedRoute>
                 </Layout>
               </ProtectedRoute>
