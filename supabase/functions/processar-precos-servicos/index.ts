@@ -84,11 +84,12 @@ serve(async (req) => {
       .toUpperCase()
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^A-Z0-9]/g, '') // remove spaces, underscores, punctuation for robust matching
       .trim()
     const headers = (jsonData[0] as any[]).map(normalizeHeader)
     const findIndex = (...candidates: string[]) => {
       for (const c of candidates) {
-        const idx = headers.indexOf(c)
+        const idx = headers.indexOf(normalizeHeader(c))
         if (idx !== -1) return idx
       }
       return -1
