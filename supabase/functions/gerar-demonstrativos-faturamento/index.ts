@@ -791,14 +791,19 @@ serve(async (req) => {
         let csll = valorBruto * 0.01;
         let irrf = valorBruto * 0.015;
         
-        // REGRA: Se (PIS + COFINS + CSLL + IRRF) < R$ 10,00, zerar TODOS
-        const somaImpostosFederais = pis + cofins + csll + irrf;
+        // REGRA 1: Se IRRF < R$ 10,00, zerar APENAS o IRRF
+        if (irrf < 10) {
+          console.log(`⚠️ ${nomeFantasia}: IRRF ${irrf.toFixed(2)} < R$ 10,00 - IRRF zerado`);
+          irrf = 0;
+        }
+        
+        // REGRA 2: Se (PIS + COFINS + CSLL) < R$ 10,00, zerar estes três
+        const somaImpostosFederais = pis + cofins + csll;
         if (somaImpostosFederais < 10) {
-          console.log(`⚠️ ${nomeFantasia}: (PIS+COFINS+CSLL+IRRF) ${somaImpostosFederais.toFixed(2)} < R$ 10,00 - TODOS zerados`);
+          console.log(`⚠️ ${nomeFantasia}: (PIS+COFINS+CSLL) ${somaImpostosFederais.toFixed(2)} < R$ 10,00 - PIS/COFINS/CSLL zerados`);
           pis = 0;
           cofins = 0;
           csll = 0;
-          irrf = 0;
         }
         
         // ISS específico do cliente

@@ -696,14 +696,19 @@ serve(async (req: Request) => {
         let csllLocal = valorBruto * 0.01;
         let irrfLocal = valorBruto * 0.015;
         
-        // REGRA: Se (PIS + COFINS + CSLL + IRRF) < R$ 10,00, zerar TODOS
-        const somaImpostosFederais = pisLocal + cofinsLocal + csllLocal + irrfLocal;
+        // REGRA 1: Se IRRF < R$ 10,00, zerar APENAS o IRRF
+        if (irrfLocal < 10) {
+          console.log(`⚠️ IRRF ${irrfLocal.toFixed(2)} < R$ 10,00 - IRRF zerado`);
+          irrfLocal = 0;
+        }
+        
+        // REGRA 2: Se (PIS + COFINS + CSLL) < R$ 10,00, zerar estes três
+        const somaImpostosFederais = pisLocal + cofinsLocal + csllLocal;
         if (somaImpostosFederais < 10) {
-          console.log(`⚠️ (PIS+COFINS+CSLL+IRRF) ${somaImpostosFederais.toFixed(2)} < R$ 10,00 - TODOS zerados`);
+          console.log(`⚠️ (PIS+COFINS+CSLL) ${somaImpostosFederais.toFixed(2)} < R$ 10,00 - PIS/COFINS/CSLL zerados`);
           pisLocal = 0;
           cofinsLocal = 0;
           csllLocal = 0;
-          irrfLocal = 0;
         }
         
         totalImpostos = pisLocal + cofinsLocal + csllLocal + irrfLocal;
