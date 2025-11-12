@@ -19,7 +19,7 @@ export const CorrigirExamesForaPadrao = () => {
     try {
       console.log('🔧 Iniciando correção de exames fora do padrão...');
 
-      const body = { arquivo_fonte: 'fora_padrao' };
+      const body = { arquivo_fonte: 'volumetria_fora_padrao' };
 
       const { data, error } = await supabase.functions.invoke(
         'corrigir-volumetria-fora-padrao',
@@ -70,7 +70,7 @@ export const CorrigirExamesForaPadrao = () => {
         <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            Esta correção processa apenas os registros do arquivo <strong>fora_padrao</strong> que não possuem categoria, especialidade ou modalidade corretas.
+            Esta correção processa apenas os registros do arquivo <strong>volumetria_fora_padrao</strong> consultando o cadastro de exames.
           </AlertDescription>
         </Alert>
 
