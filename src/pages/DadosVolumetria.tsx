@@ -17,6 +17,7 @@ import { AnaliseRegistrosExcluidos } from '@/components/AnaliseRegistrosExcluido
 import { AutoRegrasMaster } from '@/components/AutoRegrasMaster';
 import { TesteRegras27 } from '@/components/TesteRegras27';
 import { AplicarAgrupamentoClientes } from '@/components/AplicarAgrupamentoClientes';
+import { CorrigirExamesForaPadrao } from '@/components/CorrigirExamesForaPadrao';
 import { SystemDateTime } from '@/components/SystemDateTime';
 import { LimparUploadTravado } from '@/components/LimparUploadTravado';
 import { FinalizarUploadsTravados } from '@/components/FinalizarUploadsTravados';
@@ -214,6 +215,9 @@ export default function DadosVolumetria() {
           </TabsContent>
 
           <TabsContent value="sistema-regras" className="space-y-6">
+            {/* Corrigir Exames Fora do Padrão */}
+            <CorrigirExamesForaPadrao />
+            
             {/* Aplicar Agrupamento aos Dados Existentes */}
             <AplicarAgrupamentoClientes />
             
