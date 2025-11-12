@@ -15,7 +15,7 @@ export const generateImplementationReportPDF = (): string => {
   yPosition += 10;
   pdf.setFontSize(14);
   pdf.setFont('helvetica', 'normal');
-  pdf.text('Período: 17/07/2025 até 21/07/2025', pageWidth / 2, yPosition, { align: 'center' });
+  pdf.text('Período: 15/07/2025 até 12/11/2025', pageWidth / 2, yPosition, { align: 'center' });
   
   yPosition += 20;
 

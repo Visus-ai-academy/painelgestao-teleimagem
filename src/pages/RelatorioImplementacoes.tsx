@@ -8,9 +8,9 @@ import { differenceInBusinessDays } from 'date-fns';
 
 
 const RelatorioImplementacoes = () => {
-  // Calcular dias úteis entre 15/07/2025 e 30/09/2025
+  // Calcular dias úteis entre 15/07/2025 e 12/11/2025
   const dataInicio = new Date(2025, 6, 15); // 15/07/2025
-  const dataFim = new Date(2025, 8, 30);    // 30/09/2025
+  const dataFim = new Date(2025, 10, 12);   // 12/11/2025
   const diasUteis = differenceInBusinessDays(dataFim, dataInicio) + 1;
   
   // Todas as regras implementadas no sistema

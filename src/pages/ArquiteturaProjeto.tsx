@@ -357,7 +357,7 @@ const ArquiteturaProjeto = () => {
       id: 'sistema-teleimagem',
       type: 'default',
       position: { x: 500, y: 300 },
-      data: { label: '🏗️ SISTEMA\nTELEIMAGEM\n(68 Tabelas)' },
+      data: { label: '🏗️ SISTEMA DE\nGESTÃO\n(68 Tabelas)' },
       style: { 
         backgroundColor: '#1e40af', 
         color: 'white', 
@@ -891,10 +891,10 @@ const ArquiteturaProjeto = () => {
         <Card>
           <CardHeader>
             <CardTitle className="text-3xl font-bold text-center bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-              Arquitetura do Sistema Teleimagem
+              Arquitetura do Sistema de Gestão
             </CardTitle>
             <CardDescription className="text-center text-lg">
-              Visualização completa da estrutura, fluxos e integrações do sistema
+              Visualização completa da estrutura, fluxos e integrações do sistema de gestão de volumetria, faturamento e laudos médicos
             </CardDescription>
           </CardHeader>
           <CardContent>
