@@ -73,7 +73,7 @@ export function CadastroDataTable({ data, loading, error, type, title }: Cadastr
           { key: 'valor_base', label: 'Preço', filterable: false },
           { key: 'volume_inicial', label: 'Vol Inicial', filterable: false },
           { key: 'volume_final', label: 'Vol Final', filterable: false },
-          { key: 'volume_total', label: 'Cond. Volume', filterable: false },
+          { key: 'cond_volume', label: 'Cond. Volume', filterable: false },
           { key: 'considera_prioridade_plantao', label: 'Considera Plantão', filterable: true },
           { key: 'ativo', label: 'Status', filterable: true }
         ];
@@ -147,8 +147,8 @@ export function CadastroDataTable({ data, loading, error, type, title }: Cadastr
         return item.volume_inicial || '-';
       case 'volume_final':
         return item.volume_final || '-';
-      case 'volume_total':
-        return item.volume_total || '-';
+      case 'cond_volume':
+        return item.cond_volume || '-';
       case 'considera_prioridade_plantao':
         return item.considera_prioridade_plantao ? "Sim" : "Não";
       case 'permite_quebra':
