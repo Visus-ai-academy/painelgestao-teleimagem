@@ -126,6 +126,21 @@ export function DemonstrativoFaturamentoCompleto({
     }
 
     setLoading(true);
+    
+    // Timeout geral de 15 minutos para todo o processamento
+    const timeoutId = setTimeout(() => {
+      console.error('⏰ Timeout geral atingido (15 minutos)');
+      if (onStatusChange) {
+        onStatusChange('pendente');
+      }
+      setLoading(false);
+      toast({
+        title: 'Timeout excedido',
+        description: 'O processamento excedeu o tempo limite de 15 minutos.',
+        variant: 'destructive'
+      });
+    }, 900000); // 15 minutos
+    
     try {
       console.log('🔄 Iniciando geração em lotes para o período:', periodo);
 
@@ -241,10 +256,14 @@ export function DemonstrativoFaturamentoCompleto({
         resumoAgregado.clientes_regime_normal += Number(r.clientes_regime_normal || 0);
       };
 
+      const totalLotes = Math.ceil(clientes.length / chunkSize);
+      console.log(`📦 Total de ${clientes.length} clientes será processado em ${totalLotes} lote(s)`);
+      
       for (let i = 0; i < clientes.length; i += chunkSize) {
         const chunk = clientes.slice(i, i + chunkSize);
         const ids = chunk.map(c => c.id);
-        console.log(`🚚 Processando lote ${i / chunkSize + 1} (${ids.length} clientes)`);
+        const loteNumero = Math.floor(i / chunkSize) + 1;
+        console.log(`🚚 Processando lote ${loteNumero}/${totalLotes} (${ids.length} clientes)`);
 
         let data: any, error: any;
         try {
@@ -256,11 +275,11 @@ export function DemonstrativoFaturamentoCompleto({
           error = (resp as any)?.error;
         } catch (e: any) {
           error = e;
+          console.error(`❌ Erro ao processar lote ${loteNumero}:`, e);
         }
 
         if (error) {
-          const loteNumero = i / chunkSize + 1;
-          console.error(`❌ Erro no lote ${loteNumero}:`, error);
+          console.error(`❌ Erro no lote ${loteNumero}/${totalLotes}:`, error);
           console.error('📋 IDs do lote com erro:', ids);
           
           // Tentar extrair mais detalhes do erro
@@ -268,17 +287,19 @@ export function DemonstrativoFaturamentoCompleto({
           const errorDetails = error.details || error.hint || '';
           
           toast({ 
-            title: `Lote ${loteNumero} com erro`, 
+            title: `Lote ${loteNumero}/${totalLotes} com erro`, 
             description: `${errorMessage}${errorDetails ? ` - ${errorDetails}` : ''}`, 
             variant: 'destructive' 
           });
           continue;
         }
         if (!data?.success) {
-          console.warn('⚠️ Lote sem sucesso:', data);
+          console.warn(`⚠️ Lote ${loteNumero}/${totalLotes} sem sucesso:`, data);
           continue;
         }
 
+        console.log(`✅ Lote ${loteNumero}/${totalLotes} processado com sucesso`);
+        
         if (Array.isArray(data.demonstrativos)) {
           allDemonstrativos.push(...data.demonstrativos);
         }
@@ -287,6 +308,8 @@ export function DemonstrativoFaturamentoCompleto({
         }
         somarResumo(data.resumo);
       }
+      
+      console.log(`🎯 Processamento de lotes concluído. Total de demonstrativos: ${allDemonstrativos.length}`);
 
       // Remover duplicados por cliente_id preservando o último
       const mapByCliente = new Map<string, any>();
@@ -294,6 +317,11 @@ export function DemonstrativoFaturamentoCompleto({
         mapByCliente.set(d.cliente_id, d);
       }
       const dedupedDemonstrativos = Array.from(mapByCliente.values());
+      
+      // Se não houver demonstrativos, lançar erro
+      if (dedupedDemonstrativos.length === 0) {
+        throw new Error('Nenhum demonstrativo foi gerado. Verifique os erros nos lotes processados.');
+      }
 
       setDemonstrativos(dedupedDemonstrativos);
       setResumo(resumoAgregado);
@@ -313,13 +341,23 @@ export function DemonstrativoFaturamentoCompleto({
       }
 
       // Atualizar status/parent e exibir sucesso antes de gravar no banco
-      if (onStatusChange) onStatusChange('concluido');
-      if (onDemonstrativosGerados) onDemonstrativosGerados({ demonstrativos: dedupedDemonstrativos, resumo: resumoAgregado });
+      console.log('🏁 Finalizando processamento...');
+      if (onStatusChange) {
+        console.log('✅ Mudando status para: concluido');
+        onStatusChange('concluido');
+      }
+      if (onDemonstrativosGerados) {
+        console.log('📤 Enviando callback onDemonstrativosGerados');
+        onDemonstrativosGerados({ demonstrativos: dedupedDemonstrativos, resumo: resumoAgregado });
+      }
 
       toast({
         title: 'Demonstrativos gerados com sucesso!',
-        description: `${dedupedDemonstrativos.length} clientes processados em ${Math.ceil(clientes.length / chunkSize)} lote(s)`
+        description: `${dedupedDemonstrativos.length} clientes processados em ${totalLotes} lote(s)`
       });
+
+      // Limpar timeout
+      clearTimeout(timeoutId);
 
       // 💾 Gravar demonstrativos no banco de dados em segundo plano (chunked)
       (async () => {
@@ -374,7 +412,13 @@ export function DemonstrativoFaturamentoCompleto({
       }
     } catch (error: any) {
       console.error('❌ Erro completo:', error);
+      console.error('❌ Stack trace:', error.stack);
+      
+      // Limpar timeout
+      clearTimeout(timeoutId);
+      
       if (onStatusChange) {
+        console.log('⚠️ Mudando status para: pendente (devido a erro)');
         onStatusChange('pendente');
       }
       toast({
@@ -383,7 +427,15 @@ export function DemonstrativoFaturamentoCompleto({
         variant: 'destructive'
       });
     } finally {
+      console.log('🔚 Finalizando função handleGerarDemonstrativos');
       setLoading(false);
+      
+      // Garantir que o timeout seja limpo mesmo em caso de erro
+      try {
+        clearTimeout(timeoutId);
+      } catch (e) {
+        // Ignorar erro ao limpar timeout
+      }
     }
   };
 
