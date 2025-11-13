@@ -7,39 +7,19 @@ import { Label } from "@/components/ui/label";
 import { Calendar, AlertTriangle, CheckCircle } from "lucide-react";
 
 // Função para verificar se um período pode ser editado
+// Por padrão, todos os períodos são editáveis
+// Futuramente, isso pode ser controlado por uma tabela de bloqueio de períodos
 export const isPeriodoEditavel = (periodo: string): boolean => {
-  const hoje = new Date();
-  const anoAtual = hoje.getFullYear();
-  const mesAtual = hoje.getMonth() + 1; // getMonth() retorna 0-11
-  const diaAtual = hoje.getDate();
-  
-  const [anoPeriodo, mesPeriodo] = periodo.split('-').map(Number);
-  
-  // Se é período futuro, não pode editar
-  if (anoPeriodo > anoAtual || (anoPeriodo === anoAtual && mesPeriodo > mesAtual)) {
-    return false;
-  }
-  
-  // Se é período anterior ao atual, não pode editar (dados históricos)
-  if (anoPeriodo < anoAtual || (anoPeriodo === anoAtual && mesPeriodo < mesAtual)) {
-    return false;
-  }
-  
-  // Se é o mês atual mas depois do dia 5, considera fechado (exemplo de regra)
-  if (anoPeriodo === anoAtual && mesPeriodo === mesAtual && diaAtual > 5) {
-    return false;
-  }
-  
-  // Período atual e dentro do prazo de edição
+  // TODO: Implementar lógica de bloqueio manual de períodos
+  // Por enquanto, todos os períodos são editáveis
   return true;
 };
 
-// Função para obter status do período
+// Função para obter status do período (informativo apenas)
 export const getStatusPeriodo = (periodo: string): 'editavel' | 'fechado' | 'historico' | 'futuro' => {
   const hoje = new Date();
   const anoAtual = hoje.getFullYear();
   const mesAtual = hoje.getMonth() + 1;
-  const diaAtual = hoje.getDate();
   
   const [anoPeriodo, mesPeriodo] = periodo.split('-').map(Number);
   
@@ -51,11 +31,8 @@ export const getStatusPeriodo = (periodo: string): 'editavel' | 'fechado' | 'his
     return 'historico';
   }
   
-  if (anoPeriodo === anoAtual && mesPeriodo === mesAtual) {
-    return diaAtual <= 5 ? 'editavel' : 'fechado';
-  }
-  
-  return 'fechado';
+  // Período atual sempre editável
+  return 'editavel';
 };
 
 interface ControlePeriodoProps {
