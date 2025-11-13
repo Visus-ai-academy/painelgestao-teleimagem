@@ -36,7 +36,17 @@ serve(async (req) => {
 
     const { periodo_referencia } = await req.json();
 
-    console.log('🔧 Iniciando correção de tipificação de clientes NC...');
+    if (!periodo_referencia) {
+      return new Response(JSON.stringify({
+        sucesso: false,
+        erro: 'periodo_referencia é obrigatório'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      });
+    }
+
+    console.log(`🔧 Iniciando correção de tipificação de clientes NC para período ${periodo_referencia}...`);
 
     // 1. Buscar todos os clientes NC com contratos
     const { data: clientesNC, error: clientesError } = await supabase
@@ -96,21 +106,17 @@ serve(async (req) => {
       console.log('✅ Todos os contratos já estão corretos');
     }
 
-    // 3. FORÇAR tipificação COMPLETA para clientes NC
+    // 3. FORÇAR tipificação COMPLETA para clientes NC no período específico
     let tipificacaoResult = null;
     
-    console.log(`🔄 FORÇANDO tipificação COMPLETA para clientes NC${periodo_referencia ? ` no período ${periodo_referencia}` : ' (todos os períodos)'}...`);
+    console.log(`🔄 FORÇANDO tipificação COMPLETA para clientes NC no período ${periodo_referencia}...`);
     
-    // Buscar TODOS os registros dos clientes NC
-    let queryRegistros = supabase
+    // Buscar registros dos clientes NC no período específico
+    const queryRegistros = supabase
       .from('volumetria_mobilemed')
       .select('id, "EMPRESA", lote_upload, arquivo_fonte')
-      .in('EMPRESA', CLIENTES_NC);
-    
-    // Se houver período, filtrar por ele
-    if (periodo_referencia) {
-      queryRegistros = queryRegistros.eq('periodo_referencia', periodo_referencia);
-    }
+      .in('EMPRESA', CLIENTES_NC)
+      .eq('periodo_referencia', periodo_referencia);
     
     const { data: registros, error: registrosError } = await queryRegistros;
 
@@ -176,17 +182,12 @@ serve(async (req) => {
       }
     }
 
-    // 4. Estatísticas finais - buscar do banco APÓS aplicar tipificação (apenas clientes NC)
-    let queryStats = supabase
+    // 4. Estatísticas finais - buscar do banco APÓS aplicar tipificação (apenas clientes NC no período)
+    const { data: volumetriaStats } = await supabase
       .from('volumetria_mobilemed')
       .select('"EMPRESA", tipo_cliente, tipo_faturamento')
-      .in('EMPRESA', CLIENTES_NC);
-    
-    if (periodo_referencia) {
-      queryStats = queryStats.eq('periodo_referencia', periodo_referencia);
-    }
-    
-    const { data: volumetriaStats } = await queryStats;
+      .in('EMPRESA', CLIENTES_NC)
+      .eq('periodo_referencia', periodo_referencia);
 
     const estatisticas = {
       por_cliente: {} as Record<string, any>
