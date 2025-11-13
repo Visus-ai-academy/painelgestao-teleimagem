@@ -1522,11 +1522,35 @@ export default function GerarFaturamento() {
     } finally {
       console.log('🏁 [FINALLY] Finalizando processo...');
       setProcessandoTodos(false);
+      setClientesProcessandoDemonstrativo(new Set());
+      setStatusProcessamento({
+        processando: false,
+        mensagem: '',
+        progresso: 0
+      });
       // Manter monitoramento visível por 5 segundos após conclusão
       setTimeout(() => {
         setMostrarMonitoramento(false);
       }, 5000);
     }
+  };
+
+  // Função para cancelar processamento travado
+  const cancelarProcessamento = () => {
+    console.log('🛑 Cancelando processamento travado...');
+    setProcessandoTodos(false);
+    setClientesProcessandoDemonstrativo(new Set());
+    setStatusProcessamento({
+      processando: false,
+      mensagem: '',
+      progresso: 0
+    });
+    setMostrarMonitoramento(false);
+    setLotesMonitoramento([]);
+    toast({
+      title: "Processamento cancelado",
+      description: "O processamento foi cancelado. Você pode tentar novamente.",
+    });
   };
 
   // Função para mostrar confirmação de emails
