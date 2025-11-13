@@ -130,21 +130,9 @@ serve(async (req) => {
       }
     }
 
-    // 5. Aplicar tipificação de faturamento nos registros corrigidos
-    console.log('🔄 Aplicando tipificação de faturamento');
-    const { data: tipificacaoResult, error: errorTipificacao } = await supabase
-      .from('volumetria_mobilemed')
-      .update({
-        tipo_faturamento: 'padrao',
-        updated_at: new Date().toISOString()
-      })
-      .or('ESPECIALIDADE.eq.MEDICINA INTERNA,ESPECIALIDADE.eq.GERAL,ESPECIALIDADE.eq.MUSCULOESQUELETICO')
-      .is('tipo_faturamento', null)
-      .select('id');
-
-    if (!errorTipificacao && tipificacaoResult) {
-      console.log(`✅ Tipificação aplicada em ${tipificacaoResult.length} registros`);
-    }
+    // 5. NÃO aplicar tipificação de faturamento aqui
+    // O tipo_faturamento deve vir APENAS do contrato via aplicar-tipificacao-faturamento
+    console.log('ℹ️ tipo_faturamento será aplicado pela função aplicar-tipificacao-faturamento');
 
     totalCorrigidos = correcoes.especialidades + correcoes.modalidades + correcoes.prioridades + correcoes.categorias;
 

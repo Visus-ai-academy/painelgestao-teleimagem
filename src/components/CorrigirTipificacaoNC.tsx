@@ -22,6 +22,20 @@ export const CorrigirTipificacaoNC = ({ periodoReferencia }: CorrigirTipificacao
     try {
       console.log('🔧 Iniciando correção de tipificação de clientes NC...');
       
+      // PASSO 1: Limpar tipo_faturamento incorreto da volumetria
+      console.log('🧹 Limpando tipo_faturamento incorreto...');
+      const { data: limpezaData, error: limpezaError } = await supabase.functions.invoke(
+        'limpar-tipo-faturamento-incorreto',
+        { body: {} }
+      );
+      
+      if (limpezaError) {
+        console.error('⚠️ Erro na limpeza:', limpezaError);
+      } else {
+        console.log('✅ Limpeza concluída:', limpezaData);
+      }
+      
+      // PASSO 2: Corrigir tipificação NC
       const { data, error } = await supabase.functions.invoke(
         'corrigir-tipificacao-clientes-nc',
         {
@@ -38,7 +52,7 @@ export const CorrigirTipificacaoNC = ({ periodoReferencia }: CorrigirTipificacao
 
       toast({
         title: "Correção executada com sucesso",
-        description: `${data.contratos_corrigidos} contratos corrigidos`,
+        description: `${data.contratos_corrigidos} contratos corrigidos, ${limpezaData?.registrosLimpos || 0} registros limpos`,
       });
 
     } catch (error: any) {
@@ -61,18 +75,18 @@ export const CorrigirTipificacaoNC = ({ periodoReferencia }: CorrigirTipificacao
           Correção de Tipificação - Clientes NC
         </CardTitle>
         <CardDescription>
-          Corrige automaticamente a tipificação de clientes NC (Não Credenciados) e re-executa a tipificação de faturamento
+          Corrige automaticamente a tipificação de clientes NC (Não Consolidados) e atualiza tipo_cliente e tipo_faturamento na volumetria conforme contrato
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            <strong>Esta ferramenta:</strong>
+            <strong>Esta ferramenta executa 3 passos:</strong>
             <ul className="list-disc list-inside mt-2 space-y-1">
-              <li>Corrige contratos de clientes NC com tipo_cliente incorreto</li>
-              <li>Re-executa a tipificação de faturamento para o período</li>
-              <li>Atualiza os registros de volumetria com os tipos corretos</li>
+              <li>1. Limpa valores incorretos (alta_complexidade, padrao, oncologia) do campo tipo_faturamento</li>
+              <li>2. Corrige tipo_cliente nos contratos de clientes NC (Não Consolidados)</li>
+              <li>3. Aplica tipo_cliente (CO, NC, NC1) e tipo_faturamento (CO-FT, NC-FT, etc) conforme contrato</li>
             </ul>
           </AlertDescription>
         </Alert>
@@ -147,12 +161,16 @@ export const CorrigirTipificacaoNC = ({ periodoReferencia }: CorrigirTipificacao
                 <div className="mt-3 pt-3 border-t">
                   <h5 className="font-semibold text-sm mb-2">Estatísticas por Cliente:</h5>
                   <div className="space-y-1 text-sm">
-                    {Object.entries(resultado.estatisticas.por_cliente).map(([cliente, stats]: [string, any]) => (
-                      <div key={cliente} className="flex justify-between">
+                    {Object.entries(resultado.estatisticas.por_cliente).map(([cliente, configs]: [string, any]) => (
+                      <div key={cliente}>
                         <span className="font-medium">{cliente}:</span>
-                        <span className="text-muted-foreground">
-                          {stats.total} registros ({stats.tipo_cliente} - {stats.tipo_faturamento})
-                        </span>
+                        <div className="ml-4 text-muted-foreground">
+                          {Object.entries(configs).map(([key, config]: [string, any]) => (
+                            <div key={key}>
+                              {config.total} registros (tipo_cliente: {config.tipo_cliente}, tipo_faturamento: {config.tipo_faturamento})
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -165,8 +183,9 @@ export const CorrigirTipificacaoNC = ({ periodoReferencia }: CorrigirTipificacao
         <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertDescription className="text-xs">
-            <strong>Quando usar:</strong> Execute esta correção quando identificar que clientes NC estão com tipificação incorreta 
-            ou quando não estão sendo gerados demonstrativos de faturamento para clientes NC que deveriam ter.
+            <strong>Quando usar:</strong> Execute esta correção quando identificar clientes NC (Não Consolidados) com tipificação incorreta 
+            ou quando não estão sendo gerados demonstrativos de faturamento para clientes que deveriam ter. 
+            <strong>Tipos de Cliente:</strong> CO, NC, NC1 | <strong>Tipos de Faturamento:</strong> CO-FT, CO-NT, NC-FT, NC-NT, NC1-NF
           </AlertDescription>
         </Alert>
       </CardContent>
