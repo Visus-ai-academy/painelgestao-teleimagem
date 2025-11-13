@@ -8,9 +8,17 @@ const corsHeaders = {
 
 // Tipos de Faturamento Definidos:
 // CO-FT: CO com faturamento
+// CO-NF: CO não faturado
 // NC-FT: NC faturado
 // NC-NF: NC não faturado
-type TipoFaturamento = "CO-FT" | "NC-FT" | "NC-NF";
+// NC1-NF: NC1 não faturado
+type TipoFaturamento = "CO-FT" | "CO-NF" | "NC-FT" | "NC-NF" | "NC1-NF";
+
+// Tipos de Cliente Definidos:
+// CO: Cliente do tipo CO
+// NC: Cliente do tipo NC
+// NC1: Cliente do tipo NC1
+type TipoCliente = "CO" | "NC" | "NC1";
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -31,7 +39,7 @@ serve(async (req) => {
     // 1. Buscar registros que precisam de tipificação
     let query = supabaseClient
       .from('volumetria_mobilemed')
-      .select('id, "EMPRESA", "ESPECIALIDADE", "PRIORIDADE", "MEDICO", "ESTUDO_DESCRICAO"');
+      .select('id, "EMPRESA", "MODALIDADE", "ESPECIALIDADE", "PRIORIDADE"');
 
     // Aplicar filtros conforme parâmetros
     if (arquivo_fonte && lote_upload) {
@@ -66,12 +74,16 @@ serve(async (req) => {
 
     console.log(`📊 Processando ${registros.length} registros para tipificação`);
 
-    // 2. Buscar configurações de contratos dos clientes
+    // 2. Buscar configurações de contratos dos clientes (TODOS os contratos para considerar faturamento misto)
     const { data: contratos, error: contratosError } = await supabaseClient
       .from('contratos_clientes')
       .select(`
+        id,
         tipo_cliente,
         tipo_faturamento,
+        modalidades,
+        especialidades,
+        considera_plantao,
         clientes (
           nome,
           nome_mobilemed,
@@ -85,33 +97,90 @@ serve(async (req) => {
       throw contratosError;
     }
 
-    // 3. Criar mapa de configurações por cliente (apenas nome_fantasia)
-    const configClientes = new Map<string, { tipo_cliente: string, tipo_faturamento: string }>();
+    console.log(`📋 Carregados ${contratos?.length || 0} contratos ativos`);
+
+    // 3. Criar mapa de configurações por cliente
+    // Agrupamos contratos por nome_fantasia para detectar faturamento misto
+    const configClientes = new Map<string, Array<{
+      tipo_cliente: string;
+      tipo_faturamento: string;
+      modalidades: string[];
+      especialidades: string[];
+      considera_plantao: boolean;
+    }>>();
     
     contratos?.forEach(contrato => {
-      // Mapear apenas pelo nome_fantasia pois na volumetria já foi aplicado o nome_fantasia
       if (contrato.clientes?.nome_fantasia) {
-        configClientes.set(contrato.clientes.nome_fantasia, {
+        const nomeFantasia = contrato.clientes.nome_fantasia;
+        if (!configClientes.has(nomeFantasia)) {
+          configClientes.set(nomeFantasia, []);
+        }
+        configClientes.get(nomeFantasia)!.push({
           tipo_cliente: contrato.tipo_cliente || 'CO',
-          tipo_faturamento: contrato.tipo_faturamento || 'CO-FT'
+          tipo_faturamento: contrato.tipo_faturamento || 'CO-FT',
+          modalidades: contrato.modalidades || [],
+          especialidades: contrato.especialidades || [],
+          considera_plantao: contrato.considera_plantao || false
         });
       }
     });
 
-    console.log(`📋 Carregados ${configClientes.size} configurações de clientes dos contratos`);
+    console.log(`📋 Configurações de ${configClientes.size} clientes carregadas`);
 
-    // 4. Função para determinar tipo de faturamento baseado no contrato
-    function determinarTipoFaturamento(nomeCliente: string): TipoFaturamento {
-      const config = configClientes.get(nomeCliente);
+    // 4. Função para determinar tipo de faturamento baseado em regras do contrato
+    function determinarTipoFaturamento(
+      nomeCliente: string,
+      modalidade: string,
+      especialidade: string,
+      prioridade: string
+    ): { tipo_faturamento: TipoFaturamento, tipo_cliente: TipoCliente } {
+      const configs = configClientes.get(nomeCliente);
       
-      if (config) {
-        // Usar configuração do contrato
-        return config.tipo_faturamento as TipoFaturamento;
-      } else {
-        // Fallback: Cliente sem contrato = "Sem informação"
-        console.log(`⚠️ Cliente sem contrato encontrado: ${nomeCliente} - Aplicando "Sem informação"`);
-        return "Sem informação";
+      if (!configs || configs.length === 0) {
+        // Fallback: Cliente sem contrato
+        console.warn(`⚠️ Cliente sem contrato: ${nomeCliente}`);
+        return { tipo_faturamento: 'CO-FT', tipo_cliente: 'CO' };
       }
+
+      // Se há apenas um contrato, usar diretamente
+      if (configs.length === 1) {
+        return {
+          tipo_faturamento: configs[0].tipo_faturamento as TipoFaturamento,
+          tipo_cliente: configs[0].tipo_cliente as TipoCliente
+        };
+      }
+
+      // Faturamento misto: múltiplos contratos para o mesmo cliente
+      // Verificar qual contrato se aplica baseado em modalidade, especialidade e prioridade
+      for (const config of configs) {
+        // Verificar modalidade
+        const modalidadeMatch = config.modalidades.length === 0 || 
+                               config.modalidades.includes(modalidade);
+        
+        // Verificar especialidade
+        const especialidadeMatch = config.especialidades.length === 0 || 
+                                  config.especialidades.includes(especialidade);
+        
+        // Verificar plantão
+        const prioridadeUpper = (prioridade || '').toUpperCase();
+        const isPlantao = prioridadeUpper.includes('PLANTAO') || prioridadeUpper.includes('PLANTÃO');
+        const plantaoMatch = !isPlantao || config.considera_plantao;
+        
+        // Se todos os critérios correspondem, usar este contrato
+        if (modalidadeMatch && especialidadeMatch && plantaoMatch) {
+          return {
+            tipo_faturamento: config.tipo_faturamento as TipoFaturamento,
+            tipo_cliente: config.tipo_cliente as TipoCliente
+          };
+        }
+      }
+
+      // Se nenhum contrato específico se aplica, usar o primeiro
+      console.warn(`⚠️ Múltiplos contratos para ${nomeCliente}, usando primeiro contrato`);
+      return {
+        tipo_faturamento: configs[0].tipo_faturamento as TipoFaturamento,
+        tipo_cliente: configs[0].tipo_cliente as TipoCliente
+      };
     }
 
     // 5. Processar registros em lotes de 500
@@ -127,7 +196,12 @@ serve(async (req) => {
 
       // Preparar atualizações em massa
       const updates = lote.map(registro => {
-        const tipoFaturamento = determinarTipoFaturamento(registro.EMPRESA);
+        const { tipo_faturamento, tipo_cliente } = determinarTipoFaturamento(
+          registro.EMPRESA || '',
+          registro.MODALIDADE || '',
+          registro.ESPECIALIDADE || '',
+          registro.PRIORIDADE || ''
+        );
         
         // Rastrear clientes sem contrato
         if (!configClientes.has(registro.EMPRESA)) {
@@ -138,7 +212,8 @@ serve(async (req) => {
 
         return {
           id: registro.id,
-          tipo_faturamento: tipoFaturamento
+          tipo_faturamento,
+          tipo_cliente
         };
       });
 
@@ -150,18 +225,20 @@ serve(async (req) => {
         const updatePromises = parallelUpdates.map(async (update) => {
           const { error } = await supabaseClient
             .from('volumetria_mobilemed')
-            .update({ tipo_faturamento: update.tipo_faturamento })
+            .update({ 
+              tipo_faturamento: update.tipo_faturamento,
+              tipo_cliente: update.tipo_cliente
+            })
             .eq('id', update.id);
 
           if (error) {
             console.error(`❌ Erro ao atualizar registro ${update.id}:`, error);
-            return false;
+          } else {
+            registrosAtualizados++;
           }
-          return true;
         });
 
-        const results = await Promise.all(updatePromises);
-        registrosAtualizados += results.filter(Boolean).length;
+        await Promise.all(updatePromises);
       }
     }
 

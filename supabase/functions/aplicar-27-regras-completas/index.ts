@@ -367,13 +367,8 @@ Deno.serve(async (req) => {
         .like('ESTUDO_DESCRICAO', '%onco%')
       regrasAplicadasArquivo.add('v021')
 
-      // REGRA v022: Categoria pediatria
-      console.log('  ⚡ Aplicando v022 - Categoria pediatria')
-      await supabase.from('volumetria_mobilemed')
-        .update({ CATEGORIA: 'PEDIATRIA' })
-        .eq('arquivo_fonte', arquivoAtual)
-        .like('ESTUDO_DESCRICAO', '%ped%')
-      regrasAplicadasArquivo.add('v022')
+      // REGRA v022: REMOVIDA - Categoria PEDIATRIA não existe no sistema
+      console.log('  ℹ️ Regra v022 removida - PEDIATRIA não é categoria válida')
 
       // REGRA v023: Correção valores nulos
       console.log('  ⚡ Aplicando v023 - Correção valores nulos')
@@ -391,17 +386,9 @@ Deno.serve(async (req) => {
         .or('DUPLICADO.is.null,DUPLICADO.eq.')
       regrasAplicadasArquivo.add('v024')
 
-      // REGRA v025: Aplicação tipo faturamento padrão
-      console.log('  ⚡ Aplicando v025 - Tipo faturamento padrão')
-      await supabase.from('volumetria_mobilemed')
-        .update({ tipo_faturamento: 'padrao' })
-        .eq('arquivo_fonte', arquivoAtual)
-        .or('tipo_faturamento.is.null,tipo_faturamento.eq.')
-      regrasAplicadasArquivo.add('v025')
-
-      // REGRA v026 e v027: REMOVIDO - Não aplicar tipo_faturamento com classificação de exame
-      // O campo tipo_faturamento deve conter apenas tipos válidos de cliente (CO-FT, NC-FT, etc)
-      console.log('  ℹ️ Regras v026 e v027 removidas - tipo_faturamento virá do contrato')
+      // REGRA v025: REMOVIDA - tipo_faturamento será aplicado pela função aplicar-tipificacao-faturamento
+      // O campo tipo_faturamento deve conter apenas tipos válidos de cliente (CO-FT, CO-NF, NC-FT, NC-NF, NC1-NF)
+      console.log('  ℹ️ Regra v025 removida - tipo_faturamento será aplicado do contrato')
 
       console.log(`  ✅ Aplicadas ${regrasAplicadasArquivo.size} regras para ${arquivoAtual}`)
 

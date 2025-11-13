@@ -193,13 +193,9 @@ serve(async (req) => {
       }
 
       // CRITICAL: Apply client tipo_faturamento from contract to all volumetria records
-      // The tipo_faturamento field in volumetria_mobilemed may be polluted with wrong values
-      // (alta_complexidade, oncologia, padrao, urgencia) instead of client billing types
-      // So we override it with the contract's tipo_faturamento
-      volumetria = volumetria.map(vol => ({
-        ...vol,
-        tipo_faturamento: tipoFaturamento // Override with client's contract tipo_faturamento
-      }));
+      // The tipo_faturamento and tipo_cliente should already be set by aplicar-tipificacao-faturamento
+      // during volumetria processing, so we don't need to override anymore
+      console.log(`✅ Cliente ${nomeFantasia}: ${volumetria.length} registros (tipo_faturamento já aplicado)`);
 
       // Filter out NC-NF and EXCLUSAO records based on CLIENT tipo_faturamento
       if (tipoFaturamento === 'NC-NF' || tipoFaturamento === 'EXCLUSAO') {
