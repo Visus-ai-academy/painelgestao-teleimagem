@@ -133,6 +133,35 @@ export function DemonstrativoFaturamentoCompleto({
       return;
     }
 
+    // ✅ VALIDAÇÃO CRÍTICA: Verificar se há registros sem tipificação
+    console.log('🔍 Validando tipificação dos registros...');
+    const { count: registrosSemTipificacao, error: validacaoError } = await supabase
+      .from('volumetria_mobilemed')
+      .select('*', { count: 'exact', head: true })
+      .eq('periodo_referencia', periodo)
+      .is('tipo_faturamento', null);
+
+    if (validacaoError) {
+      console.error('❌ Erro ao validar tipificação:', validacaoError);
+      toast({
+        title: "Erro na validação",
+        description: "Não foi possível verificar a tipificação dos registros.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (registrosSemTipificacao && registrosSemTipificacao > 0) {
+      toast({
+        title: "Tipificação incompleta",
+        description: `Existem ${registrosSemTipificacao.toLocaleString('pt-BR')} registros sem tipo_faturamento. Execute a correção de tipificação antes de gerar os demonstrativos.`,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    console.log('✅ Todos os registros estão tipificados. Iniciando geração de demonstrativos...');
+
     // Reset todos os status para "Pendente"
     if (onResetarStatus) {
       onResetarStatus();
