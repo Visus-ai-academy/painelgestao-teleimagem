@@ -139,7 +139,18 @@ export default function GerarFaturamento() {
   const [lotesMonitoramento, setLotesMonitoramento] = useState<LoteStatus[]>([]);
   const [tempoInicioProcessamento, setTempoInicioProcessamento] = useState(0);
   const [mostrarMonitoramento, setMostrarMonitoramento] = useState(false);
-  
+
+  // Quando todos os lotes terminarem (concluído ou erro), finalizar processamento e ocultar painel
+  useEffect(() => {
+    if (lotesMonitoramento.length === 0) return;
+    const allDone = lotesMonitoramento.every(l => l.status === 'concluido' || l.status === 'erro');
+    if (allDone) {
+      setProcessandoTodos(false);
+      setStatusProcessamento(prev => ({ ...prev, processando: false, mensagem: 'Processo concluído', progresso: 100 }));
+      const t = setTimeout(() => setMostrarMonitoramento(false), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [lotesMonitoramento]);
   // Verificar se há dados de faturamento processados para este período
   const verificarDemonstrativoGerado = useCallback(async () => {
     if (!periodoSelecionado) return;
@@ -1513,9 +1524,7 @@ export default function GerarFaturamento() {
       setProcessandoTodos(false);
       // Manter monitoramento visível por 5 segundos após conclusão
       setTimeout(() => {
-        if (!processandoTodos) {
-          setMostrarMonitoramento(false);
-        }
+        setMostrarMonitoramento(false);
       }, 5000);
     }
   };
