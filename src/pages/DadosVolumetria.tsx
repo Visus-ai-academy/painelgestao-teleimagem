@@ -218,12 +218,7 @@ export default function DadosVolumetria() {
 
           <TabsContent value="sistema-regras" className="space-y-6">
             {/* Correção de Tipificação NC */}
-            <CorrigirTipificacaoNC 
-              periodoReferencia={periodoFaturamentoVolumetria 
-                ? `${periodoFaturamentoVolumetria.ano}-${String(periodoFaturamentoVolumetria.mes).padStart(2, '0')}` 
-                : undefined
-              } 
-            />
+            <CorrigirTipificacaoNC />
             
             {/* Corrigir Exames Fora do Padrão */}
             <CorrigirExamesForaPadrao />

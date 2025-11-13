@@ -1,26 +1,70 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertCircle, CheckCircle, Loader2, RefreshCw } from "lucide-react";
+import { AlertCircle, CheckCircle, Loader2, RefreshCw, Lock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { isPeriodoEditavel, getStatusPeriodo } from "@/components/ControlePeriodo";
 
-interface CorrigirTipificacaoNCProps {
-  periodoReferencia?: string;
-}
-
-export const CorrigirTipificacaoNC = ({ periodoReferencia }: CorrigirTipificacaoNCProps) => {
+export const CorrigirTipificacaoNC = () => {
   const [loading, setLoading] = useState(false);
   const [resultado, setResultado] = useState<any>(null);
+  const [periodoSelecionado, setPeriodoSelecionado] = useState<string>("");
+  const [periodosDisponiveis, setPeriodosDisponiveis] = useState<string[]>([]);
+  const [loadingPeriodos, setLoadingPeriodos] = useState(true);
   const { toast } = useToast();
 
+  useEffect(() => {
+    const loadPeriodos = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('volumetria_mobilemed')
+          .select('periodo_referencia')
+          .order('periodo_referencia', { ascending: false });
+
+        if (error) throw error;
+
+        const periodosUnicos = [...new Set(data?.map(d => d.periodo_referencia).filter(Boolean))];
+        setPeriodosDisponiveis(periodosUnicos as string[]);
+      } catch (error) {
+        console.error('Erro ao carregar períodos:', error);
+      } finally {
+        setLoadingPeriodos(false);
+      }
+    };
+
+    loadPeriodos();
+  }, []);
+
+  const periodoEditavel = periodoSelecionado ? isPeriodoEditavel(periodoSelecionado) : false;
+  const statusPeriodo = periodoSelecionado ? getStatusPeriodo(periodoSelecionado) : null;
+
   const executarCorrecao = async () => {
+    if (!periodoSelecionado) {
+      toast({
+        title: "Período não selecionado",
+        description: "Selecione um período para aplicar a correção",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!periodoEditavel) {
+      toast({
+        title: "Período fechado",
+        description: "Não é possível aplicar correções em períodos fechados",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
     setResultado(null);
 
     try {
-      console.log('🔧 Iniciando correção de tipificação de clientes NC...');
+      console.log(`🔧 Iniciando correção de tipificação de clientes NC para período ${periodoSelecionado}...`);
       
       // PASSO 1: Limpar tipo_faturamento incorreto da volumetria
       console.log('🧹 Limpando tipo_faturamento incorreto...');
@@ -40,7 +84,7 @@ export const CorrigirTipificacaoNC = ({ periodoReferencia }: CorrigirTipificacao
         'corrigir-tipificacao-clientes-nc',
         {
           body: {
-            periodo_referencia: periodoReferencia
+            periodo_referencia: periodoSelecionado
           }
         }
       );
@@ -52,7 +96,7 @@ export const CorrigirTipificacaoNC = ({ periodoReferencia }: CorrigirTipificacao
 
       toast({
         title: "Correção executada com sucesso",
-        description: `${data?.tipificacao?.registros_tipificados ?? data?.tipificacao?.registros_processados ?? 0} registros tipificados em ${data?.tipificacao?.lotes_processados ?? data?.tipificacao?.lotes_retipificados ?? 0} lotes`,
+        description: `${data?.tipificacao?.registros_tipificados ?? 0} registros tipificados em ${data?.tipificacao?.lotes_processados ?? 0} lotes`,
       });
 
     } catch (error: any) {
@@ -91,15 +135,50 @@ export const CorrigirTipificacaoNC = ({ periodoReferencia }: CorrigirTipificacao
           </AlertDescription>
         </Alert>
 
-        {periodoReferencia && (
-          <div className="text-sm text-muted-foreground">
-            Período de referência: <strong>{periodoReferencia}</strong>
-          </div>
-        )}
+        <div className="space-y-3">
+          <label className="text-sm font-medium">Selecionar Período</label>
+          <Select
+            value={periodoSelecionado}
+            onValueChange={setPeriodoSelecionado}
+            disabled={loadingPeriodos}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder={loadingPeriodos ? "Carregando períodos..." : "Selecione o período"} />
+            </SelectTrigger>
+            <SelectContent>
+              {periodosDisponiveis.map((periodo) => {
+                const editavel = isPeriodoEditavel(periodo);
+                const status = getStatusPeriodo(periodo);
+                return (
+                  <SelectItem key={periodo} value={periodo}>
+                    {periodo} {!editavel && <Lock className="inline h-3 w-3 ml-1" />}
+                    {status === 'fechado' && " (Fechado)"}
+                    {status === 'historico' && " (Histórico)"}
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+          
+          {periodoSelecionado && !periodoEditavel && (
+            <Alert variant="destructive">
+              <Lock className="h-4 w-4" />
+              <AlertDescription>
+                Este período está fechado e não pode receber alterações. Selecione um período editável.
+              </AlertDescription>
+            </Alert>
+          )}
+          
+          {periodoSelecionado && periodoEditavel && (
+            <div className="text-sm text-success">
+              ✓ Período {periodoSelecionado} está editável
+            </div>
+          )}
+        </div>
 
         <Button 
           onClick={executarCorrecao} 
-          disabled={loading}
+          disabled={loading || !periodoSelecionado || !periodoEditavel}
           className="w-full"
         >
           {loading ? (
