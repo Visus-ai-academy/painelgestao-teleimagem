@@ -67,7 +67,25 @@ export function DemonstrativoFaturamentoCompleto({
   const [demonstrativos, setDemonstrativos] = useState<DemonstrativoCliente[]>([]);
   const [resumo, setResumo] = useState<Resumo | null>(null);
   const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set());
+  const [timeoutIdRef, setTimeoutIdRef] = useState<number | null>(null);
   const { toast } = useToast();
+
+  // Função para cancelar processamento
+  const cancelarProcessamento = () => {
+    console.log('🛑 Cancelando processamento...');
+    setLoading(false);
+    if (timeoutIdRef) {
+      clearTimeout(timeoutIdRef);
+      setTimeoutIdRef(null);
+    }
+    if (onStatusChange) {
+      onStatusChange('pendente');
+    }
+    toast({
+      title: 'Processamento cancelado',
+      description: 'O processamento foi cancelado pelo usuário.',
+    });
+  };
 
   // Chave para localStorage baseada no período
   const storageKey = `demonstrativos_${periodo}`;
@@ -134,12 +152,15 @@ export function DemonstrativoFaturamentoCompleto({
         onStatusChange('pendente');
       }
       setLoading(false);
+      setTimeoutIdRef(null);
       toast({
         title: 'Timeout excedido',
-        description: 'O processamento excedeu o tempo limite de 15 minutos.',
+        description: 'O processamento excedeu o tempo limite de 15 minutos. Use o botão "Cancelar" se ainda estiver travado.',
         variant: 'destructive'
       });
     }, 900000); // 15 minutos
+    
+    setTimeoutIdRef(timeoutId as unknown as number);
     
     try {
       console.log('🔄 Iniciando geração em lotes para o período:', periodo);
@@ -431,10 +452,13 @@ export function DemonstrativoFaturamentoCompleto({
       setLoading(false);
       
       // Garantir que o timeout seja limpo mesmo em caso de erro
-      try {
-        clearTimeout(timeoutId);
-      } catch (e) {
-        // Ignorar erro ao limpar timeout
+      if (timeoutIdRef) {
+        try {
+          clearTimeout(timeoutIdRef);
+          setTimeoutIdRef(null);
+        } catch (e) {
+          // Ignorar erro ao limpar timeout
+        }
       }
     }
   };
@@ -469,24 +493,35 @@ export function DemonstrativoFaturamentoCompleto({
   // Renderizar apenas o botão se renderMode = 'button-only'
   if (renderMode === 'button-only') {
     return (
-      <Button 
-        onClick={handleGerarDemonstrativos}
-        disabled={loading || !periodo}
-        size="lg"
-        className="min-w-[280px] bg-blue-600 hover:bg-blue-700"
-      >
-        {loading ? (
-          <>
-            <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-            Processando...
-          </>
-        ) : (
-          <>
-            <FileText className="h-5 w-5 mr-2" />
-            📊 Gerar Demonstrativos
-          </>
+      <div className="flex gap-2">
+        <Button 
+          onClick={handleGerarDemonstrativos}
+          disabled={loading || !periodo}
+          size="lg"
+          className="min-w-[280px] bg-blue-600 hover:bg-blue-700"
+        >
+          {loading ? (
+            <>
+              <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+              Processando...
+            </>
+          ) : (
+            <>
+              <FileText className="h-5 w-5 mr-2" />
+              📊 Gerar Demonstrativos
+            </>
+          )}
+        </Button>
+        {loading && (
+          <Button 
+            onClick={cancelarProcessamento}
+            variant="destructive"
+            size="lg"
+          >
+            Cancelar
+          </Button>
         )}
-      </Button>
+      </div>
     );
   }
 
