@@ -399,21 +399,9 @@ Deno.serve(async (req) => {
         .or('tipo_faturamento.is.null,tipo_faturamento.eq.')
       regrasAplicadasArquivo.add('v025')
 
-      // REGRA v026: Tipo faturamento urgência
-      console.log('  ⚡ Aplicando v026 - Tipo faturamento urgência')
-      await supabase.from('volumetria_mobilemed')
-        .update({ tipo_faturamento: 'urgencia' })
-        .eq('arquivo_fonte', arquivoAtual)
-        .eq('PRIORIDADE', 'URGENTE')
-      regrasAplicadasArquivo.add('v026')
-
-      // REGRA v027: Tipo faturamento oncologia
-      console.log('  ⚡ Aplicando v027 - Tipo faturamento oncologia')
-      await supabase.from('volumetria_mobilemed')
-        .update({ tipo_faturamento: 'oncologia' })
-        .eq('arquivo_fonte', arquivoAtual)
-        .eq('CATEGORIA', 'ONCOLOGIA')
-      regrasAplicadasArquivo.add('v027')
+      // REGRA v026 e v027: REMOVIDO - Não aplicar tipo_faturamento com classificação de exame
+      // O campo tipo_faturamento deve conter apenas tipos válidos de cliente (CO-FT, NC-FT, etc)
+      console.log('  ℹ️ Regras v026 e v027 removidas - tipo_faturamento virá do contrato')
 
       console.log(`  ✅ Aplicadas ${regrasAplicadasArquivo.size} regras para ${arquivoAtual}`)
 

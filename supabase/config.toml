@@ -226,3 +226,6 @@ verify_jwt = true
 
 [functions.corrigir-especialidades-do]
 verify_jwt = true
+
+[functions.limpar-tipo-faturamento-incorreto]
+verify_jwt = true

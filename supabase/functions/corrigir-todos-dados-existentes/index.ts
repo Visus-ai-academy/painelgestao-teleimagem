@@ -155,23 +155,9 @@ serve(async (req) => {
           }
         }
 
-        // 8. Aplicar tipificação de faturamento
-        if (!registro.tipo_faturamento || registro.tipo_faturamento === '') {
-          let tipoFaturamento = 'padrao';
-          
-          if (registro.CATEGORIA && ['onco', 'Onco', 'ONCO'].includes(registro.CATEGORIA)) {
-            tipoFaturamento = 'oncologia';
-          } else if (registro.PRIORIDADE && ['urgência', 'urgencia', 'URGENCIA'].includes(registro.PRIORIDADE)) {
-            tipoFaturamento = 'urgencia';
-          } else if (registro.MODALIDADE && ['CT', 'MR'].includes(registro.MODALIDADE)) {
-            tipoFaturamento = 'alta_complexidade';
-          }
-
-          if (tipoFaturamento !== registro.tipo_faturamento) {
-            updates.tipo_faturamento = tipoFaturamento;
-            precisaAtualizar = true;
-          }
-        }
+        // 8. REMOVIDO: Não aplicar tipificação de faturamento com classificação de exame
+        // O campo tipo_faturamento deve conter apenas tipos válidos de cliente (CO-FT, NC-FT, etc)
+        // e será aplicado a partir do contrato do cliente no momento da geração do demonstrativo
 
         // 9. Garantir data de referência
         if (!registro.data_referencia && registro.DATA_REALIZACAO) {
