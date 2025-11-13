@@ -96,31 +96,38 @@ serve(async (req) => {
       console.log('✅ Todos os contratos já estão corretos');
     }
 
-    // 3. Re-executar tipificação para o período (se especificado)
+    // 3. Re-executar tipificação COMPLETA para TODO o período
     let tipificacaoResult = null;
     if (periodo_referencia) {
-      console.log(`🔄 Re-executando tipificação para período ${periodo_referencia}...`);
+      console.log(`🔄 Aplicando tipificação COMPLETA para período ${periodo_referencia}...`);
       
-      // Buscar registros do período que precisam retipificação
+      // Buscar TODOS os registros do período (não só NC)
       const { data: registros, error: registrosError } = await supabase
         .from('volumetria_mobilemed')
-        .select('id, "EMPRESA", "MODALIDADE", "ESPECIALIDADE", "PRIORIDADE", lote_upload, arquivo_fonte')
+        .select('id, "EMPRESA", lote_upload, arquivo_fonte')
         .eq('periodo_referencia', periodo_referencia)
-        .in('EMPRESA', CLIENTES_NC);
+        .is('tipo_faturamento', null);
 
       if (registrosError) {
         console.error('❌ Erro ao buscar registros:', registrosError);
       } else {
-        console.log(`📊 Encontrados ${registros?.length || 0} registros de clientes NC no período`);
+        console.log(`📊 Encontrados ${registros?.length || 0} registros SEM tipo_faturamento no período`);
 
         // Agrupar por lote_upload
-        const lotes = new Set(registros?.map(r => r.lote_upload) || []);
-        console.log(`📦 ${lotes.size} lotes para retipificar`);
+        const lotesMap = new Map<string, string>();
+        registros?.forEach(r => {
+          if (r.lote_upload && !lotesMap.has(r.lote_upload)) {
+            lotesMap.set(r.lote_upload, r.arquivo_fonte);
+          }
+        });
 
-        // Re-tipificar cada lote
-        for (const lote of lotes) {
-          const arquivo = registros?.find(r => r.lote_upload === lote)?.arquivo_fonte;
-          
+        console.log(`📦 ${lotesMap.size} lotes para tipificar`);
+
+        let totalProcessados = 0;
+        let lotesComErro = 0;
+
+        // Tipificar cada lote
+        for (const [lote, arquivo] of lotesMap) {
           const { data: tipResult, error: tipError } = await supabase.functions.invoke(
             'aplicar-tipificacao-faturamento',
             {
@@ -132,15 +139,18 @@ serve(async (req) => {
           );
 
           if (tipError) {
-            console.error(`❌ Erro ao retipificar lote ${lote}:`, tipError);
+            console.error(`❌ Erro ao tipificar lote ${lote}:`, tipError);
+            lotesComErro++;
           } else {
-            console.log(`✅ Lote ${lote} retipificado:`, tipResult);
+            console.log(`✅ Lote ${lote} tipificado:`, tipResult);
+            totalProcessados += tipResult?.registros_atualizados || 0;
           }
         }
 
         tipificacaoResult = {
-          lotes_retipificados: lotes.size,
-          registros_processados: registros?.length || 0
+          lotes_processados: lotesMap.size,
+          lotes_com_erro: lotesComErro,
+          registros_tipificados: totalProcessados
         };
       }
     }
