@@ -185,17 +185,17 @@ const REGRAS_SISTEMA = [
   },
   {
     id: 'v023',
-    nome: 'Tipificação por Prioridade URGENTE',
-    categoria: 'Faturamento',
-    criterio: 'Define tipo_faturamento = "urgencia" quando prioridade contém "urgenc".',
-    implementacao: 'Aplicado durante processamento de tipificação'
+    nome: 'Correção Valores Nulos',
+    categoria: 'Dados',
+    criterio: 'Define VALORES = 1 quando o campo está nulo ou igual a zero.',
+    implementacao: 'Edge function: aplicar-27-regras-completas'
   },
   {
     id: 'v024',
-    nome: 'Tipificação por Modalidade Alta Complexidade',
-    categoria: 'Faturamento',
-    criterio: 'Define tipo_faturamento = "alta_complexidade" para modalidades CT, MR, TC, RM.',
-    implementacao: 'Aplicado durante processamento de tipificação'
+    nome: 'Aplicação Duplicado Padrão',
+    categoria: 'Dados',
+    criterio: 'Define DUPLICADO = "NAO" quando o campo está nulo ou vazio.',
+    implementacao: 'Edge function: aplicar-27-regras-completas'
   },
   {
     id: 'v025',

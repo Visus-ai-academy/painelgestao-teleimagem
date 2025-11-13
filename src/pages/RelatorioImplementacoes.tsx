@@ -40,8 +40,8 @@ const RelatorioImplementacoes = () => {
     { id: 'v020', nome: 'Análise de Divergências', modulo: 'volumetria', categoria: 'validação', criterio: 'Identifica clientes presentes em um arquivo mas ausentes em outro.' },
     { id: 'v021', nome: 'Exames Não Identificados', modulo: 'volumetria', categoria: 'validação', criterio: 'Lista exames sem categoria ou especialidade definida.' },
     { id: 'v022', nome: 'Clientes Atrasados', modulo: 'volumetria', categoria: 'análise', criterio: 'Identifica clientes com maior percentual de laudos atrasados.' },
-    { id: 'v023', nome: 'Laudos Atrasados Detalhado', modulo: 'volumetria', categoria: 'análise', criterio: 'Lista detalhada de todos os exames atrasados por cliente.' },
-    { id: 'v024', nome: 'Análise por Médicos', modulo: 'volumetria', categoria: 'análise', criterio: 'Agrupa volumetria por médico para análise de produtividade.' },
+    { id: 'v023', nome: 'Correção Valores Nulos', modulo: 'volumetria', categoria: 'dados', criterio: 'Define VALORES = 1 quando o campo está nulo ou igual a zero.' },
+    { id: 'v024', nome: 'Aplicação Duplicado Padrão', modulo: 'volumetria', categoria: 'dados', criterio: 'Define DUPLICADO = "NAO" quando o campo está nulo ou vazio.' },
     { id: 'v025', nome: 'Cache de Performance', modulo: 'volumetria', categoria: 'performance', criterio: 'Utiliza cache materializado para consultas de dashboard.' },
     { id: 'v026', nome: 'Processamento em Lotes', modulo: 'volumetria', categoria: 'performance', criterio: 'Processa uploads em chunks de 200 registros para otimização.' },
     
