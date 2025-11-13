@@ -96,62 +96,72 @@ serve(async (req) => {
       console.log('✅ Todos os contratos já estão corretos');
     }
 
-    // 3. Re-executar tipificação COMPLETA para TODO o período
+    // 3. FORÇAR tipificação COMPLETA para TODO o período (todos os registros)
     let tipificacaoResult = null;
     if (periodo_referencia) {
-      console.log(`🔄 Aplicando tipificação COMPLETA para período ${periodo_referencia}...`);
+      console.log(`🔄 FORÇANDO tipificação COMPLETA para período ${periodo_referencia}...`);
       
-      // Buscar TODOS os registros do período (não só NC)
+      // Buscar TODOS os registros do período (não filtrar por tipo_faturamento NULL)
       const { data: registros, error: registrosError } = await supabase
         .from('volumetria_mobilemed')
         .select('id, "EMPRESA", lote_upload, arquivo_fonte')
-        .eq('periodo_referencia', periodo_referencia)
-        .is('tipo_faturamento', null);
+        .eq('periodo_referencia', periodo_referencia);
 
       if (registrosError) {
         console.error('❌ Erro ao buscar registros:', registrosError);
       } else {
-        console.log(`📊 Encontrados ${registros?.length || 0} registros SEM tipo_faturamento no período`);
+        console.log(`📊 Encontrados ${registros?.length || 0} registros TOTAIS no período para re-tipificar`);
 
-        // Agrupar por lote_upload
-        const lotesMap = new Map<string, string>();
-        registros?.forEach(r => {
-          if (r.lote_upload && !lotesMap.has(r.lote_upload)) {
-            lotesMap.set(r.lote_upload, r.arquivo_fonte);
-          }
-        });
-
-        console.log(`📦 ${lotesMap.size} lotes para tipificar`);
-
-        let totalProcessados = 0;
-        let lotesComErro = 0;
-
-        // Tipificar cada lote
-        for (const [lote, arquivo] of lotesMap) {
-          const { data: tipResult, error: tipError } = await supabase.functions.invoke(
-            'aplicar-tipificacao-faturamento',
-            {
-              body: {
-                arquivo_fonte: arquivo,
-                lote_upload: lote
-              }
+        if (registros && registros.length > 0) {
+          // Agrupar por lote_upload
+          const lotesMap = new Map<string, string>();
+          registros.forEach(r => {
+            if (r.lote_upload && !lotesMap.has(r.lote_upload)) {
+              lotesMap.set(r.lote_upload, r.arquivo_fonte);
             }
-          );
+          });
 
-          if (tipError) {
-            console.error(`❌ Erro ao tipificar lote ${lote}:`, tipError);
-            lotesComErro++;
-          } else {
-            console.log(`✅ Lote ${lote} tipificado:`, tipResult);
-            totalProcessados += tipResult?.registros_atualizados || 0;
+          console.log(`📦 ${lotesMap.size} lotes para FORÇAR re-tipificação`);
+
+          let totalProcessados = 0;
+          let lotesComErro = 0;
+
+          // FORÇAR tipificação de cada lote
+          for (const [lote, arquivo] of lotesMap) {
+            console.log(`🔄 Processando lote ${lote} (arquivo: ${arquivo})...`);
+            
+            const { data: tipResult, error: tipError } = await supabase.functions.invoke(
+              'aplicar-tipificacao-faturamento',
+              {
+                body: {
+                  arquivo_fonte: arquivo,
+                  lote_upload: lote
+                }
+              }
+            );
+
+            if (tipError) {
+              console.error(`❌ Erro ao tipificar lote ${lote}:`, tipError);
+              lotesComErro++;
+            } else {
+              console.log(`✅ Lote ${lote} tipificado:`, tipResult);
+              totalProcessados += tipResult?.registros_atualizados || 0;
+            }
           }
-        }
 
-        tipificacaoResult = {
-          lotes_processados: lotesMap.size,
-          lotes_com_erro: lotesComErro,
-          registros_tipificados: totalProcessados
-        };
+          tipificacaoResult = {
+            lotes_processados: lotesMap.size,
+            lotes_com_erro: lotesComErro,
+            registros_tipificados: totalProcessados
+          };
+        } else {
+          console.log('⚠️ Nenhum registro encontrado no período');
+          tipificacaoResult = {
+            lotes_processados: 0,
+            lotes_com_erro: 0,
+            registros_tipificados: 0
+          };
+        }
       }
     }
 
