@@ -39,7 +39,7 @@ serve(async (req) => {
     // 1. Buscar registros que precisam de tipificação
     let query = supabaseClient
       .from('volumetria_mobilemed')
-      .select('id, "EMPRESA", "MODALIDADE", "ESPECIALIDADE", "PRIORIDADE"');
+      .select('id, "EMPRESA", "MODALIDADE", "ESPECIALIDADE", "CATEGORIA", "PRIORIDADE"');
 
     // Aplicar filtros conforme parâmetros
     if (arquivo_fonte && lote_upload) {
@@ -83,6 +83,7 @@ serve(async (req) => {
         tipo_faturamento,
         modalidades,
         especialidades,
+        categorias,
         considera_plantao,
         clientes (
           nome,
@@ -106,6 +107,7 @@ serve(async (req) => {
       tipo_faturamento: string;
       modalidades: string[];
       especialidades: string[];
+      categorias: string[];
       considera_plantao: boolean;
     }>>();
     
@@ -120,6 +122,7 @@ serve(async (req) => {
           tipo_faturamento: contrato.tipo_faturamento || 'CO-FT',
           modalidades: contrato.modalidades || [],
           especialidades: contrato.especialidades || [],
+          categorias: contrato.categorias || [],
           considera_plantao: contrato.considera_plantao || false
         });
       }
@@ -132,6 +135,7 @@ serve(async (req) => {
       nomeCliente: string,
       modalidade: string,
       especialidade: string,
+      categoria: string,
       prioridade: string
     ): { tipo_faturamento: TipoFaturamento, tipo_cliente: TipoCliente } {
       const configs = configClientes.get(nomeCliente);
@@ -151,7 +155,7 @@ serve(async (req) => {
       }
 
       // Faturamento misto: múltiplos contratos para o mesmo cliente
-      // Verificar qual contrato se aplica baseado em modalidade, especialidade e prioridade
+      // Verificar qual contrato se aplica baseado em modalidade, especialidade, categoria e prioridade
       for (const config of configs) {
         // Verificar modalidade
         const modalidadeMatch = config.modalidades.length === 0 || 
@@ -161,13 +165,17 @@ serve(async (req) => {
         const especialidadeMatch = config.especialidades.length === 0 || 
                                   config.especialidades.includes(especialidade);
         
+        // Verificar categoria
+        const categoriaMatch = config.categorias.length === 0 || 
+                              config.categorias.includes(categoria);
+        
         // Verificar plantão
         const prioridadeUpper = (prioridade || '').toUpperCase();
         const isPlantao = prioridadeUpper.includes('PLANTAO') || prioridadeUpper.includes('PLANTÃO');
         const plantaoMatch = !isPlantao || config.considera_plantao;
         
         // Se todos os critérios correspondem, usar este contrato
-        if (modalidadeMatch && especialidadeMatch && plantaoMatch) {
+        if (modalidadeMatch && especialidadeMatch && categoriaMatch && plantaoMatch) {
           return {
             tipo_faturamento: config.tipo_faturamento as TipoFaturamento,
             tipo_cliente: config.tipo_cliente as TipoCliente
@@ -200,6 +208,7 @@ serve(async (req) => {
           registro.EMPRESA || '',
           registro.MODALIDADE || '',
           registro.ESPECIALIDADE || '',
+          registro.CATEGORIA || '',
           registro.PRIORIDADE || ''
         );
         
