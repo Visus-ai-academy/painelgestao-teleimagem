@@ -161,19 +161,10 @@ serve(async (req) => {
       }
     }
 
-    // 6. Aplicar tipificação de faturamento
-    console.log('🔄 Aplicando tipificação de faturamento');
-    await supabase
-      .from('volumetria_mobilemed')
-      .update({ tipo_faturamento: 'alta_complexidade' })
-      .eq('arquivo_fonte', arquivo_fonte)
-      .in('MODALIDADE', ['CT', 'MR', 'DO']);
-
-    await supabase
-      .from('volumetria_mobilemed')
-      .update({ tipo_faturamento: 'padrao' })
-      .eq('arquivo_fonte', arquivo_fonte)
-      .not('MODALIDADE', 'in', '("CT","MR","DO")');
+    // 6. REMOVIDO: Não aplicar mais tipificação de faturamento aqui
+    // O campo tipo_faturamento deve conter apenas tipos válidos de cliente (CO-FT, NC-FT, etc)
+    // e será aplicado a partir do contrato do cliente no momento da geração do demonstrativo
+    console.log('ℹ️ Tipificação de faturamento será aplicada via contrato do cliente');
 
     // Contar total de correções
     const { count: totalCount } = await supabase
