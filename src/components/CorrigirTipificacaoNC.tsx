@@ -52,7 +52,7 @@ export const CorrigirTipificacaoNC = ({ periodoReferencia }: CorrigirTipificacao
 
       toast({
         title: "Correção executada com sucesso",
-        description: `${data.contratos_corrigidos} contratos corrigidos, ${limpezaData?.registrosLimpos || 0} registros limpos`,
+        description: `${data?.tipificacao?.registros_tipificados ?? data?.tipificacao?.registros_processados ?? 0} registros tipificados em ${data?.tipificacao?.lotes_processados ?? data?.tipificacao?.lotes_retipificados ?? 0} lotes`,
       });
 
     } catch (error: any) {
@@ -125,19 +125,15 @@ export const CorrigirTipificacaoNC = ({ periodoReferencia }: CorrigirTipificacao
             </Alert>
 
             <div className="rounded-lg border bg-card p-4 space-y-2">
-              <h4 className="font-semibold text-sm">Resumo da Correção:</h4>
+              <h4 className="font-semibold text-sm">Resultados da Tipificação:</h4>
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div>
-                  <span className="text-muted-foreground">Clientes NC cadastrados:</span>
-                  <span className="ml-2 font-medium">{resultado.clientes_nc_cadastrados}</span>
+                  <span className="text-muted-foreground">Registros tipificados:</span>
+                  <span className="ml-2 font-medium text-green-600">{resultado.tipificacao?.registros_tipificados ?? resultado.tipificacao?.registros_processados ?? 0}</span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground">Clientes NC encontrados:</span>
-                  <span className="ml-2 font-medium">{resultado.clientes_nc_encontrados}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Contratos corrigidos:</span>
-                  <span className="ml-2 font-medium text-green-600">{resultado.contratos_corrigidos}</span>
+                  <span className="text-muted-foreground">Lotes processados:</span>
+                  <span className="ml-2 font-medium">{resultado.tipificacao?.lotes_processados ?? resultado.tipificacao?.lotes_retipificados ?? 0}</span>
                 </div>
               </div>
 
