@@ -22,6 +22,7 @@ import { RemoverExamesUS } from '@/components/RemoverExamesUS';
 import { SystemDateTime } from '@/components/SystemDateTime';
 import { LimparUploadTravado } from '@/components/LimparUploadTravado';
 import { FinalizarUploadsTravados } from '@/components/FinalizarUploadsTravados';
+import { CorrigirTipificacaoNC } from '@/components/CorrigirTipificacaoNC';
 import { DemonstrativoVolumetriaPorCliente } from '@/components/DemonstrativoVolumetriaPorCliente';
 import { VolumetriaProvider } from "@/contexts/VolumetriaContext";
 import { useToast } from "@/hooks/use-toast";
@@ -216,6 +217,14 @@ export default function DadosVolumetria() {
           </TabsContent>
 
           <TabsContent value="sistema-regras" className="space-y-6">
+            {/* Correção de Tipificação NC */}
+            <CorrigirTipificacaoNC 
+              periodoReferencia={periodoFaturamentoVolumetria 
+                ? `${periodoFaturamentoVolumetria.ano}-${String(periodoFaturamentoVolumetria.mes).padStart(2, '0')}` 
+                : undefined
+              } 
+            />
+            
             {/* Corrigir Exames Fora do Padrão */}
             <CorrigirExamesForaPadrao />
             
