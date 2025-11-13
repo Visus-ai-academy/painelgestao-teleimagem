@@ -96,23 +96,35 @@ serve(async (req) => {
       console.log('✅ Todos os contratos já estão corretos');
     }
 
-    // 3. FORÇAR tipificação COMPLETA para TODO o período (todos os registros)
+    // 3. FORÇAR tipificação COMPLETA para clientes NC
     let tipificacaoResult = null;
+    
+    console.log(`🔄 FORÇANDO tipificação COMPLETA para clientes NC${periodo_referencia ? ` no período ${periodo_referencia}` : ' (todos os períodos)'}...`);
+    
+    // Buscar TODOS os registros dos clientes NC
+    let queryRegistros = supabase
+      .from('volumetria_mobilemed')
+      .select('id, "EMPRESA", lote_upload, arquivo_fonte')
+      .in('EMPRESA', CLIENTES_NC);
+    
+    // Se houver período, filtrar por ele
     if (periodo_referencia) {
-      console.log(`🔄 FORÇANDO tipificação COMPLETA para período ${periodo_referencia}...`);
-      
-      // Buscar TODOS os registros do período (não filtrar por tipo_faturamento NULL)
-      const { data: registros, error: registrosError } = await supabase
-        .from('volumetria_mobilemed')
-        .select('id, "EMPRESA", lote_upload, arquivo_fonte')
-        .eq('periodo_referencia', periodo_referencia);
+      queryRegistros = queryRegistros.eq('periodo_referencia', periodo_referencia);
+    }
+    
+    const { data: registros, error: registrosError } = await queryRegistros;
 
-      if (registrosError) {
-        console.error('❌ Erro ao buscar registros:', registrosError);
-      } else {
-        console.log(`📊 Encontrados ${registros?.length || 0} registros TOTAIS no período para re-tipificar`);
+    if (registrosError) {
+      console.error('❌ Erro ao buscar registros:', registrosError);
+      tipificacaoResult = {
+        lotes_processados: 0,
+        lotes_com_erro: 1,
+        registros_tipificados: 0
+      };
+    } else {
+      console.log(`📊 Encontrados ${registros?.length || 0} registros de clientes NC para re-tipificar`);
 
-        if (registros && registros.length > 0) {
+      if (registros && registros.length > 0) {
           // Agrupar por lote_upload
           const lotesMap = new Map<string, string>();
           registros.forEach(r => {
@@ -149,29 +161,32 @@ serve(async (req) => {
             }
           }
 
-          tipificacaoResult = {
-            lotes_processados: lotesMap.size,
-            lotes_com_erro: lotesComErro,
-            registros_tipificados: totalProcessados
-          };
-        } else {
-          console.log('⚠️ Nenhum registro encontrado no período');
-          tipificacaoResult = {
-            lotes_processados: 0,
-            lotes_com_erro: 0,
-            registros_tipificados: 0
-          };
-        }
+        tipificacaoResult = {
+          lotes_processados: lotesMap.size,
+          lotes_com_erro: lotesComErro,
+          registros_tipificados: totalProcessados
+        };
+      } else {
+        console.log('⚠️ Nenhum registro encontrado');
+        tipificacaoResult = {
+          lotes_processados: 0,
+          lotes_com_erro: 0,
+          registros_tipificados: 0
+        };
       }
     }
 
-    // 4. Estatísticas finais - buscar do banco APÓS aplicar tipificação
-    const { data: volumetriaStats } = await supabase
+    // 4. Estatísticas finais - buscar do banco APÓS aplicar tipificação (apenas clientes NC)
+    let queryStats = supabase
       .from('volumetria_mobilemed')
       .select('"EMPRESA", tipo_cliente, tipo_faturamento')
-      .in('EMPRESA', CLIENTES_NC)
-      .eq('periodo_referencia', periodo_referencia || '2025-10')
-      .in('tipo_faturamento', ['CO-FT', 'CO-NT', 'NC-FT', 'NC-NT', 'NC1-NF']); // Filtrar apenas tipos válidos do contrato
+      .in('EMPRESA', CLIENTES_NC);
+    
+    if (periodo_referencia) {
+      queryStats = queryStats.eq('periodo_referencia', periodo_referencia);
+    }
+    
+    const { data: volumetriaStats } = await queryStats;
 
     const estatisticas = {
       por_cliente: {} as Record<string, any>
