@@ -155,7 +155,7 @@ export function DemonstrativoFaturamentoCompleto({
       setTimeoutIdRef(null);
       toast({
         title: 'Timeout excedido',
-        description: 'O processamento excedeu o tempo limite de 15 minutos. Use o botão "Cancelar" se ainda estiver travado.',
+        description: 'O processamento excedeu 15 minutos. Verifique se os demonstrativos foram gerados no banco de dados.',
         variant: 'destructive'
       });
     }, 900000); // 15 minutos
@@ -493,7 +493,7 @@ export function DemonstrativoFaturamentoCompleto({
   // Renderizar apenas o botão se renderMode = 'button-only'
   if (renderMode === 'button-only') {
     return (
-      <div className="flex gap-2">
+      <div className="flex gap-2 items-center">
         <Button 
           onClick={handleGerarDemonstrativos}
           disabled={loading || !periodo}
@@ -515,10 +515,11 @@ export function DemonstrativoFaturamentoCompleto({
         {loading && (
           <Button 
             onClick={cancelarProcessamento}
-            variant="destructive"
+            variant="outline"
             size="lg"
+            className="text-destructive border-destructive hover:bg-destructive/10"
           >
-            Cancelar
+            Forçar Cancelamento
           </Button>
         )}
       </div>

@@ -145,27 +145,35 @@ serve(async (req) => {
       }
     }
 
-    // 4. Estatísticas finais
+    // 4. Estatísticas finais - buscar do banco APÓS aplicar tipificação
     const { data: volumetriaStats } = await supabase
       .from('volumetria_mobilemed')
       .select('"EMPRESA", tipo_cliente, tipo_faturamento')
       .in('EMPRESA', CLIENTES_NC)
-      .eq('periodo_referencia', periodo_referencia || '2025-10');
+      .eq('periodo_referencia', periodo_referencia || '2025-10')
+      .in('tipo_faturamento', ['CO-FT', 'CO-NT', 'NC-FT', 'NC-NT', 'NC1-NF']); // Filtrar apenas tipos válidos do contrato
 
     const estatisticas = {
       por_cliente: {} as Record<string, any>
     };
 
+    // Agrupar por cliente mostrando APENAS os valores do contrato
     volumetriaStats?.forEach((record: any) => {
       const empresa = record.EMPRESA;
+      const key = `${record.tipo_cliente}_${record.tipo_faturamento}`;
+      
       if (!estatisticas.por_cliente[empresa]) {
-        estatisticas.por_cliente[empresa] = {
+        estatisticas.por_cliente[empresa] = {};
+      }
+      
+      if (!estatisticas.por_cliente[empresa][key]) {
+        estatisticas.por_cliente[empresa][key] = {
           total: 0,
           tipo_cliente: record.tipo_cliente,
           tipo_faturamento: record.tipo_faturamento
         };
       }
-      estatisticas.por_cliente[empresa].total++;
+      estatisticas.por_cliente[empresa][key].total++;
     });
 
     const resultado = {
