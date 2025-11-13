@@ -111,10 +111,10 @@ serve(async (req) => {
     
     console.log(`🔄 FORÇANDO tipificação COMPLETA para clientes NC no período ${periodo_referencia}...`);
     
-    // Buscar registros dos clientes NC no período específico
+    // Buscar registros dos clientes NC no período específico que precisam de tipificação
     const queryRegistros = supabase
       .from('volumetria_mobilemed')
-      .select('id, "EMPRESA", lote_upload, arquivo_fonte')
+      .select('id, "EMPRESA", "MODALIDADE", "ESPECIALIDADE", "CATEGORIA", "PRIORIDADE", "MEDICO"')
       .in('EMPRESA', CLIENTES_NC)
       .eq('periodo_referencia', periodo_referencia);
     
@@ -123,61 +123,142 @@ serve(async (req) => {
     if (registrosError) {
       console.error('❌ Erro ao buscar registros:', registrosError);
       tipificacaoResult = {
-        lotes_processados: 0,
-        lotes_com_erro: 1,
+        registros_processados: 0,
+        registros_com_erro: 0,
         registros_tipificados: 0
       };
     } else {
       console.log(`📊 Encontrados ${registros?.length || 0} registros de clientes NC para re-tipificar`);
 
       if (registros && registros.length > 0) {
-          // Agrupar por lote_upload
-          const lotesMap = new Map<string, string>();
-          registros.forEach(r => {
-            if (r.lote_upload && !lotesMap.has(r.lote_upload)) {
-              lotesMap.set(r.lote_upload, r.arquivo_fonte);
+        // Médicos da Equipe 2
+        const MEDICOS_EQUIPE_2 = [
+          'Dr. Antonio Gualberto Chianca Filho', 'Dr. Daniel Chrispim', 'Dr. Efraim Da Silva Ferreira', 
+          'Dr. Felipe Falcão de Sá', 'Dr. Guilherme N. Schincariol', 'Dr. Gustavo Andreis', 
+          'Dr. João Carlos Dantas do Amaral', 'Dr. João Fernando Miranda Pompermayer', 
+          'Dr. Leonardo de Paula Ribeiro Figueiredo', 'Dr. Raphael Sanfelice João', 'Dr. Thiago P. Martins', 
+          'Dr. Virgílio Oliveira Barreto', 'Dra. Adriana Giubilei Pimenta', 'Dra. Aline Andrade Dorea', 
+          'Dra. Camila Amaral Campos', 'Dra. Cynthia Mendes Vieira de Morais', 'Dra. Fernanda Gama Barbosa', 
+          'Dra. Kenia Menezes Fernandes', 'Dra. Lara M. Durante Bacelar', 'Dr. Aguinaldo Cunha Zuppani', 
+          'Dr. Alex Gueiros de Barros', 'Dr. Eduardo Caminha Nunes', 'Dr. Márcio D\'Andréa Rossi', 
+          'Dr. Rubens Pereira Moura Filho', 'Dr. Wesley Walber da Silva', 'Dra. Luna Azambuja Satte Alam', 
+          'Dra. Roberta Bertoldo Sabatini Treml', 'Dra. Thais Nogueira D. Gastaldi', 'Dra. Vanessa da Costa Maldonado'
+        ];
+
+        // Clientes NC que seguem regra: Cardio OU Plantão
+        const CLIENTES_CARDIO_OU_PLANTAO = [
+          'CDICARDIO', 'CDIGOIAS', 'CISP', 'CRWANDERLEY', 'DIAGMAX-PR', 'GOLD', 'PRODIMAGEM', 'TRANSDUSON', 'ZANELLO'
+        ];
+
+        // Clientes NC que seguem regra: Cardio E Plantão
+        const CLIENTES_CARDIO_E_PLANTAO = ['CEMVALENCA', 'RMPADUA'];
+
+        // Cliente especial RADI-IMAGEM
+        const RADI_IMAGEM = 'RADI-IMAGEM';
+
+        // Função de tipificação
+        const determinarTipoFaturamento = (record: any): { tipo_faturamento: string; tipo_cliente: string } => {
+          const empresa = record.EMPRESA;
+          const modalidade = record.MODALIDADE || '';
+          const especialidade = record.ESPECIALIDADE || '';
+          const categoria = record.CATEGORIA || '';
+          const prioridade = record.PRIORIDADE || '';
+          const medico = record.MEDICO || '';
+
+          const isCardio = especialidade.toLowerCase().includes('cardio') || 
+                          modalidade.toLowerCase().includes('cardio');
+          const isPlantao = prioridade === 'URGENTE';
+          const isEquipe2 = MEDICOS_EQUIPE_2.includes(medico);
+
+          // Cliente especial: RADI-IMAGEM
+          if (empresa === RADI_IMAGEM) {
+            if (isEquipe2) {
+              return { tipo_faturamento: 'NC-FT', tipo_cliente: 'NC' };
             }
+            return { tipo_faturamento: 'CO-FT', tipo_cliente: 'CO' };
+          }
+
+          // Clientes NC: Cardio OU Plantão
+          if (CLIENTES_CARDIO_OU_PLANTAO.includes(empresa)) {
+            if (isCardio || isPlantao) {
+              return { tipo_faturamento: 'NC-FT', tipo_cliente: 'NC' };
+            }
+            return { tipo_faturamento: 'NC-NF', tipo_cliente: 'NC' };
+          }
+
+          // Clientes NC: Cardio E Plantão
+          if (CLIENTES_CARDIO_E_PLANTAO.includes(empresa)) {
+            if (isCardio && isPlantao) {
+              return { tipo_faturamento: 'NC-FT', tipo_cliente: 'NC' };
+            }
+            return { tipo_faturamento: 'NC-NF', tipo_cliente: 'NC' };
+          }
+
+          // Cliente CLIRAM: apenas Equipe2
+          if (empresa === 'CLIRAM') {
+            if (isEquipe2) {
+              return { tipo_faturamento: 'NC1-NF', tipo_cliente: 'NC1' };
+            }
+            return { tipo_faturamento: 'NC-NF', tipo_cliente: 'NC' };
+          }
+
+          // Padrão para clientes NC
+          return { tipo_faturamento: 'NC-NF', tipo_cliente: 'NC' };
+        };
+
+        // Processar em lotes de 500 registros
+        const BATCH_SIZE = 500;
+        let totalProcessados = 0;
+        let totalAtualizados = 0;
+        let totalComErro = 0;
+
+        for (let i = 0; i < registros.length; i += BATCH_SIZE) {
+          const batch = registros.slice(i, i + BATCH_SIZE);
+          console.log(`📦 Processando lote ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(registros.length / BATCH_SIZE)} (${batch.length} registros)...`);
+
+          // Preparar updates
+          const updates = batch.map(record => {
+            const { tipo_faturamento, tipo_cliente } = determinarTipoFaturamento(record);
+            return {
+              id: record.id,
+              tipo_faturamento,
+              tipo_cliente
+            };
           });
 
-          console.log(`📦 ${lotesMap.size} lotes para FORÇAR re-tipificação`);
+          // Atualizar em lote
+          for (const update of updates) {
+            const { error: updateError } = await supabase
+              .from('volumetria_mobilemed')
+              .update({
+                tipo_faturamento: update.tipo_faturamento,
+                tipo_cliente: update.tipo_cliente
+              })
+              .eq('id', update.id);
 
-          let totalProcessados = 0;
-          let lotesComErro = 0;
-
-          // FORÇAR tipificação de cada lote
-          for (const [lote, arquivo] of lotesMap) {
-            console.log(`🔄 Processando lote ${lote} (arquivo: ${arquivo})...`);
-            
-            const { data: tipResult, error: tipError } = await supabase.functions.invoke(
-              'aplicar-tipificacao-faturamento',
-              {
-                body: {
-                  arquivo_fonte: arquivo,
-                  lote_upload: lote
-                }
-              }
-            );
-
-            if (tipError) {
-              console.error(`❌ Erro ao tipificar lote ${lote}:`, tipError);
-              lotesComErro++;
+            if (updateError) {
+              console.error(`❌ Erro ao atualizar registro ${update.id}:`, updateError);
+              totalComErro++;
             } else {
-              console.log(`✅ Lote ${lote} tipificado:`, tipResult);
-              totalProcessados += tipResult?.registros_atualizados || 0;
+              totalAtualizados++;
             }
           }
 
+          totalProcessados += batch.length;
+          console.log(`✅ Lote processado: ${totalAtualizados} atualizados, ${totalComErro} erros`);
+        }
+
         tipificacaoResult = {
-          lotes_processados: lotesMap.size,
-          lotes_com_erro: lotesComErro,
-          registros_tipificados: totalProcessados
+          registros_processados: totalProcessados,
+          registros_tipificados: totalAtualizados,
+          registros_com_erro: totalComErro
         };
       } else {
         console.log('⚠️ Nenhum registro encontrado');
         tipificacaoResult = {
-          lotes_processados: 0,
-          lotes_com_erro: 0,
-          registros_tipificados: 0
+          registros_processados: 0,
+          registros_tipificados: 0,
+          registros_com_erro: 0
         };
       }
     }
