@@ -22,6 +22,7 @@ import { RemoverExamesUS } from '@/components/RemoverExamesUS';
 import { SystemDateTime } from '@/components/SystemDateTime';
 import { LimparUploadTravado } from '@/components/LimparUploadTravado';
 import { FinalizarUploadsTravados } from '@/components/FinalizarUploadsTravados';
+import { AplicarTipificacaoGeral } from "@/components/AplicarTipificacaoGeral";
 import { CorrigirTipificacaoNC } from '@/components/CorrigirTipificacaoNC';
 import { IndicadorTipificacao } from '@/components/IndicadorTipificacao';
 import { DemonstrativoVolumetriaPorCliente } from '@/components/DemonstrativoVolumetriaPorCliente';
@@ -219,13 +220,18 @@ export default function DadosVolumetria() {
           </TabsContent>
 
           <TabsContent value="sistema-regras" className="space-y-6">
+            {/* Tipificação Geral - TODOS os clientes */}
+            <AplicarTipificacaoGeral 
+              onCorrecaoConcluida={() => setRefreshTipificacao(prev => prev + 1)}
+            />
+
             {/* Correção de Tipificação NC */}
             <CorrigirTipificacaoNC 
               onCorrecaoConcluida={() => setRefreshTipificacao(prev => prev + 1)}
             />
             
             {/* Status de Tipificação em Tempo Real */}
-            <IndicadorTipificacao 
+            <IndicadorTipificacao
               key={refreshTipificacao}
               periodoReferencia={periodoFaturamentoVolumetria 
                 ? `${periodoFaturamentoVolumetria.ano}-${String(periodoFaturamentoVolumetria.mes).padStart(2, '0')}` 
