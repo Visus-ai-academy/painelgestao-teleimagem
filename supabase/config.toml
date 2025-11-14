@@ -229,3 +229,12 @@ verify_jwt = true
 
 [functions.limpar-tipo-faturamento-incorreto]
 verify_jwt = true
+
+[functions.corrigir-tipificacao-clientes-nc]
+verify_jwt = true
+
+[functions.aplicar-tipificacao-faturamento]
+verify_jwt = true
+
+[functions.resetar-tipificacao-clientes]
+verify_jwt = false

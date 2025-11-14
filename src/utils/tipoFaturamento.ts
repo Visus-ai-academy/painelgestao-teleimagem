@@ -13,14 +13,17 @@ export type TipoFaturamento = "CO-FT" | "CO-NF" | "NC-FT" | "NC-NF" | "NC1-NF";
 
 // Lista de clientes NC (Cliente do tipo NC)
 const CLIENTES_NC = [
+  "CBU",
   "CDICARDIO",
-  "CDIGOIAS", 
+  "CDIGOIAS",
+  "CICOMANGRA",
   "CISP",
   "CLIRAM",
   "CRWANDERLEY",
   "DIAGMAX-PR",
   "GOLD",
   "PRODIMAGEM",
+  "RADMED",
   "TRANSDUSON",
   "ZANELLO",
   "CEMVALENCA",
