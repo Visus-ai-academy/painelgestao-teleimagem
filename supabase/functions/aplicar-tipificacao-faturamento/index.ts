@@ -243,62 +243,75 @@ serve(async (req) => {
       return { tipo_faturamento: 'NC-NF', tipo_cliente: 'NC' };
     }
 
-    // 5. Processar registros em lotes de 500
-    const BATCH_SIZE = 500;
+    // 5. Calcular tipificação para todos os registros primeiro
+    console.log(`📊 Calculando tipificação para ${registros.length} registros...`);
+    
+    const updates = registros.map(registro => {
+      const { tipo_faturamento, tipo_cliente } = determinarTipoFaturamento(
+        registro.EMPRESA || '',
+        registro.MODALIDADE || '',
+        registro.ESPECIALIDADE || '',
+        registro.CATEGORIA || '',
+        registro.PRIORIDADE || '',
+        registro.MEDICO || ''
+      );
+
+      return {
+        id: registro.id,
+        tipo_faturamento,
+        tipo_cliente
+      };
+    });
+
+    console.log(`✅ Tipificação calculada. Iniciando atualização em massa...`);
+
+    // 6. Processar updates em batches maiores (1000 por vez) usando upsert
+    const BATCH_SIZE = 1000;
     let registrosProcessados = 0;
     let registrosAtualizados = 0;
+    let erros = 0;
 
-    for (let i = 0; i < registros.length; i += BATCH_SIZE) {
-      const lote = registros.slice(i, i + BATCH_SIZE);
+    for (let i = 0; i < updates.length; i += BATCH_SIZE) {
+      const batch = updates.slice(i, i + BATCH_SIZE);
+      const batchNum = Math.floor(i/BATCH_SIZE) + 1;
+      const totalBatches = Math.ceil(updates.length/BATCH_SIZE);
       
-      console.log(`🔄 Processando lote ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(registros.length/BATCH_SIZE)} - ${lote.length} registros`);
+      console.log(`🔄 Atualizando batch ${batchNum}/${totalBatches} - ${batch.length} registros`);
 
-      // Preparar atualizações em massa
-      const updates = lote.map(registro => {
-        const { tipo_faturamento, tipo_cliente } = determinarTipoFaturamento(
-          registro.EMPRESA || '',
-          registro.MODALIDADE || '',
-          registro.ESPECIALIDADE || '',
-          registro.CATEGORIA || '',
-          registro.PRIORIDADE || '',
-          registro.MEDICO || ''
-        );
+      try {
+        // Usar upsert para atualização em massa
+        const { error, count } = await supabaseClient
+          .from('volumetria_mobilemed')
+          .upsert(
+            batch.map(u => ({
+              id: u.id,
+              tipo_faturamento: u.tipo_faturamento,
+              tipo_cliente: u.tipo_cliente
+            })),
+            { 
+              onConflict: 'id',
+              ignoreDuplicates: false 
+            }
+          );
 
-        registrosProcessados++;
-
-        return {
-          id: registro.id,
-          tipo_faturamento,
-          tipo_cliente
-        };
-      });
-
-      // Executar atualizações em paralelo (grupos de 50)
-      const PARALLEL_SIZE = 50;
-      for (let j = 0; j < updates.length; j += PARALLEL_SIZE) {
-        const parallelUpdates = updates.slice(j, j + PARALLEL_SIZE);
+        if (error) {
+          console.error(`❌ Erro no batch ${batchNum}:`, error);
+          erros += batch.length;
+        } else {
+          registrosAtualizados += batch.length;
+          console.log(`✅ Batch ${batchNum} atualizado com sucesso`);
+        }
         
-        const updatePromises = parallelUpdates.map(async (update) => {
-          const { error } = await supabaseClient
-            .from('volumetria_mobilemed')
-            .update({ 
-              tipo_faturamento: update.tipo_faturamento,
-              tipo_cliente: update.tipo_cliente
-            })
-            .eq('id', update.id);
-
-          if (error) {
-            console.error(`❌ Erro ao atualizar registro ${update.id}:`, error);
-          } else {
-            registrosAtualizados++;
-          }
-        });
-
-        await Promise.all(updatePromises);
+        registrosProcessados += batch.length;
+      } catch (error) {
+        console.error(`❌ Exceção no batch ${batchNum}:`, error);
+        erros += batch.length;
       }
     }
 
-    // 6. Estatísticas finais
+    console.log(`📊 Processamento concluído: ${registrosAtualizados} atualizados, ${erros} erros`);
+
+    // 7. Estatísticas finais
     const { data: stats, error: statsError } = await supabaseClient
       .from('volumetria_mobilemed')
       .select('tipo_faturamento')
@@ -318,6 +331,7 @@ serve(async (req) => {
       registros_encontrados: registros.length,
       registros_processados: registrosProcessados,
       registros_atualizados: registrosAtualizados,
+      registros_erro: erros,
       estatisticas_tipos: estatisticas,
       regras_aplicadas: [
         'Tipificação baseada nas MESMAS REGRAS usadas no demonstrativo de faturamento',
