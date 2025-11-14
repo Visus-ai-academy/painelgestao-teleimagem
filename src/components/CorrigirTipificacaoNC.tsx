@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Progress } from "@/components/ui/progress";
 import { isPeriodoEditavel, getStatusPeriodo } from "@/components/ControlePeriodo";
 
 export const CorrigirTipificacaoNC = () => {
@@ -14,6 +15,8 @@ export const CorrigirTipificacaoNC = () => {
   const [periodoSelecionado, setPeriodoSelecionado] = useState<string>("");
   const [periodosDisponiveis, setPeriodosDisponiveis] = useState<string[]>([]);
   const [loadingPeriodos, setLoadingPeriodos] = useState(true);
+  const [progresso, setProgresso] = useState({ atual: 0, total: 0, percentual: 0 });
+  const [mensagemProgresso, setMensagemProgresso] = useState("");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -62,48 +65,93 @@ export const CorrigirTipificacaoNC = () => {
 
     setLoading(true);
     setResultado(null);
+    setProgresso({ atual: 0, total: 0, percentual: 0 });
+    setMensagemProgresso("Iniciando correção...");
 
     try {
-      console.log(`🔧 Iniciando correção de tipificação de clientes NC para período ${periodoSelecionado}...`);
-      
-      // PASSO 1: Limpar tipo_faturamento incorreto da volumetria
-      console.log('🧹 Limpando tipo_faturamento incorreto...');
-      const { data: limpezaData, error: limpezaError } = await supabase.functions.invoke(
-        'limpar-tipo-faturamento-incorreto',
-        { body: {} }
-      );
-      
-      if (limpezaError) {
-        console.error('⚠️ Erro na limpeza:', limpezaError);
-      } else {
-        console.log('✅ Limpeza concluída:', limpezaData);
-      }
-      
-      // PASSO 2: Corrigir tipificação NC
-      const { data, error } = await supabase.functions.invoke(
-        'corrigir-tipificacao-clientes-nc',
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const response = await fetch(
+        `${supabaseUrl}/functions/v1/corrigir-tipificacao-clientes-nc`,
         {
-          body: {
-            periodo_referencia: periodoSelecionado
-          }
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+          },
+          body: JSON.stringify({ periodo_referencia: periodoSelecionado }),
         }
       );
 
-      if (error) throw error;
+      if (!response.ok) {
+        throw new Error('Erro na requisição');
+      }
 
-      console.log('✅ Correção concluída:', data);
-      setResultado(data);
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
 
-      toast({
-        title: "Correção executada com sucesso",
-        description: `${data?.tipificacao?.registros_tipificados ?? 0} registros tipificados em ${data?.tipificacao?.lotes_processados ?? 0} lotes`,
-      });
+      if (!reader) {
+        throw new Error('Não foi possível ler a resposta');
+      }
 
+      let resultadoFinal: any = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = JSON.parse(line.slice(6));
+            
+            switch (data.tipo) {
+              case 'inicio':
+                setMensagemProgresso(data.mensagem);
+                break;
+              case 'registros_encontrados':
+                setProgresso({ atual: 0, total: data.total, percentual: 0 });
+                setMensagemProgresso(`Encontrados ${data.total} registros para tipificar`);
+                break;
+              case 'lote':
+                const percentual = data.total_lotes > 0 
+                  ? Math.round((data.lote / data.total_lotes) * 100)
+                  : 0;
+                setProgresso({ 
+                  atual: data.registros_tipificados, 
+                  total: progresso.total || data.registros_tipificados,
+                  percentual 
+                });
+                setMensagemProgresso(`Processando lote ${data.lote}/${data.total_lotes} - ${data.registros_tipificados} registros tipificados`);
+                break;
+              case 'estatisticas':
+                setMensagemProgresso(data.mensagem);
+                break;
+              case 'concluido':
+                resultadoFinal = data.resultado;
+                setProgresso(prev => ({ atual: prev.total, total: prev.total, percentual: 100 }));
+                setMensagemProgresso("Correção concluída!");
+                break;
+              case 'erro':
+                throw new Error(data.mensagem);
+            }
+          }
+        }
+      }
+
+      if (resultadoFinal) {
+        setResultado(resultadoFinal);
+        toast({
+          title: "Sucesso",
+          description: `Correção executada com sucesso. ${resultadoFinal.tipificacao?.registros_tipificados || 0} registros tipificados.`,
+        });
+      }
     } catch (error: any) {
-      console.error('❌ Erro ao executar correção:', error);
+      console.error('Erro ao executar correção:', error);
       toast({
-        title: "Erro ao executar correção",
-        description: error.message,
+        title: "Erro",
+        description: error.message || "Erro ao executar correção",
         variant: "destructive",
       });
     } finally {
@@ -193,6 +241,19 @@ export const CorrigirTipificacaoNC = () => {
             </>
           )}
         </Button>
+
+        {loading && progresso.total > 0 && (
+          <div className="space-y-2 mt-4">
+            <div className="flex justify-between text-sm text-muted-foreground">
+              <span>{mensagemProgresso}</span>
+              <span>{progresso.percentual}%</span>
+            </div>
+            <Progress value={progresso.percentual} className="h-2" />
+            <div className="text-xs text-muted-foreground text-center">
+              {progresso.atual.toLocaleString()} / {progresso.total.toLocaleString()} registros
+            </div>
+          </div>
+        )}
 
         {resultado && (
           <div className="mt-4 space-y-3">
