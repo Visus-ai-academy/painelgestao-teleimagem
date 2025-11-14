@@ -9,7 +9,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Progress } from "@/components/ui/progress";
 import { isPeriodoEditavel, getStatusPeriodo } from "@/components/ControlePeriodo";
 
-export const CorrigirTipificacaoNC = () => {
+export interface CorrigirTipificacaoNCProps {
+  onCorrecaoConcluida?: () => void;
+}
+
+export const CorrigirTipificacaoNC = ({ onCorrecaoConcluida }: CorrigirTipificacaoNCProps) => {
   const [loading, setLoading] = useState(false);
   const [resultado, setResultado] = useState<any>(null);
   const [periodoSelecionado, setPeriodoSelecionado] = useState<string>("");
@@ -143,6 +147,9 @@ export const CorrigirTipificacaoNC = () => {
         title: "Correção Concluída",
         description: `${totalTipificados} registros foram corrigidos com sucesso!`,
       });
+
+      // Notificar componente pai para atualizar indicador
+      onCorrecaoConcluida?.();
     } catch (error: any) {
       console.error('Erro ao executar correção:', error);
       
