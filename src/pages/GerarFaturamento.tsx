@@ -52,7 +52,7 @@ import { ExamesValoresZerados } from "@/components/ExamesValorezrados";
 import { DiagnosticoPrecosFaturamento } from "@/components/DiagnosticoPrecosFaturamento";
 import FaturamentoComparativo from "@/components/faturamento/FaturamentoComparativo";
 import { MonitoramentoLotes, type LoteStatus } from "@/components/faturamento/MonitoramentoLotes";
-import { IndicadorTipificacao } from "@/components/IndicadorTipificacao";
+
 
 import { generatePDF, downloadPDF, type FaturamentoData } from "@/lib/pdfUtils";
 
@@ -2516,15 +2516,6 @@ export default function GerarFaturamento() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-
-              {/* Indicador de Tipificação em Tempo Real */}
-              <IndicadorTipificacao 
-                periodoReferencia={periodoSelecionado}
-                onStatusChange={(temRegistrosSemTipificacao) => {
-                  // Pode usar este callback para outras validações se necessário
-                  console.log('Status tipificação:', temRegistrosSemTipificacao ? 'Incompleto' : 'Completo');
-                }}
-              />
 
               {/* Etapa 1: Gerar Demonstrativo Completo */}
               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
