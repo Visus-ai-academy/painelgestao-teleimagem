@@ -25,6 +25,7 @@ interface IndicadorTipificacaoProps {
 export const IndicadorTipificacao = ({ periodoReferencia, onStatusChange }: IndicadorTipificacaoProps) => {
   const [stats, setStats] = useState<TipificacaoStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [updatePending, setUpdatePending] = useState(false);
 
   const loadStats = async () => {
     if (!periodoReferencia) return;
@@ -79,7 +80,9 @@ export const IndicadorTipificacao = ({ periodoReferencia, onStatusChange }: Indi
   useEffect(() => {
     loadStats();
 
-    // Configurar realtime para atualizar automaticamente
+    let debounceTimer: NodeJS.Timeout;
+
+    // Configurar realtime para atualizar automaticamente com debounce
     const channel = supabase
       .channel('tipificacao-changes')
       .on(
@@ -91,18 +94,25 @@ export const IndicadorTipificacao = ({ periodoReferencia, onStatusChange }: Indi
           filter: `periodo_referencia=eq.${periodoReferencia}`
         },
         () => {
-          console.log('🔄 Tipificação atualizada, recarregando estatísticas...');
-          loadStats();
+          // Usar debounce para evitar múltiplas recargas simultâneas
+          setUpdatePending(true);
+          clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(() => {
+            console.log('🔄 Tipificação atualizada, recarregando estatísticas...');
+            loadStats();
+            setUpdatePending(false);
+          }, 2000); // Aguardar 2 segundos de "silêncio" antes de recarregar
         }
       )
       .subscribe();
 
     return () => {
+      clearTimeout(debounceTimer);
       supabase.removeChannel(channel);
     };
   }, [periodoReferencia]);
 
-  if (loading) {
+  if (loading && !stats) {
     return (
       <Card>
         <CardContent className="pt-6">
@@ -130,6 +140,9 @@ export const IndicadorTipificacao = ({ periodoReferencia, onStatusChange }: Indi
             <CheckCircle className="h-5 w-5 text-success" />
           )}
           Status de Tipificação - {periodoReferencia}
+          {updatePending && (
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground ml-2" />
+          )}
         </CardTitle>
         <CardDescription>
           Acompanhamento em tempo real da aplicação de tipo_faturamento nos registros
