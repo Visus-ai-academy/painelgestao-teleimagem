@@ -37,6 +37,7 @@ const PERIODO_ATUAL = "2025-06";
 export default function DadosVolumetria() {
   const [refreshUploadStatus, setRefreshUploadStatus] = useState(0);
   const [periodoFaturamentoVolumetria, setPeriodoFaturamentoVolumetria] = useState<{ ano: number; mes: number } | null>(null);
+  const [refreshTipificacao, setRefreshTipificacao] = useState(0);
   const { toast } = useToast();
   const { status: uploadStatus, refresh: refreshUploadData } = useUploadStatus([
     'volumetria_padrao', 
@@ -219,10 +220,13 @@ export default function DadosVolumetria() {
 
           <TabsContent value="sistema-regras" className="space-y-6">
             {/* Correção de Tipificação NC */}
-            <CorrigirTipificacaoNC />
+            <CorrigirTipificacaoNC 
+              onCorrecaoConcluida={() => setRefreshTipificacao(prev => prev + 1)}
+            />
             
             {/* Status de Tipificação em Tempo Real */}
             <IndicadorTipificacao 
+              key={refreshTipificacao}
               periodoReferencia={periodoFaturamentoVolumetria 
                 ? `${periodoFaturamentoVolumetria.ano}-${String(periodoFaturamentoVolumetria.mes).padStart(2, '0')}` 
                 : '2025-10'
