@@ -296,38 +296,36 @@ serve(async (req) => {
       try {
         const gruposArray = Object.values(grupos);
 
-        // Executar atualizações dos grupos em paralelo
-        const results = await Promise.all(
-          gruposArray.map(async (g) => {
-            if (!g.ids.length) return { updated: 0, error: null as any };
+        // Processar cada grupo sequencialmente para evitar problemas de concorrência
+        for (const g of gruposArray) {
+          if (!g.ids.length) continue;
+
+          // Sub-dividir grupos grandes em chunks menores (200 IDs por vez)
+          const chunkSize = 200;
+          for (let j = 0; j < g.ids.length; j += chunkSize) {
+            const idsChunk = g.ids.slice(j, j + chunkSize);
+            
             const { error, count } = await supabaseClient
               .from('volumetria_mobilemed')
               .update({
                 tipo_faturamento: g.tipo_faturamento,
                 tipo_cliente: g.tipo_cliente,
               })
-              .in('id', g.ids)
-              .select('id', { count: 'exact', head: true });
+              .in('id', idsChunk);
 
             if (error) {
-              console.error(`❌ Erro ao atualizar grupo ${g.tipo_faturamento}/${g.tipo_cliente} no batch ${batchNum}:`, error);
-              return { updated: 0, error };
+              console.error(`❌ Erro ao atualizar grupo ${g.tipo_faturamento}/${g.tipo_cliente} (${idsChunk.length} IDs):`, error);
+              erros += idsChunk.length;
+            } else {
+              const updated = count ?? idsChunk.length;
+              registrosAtualizados += updated;
+              console.log(`✅ Atualizado: ${updated} registros do grupo ${g.tipo_faturamento}/${g.tipo_cliente}`);
             }
-            return { updated: count ?? g.ids.length, error: null };
-          })
-        );
-
-        const atualizados = results.reduce((sum, r) => sum + (r.updated || 0), 0);
-        const errosGrupos = results.filter((r) => r.error).length;
-
-        registrosAtualizados += atualizados;
-        registrosProcessados += batch.length;
-        if (errosGrupos > 0) {
-          // Em caso de erro em grupos, considerar não atualizados como erro
-          erros += Math.max(0, batch.length - atualizados);
+          }
         }
 
-        console.log(`✅ Batch ${batchNum} atualizado. Registros atualizados: ${atualizados}`);
+        registrosProcessados += batch.length;
+        console.log(`✅ Batch ${batchNum} concluído. Total atualizado: ${registrosAtualizados}`);
       } catch (error) {
         console.error(`❌ Exceção no batch ${batchNum}:`, error);
         erros += batch.length;
