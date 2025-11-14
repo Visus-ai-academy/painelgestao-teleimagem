@@ -266,6 +266,7 @@ serve(async (req) => {
     console.log(`✅ Tipificação calculada. Iniciando atualização em massa...`);
 
     // 6. Processar updates em batches maiores (1000 por vez) usando upsert
+    // 6. Processar updates em batches agrupando por tipo para reduzir chamadas
     const BATCH_SIZE = 1000;
     let registrosProcessados = 0;
     let registrosAtualizados = 0;
@@ -273,36 +274,60 @@ serve(async (req) => {
 
     for (let i = 0; i < updates.length; i += BATCH_SIZE) {
       const batch = updates.slice(i, i + BATCH_SIZE);
-      const batchNum = Math.floor(i/BATCH_SIZE) + 1;
-      const totalBatches = Math.ceil(updates.length/BATCH_SIZE);
-      
+      const batchNum = Math.floor(i / BATCH_SIZE) + 1;
+      const totalBatches = Math.ceil(updates.length / BATCH_SIZE);
+
       console.log(`🔄 Atualizando batch ${batchNum}/${totalBatches} - ${batch.length} registros`);
 
-      try {
-        // Usar upsert para atualização em massa
-        const { error, count } = await supabaseClient
-          .from('volumetria_mobilemed')
-          .upsert(
-            batch.map(u => ({
-              id: u.id,
-              tipo_faturamento: u.tipo_faturamento,
-              tipo_cliente: u.tipo_cliente
-            })),
-            { 
-              onConflict: 'id',
-              ignoreDuplicates: false 
-            }
-          );
-
-        if (error) {
-          console.error(`❌ Erro no batch ${batchNum}:`, error);
-          erros += batch.length;
-        } else {
-          registrosAtualizados += batch.length;
-          console.log(`✅ Batch ${batchNum} atualizado com sucesso`);
+      // Agrupar por par (tipo_faturamento, tipo_cliente) para atualizar em massa
+      const grupos = batch.reduce((acc, u) => {
+        const key = `${u.tipo_faturamento}|${u.tipo_cliente}`;
+        if (!acc[key]) {
+          acc[key] = {
+            tipo_faturamento: u.tipo_faturamento as TipoFaturamento,
+            tipo_cliente: u.tipo_cliente as TipoCliente,
+            ids: [] as string[],
+          };
         }
-        
+        acc[key].ids.push(u.id);
+        return acc;
+      }, {} as Record<string, { tipo_faturamento: TipoFaturamento; tipo_cliente: TipoCliente; ids: string[] }>);
+
+      try {
+        const gruposArray = Object.values(grupos);
+
+        // Executar atualizações dos grupos em paralelo
+        const results = await Promise.all(
+          gruposArray.map(async (g) => {
+            if (!g.ids.length) return { updated: 0, error: null as any };
+            const { error, count } = await supabaseClient
+              .from('volumetria_mobilemed')
+              .update({
+                tipo_faturamento: g.tipo_faturamento,
+                tipo_cliente: g.tipo_cliente,
+              })
+              .in('id', g.ids)
+              .select('id', { count: 'exact', head: true });
+
+            if (error) {
+              console.error(`❌ Erro ao atualizar grupo ${g.tipo_faturamento}/${g.tipo_cliente} no batch ${batchNum}:`, error);
+              return { updated: 0, error };
+            }
+            return { updated: count ?? g.ids.length, error: null };
+          })
+        );
+
+        const atualizados = results.reduce((sum, r) => sum + (r.updated || 0), 0);
+        const errosGrupos = results.filter((r) => r.error).length;
+
+        registrosAtualizados += atualizados;
         registrosProcessados += batch.length;
+        if (errosGrupos > 0) {
+          // Em caso de erro em grupos, considerar não atualizados como erro
+          erros += Math.max(0, batch.length - atualizados);
+        }
+
+        console.log(`✅ Batch ${batchNum} atualizado. Registros atualizados: ${atualizados}`);
       } catch (error) {
         console.error(`❌ Exceção no batch ${batchNum}:`, error);
         erros += batch.length;
