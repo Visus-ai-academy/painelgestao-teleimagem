@@ -68,117 +68,95 @@ export const CorrigirTipificacaoNC = () => {
     setProgresso({ atual: 0, total: 0, percentual: 0 });
     setMensagemProgresso("Iniciando correção...");
 
-    const timeoutId = setTimeout(() => {
-      toast({
-        title: "Timeout",
-        description: "A operação está demorando mais do que o esperado. Verifique o status na aba Gerar.",
-        variant: "destructive",
-      });
-      setLoading(false);
-    }, 300000); // 5 minutos timeout
-
     try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const response = await fetch(
-        `${supabaseUrl}/functions/v1/corrigir-tipificacao-clientes-nc`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
-          },
-          body: JSON.stringify({ periodo_referencia: periodoSelecionado }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Erro na requisição');
-      }
-
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-
-      if (!reader) {
-        throw new Error('Não foi possível ler a resposta');
-      }
-
-      let resultadoFinal: any = null;
-      let lastUpdate = Date.now();
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) {
-          if (!resultadoFinal) {
-            throw new Error('Processo interrompido antes da conclusão. Verifique o status na aba Gerar.');
-          }
-          break;
-        }
-
-        lastUpdate = Date.now();
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n\n');
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              
-              switch (data.tipo) {
-                case 'inicio':
-                  setMensagemProgresso(data.mensagem);
-                  break;
-                case 'registros_encontrados':
-                  setProgresso({ atual: 0, total: data.total, percentual: 0 });
-                  setMensagemProgresso(`Encontrados ${data.total} registros para tipificar`);
-                  break;
-                case 'lote':
-                  const percentual = data.total_lotes > 0 
-                    ? Math.round((data.lote / data.total_lotes) * 100)
-                    : 0;
-                  setProgresso({ 
-                    atual: data.registros_tipificados, 
-                    total: progresso.total || data.registros_tipificados,
-                    percentual 
-                  });
-                  setMensagemProgresso(`Processando lote ${data.lote}/${data.total_lotes} - ${data.registros_tipificados} registros tipificados`);
-                  break;
-                case 'estatisticas':
-                  setMensagemProgresso(data.mensagem);
-                  break;
-                case 'concluido':
-                  resultadoFinal = data.resultado;
-                  setProgresso(prev => ({ atual: prev.total, total: prev.total, percentual: 100 }));
-                  setMensagemProgresso("Correção concluída!");
-                  break;
-                case 'erro':
-                  throw new Error(data.mensagem);
-              }
-            } catch (parseError) {
-              console.error('Erro ao processar mensagem:', parseError);
+      let resumeFrom = 0;
+      let concluido = false;
+      let totalTipificados = 0;
+      let totalErros = 0;
+      let totalRegistros = 0;
+      let totalLotes = 0;
+      
+      // Loop para processar todos os lotes em chunks
+      while (!concluido) {
+        setMensagemProgresso(`Processando lote ${resumeFrom + 1}...`);
+        
+        const { data, error } = await supabase.functions.invoke(
+          'corrigir-tipificacao-clientes-nc',
+          {
+            body: { 
+              periodo_referencia: periodoSelecionado,
+              resume_from: resumeFrom,
+              max_batches: 5
             }
           }
+        );
+
+        if (error) {
+          console.error('Erro na requisição:', error);
+          throw new Error(error.message || 'Erro na requisição');
+        }
+
+        if (!data || !data.sucesso) {
+          throw new Error(data?.erro || 'Erro desconhecido na correção');
+        }
+
+        // Atualizar progresso
+        totalTipificados += data.registros_tipificados || 0;
+        totalErros += data.registros_com_erro || 0;
+        totalRegistros = data.total_registros || 0;
+        totalLotes = data.total_lotes || 0;
+        
+        const percentual = totalLotes > 0 
+          ? Math.round((data.lotes_processados / totalLotes) * 100)
+          : 0;
+        
+        setProgresso({
+          atual: totalTipificados,
+          total: totalRegistros,
+          percentual
+        });
+
+        setMensagemProgresso(
+          `Processando lote ${data.lotes_processados}/${totalLotes} - ${totalTipificados} registros tipificados`
+        );
+
+        // Verificar se está concluído
+        concluido = data.concluido;
+        
+        // Se não está concluído, pegar o próximo ponto de retomada
+        if (!concluido && data.next_resume !== undefined) {
+          resumeFrom = data.next_resume;
         }
       }
 
-      clearTimeout(timeoutId);
+      // Correção concluída
+      const resultadoFinal = {
+        sucesso: true,
+        total_registros: totalRegistros,
+        registros_tipificados: totalTipificados,
+        registros_com_erro: totalErros
+      };
 
-      if (resultadoFinal) {
-        setResultado(resultadoFinal);
-        toast({
-          title: "Sucesso",
-          description: `Correção executada com sucesso. ${resultadoFinal.tipificacao?.registros_tipificados || 0} registros tipificados.`,
-        });
-      }
-    } catch (error: any) {
-      clearTimeout(timeoutId);
-      console.error('Erro ao executar correção:', error);
+      setResultado(resultadoFinal);
+      
       toast({
-        title: "Erro",
-        description: error.message || "Erro ao executar correção. Verifique o status na aba Gerar.",
+        title: "Correção Concluída",
+        description: `${totalTipificados} registros foram corrigidos com sucesso!`,
+      });
+    } catch (error: any) {
+      console.error('Erro ao executar correção:', error);
+      
+      toast({
+        title: "Erro na Correção",
+        description: error.message || "Ocorreu um erro ao processar a correção.",
         variant: "destructive",
       });
+      
+      setResultado({
+        sucesso: false,
+        erro: error.message
+      });
     } finally {
-      clearTimeout(timeoutId);
       setLoading(false);
     }
   };
@@ -280,72 +258,44 @@ export const CorrigirTipificacaoNC = () => {
         )}
 
         {resultado && (
-          <div className="mt-4 space-y-3">
-            <Alert>
-              <CheckCircle className="h-4 w-4" />
-              <AlertDescription>
-                <strong>Correção concluída com sucesso!</strong>
-              </AlertDescription>
-            </Alert>
-
-            <div className="rounded-lg border bg-card p-4 space-y-2">
-              <h4 className="font-semibold text-sm">Resultados da Tipificação:</h4>
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div>
-                  <span className="text-muted-foreground">Registros tipificados:</span>
-                  <span className="ml-2 font-medium text-green-600">{resultado.tipificacao?.registros_tipificados ?? resultado.tipificacao?.registros_processados ?? 0}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Lotes processados:</span>
-                  <span className="ml-2 font-medium">{resultado.tipificacao?.lotes_processados ?? resultado.tipificacao?.lotes_retipificados ?? 0}</span>
-                </div>
-              </div>
-
-              {resultado.tipificacao && (
-                <div className="mt-3 pt-3 border-t">
-                  <h5 className="font-semibold text-sm mb-2">Re-tipificação executada:</h5>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div>
-                      <span className="text-muted-foreground">Lotes processados:</span>
-                      <span className="ml-2 font-medium">{resultado.tipificacao.lotes_retipificados}</span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Registros atualizados:</span>
-                      <span className="ml-2 font-medium">{resultado.tipificacao.registros_processados}</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {resultado.estatisticas?.por_cliente && Object.keys(resultado.estatisticas.por_cliente).length > 0 && (
-                <div className="mt-3 pt-3 border-t">
-                  <h5 className="font-semibold text-sm mb-2">Estatísticas por Cliente:</h5>
+          <Alert variant={resultado.sucesso ? "default" : "destructive"}>
+            {resultado.sucesso ? (
+              <>
+                <CheckCircle className="h-4 w-4" />
+                <AlertDescription>
+                  <div className="font-semibold mb-2">Correção executada com sucesso!</div>
                   <div className="space-y-1 text-sm">
-                    {Object.entries(resultado.estatisticas.por_cliente).map(([cliente, configs]: [string, any]) => (
-                      <div key={cliente}>
-                        <span className="font-medium">{cliente}:</span>
-                        <div className="ml-4 text-muted-foreground">
-                          {Object.entries(configs).map(([key, config]: [string, any]) => (
-                            <div key={key}>
-                              {config.total} registros (tipo_cliente: {config.tipo_cliente}, tipo_faturamento: {config.tipo_faturamento})
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
+                    <div>Total de registros: {resultado.total_registros?.toLocaleString() || 0}</div>
+                    <div>Registros tipificados: {resultado.registros_tipificados?.toLocaleString() || 0}</div>
+                    {resultado.registros_com_erro > 0 && (
+                      <div className="text-destructive">Registros com erro: {resultado.registros_com_erro}</div>
+                    )}
                   </div>
-                </div>
-              )}
-            </div>
-          </div>
+                </AlertDescription>
+              </>
+            ) : (
+              <>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  <div className="font-semibold mb-2">Erro na correção</div>
+                  <div className="text-sm">{resultado.erro}</div>
+                </AlertDescription>
+              </>
+            )}
+          </Alert>
         )}
 
         <Alert>
           <AlertCircle className="h-4 w-4" />
-          <AlertDescription className="text-xs">
-            <strong>Quando usar:</strong> Execute esta correção quando identificar clientes NC (Não Consolidados) com tipificação incorreta 
-            ou quando não estão sendo gerados demonstrativos de faturamento para clientes que deveriam ter. 
-            <strong>Tipos de Cliente:</strong> CO, NC, NC1 | <strong>Tipos de Faturamento:</strong> CO-FT, CO-NT, NC-FT, NC-NT, NC1-NF
+          <AlertDescription>
+            <strong>Detalhamento dos tipos de clientes e faturamento:</strong>
+            <ul className="list-disc list-inside mt-2 space-y-1 text-sm">
+              <li><strong>CO:</strong> Cliente Consolidado - faturas agrupadas</li>
+              <li><strong>NC:</strong> Cliente Não Consolidado - fatura individual</li>
+              <li><strong>CO-FT:</strong> Consolidado com Faturamento</li>
+              <li><strong>NC-FT:</strong> Não Consolidado com Faturamento</li>
+              <li><strong>NC-NF:</strong> Não Consolidado Sem Faturamento</li>
+            </ul>
           </AlertDescription>
         </Alert>
       </CardContent>
