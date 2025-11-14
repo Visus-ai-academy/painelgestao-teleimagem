@@ -68,6 +68,15 @@ export const CorrigirTipificacaoNC = () => {
     setProgresso({ atual: 0, total: 0, percentual: 0 });
     setMensagemProgresso("Iniciando correção...");
 
+    const timeoutId = setTimeout(() => {
+      toast({
+        title: "Timeout",
+        description: "A operação está demorando mais do que o esperado. Verifique o status na aba Gerar.",
+        variant: "destructive",
+      });
+      setLoading(false);
+    }, 300000); // 5 minutos timeout
+
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const response = await fetch(
@@ -94,51 +103,64 @@ export const CorrigirTipificacaoNC = () => {
       }
 
       let resultadoFinal: any = null;
+      let lastUpdate = Date.now();
 
       while (true) {
         const { done, value } = await reader.read();
-        if (done) break;
+        if (done) {
+          if (!resultadoFinal) {
+            throw new Error('Processo interrompido antes da conclusão. Verifique o status na aba Gerar.');
+          }
+          break;
+        }
 
+        lastUpdate = Date.now();
         const chunk = decoder.decode(value);
         const lines = chunk.split('\n\n');
 
         for (const line of lines) {
           if (line.startsWith('data: ')) {
-            const data = JSON.parse(line.slice(6));
-            
-            switch (data.tipo) {
-              case 'inicio':
-                setMensagemProgresso(data.mensagem);
-                break;
-              case 'registros_encontrados':
-                setProgresso({ atual: 0, total: data.total, percentual: 0 });
-                setMensagemProgresso(`Encontrados ${data.total} registros para tipificar`);
-                break;
-              case 'lote':
-                const percentual = data.total_lotes > 0 
-                  ? Math.round((data.lote / data.total_lotes) * 100)
-                  : 0;
-                setProgresso({ 
-                  atual: data.registros_tipificados, 
-                  total: progresso.total || data.registros_tipificados,
-                  percentual 
-                });
-                setMensagemProgresso(`Processando lote ${data.lote}/${data.total_lotes} - ${data.registros_tipificados} registros tipificados`);
-                break;
-              case 'estatisticas':
-                setMensagemProgresso(data.mensagem);
-                break;
-              case 'concluido':
-                resultadoFinal = data.resultado;
-                setProgresso(prev => ({ atual: prev.total, total: prev.total, percentual: 100 }));
-                setMensagemProgresso("Correção concluída!");
-                break;
-              case 'erro':
-                throw new Error(data.mensagem);
+            try {
+              const data = JSON.parse(line.slice(6));
+              
+              switch (data.tipo) {
+                case 'inicio':
+                  setMensagemProgresso(data.mensagem);
+                  break;
+                case 'registros_encontrados':
+                  setProgresso({ atual: 0, total: data.total, percentual: 0 });
+                  setMensagemProgresso(`Encontrados ${data.total} registros para tipificar`);
+                  break;
+                case 'lote':
+                  const percentual = data.total_lotes > 0 
+                    ? Math.round((data.lote / data.total_lotes) * 100)
+                    : 0;
+                  setProgresso({ 
+                    atual: data.registros_tipificados, 
+                    total: progresso.total || data.registros_tipificados,
+                    percentual 
+                  });
+                  setMensagemProgresso(`Processando lote ${data.lote}/${data.total_lotes} - ${data.registros_tipificados} registros tipificados`);
+                  break;
+                case 'estatisticas':
+                  setMensagemProgresso(data.mensagem);
+                  break;
+                case 'concluido':
+                  resultadoFinal = data.resultado;
+                  setProgresso(prev => ({ atual: prev.total, total: prev.total, percentual: 100 }));
+                  setMensagemProgresso("Correção concluída!");
+                  break;
+                case 'erro':
+                  throw new Error(data.mensagem);
+              }
+            } catch (parseError) {
+              console.error('Erro ao processar mensagem:', parseError);
             }
           }
         }
       }
+
+      clearTimeout(timeoutId);
 
       if (resultadoFinal) {
         setResultado(resultadoFinal);
@@ -148,13 +170,15 @@ export const CorrigirTipificacaoNC = () => {
         });
       }
     } catch (error: any) {
+      clearTimeout(timeoutId);
       console.error('Erro ao executar correção:', error);
       toast({
         title: "Erro",
-        description: error.message || "Erro ao executar correção",
+        description: error.message || "Erro ao executar correção. Verifique o status na aba Gerar.",
         variant: "destructive",
       });
     } finally {
+      clearTimeout(timeoutId);
       setLoading(false);
     }
   };

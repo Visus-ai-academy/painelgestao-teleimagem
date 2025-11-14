@@ -228,8 +228,8 @@ serve(async (req) => {
               return { tipo_faturamento: 'NC-NF', tipo_cliente: 'NC' };
             };
 
-            // Processar em lotes de 500 registros
-            const BATCH_SIZE = 500;
+            // Processar em lotes de 300 registros com delays para evitar timeout de CPU
+            const BATCH_SIZE = 300;
             let totalProcessados = 0;
             let totalAtualizados = 0;
             let totalComErro = 0;
@@ -278,6 +278,11 @@ serve(async (req) => {
 
               totalProcessados += batch.length;
               console.log(`✅ Lote processado: ${totalAtualizados} atualizados, ${totalComErro} erros`);
+              
+              // Adicionar pequeno delay entre lotes para evitar timeout de CPU
+              if (loteAtual < totalLotes) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+              }
             }
 
             tipificacaoResult = {
