@@ -32,9 +32,9 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { arquivo_fonte, lote_upload } = await req.json();
+    const { arquivo_fonte, lote_upload, periodo_referencia } = await req.json();
 
-    console.log(`🔄 Aplicando tipificação de faturamento - Arquivo: ${arquivo_fonte}, Lote: ${lote_upload}`);
+    console.log(`🔄 Aplicando tipificação de faturamento - Arquivo: ${arquivo_fonte}, Lote: ${lote_upload}, Período: ${periodo_referencia}`);
 
     // 1. Buscar registros que precisam de tipificação
     let query = supabaseClient
@@ -42,7 +42,10 @@ serve(async (req) => {
       .select('id, "EMPRESA", "MODALIDADE", "ESPECIALIDADE", "CATEGORIA", "PRIORIDADE", "MEDICO"');
 
     // Aplicar filtros conforme parâmetros
-    if (arquivo_fonte && lote_upload) {
+    if (periodo_referencia) {
+      // Filtrar por período e apenas registros sem tipo de faturamento
+      query = query.eq('periodo_referencia', periodo_referencia).is('tipo_faturamento', null);
+    } else if (arquivo_fonte && lote_upload) {
       query = query.eq('arquivo_fonte', arquivo_fonte).eq('lote_upload', lote_upload);
     } else if (arquivo_fonte) {
       query = query.eq('arquivo_fonte', arquivo_fonte);
