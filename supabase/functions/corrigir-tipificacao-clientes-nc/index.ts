@@ -34,20 +34,9 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { periodo_referencia } = await req.json();
-    
-    // Create a TransformStream for streaming progress updates
-    const stream = new TransformStream();
-    const writer = stream.writable.getWriter();
-    const encoder = new TextEncoder();
-    
-    // Send progress update helper
-    const sendProgress = async (data: any) => {
-      await writer.write(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
-    };
+    const { periodo_referencia, resume_from = 0, max_batches = 5 } = await req.json();
 
     if (!periodo_referencia) {
-      await writer.close();
       return new Response(JSON.stringify({
         sucesso: false,
         erro: 'periodo_referencia é obrigatório'
@@ -57,309 +46,236 @@ serve(async (req) => {
       });
     }
 
-    // Start processing asynchronously
-    (async () => {
-      try {
-        await sendProgress({ tipo: 'inicio', mensagem: 'Iniciando correção de tipificação...' });
+    console.log(`🔧 Iniciando correção de tipificação de clientes NC para período ${periodo_referencia} (lote ${resume_from})...`);
 
-        console.log(`🔧 Iniciando correção de tipificação de clientes NC para período ${periodo_referencia}...`);
-
-    // 1. Buscar todos os clientes NC com contratos
-    const { data: clientesNC, error: clientesError } = await supabase
-      .from('clientes')
-      .select(`
-        id,
-        nome,
-        nome_fantasia,
-        contratos_clientes (
-          id,
-          tipo_cliente,
-          tipo_faturamento,
-          status
-        )
-      `)
-      .in('nome', CLIENTES_NC);
-
-    if (clientesError) {
-      throw clientesError;
-    }
-
-        console.log(`📋 Encontrados ${clientesNC?.length || 0} clientes NC no sistema`);
-        await sendProgress({ tipo: 'clientes', total: clientesNC?.length || 0 });
-
-        // 2. Corrigir contratos com tipo_cliente incorreto
+    // 1. Buscar todos os clientes NC com contratos (somente na primeira chamada)
     let contratosCorrigidos = 0;
-    const contratosParaCorrigir: string[] = [];
+    if (resume_from === 0) {
+      const { data: clientesNC, error: clientesError } = await supabase
+        .from('clientes')
+        .select(`
+          id,
+          nome,
+          nome_fantasia,
+          contratos_clientes (
+            id,
+            tipo_cliente,
+            tipo_faturamento,
+            status
+          )
+        `)
+        .in('nome', CLIENTES_NC);
 
-    for (const cliente of clientesNC || []) {
-      if (cliente.contratos_clientes) {
-        for (const contrato of cliente.contratos_clientes) {
-          if (contrato.tipo_cliente !== 'NC' && contrato.status === 'ativo') {
-            contratosParaCorrigir.push(contrato.id);
-            console.log(`⚠️  ${cliente.nome}: contrato ${contrato.id} com tipo_cliente incorreto (${contrato.tipo_cliente})`);
+      if (clientesError) {
+        throw clientesError;
+      }
+
+      console.log(`📋 Encontrados ${clientesNC?.length || 0} clientes NC no sistema`);
+
+      // 2. Corrigir contratos com tipo_cliente incorreto
+      const contratosParaCorrigir: string[] = [];
+
+      for (const cliente of clientesNC || []) {
+        if (cliente.contratos_clientes) {
+          for (const contrato of cliente.contratos_clientes) {
+            if (contrato.tipo_cliente !== 'NC' && contrato.status === 'ativo') {
+              contratosParaCorrigir.push(contrato.id);
+              console.log(`⚠️  ${cliente.nome}: contrato ${contrato.id} com tipo_cliente incorreto (${contrato.tipo_cliente})`);
+            }
           }
         }
       }
-    }
 
-    if (contratosParaCorrigir.length > 0) {
-      console.log(`🔧 Corrigindo ${contratosParaCorrigir.length} contratos...`);
-      
-      for (const contratoId of contratosParaCorrigir) {
-        const { error: updateError } = await supabase
-          .from('contratos_clientes')
-          .update({ tipo_cliente: 'NC' })
-          .eq('id', contratoId);
+      if (contratosParaCorrigir.length > 0) {
+        console.log(`🔧 Corrigindo ${contratosParaCorrigir.length} contratos...`);
+        
+        for (const contratoId of contratosParaCorrigir) {
+          const { error: updateError } = await supabase
+            .from('contratos_clientes')
+            .update({ tipo_cliente: 'NC' })
+            .eq('id', contratoId);
 
-        if (updateError) {
-          console.error(`❌ Erro ao corrigir contrato ${contratoId}:`, updateError);
-        } else {
-          contratosCorrigidos++;
+          if (updateError) {
+            console.error(`❌ Erro ao corrigir contrato ${contratoId}:`, updateError);
+          } else {
+            contratosCorrigidos++;
+          }
         }
-      }
 
         console.log(`✅ ${contratosCorrigidos} contratos corrigidos`);
-        await sendProgress({ tipo: 'contratos', corrigidos: contratosCorrigidos });
       } else {
-        console.log('✅ Todos os contratos já estão corretos');
-        await sendProgress({ tipo: 'contratos', corrigidos: 0 });
+        console.log(`✅ Todos os contratos já estão corretos`);
       }
+    }
 
-        // 3. FORÇAR tipificação COMPLETA para clientes NC no período específico
-        let tipificacaoResult = null;
-        
-        console.log(`🔄 FORÇANDO tipificação COMPLETA para clientes NC no período ${periodo_referencia}...`);
-        await sendProgress({ tipo: 'iniciando_tipificacao', mensagem: 'Buscando registros para tipificação...' });
+    // 3. Buscar registros dos clientes NC no período específico
+    console.log(`🔄 Buscando registros para tipificação no período ${periodo_referencia}...`);
     
-    // Buscar registros dos clientes NC no período específico que precisam de tipificação
-    const queryRegistros = supabase
+    const { data: registros, error: registrosError } = await supabase
       .from('volumetria_mobilemed')
       .select('id, "EMPRESA", "MODALIDADE", "ESPECIALIDADE", "CATEGORIA", "PRIORIDADE", "MEDICO"')
       .in('EMPRESA', CLIENTES_NC)
       .eq('periodo_referencia', periodo_referencia);
-    
-    const { data: registros, error: registrosError } = await queryRegistros;
 
-        if (registrosError) {
-          console.error('❌ Erro ao buscar registros:', registrosError);
-          await sendProgress({ tipo: 'erro', mensagem: 'Erro ao buscar registros' });
-          tipificacaoResult = {
-            registros_processados: 0,
-            registros_com_erro: 0,
-            registros_tipificados: 0
-          };
-        } else {
-          console.log(`📊 Encontrados ${registros?.length || 0} registros de clientes NC para re-tipificar`);
-          await sendProgress({ tipo: 'registros_encontrados', total: registros?.length || 0 });
+    if (registrosError) {
+      throw registrosError;
+    }
 
-          if (registros && registros.length > 0) {
-            // Médicos da Equipe 2
-            const MEDICOS_EQUIPE_2 = [
-          'Dr. Antonio Gualberto Chianca Filho', 'Dr. Daniel Chrispim', 'Dr. Efraim Da Silva Ferreira', 
-          'Dr. Felipe Falcão de Sá', 'Dr. Guilherme N. Schincariol', 'Dr. Gustavo Andreis', 
-          'Dr. João Carlos Dantas do Amaral', 'Dr. João Fernando Miranda Pompermayer', 
-          'Dr. Leonardo de Paula Ribeiro Figueiredo', 'Dr. Raphael Sanfelice João', 'Dr. Thiago P. Martins', 
-          'Dr. Virgílio Oliveira Barreto', 'Dra. Adriana Giubilei Pimenta', 'Dra. Aline Andrade Dorea', 
-          'Dra. Camila Amaral Campos', 'Dra. Cynthia Mendes Vieira de Morais', 'Dra. Fernanda Gama Barbosa', 
-          'Dra. Kenia Menezes Fernandes', 'Dra. Lara M. Durante Bacelar', 'Dr. Aguinaldo Cunha Zuppani', 
-          'Dr. Alex Gueiros de Barros', 'Dr. Eduardo Caminha Nunes', 'Dr. Márcio D\'Andréa Rossi', 
-          'Dr. Rubens Pereira Moura Filho', 'Dr. Wesley Walber da Silva', 'Dra. Luna Azambuja Satte Alam', 
-          'Dra. Roberta Bertoldo Sabatini Treml', 'Dra. Thais Nogueira D. Gastaldi', 'Dra. Vanessa da Costa Maldonado'
-            ];
+    const totalRegistros = registros?.length || 0;
+    console.log(`📊 Total de ${totalRegistros} registros encontrados`);
 
-            // Clientes NC que seguem regra: Cardio OU Plantão
-            const CLIENTES_CARDIO_OU_PLANTAO = [
-          'CDICARDIO', 'CDIGOIAS', 'CISP', 'CRWANDERLEY', 'DIAGMAX-PR', 'GOLD', 'PRODIMAGEM', 'TRANSDUSON', 'ZANELLO'
-            ];
+    if (totalRegistros === 0) {
+      return new Response(JSON.stringify({
+        sucesso: true,
+        concluido: true,
+        contratos_corrigidos: contratosCorrigidos,
+        lotes_processados: 0,
+        registros_processados: 0,
+        registros_tipificados: 0,
+        registros_com_erro: 0,
+        total_registros: 0,
+        total_lotes: 0,
+        next_resume: null
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
-            // Clientes NC que seguem regra: Cardio E Plantão
-            const CLIENTES_CARDIO_E_PLANTAO = ['CEMVALENCA', 'RMPADUA'];
+    // Médicos da Equipe 2
+    const MEDICOS_EQUIPE_2 = [
+      'Dr. Antonio Gualberto Chianca Filho', 'Dr. Daniel Chrispim', 'Dr. Efraim Da Silva Ferreira', 
+      'Dr. Felipe Falcão de Sá', 'Dr. Guilherme N. Schincariol', 'Dr. Gustavo Andreis', 
+      'Dr. João Carlos Dantas do Amaral', 'Dr. João Fernando Miranda Pompermayer', 
+      'Dr. Leonardo de Paula Ribeiro Figueiredo', 'Dr. Raphael Sanfelice João', 'Dr. Thiago P. Martins', 
+      'Dr. Virgílio Oliveira Barreto', 'Dra. Adriana Giubilei Pimenta', 'Dra. Aline Andrade Dorea', 
+      'Dra. Camila Amaral Campos', 'Dra. Cynthia Mendes Vieira de Morais', 'Dra. Fernanda Gama Barbosa', 
+      'Dra. Kenia Menezes Fernandes', 'Dra. Lara M. Durante Bacelar', 'Dr. Aguinaldo Cunha Zuppani', 
+      'Dr. Alex Gueiros de Barros', 'Dr. Eduardo Caminha Nunes', 'Dr. Márcio D\'Andréa Rossi', 
+      'Dr. Rubens Pereira Moura Filho', 'Dr. Wesley Walber da Silva', 'Dra. Luna Azambuja Satte Alam', 
+      'Dra. Roberta Bertoldo Sabatini Treml', 'Dra. Thais Nogueira D. Gastaldi', 'Dra. Vanessa da Costa Maldonado'
+    ];
 
-            // Cliente especial RADI-IMAGEM
-            const RADI_IMAGEM = 'RADI-IMAGEM';
+    // Clientes NC que seguem regra: Cardio OU Plantão
+    const CLIENTES_CARDIO_OU_PLANTAO = [
+      'CDICARDIO', 'CDIGOIAS', 'CISP', 'CRWANDERLEY', 'DIAGMAX-PR', 'GOLD', 'PRODIMAGEM', 'TRANSDUSON', 'ZANELLO'
+    ];
 
-            // Função de tipificação
-            const determinarTipoFaturamento = (record: any): { tipo_faturamento: string; tipo_cliente: string } => {
-              const empresa = record.EMPRESA;
-              const modalidade = record.MODALIDADE || '';
-              const especialidade = record.ESPECIALIDADE || '';
-              const categoria = record.CATEGORIA || '';
-              const prioridade = record.PRIORIDADE || '';
-              const medico = record.MEDICO || '';
+    // Clientes NC que seguem regra: Cardio E Plantão
+    const CLIENTES_CARDIO_E_PLANTAO = ['CEMVALENCA', 'RMPADUA'];
 
-              const isCardio = especialidade.toLowerCase().includes('cardio') || 
-                              modalidade.toLowerCase().includes('cardio');
-              const isPlantao = prioridade === 'URGENTE';
-              const isEquipe2 = MEDICOS_EQUIPE_2.includes(medico);
+    // Cliente especial RADI-IMAGEM
+    const RADI_IMAGEM = 'RADI-IMAGEM';
 
-              // Cliente especial: RADI-IMAGEM
-              if (empresa === RADI_IMAGEM) {
-                if (isEquipe2) {
-                  return { tipo_faturamento: 'NC-FT', tipo_cliente: 'NC' };
-                }
-                return { tipo_faturamento: 'CO-FT', tipo_cliente: 'CO' };
-              }
+    // Função de tipificação
+    const determinarTipoFaturamento = (record: any): { tipo_faturamento: string; tipo_cliente: string } => {
+      const empresa = record.EMPRESA;
+      const modalidade = record.MODALIDADE || '';
+      const especialidade = record.ESPECIALIDADE || '';
+      const categoria = record.CATEGORIA || '';
+      const prioridade = record.PRIORIDADE || '';
+      const medico = record.MEDICO || '';
 
-              // Clientes NC: Cardio OU Plantão
-              if (CLIENTES_CARDIO_OU_PLANTAO.includes(empresa)) {
-                if (isCardio || isPlantao) {
-                  return { tipo_faturamento: 'NC-FT', tipo_cliente: 'NC' };
-                }
-                return { tipo_faturamento: 'NC-NF', tipo_cliente: 'NC' };
-              }
+      const isCardio = especialidade.toLowerCase().includes('cardio') || 
+                      modalidade.toLowerCase().includes('cardio');
+      const isPlantao = prioridade === 'URGENTE';
+      const isEquipe2 = MEDICOS_EQUIPE_2.includes(medico);
 
-              // Clientes NC: Cardio E Plantão
-              if (CLIENTES_CARDIO_E_PLANTAO.includes(empresa)) {
-                if (isCardio && isPlantao) {
-                  return { tipo_faturamento: 'NC-FT', tipo_cliente: 'NC' };
-                }
-                return { tipo_faturamento: 'NC-NF', tipo_cliente: 'NC' };
-              }
-
-              // Cliente CLIRAM: apenas Equipe2
-              if (empresa === 'CLIRAM') {
-                if (isEquipe2) {
-                  return { tipo_faturamento: 'NC1-NF', tipo_cliente: 'NC1' };
-                }
-                return { tipo_faturamento: 'NC-NF', tipo_cliente: 'NC' };
-              }
-
-              // Padrão para clientes NC
-              return { tipo_faturamento: 'NC-NF', tipo_cliente: 'NC' };
-            };
-
-            // Processar em lotes de 300 registros com delays para evitar timeout de CPU
-            const BATCH_SIZE = 300;
-            let totalProcessados = 0;
-            let totalAtualizados = 0;
-            let totalComErro = 0;
-
-            for (let i = 0; i < registros.length; i += BATCH_SIZE) {
-              const batch = registros.slice(i, i + BATCH_SIZE);
-              const loteAtual = Math.floor(i / BATCH_SIZE) + 1;
-              const totalLotes = Math.ceil(registros.length / BATCH_SIZE);
-              
-              console.log(`📦 Processando lote ${loteAtual}/${totalLotes} (${batch.length} registros)...`);
-              await sendProgress({ 
-                tipo: 'lote', 
-                lote: loteAtual, 
-                total_lotes: totalLotes,
-                registros_processados: totalProcessados,
-                registros_tipificados: totalAtualizados
-              });
-
-              // Preparar updates
-              const updates = batch.map(record => {
-                const { tipo_faturamento, tipo_cliente } = determinarTipoFaturamento(record);
-                return {
-                  id: record.id,
-                  tipo_faturamento,
-                  tipo_cliente
-                };
-              });
-
-              // Atualizar em lote
-              for (const update of updates) {
-                const { error: updateError } = await supabase
-                  .from('volumetria_mobilemed')
-                  .update({
-                    tipo_faturamento: update.tipo_faturamento,
-                    tipo_cliente: update.tipo_cliente
-                  })
-                  .eq('id', update.id);
-
-                if (updateError) {
-                  console.error(`❌ Erro ao atualizar registro ${update.id}:`, updateError);
-                  totalComErro++;
-                } else {
-                  totalAtualizados++;
-                }
-              }
-
-              totalProcessados += batch.length;
-              console.log(`✅ Lote processado: ${totalAtualizados} atualizados, ${totalComErro} erros`);
-              
-              // Adicionar pequeno delay entre lotes para evitar timeout de CPU
-              if (loteAtual < totalLotes) {
-                await new Promise(resolve => setTimeout(resolve, 100));
-              }
-            }
-
-            tipificacaoResult = {
-              registros_processados: totalProcessados,
-              registros_tipificados: totalAtualizados,
-              registros_com_erro: totalComErro
-            };
-          } else {
-            console.log('⚠️ Nenhum registro encontrado');
-            tipificacaoResult = {
-              registros_processados: 0,
-              registros_tipificados: 0,
-              registros_com_erro: 0
-            };
-          }
+      // Cliente especial: RADI-IMAGEM
+      if (empresa === RADI_IMAGEM) {
+        if (isEquipe2) {
+          return { tipo_faturamento: 'NC-FT', tipo_cliente: 'NC' };
         }
-
-        // 4. Estatísticas finais - buscar do banco APÓS aplicar tipificação (apenas clientes NC no período)
-        await sendProgress({ tipo: 'estatisticas', mensagem: 'Calculando estatísticas finais...' });
-        
-        const { data: volumetriaStats } = await supabase
-          .from('volumetria_mobilemed')
-          .select('"EMPRESA", tipo_cliente, tipo_faturamento')
-          .in('EMPRESA', CLIENTES_NC)
-          .eq('periodo_referencia', periodo_referencia);
-
-        const estatisticas = {
-          por_cliente: {} as Record<string, any>
-        };
-
-        // Agrupar por cliente mostrando APENAS os valores do contrato
-        volumetriaStats?.forEach((record: any) => {
-          const empresa = record.EMPRESA;
-          const key = `${record.tipo_cliente}_${record.tipo_faturamento}`;
-          
-          if (!estatisticas.por_cliente[empresa]) {
-            estatisticas.por_cliente[empresa] = {};
-          }
-          
-          if (!estatisticas.por_cliente[empresa][key]) {
-            estatisticas.por_cliente[empresa][key] = {
-              total: 0,
-              tipo_cliente: record.tipo_cliente,
-              tipo_faturamento: record.tipo_faturamento
-            };
-          }
-          estatisticas.por_cliente[empresa][key].total++;
-        });
-
-        const resultado = {
-          sucesso: true,
-          clientes_nc_cadastrados: CLIENTES_NC.length,
-          clientes_nc_encontrados: clientesNC?.length || 0,
-          contratos_corrigidos: contratosCorrigidos,
-          tipificacao: tipificacaoResult,
-          estatisticas: estatisticas,
-          timestamp: new Date().toISOString()
-        };
-
-        console.log('✅ Correção concluída:', resultado);
-
-        await sendProgress({ tipo: 'concluido', resultado });
-        await writer.close();
-      } catch (error) {
-        console.error('❌ Erro na correção:', error);
-        await sendProgress({ tipo: 'erro', mensagem: error.message });
-        await writer.close();
+        return { tipo_faturamento: 'CO-FT', tipo_cliente: 'CO' };
       }
-    })();
 
-    return new Response(stream.readable, {
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-      },
+      // Clientes NC: Cardio OU Plantão
+      if (CLIENTES_CARDIO_OU_PLANTAO.includes(empresa)) {
+        if (isCardio || isPlantao) {
+          return { tipo_faturamento: 'NC-FT', tipo_cliente: 'NC' };
+        }
+        return { tipo_faturamento: 'NC-NF', tipo_cliente: 'NC' };
+      }
+
+      // Clientes NC: Cardio E Plantão
+      if (CLIENTES_CARDIO_E_PLANTAO.includes(empresa)) {
+        if (isCardio && isPlantao) {
+          return { tipo_faturamento: 'NC-FT', tipo_cliente: 'NC' };
+        }
+        return { tipo_faturamento: 'NC-NF', tipo_cliente: 'NC' };
+      }
+
+      // Cliente CLIRAM: apenas Equipe2
+      if (empresa === 'CLIRAM') {
+        if (isEquipe2) {
+          return { tipo_faturamento: 'NC1-NF', tipo_cliente: 'NC1' };
+        }
+        return { tipo_faturamento: 'NC-NF', tipo_cliente: 'NC' };
+      }
+
+      // Padrão para clientes NC
+      return { tipo_faturamento: 'NC-NF', tipo_cliente: 'NC' };
+    };
+
+    // Processar em lotes
+    const BATCH_SIZE = 300;
+    const totalLotes = Math.ceil(totalRegistros / BATCH_SIZE);
+    const startBatch = resume_from;
+    const endBatch = Math.min(startBatch + max_batches, totalLotes);
+    
+    let totalAtualizados = 0;
+    let totalComErro = 0;
+
+    console.log(`📦 Processando lotes ${startBatch + 1} a ${endBatch} de ${totalLotes}...`);
+
+    for (let loteAtual = startBatch; loteAtual < endBatch; loteAtual++) {
+      const startIdx = loteAtual * BATCH_SIZE;
+      const endIdx = Math.min(startIdx + BATCH_SIZE, totalRegistros);
+      const batch = registros.slice(startIdx, endIdx);
+      
+      console.log(`📦 Processando lote ${loteAtual + 1}/${totalLotes} (${batch.length} registros)...`);
+
+      // Preparar e executar updates
+      for (const record of batch) {
+        const { tipo_faturamento, tipo_cliente } = determinarTipoFaturamento(record);
+        
+        const { error: updateError } = await supabase
+          .from('volumetria_mobilemed')
+          .update({
+            tipo_faturamento,
+            tipo_cliente
+          })
+          .eq('id', record.id);
+
+        if (updateError) {
+          console.error(`❌ Erro ao atualizar registro ${record.id}:`, updateError);
+          totalComErro++;
+        } else {
+          totalAtualizados++;
+        }
+      }
+
+      console.log(`✅ Lote ${loteAtual + 1} processado: ${totalAtualizados} atualizados, ${totalComErro} erros`);
+    }
+
+    const lotesProcessados = endBatch - startBatch;
+    const concluido = endBatch >= totalLotes;
+    const nextResume = concluido ? null : endBatch;
+
+    console.log(`✅ Chunk concluído: ${lotesProcessados} lotes processados, ${totalAtualizados} registros tipificados`);
+
+    return new Response(JSON.stringify({
+      sucesso: true,
+      concluido,
+      contratos_corrigidos: contratosCorrigidos,
+      lotes_processados: lotesProcessados,
+      registros_processados: lotesProcessados * BATCH_SIZE,
+      registros_tipificados: totalAtualizados,
+      registros_com_erro: totalComErro,
+      total_registros: totalRegistros,
+      total_lotes: totalLotes,
+      next_resume: nextResume
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
