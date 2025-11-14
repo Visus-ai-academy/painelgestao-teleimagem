@@ -93,8 +93,8 @@ serve(async (req) => {
 
     // 3. Lista de clientes NC (sem faturamento por padrão)
     const CLIENTES_NC = [
-      "CDICARDIO", "CDIGOIAS", "CISP", "CLIRAM", "CRWANDERLEY", "DIAGMAX-PR", 
-      "GOLD", "PRODIMAGEM", "TRANSDUSON", "ZANELLO", "CEMVALENCA", "RMPADUA", "RADI-IMAGEM"
+      "CBU", "CDICARDIO", "CDIGOIAS", "CICOMANGRA", "CISP", "CLIRAM", "CRWANDERLEY", "DIAGMAX-PR", 
+      "GOLD", "PRODIMAGEM", "RADMED", "TRANSDUSON", "ZANELLO", "CEMVALENCA", "RMPADUA", "RADI-IMAGEM"
     ];
 
     // 4. Clientes NC que seguem regra: Cardio OU Plantão
