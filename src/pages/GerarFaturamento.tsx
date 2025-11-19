@@ -74,6 +74,10 @@ export default function GerarFaturamento() {
 
   // Estado para controlar clientes selecionados para NF
   const [clientesSelecionadosNF, setClientesSelecionadosNF] = useState<Set<string>>(new Set());
+  
+  // Estados para filtros do Resumo Geral
+  const [filtroTipoCliente, setFiltroTipoCliente] = useState<string>("todos");
+  const [filtroTipoFaturamento, setFiltroTipoFaturamento] = useState<string>("todos");
   // Estados persistentes que não devem zerar ao trocar de aba
   const [relatoriosGerados, setRelatoriosGerados] = useState(() => {
     const saved = localStorage.getItem('relatoriosGerados');
@@ -2501,6 +2505,212 @@ export default function GerarFaturamento() {
                 setMostrarApenasDisponiveis={setMostrarApenasEditaveis}
                 onPeriodoChange={setPeriodoSelecionado}
               />
+            </CardContent>
+          </Card>
+
+          {/* Resumo Geral com Filtros */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileBarChart2 className="h-5 w-5" />
+                Resumo Geral - {periodoSelecionado}
+              </CardTitle>
+              <CardDescription>
+                Estatísticas e filtros por tipo de cliente e faturamento
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Filtros */}
+              <div className="flex flex-col sm:flex-row gap-4 p-4 bg-muted/50 rounded-lg">
+                <div className="flex-1">
+                  <label className="text-sm font-medium mb-2 block">Tipo de Cliente</label>
+                  <Select value={filtroTipoCliente} onValueChange={setFiltroTipoCliente}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos</SelectItem>
+                      <SelectItem value="CO">CO (Com Faturamento)</SelectItem>
+                      <SelectItem value="NC">NC (Não Contratual)</SelectItem>
+                      <SelectItem value="NC1">NC1 (Não Contratual 1)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="flex-1">
+                  <label className="text-sm font-medium mb-2 block">Tipo de Faturamento</label>
+                  <Select value={filtroTipoFaturamento} onValueChange={setFiltroTipoFaturamento}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos</SelectItem>
+                      <SelectItem value="CO-FT">CO-FT (CO com faturamento)</SelectItem>
+                      <SelectItem value="CO-NF">CO-NF (CO não faturado)</SelectItem>
+                      <SelectItem value="NC-FT">NC-FT (NC faturado)</SelectItem>
+                      <SelectItem value="NC-NF">NC-NF (NC não faturado)</SelectItem>
+                      <SelectItem value="NC1-NF">NC1-NF (NC1 não faturado)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Estatísticas Filtradas */}
+              {(() => {
+                const demonstrativosCompletos = localStorage.getItem(`demonstrativos_completos_${periodoSelecionado}`);
+                if (!demonstrativosCompletos) {
+                  return (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <FileBarChart2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>Gere o demonstrativo primeiro para visualizar as estatísticas</p>
+                    </div>
+                  );
+                }
+
+                try {
+                  const dados = JSON.parse(demonstrativosCompletos);
+                  const demonstrativos = dados.demonstrativos || [];
+
+                  // Aplicar filtros
+                  const demonstrativosFiltrados = demonstrativos.filter((demo: any) => {
+                    const tipoCliente = demo.tipo_cliente || demo.tipo || '';
+                    const tipoFaturamento = demo.tipo_faturamento || '';
+
+                    const passaTipoCliente = filtroTipoCliente === "todos" || tipoCliente === filtroTipoCliente;
+                    const passaTipoFaturamento = filtroTipoFaturamento === "todos" || tipoFaturamento === filtroTipoFaturamento;
+
+                    return passaTipoCliente && passaTipoFaturamento;
+                  });
+
+                  const totalClientes = demonstrativosFiltrados.length;
+                  const totalExames = demonstrativosFiltrados.reduce((s: number, d: any) => 
+                    s + Number(d.total_exames || d.total_laudos || 0), 0
+                  );
+                  const valorBruto = demonstrativosFiltrados.reduce((s: number, d: any) => 
+                    s + Number(d.valor_bruto_total || d.valor_bruto || 0), 0
+                  );
+                  const valorTotal = demonstrativosFiltrados.reduce((s: number, d: any) => 
+                    s + Number(d.valor_total_faturamento || d.valor_total || 0), 0
+                  );
+
+                  // Estatísticas por tipo
+                  const porTipoCliente = demonstrativosFiltrados.reduce((acc: any, d: any) => {
+                    const tipo = d.tipo_cliente || d.tipo || 'Não definido';
+                    if (!acc[tipo]) acc[tipo] = { count: 0, valor: 0 };
+                    acc[tipo].count++;
+                    acc[tipo].valor += Number(d.valor_total_faturamento || d.valor_total || 0);
+                    return acc;
+                  }, {});
+
+                  const porTipoFaturamento = demonstrativosFiltrados.reduce((acc: any, d: any) => {
+                    const tipo = d.tipo_faturamento || 'Não definido';
+                    if (!acc[tipo]) acc[tipo] = { count: 0, valor: 0 };
+                    acc[tipo].count++;
+                    acc[tipo].valor += Number(d.valor_total_faturamento || d.valor_total || 0);
+                    return acc;
+                  }, {});
+
+                  return (
+                    <div className="space-y-6">
+                      {/* Cards de Totais */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="p-4 rounded-lg bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-blue-700">Total de Clientes</p>
+                              <p className="text-2xl font-bold text-blue-900">{totalClientes}</p>
+                            </div>
+                            <Users className="h-8 w-8 text-blue-600 opacity-50" />
+                          </div>
+                        </div>
+
+                        <div className="p-4 rounded-lg bg-gradient-to-br from-green-50 to-green-100 border border-green-200">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-green-700">Total de Exames</p>
+                              <p className="text-2xl font-bold text-green-900">{totalExames.toLocaleString('pt-BR')}</p>
+                            </div>
+                            <FileText className="h-8 w-8 text-green-600 opacity-50" />
+                          </div>
+                        </div>
+
+                        <div className="p-4 rounded-lg bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-purple-700">Valor Bruto</p>
+                              <p className="text-2xl font-bold text-purple-900">
+                                {valorBruto.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                              </p>
+                            </div>
+                            <FileSpreadsheet className="h-8 w-8 text-purple-600 opacity-50" />
+                          </div>
+                        </div>
+
+                        <div className="p-4 rounded-lg bg-gradient-to-br from-orange-50 to-orange-100 border border-orange-200">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-orange-700">Valor Total</p>
+                              <p className="text-2xl font-bold text-orange-900">
+                                {valorTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                              </p>
+                            </div>
+                            <FileBarChart2 className="h-8 w-8 text-orange-600 opacity-50" />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Distribuição por Tipo de Cliente */}
+                      <div className="p-4 bg-muted/30 rounded-lg">
+                        <h4 className="font-semibold mb-3 flex items-center gap-2">
+                          <Users className="h-4 w-4" />
+                          Distribuição por Tipo de Cliente
+                        </h4>
+                        <div className="space-y-2">
+                          {Object.entries(porTipoCliente).map(([tipo, stats]: [string, any]) => (
+                            <div key={tipo} className="flex items-center justify-between p-2 bg-background rounded">
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline">{tipo}</Badge>
+                                <span className="text-sm text-muted-foreground">{stats.count} cliente(s)</span>
+                              </div>
+                              <span className="text-sm font-medium">
+                                {stats.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Distribuição por Tipo de Faturamento */}
+                      <div className="p-4 bg-muted/30 rounded-lg">
+                        <h4 className="font-semibold mb-3 flex items-center gap-2">
+                          <FileBarChart2 className="h-4 w-4" />
+                          Distribuição por Tipo de Faturamento
+                        </h4>
+                        <div className="space-y-2">
+                          {Object.entries(porTipoFaturamento).map(([tipo, stats]: [string, any]) => (
+                            <div key={tipo} className="flex items-center justify-between p-2 bg-background rounded">
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline">{tipo}</Badge>
+                                <span className="text-sm text-muted-foreground">{stats.count} cliente(s)</span>
+                              </div>
+                              <span className="text-sm font-medium">
+                                {stats.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                } catch (error) {
+                  return (
+                    <div className="text-center py-8 text-destructive">
+                      <AlertTriangle className="h-12 w-12 mx-auto mb-4" />
+                      <p>Erro ao carregar estatísticas</p>
+                    </div>
+                  );
+                }
+              })()}
             </CardContent>
           </Card>
 
