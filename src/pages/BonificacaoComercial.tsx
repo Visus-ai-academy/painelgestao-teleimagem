@@ -165,8 +165,8 @@ const gerarDadosCalculados = (
     // Habilitação bonificação - precisa ter retenção OK E contatos OK
     const habilitacaoBonificacao = retencaoCarteira === "OK" && realizouContatos100 === "OK";
     
-    // Faixa e valor de bonificação baseado no % Acumulado
-    const { faixa, valor } = calcularFaixaBonificacao(percentualAcumuladoMeta);
+    // Faixa e valor de bonificação baseado no % Atingido do Mês (não acumulado)
+    const { faixa, valor } = calcularFaixaBonificacao(percentualAtingidoMetaMes);
     const faixaReferencialBonificacao = faturamentoRealizadoCarteira > 0
       ? faixa
       : "";
