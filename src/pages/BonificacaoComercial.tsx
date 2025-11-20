@@ -66,7 +66,8 @@ const calcularFaixaBonificacao = (percentualAcumulado: number): { faixa: string;
 // Função para gerar dados calculados
 const gerarDadosCalculados = (
   faturamentosEditaveis: Record<string, number> = {},
-  contatosEditaveis: Record<string, string> = {}
+  contatosEditaveis: Record<string, string> = {},
+  basesEditadas: Record<string, number> = {}
 ): DadosBonificacao[] => {
   const dados: DadosBonificacao[] = [];
   let baseFaturamentoAnterior = configMetas.baseFaturamentoInicial;
@@ -94,15 +95,15 @@ const gerarDadosCalculados = (
     const meta = i < configMetas.mesesComMetaInicial ? configMetas.metaInicial : configMetas.metaPosterior;
     
     // Base de faturamento:
-    // - Primeiro mês (i=0): usa a base inicial
-    // - Demais meses: usa o faturamento realizado do mês anterior (se houver) ou a Meta Fat 100% do mês anterior
+    // - Primeiro mês (i=0): usa a base inicial configurada
+    // - Demais meses: usa a Meta Fat. 100% do mês anterior (ou valor editado manualmente)
     let baseFaturamento: number;
     if (i === 0) {
-      baseFaturamento = configMetas.baseFaturamentoInicial;
+      // Primeiro mês: usa valor editado ou base inicial
+      baseFaturamento = basesEditadas[mes] ?? configMetas.baseFaturamentoInicial;
     } else {
-      const mesAnterior = `${new Date(2025, 7 + i - 1, 1).getFullYear()}-${String(new Date(2025, 7 + i - 1, 1).getMonth() + 1).padStart(2, '0')}`;
-      const fatAnterior = faturamentoReal[mesAnterior] || 0;
-      baseFaturamento = fatAnterior > 0 ? fatAnterior : baseFaturamentoAnterior;
+      // Demais meses: usa valor editado ou Meta Fat. 100% do mês anterior
+      baseFaturamento = basesEditadas[mes] ?? baseFaturamentoAnterior;
     }
     
     // Calcula o valor não atingido redistribuído (apenas a partir do 2º mês)
@@ -251,9 +252,12 @@ export default function BonificacaoComercial() {
     "2025-09": "OK",
     "2025-10": "OK",
   });
+  
+  // Estado para armazenar bases de faturamento editadas manualmente
+  const [baseFaturamentoEditada, setBaseFaturamentoEditada] = useState<Record<string, number>>({});
 
   // Gera os dados calculados com as fórmulas do Excel
-  const dadosBonificacao = gerarDadosCalculados(faturamentosEditaveis, contatosEditaveis);
+  const dadosBonificacao = gerarDadosCalculados(faturamentosEditaveis, contatosEditaveis, baseFaturamentoEditada);
   
   const getBadgeRetencao = (retencao: string) => {
     if (retencao === "OK") {
@@ -457,7 +461,24 @@ export default function BonificacaoComercial() {
                 {dadosBonificacao.map((dado, index) => (
                   <TableRow key={index}>
                     <TableCell className="font-medium">{dado.mes}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(dado.baseFaturamento)}</TableCell>
+                    <TableCell className="text-right">
+                      <input
+                        type="text"
+                        value={baseFaturamentoEditada[dado.mes] !== undefined 
+                          ? baseFaturamentoEditada[dado.mes] 
+                          : dado.baseFaturamento || ''}
+                        onChange={(e) => {
+                          const valorLimpo = e.target.value.replace(/[^\d.,]/g, '').replace(',', '.');
+                          const valorNumerico = parseFloat(valorLimpo) || 0;
+                          setBaseFaturamentoEditada(prev => ({
+                            ...prev,
+                            [dado.mes]: valorNumerico
+                          }));
+                        }}
+                        className="w-full text-right bg-muted/30 border border-border/50 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary focus:bg-background"
+                        placeholder="0.00"
+                      />
+                    </TableCell>
                     <TableCell className="text-right">{formatCurrency(dado.metaIncremental)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(dado.metaFaturamento100)}</TableCell>
                     <TableCell className="text-right">
