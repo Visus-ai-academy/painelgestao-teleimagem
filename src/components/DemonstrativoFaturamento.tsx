@@ -72,6 +72,8 @@ export default function DemonstrativoFaturamento() {
   const [carregando, setCarregando] = useState(false);
   const [filtroNome, setFiltroNome] = useState("");
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
+  const [filtroTipoCliente, setFiltroTipoCliente] = useState<string>("todos");
+  const [filtroTipoFaturamento, setFiltroTipoFaturamento] = useState<string>("todos");
   // Persistir período selecionado - usar o mesmo localStorage que a página GerarFaturamento
   const [periodo, setPeriodo] = useState(() => {
     const saved = localStorage.getItem('periodoFaturamentoSelecionado');
@@ -1157,6 +1159,26 @@ export default function DemonstrativoFaturamento() {
       );
     }
 
+    // Filtro por tipo de cliente
+    if (filtroTipoCliente && filtroTipoCliente !== "todos") {
+      filtrados = filtrados.filter(c => {
+        const tipoFat = c.tipo_faturamento || '';
+        if (filtroTipoCliente === "CO") {
+          return tipoFat.startsWith("CO");
+        } else if (filtroTipoCliente === "NC") {
+          return tipoFat === "NC-FT" || tipoFat === "NC-NF";
+        } else if (filtroTipoCliente === "NC1") {
+          return tipoFat === "NC1-NF";
+        }
+        return true;
+      });
+    }
+
+    // Filtro por tipo de faturamento
+    if (filtroTipoFaturamento && filtroTipoFaturamento !== "todos") {
+      filtrados = filtrados.filter(c => c.tipo_faturamento === filtroTipoFaturamento);
+    }
+
     // Aplicar ordenação alfabética
     filtrados.sort((a, b) => {
       const comparison = a.nome.localeCompare(b.nome, 'pt-BR');
@@ -1164,7 +1186,7 @@ export default function DemonstrativoFaturamento() {
     });
 
     setClientesFiltrados(filtrados);
-  }, [clientes, filtroNome, filtroStatus, ordemAlfabetica]);
+  }, [clientes, filtroNome, filtroStatus, filtroTipoCliente, filtroTipoFaturamento, ordemAlfabetica]);
 
   // Carregar dados ao montar o componente
   useEffect(() => {
@@ -1387,8 +1409,45 @@ export default function DemonstrativoFaturamento() {
           <Card>
             <CardHeader>
               <CardTitle>Resumo Geral - {periodo}</CardTitle>
+              <CardDescription>
+                Estatísticas gerais com filtros por tipo de cliente e faturamento
+              </CardDescription>
             </CardHeader>
             <CardContent>
+              {/* Filtros */}
+              <div className="flex flex-col sm:flex-row gap-4 p-4 bg-muted/50 rounded-lg mb-6">
+                <div className="flex-1">
+                  <label className="text-sm font-medium mb-2 block">Tipo de Cliente</label>
+                  <Select value={filtroTipoCliente} onValueChange={setFiltroTipoCliente}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos</SelectItem>
+                      <SelectItem value="CO">CO (Com Faturamento)</SelectItem>
+                      <SelectItem value="NC">NC (Não Contratual)</SelectItem>
+                      <SelectItem value="NC1">NC1 (Não Contratual 1)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="flex-1">
+                  <label className="text-sm font-medium mb-2 block">Tipo de Faturamento</label>
+                  <Select value={filtroTipoFaturamento} onValueChange={setFiltroTipoFaturamento}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos</SelectItem>
+                      <SelectItem value="CO-FT">CO-FT (CO com faturamento)</SelectItem>
+                      <SelectItem value="CO-NF">CO-NF (CO não faturado)</SelectItem>
+                      <SelectItem value="NC-FT">NC-FT (NC faturado)</SelectItem>
+                      <SelectItem value="NC-NF">NC-NF (NC não faturado)</SelectItem>
+                      <SelectItem value="NC1-NF">NC1-NF (NC1 não faturado)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
                <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
                 <div className="text-center">
                   <div className="text-2xl font-bold text-blue-600">
@@ -1537,6 +1596,74 @@ export default function DemonstrativoFaturamento() {
           </div>
         </CardHeader>
         <CardContent>
+          <div className="space-y-4">
+            {/* Filtros */}
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="flex-1">
+                  <Label htmlFor="filtro-nome">Buscar Cliente</Label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="filtro-nome"
+                      placeholder="Digite o nome do cliente..."
+                      value={filtroNome}
+                      onChange={(e) => setFiltroNome(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+                <div className="w-full sm:w-[200px]">
+                  <Label htmlFor="filtro-status">Status</Label>
+                  <Select value={filtroStatus} onValueChange={setFiltroStatus}>
+                    <SelectTrigger id="filtro-status">
+                      <SelectValue placeholder="Todos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos</SelectItem>
+                      <SelectItem value="pendente">Pendente</SelectItem>
+                      <SelectItem value="pago">Pago</SelectItem>
+                      <SelectItem value="vencido">Vencido</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              {/* Filtros adicionais: Tipo de Cliente e Tipo de Faturamento */}
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="flex-1">
+                  <Label htmlFor="filtro-tipo-cliente">Tipo de Cliente</Label>
+                  <Select value={filtroTipoCliente} onValueChange={setFiltroTipoCliente}>
+                    <SelectTrigger id="filtro-tipo-cliente">
+                      <SelectValue placeholder="Todos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos</SelectItem>
+                      <SelectItem value="CO">CO (Com Faturamento)</SelectItem>
+                      <SelectItem value="NC">NC (Não Contratual)</SelectItem>
+                      <SelectItem value="NC1">NC1 (Não Contratual 1)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex-1">
+                  <Label htmlFor="filtro-tipo-faturamento">Tipo de Faturamento</Label>
+                  <Select value={filtroTipoFaturamento} onValueChange={setFiltroTipoFaturamento}>
+                    <SelectTrigger id="filtro-tipo-faturamento">
+                      <SelectValue placeholder="Todos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos</SelectItem>
+                      <SelectItem value="CO-FT">CO-FT (CO com faturamento)</SelectItem>
+                      <SelectItem value="CO-NF">CO-NF (CO não faturado)</SelectItem>
+                      <SelectItem value="NC-FT">NC-FT (NC faturado)</SelectItem>
+                      <SelectItem value="NC-NF">NC-NF (NC não faturado)</SelectItem>
+                      <SelectItem value="NC1-NF">NC1-NF (NC1 não faturado)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          
           {carregando ? (
             <div className="text-center py-8">
               <p className="text-gray-600">Carregando dados...</p>
@@ -1661,6 +1788,7 @@ export default function DemonstrativoFaturamento() {
               </table>
             </div>
           )}
+          </div>
         </CardContent>
       </Card>
     </div>
