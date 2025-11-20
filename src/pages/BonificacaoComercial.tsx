@@ -211,12 +211,17 @@ export default function BonificacaoComercial() {
   
   // Estado para armazenar faturamentos editáveis a partir de 2025-11
   const [faturamentosEditaveis, setFaturamentosEditaveis] = useState<Record<string, number>>({});
+  
+  // Estado para controlar qual campo está sendo editado
+  const [campoEmEdicao, setCampoEmEdicao] = useState<string | null>(null);
 
   // Gera os dados calculados com as fórmulas do Excel
   const dadosBonificacao = gerarDadosCalculados(faturamentosEditaveis);
   
   const handleFaturamentoChange = (mes: string, valor: string) => {
-    const valorNumerico = parseFloat(valor.replace(/[^\d.-]/g, '')) || 0;
+    // Remove tudo exceto números e vírgula/ponto
+    const valorLimpo = valor.replace(/[^\d.,]/g, '').replace(',', '.');
+    const valorNumerico = parseFloat(valorLimpo) || 0;
     setFaturamentosEditaveis(prev => ({
       ...prev,
       [mes]: valorNumerico
@@ -392,13 +397,16 @@ export default function BonificacaoComercial() {
                     <TableCell className="text-right">
                       {dado.mes >= "2025-11" ? (
                         <input
-                          type="text"
+                          type="number"
+                          step="0.01"
                           value={faturamentosEditaveis[dado.mes] !== undefined 
-                            ? formatCurrency(faturamentosEditaveis[dado.mes]) 
-                            : formatCurrency(dado.faturamentoRealizadoCarteira)}
+                            ? faturamentosEditaveis[dado.mes] 
+                            : dado.faturamentoRealizadoCarteira || ''}
                           onChange={(e) => handleFaturamentoChange(dado.mes, e.target.value)}
+                          onFocus={() => setCampoEmEdicao(dado.mes)}
+                          onBlur={() => setCampoEmEdicao(null)}
                           className="w-full text-right bg-muted border border-border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary"
-                          placeholder="R$ 0,00"
+                          placeholder="0.00"
                         />
                       ) : (
                         formatCurrency(dado.faturamentoRealizadoCarteira)
