@@ -64,7 +64,7 @@ const calcularFaixaBonificacao = (percentualAcumulado: number): { faixa: string;
 };
 
 // Função para gerar dados calculados
-const gerarDadosCalculados = (): DadosBonificacao[] => {
+const gerarDadosCalculados = (faturamentosEditaveis: Record<string, number> = {}): DadosBonificacao[] => {
   const dados: DadosBonificacao[] = [];
   let baseFaturamentoAnterior = configMetas.baseFaturamentoInicial;
   let metaAcumuladaTotal = 0;
@@ -76,7 +76,8 @@ const gerarDadosCalculados = (): DadosBonificacao[] => {
     "2025-08": 1395015.00,
     "2025-09": 1487147.00,
     "2025-10": 1534950.00,
-    // A partir de 2025-11 virá do sistema de faturamento (clientes tipo "CO")
+    // A partir de 2025-11 virá dos valores editáveis ou do sistema de faturamento
+    ...faturamentosEditaveis
   };
 
   // Dados de contato 100% da carteira (manual, mas por enquanto mockado como OK)
@@ -207,9 +208,20 @@ export default function BonificacaoComercial() {
   const [filtroColaborador, setFiltroColaborador] = useState("todos");
   const [filtroMesAno, setFiltroMesAno] = useState("todos");
   const [filtroCliente, setFiltroCliente] = useState("todos");
+  
+  // Estado para armazenar faturamentos editáveis a partir de 2025-11
+  const [faturamentosEditaveis, setFaturamentosEditaveis] = useState<Record<string, number>>({});
 
   // Gera os dados calculados com as fórmulas do Excel
-  const dadosBonificacao = gerarDadosCalculados();
+  const dadosBonificacao = gerarDadosCalculados(faturamentosEditaveis);
+  
+  const handleFaturamentoChange = (mes: string, valor: string) => {
+    const valorNumerico = parseFloat(valor.replace(/[^\d.-]/g, '')) || 0;
+    setFaturamentosEditaveis(prev => ({
+      ...prev,
+      [mes]: valorNumerico
+    }));
+  };
 
   const getBadgeRetencao = (retencao: string) => {
     if (retencao === "OK") {
@@ -405,7 +417,21 @@ export default function BonificacaoComercial() {
                     <TableCell className="text-right">{formatCurrency(dado.metaIncremental)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(dado.metaAcumulada)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(dado.metaFaturamento100)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(dado.faturamentoRealizadoCarteira)}</TableCell>
+                    <TableCell className="text-right">
+                      {dado.mes >= "2025-11" ? (
+                        <input
+                          type="text"
+                          value={faturamentosEditaveis[dado.mes] !== undefined 
+                            ? formatCurrency(faturamentosEditaveis[dado.mes]) 
+                            : formatCurrency(dado.faturamentoRealizadoCarteira)}
+                          onChange={(e) => handleFaturamentoChange(dado.mes, e.target.value)}
+                          className="w-full text-right bg-muted border border-border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary"
+                          placeholder="R$ 0,00"
+                        />
+                      ) : (
+                        formatCurrency(dado.faturamentoRealizadoCarteira)
+                      )}
+                    </TableCell>
                     <TableCell className="text-right">{formatCurrency(dado.valorMetaNaoAtingido)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(dado.resultadoCarteira)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(dado.resultadoAcumuladoCarteira)}</TableCell>
