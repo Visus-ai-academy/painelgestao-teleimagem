@@ -118,23 +118,19 @@ const gerarDadosCalculados = (
       ? faturamentoRealizadoCarteira - baseFaturamento 
       : 0;
     
-    // Valor da meta não atingido = Meta Incremental - Resultado
-    const valorMetaNaoAtingido = faturamentoRealizadoCarteira > 0
-      ? metaIncremental - resultadoCarteira
-      : 0;
-    
-    // Atualiza o acumulado de valor não atingido apenas se houver faturamento
-    if (faturamentoRealizadoCarteira > 0) {
-      if (valorMetaNaoAtingido > 0) {
-        // Só acumula se não atingiu a meta
-        valorNaoAtingidoAcumulado += valorMetaNaoAtingido;
-      }
-      // Se atingiu ou superou a meta, não acumula negativo
-    }
-    
     // Resultado acumulado - soma apenas dos meses com faturamento
     if (faturamentoRealizadoCarteira > 0) {
       resultadoAcumuladoTotal += resultadoCarteira;
+    }
+    
+    // Valor da meta não atingido = Meta Incremental - Resultado
+    const valorMetaNaoAtingido = faturamentoRealizadoCarteira > 0
+      ? Math.max(0, metaIncremental - resultadoCarteira)
+      : 0;
+    
+    // Atualiza o acumulado de valor não atingido apenas se houver faturamento
+    if (faturamentoRealizadoCarteira > 0 && valorMetaNaoAtingido > 0) {
+      valorNaoAtingidoAcumulado += valorMetaNaoAtingido;
     }
     
     // % Acumulado da meta = (Resultado Acumulado / Meta Acumulada) * 100
@@ -164,6 +160,26 @@ const gerarDadosCalculados = (
       ? faixa
       : "";
     const valorBonificacao = habilitacaoBonificacao && faturamentoRealizadoCarteira > 0 ? valor : 0;
+    
+    // Log de depuração para o mês atual
+    if (faturamentoRealizadoCarteira > 0) {
+      console.log(`📊 ${mes}:`, {
+        baseFaturamento: baseFaturamento.toFixed(2),
+        meta: meta.toFixed(2),
+        valorNaoAtingidoRedist: valorNaoAtingidoRedistribuido.toFixed(2),
+        metaIncremental: metaIncremental.toFixed(2),
+        metaFat100: metaFaturamento100.toFixed(2),
+        fatRealizado: faturamentoRealizadoCarteira.toFixed(2),
+        resultado: resultadoCarteira.toFixed(2),
+        valorMetaNaoAtingido: valorMetaNaoAtingido.toFixed(2),
+        resultadoAcum: resultadoAcumuladoTotal.toFixed(2),
+        metaAcum: metaAcumuladaTotal.toFixed(2),
+        percAcumMeta: percentualAcumuladoMeta.toFixed(2) + '%',
+        percAtingidoMes: percentualAtingidoMetaMes.toFixed(2) + '%',
+        faixa: faixaReferencialBonificacao,
+        valorBonif: valorBonificacao.toFixed(2)
+      });
+    }
     
     dados.push({
       mes,
