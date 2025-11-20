@@ -93,22 +93,32 @@ const gerarDadosCalculados = (
     // Define a meta do mês
     const meta = i < configMetas.mesesComMetaInicial ? configMetas.metaInicial : configMetas.metaPosterior;
     
-    // Calcula o valor não atingido redistribuído
-    // Fórmula: Distribui o valor não atingido acumulado pelos meses restantes
+    // Base de faturamento:
+    // - Primeiro mês (i=0): usa a base inicial
+    // - Demais meses: usa o faturamento realizado do mês anterior (se houver) ou a Meta Fat 100% do mês anterior
+    let baseFaturamento: number;
+    if (i === 0) {
+      baseFaturamento = configMetas.baseFaturamentoInicial;
+    } else {
+      const mesAnterior = `${new Date(2025, 7 + i - 1, 1).getFullYear()}-${String(new Date(2025, 7 + i - 1, 1).getMonth() + 1).padStart(2, '0')}`;
+      const fatAnterior = faturamentoReal[mesAnterior] || 0;
+      baseFaturamento = fatAnterior > 0 ? fatAnterior : baseFaturamentoAnterior;
+    }
+    
+    // Calcula o valor não atingido redistribuído (apenas a partir do 2º mês)
     const mesesFaltantes = configMetas.totalMeses - i;
-    const valorNaoAtingidoRedistribuido = mesesFaltantes > 0 ? valorNaoAtingidoAcumulado / mesesFaltantes : 0;
+    const valorNaoAtingidoRedistribuido = i > 0 && mesesFaltantes > 0 
+      ? valorNaoAtingidoAcumulado / mesesFaltantes 
+      : 0;
     
     // Meta incremental = Meta + Valor redistribuído
     const metaIncremental = meta + valorNaoAtingidoRedistribuido;
     
+    // Meta Faturamento 100% = Base Faturamento + Meta Incremental
+    const metaFaturamento100 = baseFaturamento + metaIncremental;
+    
     // Meta acumulada
     metaAcumuladaTotal += metaIncremental;
-    
-    // Base de faturamento (primeiro mês usa a base inicial, depois usa a Meta Faturamento 100% do mês anterior)
-    const baseFaturamento = i === 0 ? configMetas.baseFaturamentoInicial : baseFaturamentoAnterior;
-    
-    // Meta Faturamento 100%
-    const metaFaturamento100 = baseFaturamento + metaIncremental;
     
     // Faturamento realizado da carteira (vem dos dados reais ou será 0 se não houver)
     const faturamentoRealizadoCarteira = faturamentoReal[mes] || 0;
