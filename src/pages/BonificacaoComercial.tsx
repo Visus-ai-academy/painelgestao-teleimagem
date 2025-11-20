@@ -247,10 +247,14 @@ export default function BonificacaoComercial() {
   };
 
   const handleContatosChange = (mes: string, valor: string) => {
-    setContatosEditaveis(prev => ({
-      ...prev,
-      [mes]: valor
-    }));
+    // Permite apenas "OK" ou vazio
+    const valorUpper = valor.toUpperCase();
+    if (valorUpper === "OK" || valorUpper === "O" || valor === "") {
+      setContatosEditaveis(prev => ({
+        ...prev,
+        [mes]: valorUpper === "OK" || valorUpper === "O" ? "OK" : ""
+      }));
+    }
   };
 
   const getBadgeHabilitacao = (habilitado: boolean) => {
@@ -432,18 +436,29 @@ export default function BonificacaoComercial() {
                     <TableCell className="text-right">{formatCurrency(dado.metaFaturamento100)}</TableCell>
                     <TableCell className="text-right">
                       {dado.mes >= "2025-11" ? (
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={faturamentosEditaveis[dado.mes] !== undefined 
-                            ? faturamentosEditaveis[dado.mes] 
-                            : dado.faturamentoRealizadoCarteira || ''}
-                          onChange={(e) => handleFaturamentoChange(dado.mes, e.target.value)}
-                          onFocus={() => setCampoEmEdicao(dado.mes)}
-                          onBlur={() => setCampoEmEdicao(null)}
-                          className="w-full text-right bg-muted border border-border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary"
-                          placeholder="0.00"
-                        />
+                        campoEmEdicao === dado.mes ? (
+                          <input
+                            type="text"
+                            value={faturamentosEditaveis[dado.mes] !== undefined 
+                              ? faturamentosEditaveis[dado.mes] 
+                              : dado.faturamentoRealizadoCarteira || ''}
+                            onChange={(e) => handleFaturamentoChange(dado.mes, e.target.value)}
+                            onFocus={() => setCampoEmEdicao(dado.mes)}
+                            onBlur={() => setCampoEmEdicao(null)}
+                            className="w-full text-right bg-muted border border-border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary"
+                            placeholder="0.00"
+                            autoFocus
+                          />
+                        ) : (
+                          <div 
+                            onClick={() => setCampoEmEdicao(dado.mes)}
+                            className="cursor-pointer hover:bg-muted/50 rounded px-2 py-1"
+                          >
+                            {formatCurrency(faturamentosEditaveis[dado.mes] !== undefined 
+                              ? faturamentosEditaveis[dado.mes] 
+                              : dado.faturamentoRealizadoCarteira)}
+                          </div>
+                        )
                       ) : (
                         formatCurrency(dado.faturamentoRealizadoCarteira)
                       )}
