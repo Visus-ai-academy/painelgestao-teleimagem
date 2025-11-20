@@ -464,9 +464,9 @@ export default function BonificacaoComercial() {
                     <TableCell className="text-right">
                       <input
                         type="text"
-                        value={baseFaturamentoEditada[dado.mes] !== undefined 
+                        value={formatCurrency(baseFaturamentoEditada[dado.mes] !== undefined 
                           ? baseFaturamentoEditada[dado.mes] 
-                          : dado.baseFaturamento || ''}
+                          : dado.baseFaturamento || 0)}
                         onChange={(e) => {
                           const valorLimpo = e.target.value.replace(/[^\d.,]/g, '').replace(',', '.');
                           const valorNumerico = parseFloat(valorLimpo) || 0;
@@ -476,7 +476,7 @@ export default function BonificacaoComercial() {
                           }));
                         }}
                         className="w-full text-right bg-muted/30 border border-border/50 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary focus:bg-background"
-                        placeholder="0.00"
+                        placeholder="R$ 0,00"
                       />
                     </TableCell>
                     <TableCell className="text-right">{formatCurrency(dado.metaIncremental)}</TableCell>
