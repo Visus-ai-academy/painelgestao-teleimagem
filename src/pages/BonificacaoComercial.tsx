@@ -18,72 +18,176 @@ const faixasBonificacao = [
   { faixa: "super meta 5", percentualMin: 200, percentualMax: 999, percentualRemuneracao: 200, valorBase: 4700 },
 ];
 
-// Dados mockados baseados no Excel (a partir de 2025-08)
-const dadosBonificacao = [
-  {
-    mes: "2025-08",
-    baseFaturamento: 1425967.00,
-    meta: 44000.00,
-    valorNaoAtingidoRedistribuido: 0,
-    metaIncremental: 44000.00,
-    metaAcumulada: 44000.00,
-    metaFaturamento100: 1469967.00,
-    faturamentoRealizadoCarteira: 1395015.00,
-    valorMetaNaoAtingido: -74952.00,
-    mesesFaltantes: 22,
-    resultadoCarteira: -30952.00,
-    resultadoAcumuladoCarteira: -30952.00,
-    percentualAcumuladoMeta: -70.35,
-    percentualAtingidoMetaMes: -70.35,
-    retencaoCarteira: "Retração",
-    realizouContatos100: "OK",
-    habilitacaoBonificacao: false,
-    faixaReferencialBonificacao: "Abaixo 75%",
-    valorBonificacao: 0
-  },
-  {
-    mes: "2025-09",
-    baseFaturamento: 1469967.00,
-    meta: 44000.00,
-    valorNaoAtingidoRedistribuido: 3406.91,
-    metaIncremental: 47406.91,
-    metaAcumulada: 91406.91,
-    metaFaturamento100: 1517373.91,
-    faturamentoRealizadoCarteira: 1487147.00,
-    valorMetaNaoAtingido: -30226.91,
-    mesesFaltantes: 23,
-    resultadoCarteira: 17180.00,
-    resultadoAcumuladoCarteira: -13772.00,
-    percentualAcumuladoMeta: -15.07,
-    percentualAtingidoMetaMes: 36.24,
-    retencaoCarteira: "OK",
-    realizouContatos100: "OK",
-    habilitacaoBonificacao: true,
-    faixaReferencialBonificacao: "Abaixo 75%",
-    valorBonificacao: 0
-  },
-  {
-    mes: "2025-10",
-    baseFaturamento: 1565619.91,
-    meta: 44000.00,
-    valorNaoAtingidoRedistribuido: 4721.12,
-    metaIncremental: 48721.12,
-    metaAcumulada: 140128.03,
-    metaFaturamento100: 1614341.03,
-    faturamentoRealizadoCarteira: 1534950.00,
-    valorMetaNaoAtingido: -79391.03,
-    mesesFaltantes: 21,
-    resultadoCarteira: -30669.91,
-    resultadoAcumuladoCarteira: -44441.91,
-    percentualAcumuladoMeta: -31.72,
-    percentualAtingidoMetaMes: -62.95,
-    retencaoCarteira: "Retração",
-    realizouContatos100: "OK",
-    habilitacaoBonificacao: false,
-    faixaReferencialBonificacao: "Abaixo 75%",
-    valorBonificacao: 0
-  },
-];
+// Configuração de metas e base inicial
+const configMetas = {
+  baseFaturamentoInicial: 1425967.00, // Base para 2025-08
+  metaInicial: 44000.00, // Meta para os primeiros 3 meses
+  metaPosterior: 100000.00, // Meta a partir de 2025-11
+  mesInicialCalculo: "2025-08",
+  mesesComMetaInicial: 3, // Agosto, Setembro, Outubro
+  totalMeses: 24, // Total de meses do projeto
+};
+
+// Interface para dados de bonificação
+interface DadosBonificacao {
+  mes: string;
+  baseFaturamento: number;
+  meta: number;
+  valorNaoAtingidoRedistribuido: number;
+  metaIncremental: number;
+  metaAcumulada: number;
+  metaFaturamento100: number;
+  faturamentoRealizadoCarteira: number;
+  valorMetaNaoAtingido: number;
+  mesesFaltantes: number;
+  resultadoCarteira: number;
+  resultadoAcumuladoCarteira: number;
+  percentualAcumuladoMeta: number;
+  percentualAtingidoMetaMes: number;
+  retencaoCarteira: string;
+  realizouContatos100: string;
+  habilitacaoBonificacao: boolean;
+  faixaReferencialBonificacao: string;
+  valorBonificacao: number;
+}
+
+// Função para calcular a faixa de bonificação
+const calcularFaixaBonificacao = (percentualAcumulado: number): { faixa: string; valor: number } => {
+  const faixa = faixasBonificacao.find(
+    f => percentualAcumulado >= f.percentualMin && percentualAcumulado <= f.percentualMax
+  );
+  
+  if (!faixa) return { faixa: "não elegível", valor: 0 };
+  
+  const valor = (faixa.valorBase * faixa.percentualRemuneracao) / 100;
+  return { faixa: faixa.faixa, valor };
+};
+
+// Função para gerar dados calculados
+const gerarDadosCalculados = (): DadosBonificacao[] => {
+  const dados: DadosBonificacao[] = [];
+  let baseFaturamentoAnterior = configMetas.baseFaturamentoInicial;
+  let metaAcumuladaTotal = 0;
+  let resultadoAcumuladoTotal = 0;
+  let valorNaoAtingidoAcumulado = 0;
+  
+  // Dados reais de faturamento (a partir de 2025-08, os 3 primeiros meses com dados reais do Excel)
+  const faturamentoReal: Record<string, number> = {
+    "2025-08": 1395015.00,
+    "2025-09": 1487147.00,
+    "2025-10": 1534950.00,
+    // A partir de 2025-11 virá do sistema de faturamento (clientes tipo "CO")
+  };
+
+  // Dados de contato 100% da carteira (manual, mas por enquanto mockado como OK)
+  const realizouContatos: Record<string, string> = {
+    "2025-08": "OK",
+    "2025-09": "OK",
+    "2025-10": "OK",
+  };
+
+  for (let i = 0; i < configMetas.totalMeses; i++) {
+    const dataBase = new Date(2025, 7 + i, 1); // Começa em agosto (mês 7)
+    const mes = `${dataBase.getFullYear()}-${String(dataBase.getMonth() + 1).padStart(2, '0')}`;
+    
+    // Define a meta do mês
+    const meta = i < configMetas.mesesComMetaInicial ? configMetas.metaInicial : configMetas.metaPosterior;
+    
+    // Calcula o valor não atingido redistribuído
+    // Fórmula: Distribui o valor não atingido acumulado pelos meses restantes
+    const mesesFaltantes = configMetas.totalMeses - i;
+    const valorNaoAtingidoRedistribuido = mesesFaltantes > 0 ? valorNaoAtingidoAcumulado / mesesFaltantes : 0;
+    
+    // Meta incremental = Meta + Valor redistribuído
+    const metaIncremental = meta + valorNaoAtingidoRedistribuido;
+    
+    // Meta acumulada
+    metaAcumuladaTotal += metaIncremental;
+    
+    // Base de faturamento (primeiro mês usa a base inicial, depois usa a Meta Faturamento 100% do mês anterior)
+    const baseFaturamento = i === 0 ? configMetas.baseFaturamentoInicial : baseFaturamentoAnterior;
+    
+    // Meta Faturamento 100%
+    const metaFaturamento100 = baseFaturamento + metaIncremental;
+    
+    // Faturamento realizado da carteira (vem dos dados reais ou será 0 se não houver)
+    const faturamentoRealizadoCarteira = faturamentoReal[mes] || 0;
+    
+    // Valor da meta não atingido
+    const valorMetaNaoAtingido = metaFaturamento100 - faturamentoRealizadoCarteira;
+    
+    // Atualiza o acumulado de valor não atingido apenas se houver faturamento
+    if (faturamentoRealizadoCarteira > 0 && valorMetaNaoAtingido < 0) {
+      // Se atingiu mais que a meta, não acumula negativo
+      valorNaoAtingidoAcumulado += 0;
+    } else if (faturamentoRealizadoCarteira > 0) {
+      valorNaoAtingidoAcumulado += valorMetaNaoAtingido;
+    }
+    
+    // Resultado da carteira
+    const resultadoCarteira = faturamentoRealizadoCarteira - baseFaturamento;
+    
+    // Resultado acumulado
+    if (faturamentoRealizadoCarteira > 0) {
+      resultadoAcumuladoTotal += resultadoCarteira;
+    }
+    
+    // % Acumulado da meta
+    const percentualAcumuladoMeta = metaAcumuladaTotal > 0 
+      ? (resultadoAcumuladoTotal / metaAcumuladaTotal) * 100 
+      : 0;
+    
+    // % Atingido da meta do mês
+    const percentualAtingidoMetaMes = metaIncremental > 0 
+      ? (resultadoCarteira / metaIncremental) * 100 
+      : 0;
+    
+    // Retenção carteira
+    const retencaoCarteira = resultadoCarteira >= 0 ? "OK" : "Retração";
+    
+    // Realizou contatos com 100% da carteira
+    const realizouContatos100 = realizouContatos[mes] || (faturamentoRealizadoCarteira > 0 ? "OK" : "");
+    
+    // Habilitação bonificação
+    const habilitacaoBonificacao = retencaoCarteira === "OK" && realizouContatos100 === "OK";
+    
+    // Faixa e valor de bonificação
+    const { faixa, valor } = calcularFaixaBonificacao(percentualAcumuladoMeta);
+    const faixaReferencialBonificacao = percentualAcumuladoMeta < 75 
+      ? "Abaixo 75%" 
+      : percentualAcumuladoMeta < 100 
+      ? "abaixo da meta" 
+      : faixa;
+    const valorBonificacao = habilitacaoBonificacao ? valor : 0;
+    
+    dados.push({
+      mes,
+      baseFaturamento,
+      meta,
+      valorNaoAtingidoRedistribuido,
+      metaIncremental,
+      metaAcumulada: metaAcumuladaTotal,
+      metaFaturamento100,
+      faturamentoRealizadoCarteira,
+      valorMetaNaoAtingido,
+      mesesFaltantes,
+      resultadoCarteira,
+      resultadoAcumuladoCarteira: resultadoAcumuladoTotal,
+      percentualAcumuladoMeta,
+      percentualAtingidoMetaMes,
+      retencaoCarteira,
+      realizouContatos100,
+      habilitacaoBonificacao,
+      faixaReferencialBonificacao,
+      valorBonificacao,
+    });
+    
+    // Atualiza a base para o próximo mês
+    baseFaturamentoAnterior = metaFaturamento100;
+  }
+  
+  return dados;
+};
 
 // Lista de colaboradores (mockado)
 const colaboradores = [
@@ -104,15 +208,8 @@ export default function BonificacaoComercial() {
   const [filtroMesAno, setFiltroMesAno] = useState("todos");
   const [filtroCliente, setFiltroCliente] = useState("todos");
 
-  const calcularValorBonificacao = (percentualAtingido: number) => {
-    const faixa = faixasBonificacao.find(
-      f => percentualAtingido >= f.percentualMin && percentualAtingido <= f.percentualMax
-    );
-    
-    if (!faixa) return 0;
-    
-    return (faixa.valorBase * faixa.percentualRemuneracao) / 100;
-  };
+  // Gera os dados calculados com as fórmulas do Excel
+  const dadosBonificacao = gerarDadosCalculados();
 
   const getBadgeRetencao = (retencao: string) => {
     if (retencao === "OK") {
