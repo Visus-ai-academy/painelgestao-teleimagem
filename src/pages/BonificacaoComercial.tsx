@@ -113,52 +113,57 @@ const gerarDadosCalculados = (
     // Faturamento realizado da carteira (vem dos dados reais ou será 0 se não houver)
     const faturamentoRealizadoCarteira = faturamentoReal[mes] || 0;
     
-    // Valor da meta não atingido
-    const valorMetaNaoAtingido = metaFaturamento100 - faturamentoRealizadoCarteira;
+    // Resultado da carteira = Faturamento Realizado - Base Faturamento
+    const resultadoCarteira = faturamentoRealizadoCarteira > 0 
+      ? faturamentoRealizadoCarteira - baseFaturamento 
+      : 0;
+    
+    // Valor da meta não atingido = Meta Incremental - Resultado
+    const valorMetaNaoAtingido = faturamentoRealizadoCarteira > 0
+      ? metaIncremental - resultadoCarteira
+      : 0;
     
     // Atualiza o acumulado de valor não atingido apenas se houver faturamento
-    if (faturamentoRealizadoCarteira > 0 && valorMetaNaoAtingido < 0) {
-      // Se atingiu mais que a meta, não acumula negativo
-      valorNaoAtingidoAcumulado += 0;
-    } else if (faturamentoRealizadoCarteira > 0) {
-      valorNaoAtingidoAcumulado += valorMetaNaoAtingido;
+    if (faturamentoRealizadoCarteira > 0) {
+      if (valorMetaNaoAtingido > 0) {
+        // Só acumula se não atingiu a meta
+        valorNaoAtingidoAcumulado += valorMetaNaoAtingido;
+      }
+      // Se atingiu ou superou a meta, não acumula negativo
     }
     
-    // Resultado da carteira
-    const resultadoCarteira = faturamentoRealizadoCarteira - baseFaturamento;
-    
-    // Resultado acumulado
+    // Resultado acumulado - soma apenas dos meses com faturamento
     if (faturamentoRealizadoCarteira > 0) {
       resultadoAcumuladoTotal += resultadoCarteira;
     }
     
-    // % Acumulado da meta
+    // % Acumulado da meta = (Resultado Acumulado / Meta Acumulada) * 100
     const percentualAcumuladoMeta = metaAcumuladaTotal > 0 
       ? (resultadoAcumuladoTotal / metaAcumuladaTotal) * 100 
       : 0;
     
-    // % Atingido da meta do mês
-    const percentualAtingidoMetaMes = metaIncremental > 0 
+    // % Atingido da meta do mês = (Resultado / Meta Incremental) * 100
+    const percentualAtingidoMetaMes = faturamentoRealizadoCarteira > 0 && metaIncremental > 0
       ? (resultadoCarteira / metaIncremental) * 100 
       : 0;
     
-    // Retenção carteira
-    const retencaoCarteira = resultadoCarteira >= 0 ? "OK" : "Retração";
+    // Retenção carteira - só mostra se houver faturamento
+    const retencaoCarteira = faturamentoRealizadoCarteira > 0
+      ? (resultadoCarteira >= 0 ? "OK" : "Retração")
+      : "";
     
     // Realizou contatos com 100% da carteira
-    const realizouContatos100 = realizouContatos[mes] || (faturamentoRealizadoCarteira > 0 ? "OK" : "");
+    const realizouContatos100 = realizouContatos[mes] || "";
     
-    // Habilitação bonificação
+    // Habilitação bonificação - precisa ter retenção OK E contatos OK
     const habilitacaoBonificacao = retencaoCarteira === "OK" && realizouContatos100 === "OK";
     
-    // Faixa e valor de bonificação
+    // Faixa e valor de bonificação baseado no % Acumulado
     const { faixa, valor } = calcularFaixaBonificacao(percentualAcumuladoMeta);
-    const faixaReferencialBonificacao = percentualAcumuladoMeta < 75 
-      ? "Abaixo 75%" 
-      : percentualAcumuladoMeta < 100 
-      ? "abaixo da meta" 
-      : faixa;
-    const valorBonificacao = habilitacaoBonificacao ? valor : 0;
+    const faixaReferencialBonificacao = faturamentoRealizadoCarteira > 0
+      ? faixa
+      : "";
+    const valorBonificacao = habilitacaoBonificacao && faturamentoRealizadoCarteira > 0 ? valor : 0;
     
     dados.push({
       mes,
