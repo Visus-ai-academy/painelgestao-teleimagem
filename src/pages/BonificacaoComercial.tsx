@@ -4,7 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Award, Download, TrendingUp, Target } from "lucide-react";
+import { Award, Download, Target } from "lucide-react";
 
 // Faixas de bonificação baseadas no Excel
 const faixasBonificacao = [
@@ -315,35 +315,7 @@ export default function BonificacaoComercial() {
       </Card>
 
       {/* Métricas Resumo */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Meta Acumulada</p>
-                <p className="text-2xl font-bold text-foreground">
-                  {formatCurrency(dadosBonificacao[dadosBonificacao.length - 1]?.metaAcumulada || 0)}
-                </p>
-              </div>
-              <Target className="h-8 w-8 text-blue-500" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Faturamento Realizado</p>
-                <p className="text-2xl font-bold text-foreground">
-                  {formatCurrency(dadosBonificacao[dadosBonificacao.length - 1]?.faturamentoRealizadoCarteira || 0)}
-                </p>
-              </div>
-              <TrendingUp className="h-8 w-8 text-green-500" />
-            </div>
-          </CardContent>
-        </Card>
-
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
