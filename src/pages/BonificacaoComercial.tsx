@@ -166,20 +166,11 @@ const gerarDadosCalculados = (
     const habilitacaoBonificacao = retencaoCarteira === "OK" && realizouContatos100 === "OK";
     
     // Faixa e valor de bonificação baseado no % Atingido do Mês (não acumulado)
-    // Só calcula faixa se bonificação estiver habilitada
-    let faixaReferencialBonificacao = "";
-    let valorBonificacao = 0;
-    
-    if (faturamentoRealizadoCarteira > 0) {
-      if (habilitacaoBonificacao) {
-        const { faixa, valor } = calcularFaixaBonificacao(percentualAtingidoMetaMes);
-        faixaReferencialBonificacao = faixa;
-        valorBonificacao = valor;
-      } else {
-        faixaReferencialBonificacao = "não elegível";
-        valorBonificacao = 0;
-      }
-    }
+    // Sempre calcula a faixa baseada no percentual do mês
+    const { faixa, valor } = calcularFaixaBonificacao(percentualAtingidoMetaMes);
+    const faixaReferencialBonificacao = faturamentoRealizadoCarteira > 0 ? faixa : "";
+    // Só paga o valor se a bonificação estiver habilitada
+    const valorBonificacao = habilitacaoBonificacao && faturamentoRealizadoCarteira > 0 ? valor : 0;
     
     // Log de depuração para o mês atual
     if (faturamentoRealizadoCarteira > 0) {
