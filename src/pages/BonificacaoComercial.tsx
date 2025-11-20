@@ -166,11 +166,10 @@ const gerarDadosCalculados = (
     const habilitacaoBonificacao = retencaoCarteira === "OK" && realizouContatos100 === "OK";
     
     // Faixa e valor de bonificação baseado no % Atingido do Mês
-    // Só mostra a faixa real se a bonificação estiver habilitada
+    // CONFORME EXCEL: Faixa SEMPRE mostra o resultado do cálculo se houver faturamento
+    // Valor só é pago se houver habilitação
     const { faixa, valor } = calcularFaixaBonificacao(percentualAtingidoMetaMes);
-    const faixaReferencialBonificacao = faturamentoRealizadoCarteira > 0 
-      ? (habilitacaoBonificacao ? faixa : "não elegível")
-      : "";
+    const faixaReferencialBonificacao = faturamentoRealizadoCarteira > 0 ? faixa : "";
     const valorBonificacao = habilitacaoBonificacao ? valor : 0;
     
     // Log de depuração para o mês atual
@@ -488,13 +487,13 @@ export default function BonificacaoComercial() {
                           <input
                             type="text"
                             value={faturamentosEditaveis[dado.mes] !== undefined 
-                              ? faturamentosEditaveis[dado.mes] 
-                              : dado.faturamentoRealizadoCarteira || ''}
+                              ? String(faturamentosEditaveis[dado.mes]).replace('.', ',')
+                              : String(dado.faturamentoRealizadoCarteira || '').replace('.', ',')}
                             onChange={(e) => handleFaturamentoChange(dado.mes, e.target.value)}
                             onFocus={() => setCampoEmEdicao(dado.mes)}
                             onBlur={() => setCampoEmEdicao(null)}
                             className="w-full text-right bg-muted border border-border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary"
-                            placeholder="0.00"
+                            placeholder="0,00"
                             autoFocus
                           />
                         ) : (
