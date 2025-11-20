@@ -2530,9 +2530,9 @@ export default function GerarFaturamento() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="todos">Todos</SelectItem>
-                      <SelectItem value="CO">CO (Com Faturamento)</SelectItem>
-                      <SelectItem value="NC">NC (Não Contratual)</SelectItem>
-                      <SelectItem value="NC1">NC1 (Não Contratual 1)</SelectItem>
+                      <SelectItem value="CO">CO</SelectItem>
+                      <SelectItem value="NC">NC</SelectItem>
+                      <SelectItem value="NC1">NC1</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
