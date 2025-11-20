@@ -408,10 +408,7 @@ export default function BonificacaoComercial() {
                 <TableRow>
                   <TableHead className="min-w-[100px]">Mês</TableHead>
                   <TableHead className="text-right min-w-[130px]">Base Faturamento</TableHead>
-                  <TableHead className="text-right min-w-[120px]">Meta</TableHead>
-                  <TableHead className="text-right min-w-[150px]">Valor Não Atingido</TableHead>
                   <TableHead className="text-right min-w-[140px]">Meta Incremental</TableHead>
-                  <TableHead className="text-right min-w-[130px]">Meta Acumulada</TableHead>
                   <TableHead className="text-right min-w-[150px]">Meta Fat. 100%</TableHead>
                   <TableHead className="text-right min-w-[170px]">Fat. Realizado</TableHead>
                   <TableHead className="text-right min-w-[160px]">Meta Não Atingido</TableHead>
@@ -431,10 +428,7 @@ export default function BonificacaoComercial() {
                   <TableRow key={index}>
                     <TableCell className="font-medium">{dado.mes}</TableCell>
                     <TableCell className="text-right">{formatCurrency(dado.baseFaturamento)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(dado.meta)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(dado.valorNaoAtingidoRedistribuido)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(dado.metaIncremental)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(dado.metaAcumulada)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(dado.metaFaturamento100)}</TableCell>
                     <TableCell className="text-right">
                       {dado.mes >= "2025-11" ? (
