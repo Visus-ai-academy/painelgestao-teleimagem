@@ -75,14 +75,19 @@ const gerarDadosCalculados = (
   let resultadoAcumuladoTotal = 0;
   let valorNaoAtingidoAcumulado = 0;
   
-  // Dados reais de faturamento (a partir de 2025-08, os 3 primeiros meses com dados reais do Excel)
+  // Dados reais de faturamento (valores editáveis têm prioridade)
   const faturamentoReal: Record<string, number> = {
     "2025-08": 1395015.00,
     "2025-09": 1487147.00,
     "2025-10": 1534950.00,
-    // A partir de 2025-11 virá dos valores editáveis ou do sistema de faturamento
-    ...faturamentosEditaveis
   };
+  
+  // Aplica valores editáveis com prioridade sobre os valores padrão
+  Object.keys(faturamentosEditaveis).forEach(mes => {
+    if (faturamentosEditaveis[mes] !== undefined && faturamentosEditaveis[mes] !== 0) {
+      faturamentoReal[mes] = faturamentosEditaveis[mes];
+    }
+  });
 
   // Dados de contato 100% da carteira (usa os valores editáveis)
   const realizouContatos: Record<string, string> = contatosEditaveis;
@@ -267,9 +272,13 @@ export default function BonificacaoComercial() {
   };
 
   const handleFaturamentoChange = (mes: string, valor: string) => {
-    // Remove tudo exceto números e vírgula/ponto
-    const valorLimpo = valor.replace(/[^\d.,]/g, '').replace(',', '.');
-    const valorNumerico = parseFloat(valorLimpo) || 0;
+    // Permite apenas números, vírgula e ponto
+    // Remove espaços e substitui vírgula por ponto para conversão
+    const valorLimpo = valor.trim().replace(/[^\d.,]/g, '').replace(',', '.');
+    
+    // Armazena o valor numérico
+    const valorNumerico = valorLimpo ? parseFloat(valorLimpo) : 0;
+    
     setFaturamentosEditaveis(prev => ({
       ...prev,
       [mes]: valorNumerico
@@ -482,32 +491,25 @@ export default function BonificacaoComercial() {
                     <TableCell className="text-right">{formatCurrency(dado.metaIncremental)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(dado.metaFaturamento100)}</TableCell>
                     <TableCell className="text-right">
-                      {dado.mes >= "2025-11" ? (
-                        campoEmEdicao === dado.mes ? (
-                          <input
-                            type="text"
-                            value={faturamentosEditaveis[dado.mes] !== undefined 
-                              ? String(faturamentosEditaveis[dado.mes]).replace('.', ',')
-                              : String(dado.faturamentoRealizadoCarteira || '').replace('.', ',')}
-                            onChange={(e) => handleFaturamentoChange(dado.mes, e.target.value)}
-                            onFocus={() => setCampoEmEdicao(dado.mes)}
-                            onBlur={() => setCampoEmEdicao(null)}
-                            className="w-full text-right bg-muted border border-border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary"
-                            placeholder="0,00"
-                            autoFocus
-                          />
-                        ) : (
-                          <div 
-                            onClick={() => setCampoEmEdicao(dado.mes)}
-                            className="cursor-pointer hover:bg-muted/50 rounded px-2 py-1"
-                          >
-                            {formatCurrency(faturamentosEditaveis[dado.mes] !== undefined 
-                              ? faturamentosEditaveis[dado.mes] 
-                              : dado.faturamentoRealizadoCarteira)}
-                          </div>
-                        )
+                      {campoEmEdicao === dado.mes ? (
+                        <input
+                          type="text"
+                          value={faturamentosEditaveis[dado.mes] !== undefined && faturamentosEditaveis[dado.mes] !== 0
+                            ? String(faturamentosEditaveis[dado.mes]).replace('.', ',')
+                            : String(dado.faturamentoRealizadoCarteira || '').replace('.', ',')}
+                          onChange={(e) => handleFaturamentoChange(dado.mes, e.target.value)}
+                          onBlur={() => setCampoEmEdicao(null)}
+                          className="w-full text-right bg-muted border border-border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary"
+                          placeholder="0,00"
+                          autoFocus
+                        />
                       ) : (
-                        formatCurrency(dado.faturamentoRealizadoCarteira)
+                        <div 
+                          onClick={() => setCampoEmEdicao(dado.mes)}
+                          className="cursor-pointer hover:bg-muted/50 rounded px-2 py-1"
+                        >
+                          {formatCurrency(dado.faturamentoRealizadoCarteira)}
+                        </div>
                       )}
                     </TableCell>
                     <TableCell className="text-right">{formatCurrency(dado.valorMetaNaoAtingido)}</TableCell>
