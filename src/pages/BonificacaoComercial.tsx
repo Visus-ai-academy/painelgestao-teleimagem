@@ -165,9 +165,12 @@ const gerarDadosCalculados = (
     // Habilitação bonificação - precisa ter retenção OK E contatos OK
     const habilitacaoBonificacao = retencaoCarteira === "OK" && realizouContatos100 === "OK";
     
-    // Faixa e valor de bonificação baseado no % Atingido do Mês (conforme Excel original)
+    // Faixa e valor de bonificação baseado no % Atingido do Mês
+    // Só mostra a faixa real se a bonificação estiver habilitada
     const { faixa, valor } = calcularFaixaBonificacao(percentualAtingidoMetaMes);
-    const faixaReferencialBonificacao = faturamentoRealizadoCarteira > 0 ? faixa : "";
+    const faixaReferencialBonificacao = faturamentoRealizadoCarteira > 0 
+      ? (habilitacaoBonificacao ? faixa : "não elegível")
+      : "";
     const valorBonificacao = habilitacaoBonificacao ? valor : 0;
     
     // Log de depuração para o mês atual
