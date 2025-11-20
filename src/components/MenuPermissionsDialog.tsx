@@ -45,6 +45,8 @@ const menuOptions: MenuOption[] = [
   
   // Sub-menus do Financeiro
   { key: 'gerar-faturamento', label: 'Gerar Faturamento', defaultRoles: ['admin', 'manager'], isSubMenu: true, parentMenu: 'financeiro' },
+  { key: 'pagamento-medico', label: 'Pagamento Médico', defaultRoles: ['admin'], isSubMenu: true, parentMenu: 'financeiro' },
+  { key: 'bonificacao-comercial', label: 'Bonificação Comercial', defaultRoles: ['admin', 'manager'], isSubMenu: true, parentMenu: 'financeiro' },
   { key: 'regua-cobranca', label: 'Régua de Cobrança', defaultRoles: ['admin', 'manager'], isSubMenu: true, parentMenu: 'financeiro' },
   
   // Sub-menus do People

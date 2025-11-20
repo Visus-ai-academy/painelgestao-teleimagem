@@ -93,6 +93,7 @@ const menuItems: MenuItem[] = [
     subItems: [
       { title: "Gerar Faturamento", url: "/financeiro/gerar-faturamento", requiredRoles: ['manager', 'admin'] },
       { title: "Pagamento Médico", url: "/financeiro/pagamentos", requiredRoles: ['admin'] },
+      { title: "Bonificação Comercial", url: "/financeiro/bonificacao-comercial", requiredRoles: ['admin', 'manager'] },
       { title: "Régua de Cobrança", url: "/financeiro/regua-cobranca", requiredRoles: ['manager', 'admin'] },
       { title: "Documentação", url: "/financeiro/documentacao", requiredRoles: ['manager', 'admin'] },
       { title: "Fluxo de Caixa", url: "/financeiro/fluxo-caixa", requiredRoles: ['admin'] },
