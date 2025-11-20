@@ -64,7 +64,10 @@ const calcularFaixaBonificacao = (percentualAcumulado: number): { faixa: string;
 };
 
 // Função para gerar dados calculados
-const gerarDadosCalculados = (faturamentosEditaveis: Record<string, number> = {}): DadosBonificacao[] => {
+const gerarDadosCalculados = (
+  faturamentosEditaveis: Record<string, number> = {},
+  contatosEditaveis: Record<string, string> = {}
+): DadosBonificacao[] => {
   const dados: DadosBonificacao[] = [];
   let baseFaturamentoAnterior = configMetas.baseFaturamentoInicial;
   let metaAcumuladaTotal = 0;
@@ -80,12 +83,8 @@ const gerarDadosCalculados = (faturamentosEditaveis: Record<string, number> = {}
     ...faturamentosEditaveis
   };
 
-  // Dados de contato 100% da carteira (manual, mas por enquanto mockado como OK)
-  const realizouContatos: Record<string, string> = {
-    "2025-08": "OK",
-    "2025-09": "OK",
-    "2025-10": "OK",
-  };
+  // Dados de contato 100% da carteira (usa os valores editáveis)
+  const realizouContatos: Record<string, string> = contatosEditaveis;
 
   for (let i = 0; i < configMetas.totalMeses; i++) {
     const dataBase = new Date(2025, 7 + i, 1); // Começa em agosto (mês 7)
@@ -214,9 +213,16 @@ export default function BonificacaoComercial() {
   
   // Estado para controlar qual campo está sendo editado
   const [campoEmEdicao, setCampoEmEdicao] = useState<string | null>(null);
+  
+  // Estado para armazenar contatos 100% editáveis
+  const [contatosEditaveis, setContatosEditaveis] = useState<Record<string, string>>({
+    "2025-08": "OK",
+    "2025-09": "OK",
+    "2025-10": "OK",
+  });
 
   // Gera os dados calculados com as fórmulas do Excel
-  const dadosBonificacao = gerarDadosCalculados(faturamentosEditaveis);
+  const dadosBonificacao = gerarDadosCalculados(faturamentosEditaveis, contatosEditaveis);
   
   const getBadgeRetencao = (retencao: string) => {
     if (retencao === "OK") {
@@ -232,6 +238,13 @@ export default function BonificacaoComercial() {
     setFaturamentosEditaveis(prev => ({
       ...prev,
       [mes]: valorNumerico
+    }));
+  };
+
+  const handleContatosChange = (mes: string, valor: string) => {
+    setContatosEditaveis(prev => ({
+      ...prev,
+      [mes]: valor
     }));
   };
 
@@ -442,7 +455,16 @@ export default function BonificacaoComercial() {
                     <TableCell className="text-right">{formatPercent(dado.percentualAcumuladoMeta)}</TableCell>
                     <TableCell className="text-right">{formatPercent(dado.percentualAtingidoMetaMes)}</TableCell>
                     <TableCell>{getBadgeRetencao(dado.retencaoCarteira)}</TableCell>
-                    <TableCell>{dado.realizouContatos100}</TableCell>
+                    <TableCell>
+                      <input
+                        type="text"
+                        value={contatosEditaveis[dado.mes] || ''}
+                        onChange={(e) => handleContatosChange(dado.mes, e.target.value)}
+                        className="w-full text-center bg-muted border border-border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary"
+                        placeholder=""
+                        maxLength={2}
+                      />
+                    </TableCell>
                     <TableCell>{getBadgeHabilitacao(dado.habilitacaoBonificacao)}</TableCell>
                     <TableCell>{dado.faixaReferencialBonificacao}</TableCell>
                     <TableCell className="text-right font-bold">{formatCurrency(dado.valorBonificacao)}</TableCell>
