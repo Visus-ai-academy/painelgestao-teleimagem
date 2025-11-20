@@ -218,6 +218,13 @@ export default function BonificacaoComercial() {
   // Gera os dados calculados com as fórmulas do Excel
   const dadosBonificacao = gerarDadosCalculados(faturamentosEditaveis);
   
+  const getBadgeRetencao = (retencao: string) => {
+    if (retencao === "OK") {
+      return <Badge className="bg-green-100 text-green-800">OK</Badge>;
+    }
+    return <Badge className="bg-red-100 text-red-800">Retração</Badge>;
+  };
+
   const handleFaturamentoChange = (mes: string, valor: string) => {
     // Remove tudo exceto números e vírgula/ponto
     const valorLimpo = valor.replace(/[^\d.,]/g, '').replace(',', '.');
@@ -226,13 +233,6 @@ export default function BonificacaoComercial() {
       ...prev,
       [mes]: valorNumerico
     }));
-  };
-
-  const getBadgeRetencao = (retencao: string) => {
-    if (retencao === "OK") {
-      return <Badge className="bg-green-100 text-green-800">OK</Badge>;
-    }
-    return <Badge className="bg-red-100 text-red-800">Retração</Badge>;
   };
 
   const getBadgeHabilitacao = (habilitado: boolean) => {
@@ -252,6 +252,16 @@ export default function BonificacaoComercial() {
   const formatPercent = (value: number) => {
     return `${value.toFixed(2)}%`;
   };
+  
+  // Encontra o último mês com faturamento realizado
+  const ultimoMesComFaturamento = dadosBonificacao
+    .filter(d => d.faturamentoRealizadoCarteira > 0)
+    .slice(-1)[0];
+  
+  // Calcula a soma acumulada da meta não atingida até o último mês com faturamento
+  const somaMetaNaoAtingida = dadosBonificacao
+    .filter(d => d.faturamentoRealizadoCarteira > 0)
+    .reduce((acc, d) => acc + d.valorMetaNaoAtingido, 0);
 
   return (
     <div className="space-y-6">
@@ -320,17 +330,31 @@ export default function BonificacaoComercial() {
       </Card>
 
       {/* Métricas Resumo */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">% Atingido da Meta</p>
                 <p className="text-2xl font-bold text-foreground">
-                  {formatPercent(dadosBonificacao[dadosBonificacao.length - 1]?.percentualAcumuladoMeta || 0)}
+                  {formatPercent(ultimoMesComFaturamento?.percentualAcumuladoMeta || 0)}
                 </p>
               </div>
               <Award className="h-8 w-8 text-purple-500" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Meta Não Atingida Acum.</p>
+                <p className="text-2xl font-bold text-foreground">
+                  {formatCurrency(somaMetaNaoAtingida)}
+                </p>
+              </div>
+              <Target className="h-8 w-8 text-orange-500" />
             </div>
           </CardContent>
         </Card>
