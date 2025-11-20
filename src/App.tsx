@@ -38,6 +38,7 @@ import MedicosAtivos from "./pages/MedicosAtivos";
 import Desenvolvimento from "./pages/Desenvolvimento";
 import PlanoCarreira from "./pages/PlanoCarreira";
 import Bonificacao from "./pages/Bonificacao";
+import BonificacaoComercial from "./pages/BonificacaoComercial";
 import Colaboradores from "./pages/Colaboradores";
 import TreinamentoEquipe from "./pages/TreinamentoEquipe";
 import ContratosClientes from "./pages/ContratosClientes";
@@ -207,6 +208,15 @@ const App = () => {
                 <Layout>
                   <RoleProtectedRoute requiredRoles={['admin']}>
                     <PagamentosMedicos />
+                  </RoleProtectedRoute>
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/financeiro/bonificacao-comercial" element={
+              <ProtectedRoute>
+                <Layout>
+                  <RoleProtectedRoute requiredRoles={['admin', 'manager']}>
+                    <BonificacaoComercial />
                   </RoleProtectedRoute>
                 </Layout>
               </ProtectedRoute>
