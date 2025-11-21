@@ -176,9 +176,9 @@ const gerarDadosCalculados = (
       ? (resultadoAcumuladoTotal / metaAcumuladaTotal) * 100 
       : 0;
     
-    // % Atingido da meta do mês = (Faturamento Realizado / Meta Fat. 100%) * 100
-    const percentualAtingidoMetaMes = faturamentoRealizadoCarteira > 0 && metaFaturamento100 > 0
-      ? (faturamentoRealizadoCarteira / metaFaturamento100) * 100 
+    // % Atingido da meta do mês = (Resultado / Meta Incremental) * 100
+    const percentualAtingidoMetaMes = faturamentoRealizadoCarteira > 0 && metaIncremental > 0
+      ? (resultadoCarteira / metaIncremental) * 100 
       : 0;
     
     // Retenção carteira - só mostra se houver faturamento
