@@ -170,10 +170,10 @@ const gerarDadosCalculados = (
     // Habilitação bonificação - precisa ter retenção OK E contatos OK
     const habilitacaoBonificacao = retencaoCarteira === "OK" && realizouContatos100 === "OK";
     
-    // Faixa e valor de bonificação baseado no % Atingido do Mês
-    // CONFORME EXCEL: Faixa SEMPRE mostra o resultado do cálculo se houver faturamento
+    // Faixa e valor de bonificação baseado no % ACUMULADO da Meta (não do mês!)
+    // CONFORME EXCEL: A faixa é calculada com base no percentual acumulado
     // Valor só é pago se houver habilitação
-    const { faixa, valor } = calcularFaixaBonificacao(percentualAtingidoMetaMes);
+    const { faixa, valor } = calcularFaixaBonificacao(percentualAcumuladoMeta);
     const faixaReferencialBonificacao = faturamentoRealizadoCarteira > 0 ? faixa : "";
     const valorBonificacao = habilitacaoBonificacao ? valor : 0;
     
@@ -272,12 +272,11 @@ export default function BonificacaoComercial() {
   };
 
   const handleFaturamentoChange = (mes: string, valor: string) => {
-    // Permite apenas números, vírgula e ponto
-    // Remove espaços e substitui vírgula por ponto para conversão
-    const valorLimpo = valor.trim().replace(/[^\d.,]/g, '').replace(',', '.');
+    // Remove espaços e caracteres inválidos, depois substitui TODAS as vírgulas por ponto
+    const valorLimpo = valor.trim().replace(/[^\d.,]/g, '').replace(/,/g, '.');
     
-    // Armazena o valor numérico
-    const valorNumerico = valorLimpo ? parseFloat(valorLimpo) : 0;
+    // Converte para número
+    const valorNumerico = valorLimpo && valorLimpo !== '.' ? parseFloat(valorLimpo) : 0;
     
     setFaturamentosEditaveis(prev => ({
       ...prev,
