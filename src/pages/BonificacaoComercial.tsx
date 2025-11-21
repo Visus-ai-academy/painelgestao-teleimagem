@@ -7,15 +7,15 @@ import { Button } from "@/components/ui/button";
 import { Award, Download, Target } from "lucide-react";
 
 // Faixas de bonificação baseadas no Excel
+// Fórmula Excel: =SE(N4<0,75;"Abaixo 75%";SE(N4<=0,99;75%;SE(N4<1,2;100%;SE(N4<1,4;120%;SE(N4<1,6;140%;SE(N4<1,8;160%;SE(N4<=5;180%)))))))
 const faixasBonificacao = [
-  { faixa: "não elegível", percentualMin: 0, percentualMax: 74.99, percentualRemuneracao: 0, valorBase: 4700 },
-  { faixa: "abaixo da meta", percentualMin: 75, percentualMax: 99.99, percentualRemuneracao: 40, valorBase: 4700 },
-  { faixa: "meta", percentualMin: 100, percentualMax: 119.99, percentualRemuneracao: 100, valorBase: 4700 },
-  { faixa: "super meta 1", percentualMin: 120, percentualMax: 139.99, percentualRemuneracao: 120, valorBase: 4700 },
-  { faixa: "super meta 2", percentualMin: 140, percentualMax: 159.99, percentualRemuneracao: 140, valorBase: 4700 },
-  { faixa: "super meta 3", percentualMin: 160, percentualMax: 189.99, percentualRemuneracao: 160, valorBase: 4700 },
-  { faixa: "super meta 4", percentualMin: 190, percentualMax: 199.99, percentualRemuneracao: 180, valorBase: 4700 },
-  { faixa: "super meta 5", percentualMin: 200, percentualMax: 999, percentualRemuneracao: 200, valorBase: 4700 },
+  { faixa: "Abaixo 75%", percentualDecimalMax: 0.75, percentualRemuneracao: 0, valorBase: 4700 },
+  { faixa: "75%", percentualDecimalMax: 0.99, percentualRemuneracao: 40, valorBase: 4700 },
+  { faixa: "100%", percentualDecimalMax: 1.2, percentualRemuneracao: 100, valorBase: 4700 },
+  { faixa: "120%", percentualDecimalMax: 1.4, percentualRemuneracao: 120, valorBase: 4700 },
+  { faixa: "140%", percentualDecimalMax: 1.6, percentualRemuneracao: 140, valorBase: 4700 },
+  { faixa: "160%", percentualDecimalMax: 1.8, percentualRemuneracao: 160, valorBase: 4700 },
+  { faixa: "180%", percentualDecimalMax: 5, percentualRemuneracao: 180, valorBase: 4700 },
 ];
 
 // Configuração de metas e base inicial
@@ -52,42 +52,37 @@ interface DadosBonificacao {
 }
 
 // Função para calcular a faixa de bonificação
+// Implementa a fórmula do Excel: =SE(N4<0,75;"Abaixo 75%";SE(N4<=0,99;75%;SE(N4<1,2;100%;SE(N4<1,4;120%;SE(N4<1,6;140%;SE(N4<1,8;160%;SE(N4<=5;180%)))))))
 const calcularFaixaBonificacao = (percentualAtingido: number): { faixa: string; valor: number } => {
-  // Arredonda para 2 casas decimais para evitar problemas de precisão
-  const percentualArredondado = Math.round(percentualAtingido * 100) / 100;
-  
-  console.log('🎯 calcularFaixaBonificacao:', {
-    percentualOriginal: percentualAtingido,
-    percentualArredondado,
-    isNaN: isNaN(percentualAtingido),
-    isFinite: isFinite(percentualAtingido)
-  });
-  
   // Verifica se é um número válido
-  if (!isFinite(percentualArredondado) || isNaN(percentualArredondado)) {
-    console.warn('⚠️ Percentual inválido:', percentualAtingido);
-    return { faixa: "não elegível", valor: 0 };
+  if (!isFinite(percentualAtingido) || isNaN(percentualAtingido)) {
+    return { faixa: "", valor: 0 };
   }
   
-  const faixa = faixasBonificacao.find(
-    f => percentualArredondado >= f.percentualMin && percentualArredondado <= f.percentualMax
-  );
+  // Converte percentual para decimal (100% = 1.0) como na fórmula do Excel
+  const valorDecimal = percentualAtingido / 100;
   
-  console.log('🔍 Busca de faixa:', {
-    percentual: percentualArredondado,
-    faixaEncontrada: faixa?.faixa || 'NENHUMA',
-    todasFaixas: faixasBonificacao.map(f => ({
-      faixa: f.faixa,
-      min: f.percentualMin,
-      max: f.percentualMax,
-      match: percentualArredondado >= f.percentualMin && percentualArredondado <= f.percentualMax
-    }))
-  });
+  // Aplica a lógica da fórmula do Excel (SE aninhados)
+  let faixaEncontrada = faixasBonificacao[0]; // Padrão: Abaixo 75%
   
-  if (!faixa) return { faixa: "não elegível", valor: 0 };
+  if (valorDecimal < 0.75) {
+    faixaEncontrada = faixasBonificacao[0]; // "Abaixo 75%"
+  } else if (valorDecimal <= 0.99) {
+    faixaEncontrada = faixasBonificacao[1]; // "75%"
+  } else if (valorDecimal < 1.2) {
+    faixaEncontrada = faixasBonificacao[2]; // "100%"
+  } else if (valorDecimal < 1.4) {
+    faixaEncontrada = faixasBonificacao[3]; // "120%"
+  } else if (valorDecimal < 1.6) {
+    faixaEncontrada = faixasBonificacao[4]; // "140%"
+  } else if (valorDecimal < 1.8) {
+    faixaEncontrada = faixasBonificacao[5]; // "160%"
+  } else if (valorDecimal <= 5) {
+    faixaEncontrada = faixasBonificacao[6]; // "180%"
+  }
   
-  const valor = (faixa.valorBase * faixa.percentualRemuneracao) / 100;
-  return { faixa: faixa.faixa, valor };
+  const valor = (faixaEncontrada.valorBase * faixaEncontrada.percentualRemuneracao) / 100;
+  return { faixa: faixaEncontrada.faixa, valor };
 };
 
 // Função para gerar dados calculados
@@ -595,21 +590,33 @@ export default function BonificacaoComercial() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {faixasBonificacao.map((faixa, index) => (
-                  <TableRow key={index}>
-                    <TableCell className="font-medium">{faixa.faixa}</TableCell>
-                    <TableCell>
-                      {faixa.percentualMax === 999 
-                        ? `Acima de ${faixa.percentualMin}%`
-                        : `${faixa.percentualMin}% - ${faixa.percentualMax}%`
-                      }
-                    </TableCell>
-                    <TableCell className="text-right">{faixa.percentualRemuneracao}%</TableCell>
-                    <TableCell className="text-right font-bold">
-                      {formatCurrency((faixa.valorBase * faixa.percentualRemuneracao) / 100)}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {faixasBonificacao.map((faixa, index) => {
+                  // Calcula os limites da faixa baseado na fórmula do Excel
+                  const limiteAnterior = index > 0 ? faixasBonificacao[index - 1].percentualDecimalMax : 0;
+                  const limiteAtual = faixa.percentualDecimalMax;
+                  
+                  // Converte de decimal para percentual (0.75 -> 75%)
+                  const percAnterior = limiteAnterior * 100;
+                  const percAtual = limiteAtual * 100;
+                  
+                  return (
+                    <TableRow key={index}>
+                      <TableCell className="font-medium">{faixa.faixa}</TableCell>
+                      <TableCell>
+                        {index === 0 
+                          ? `Abaixo de ${percAtual}%`
+                          : index === faixasBonificacao.length - 1
+                            ? `${percAnterior}% a ${percAtual * 100}%`
+                            : `${percAnterior}% a ${percAtual}%`
+                        }
+                      </TableCell>
+                      <TableCell className="text-right">{faixa.percentualRemuneracao}%</TableCell>
+                      <TableCell className="text-right font-bold">
+                        {formatCurrency((faixa.valorBase * faixa.percentualRemuneracao) / 100)}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
