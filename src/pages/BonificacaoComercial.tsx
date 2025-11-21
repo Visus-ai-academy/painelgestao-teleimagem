@@ -52,10 +52,37 @@ interface DadosBonificacao {
 }
 
 // Função para calcular a faixa de bonificação
-const calcularFaixaBonificacao = (percentualAcumulado: number): { faixa: string; valor: number } => {
+const calcularFaixaBonificacao = (percentualAtingido: number): { faixa: string; valor: number } => {
+  // Arredonda para 2 casas decimais para evitar problemas de precisão
+  const percentualArredondado = Math.round(percentualAtingido * 100) / 100;
+  
+  console.log('🎯 calcularFaixaBonificacao:', {
+    percentualOriginal: percentualAtingido,
+    percentualArredondado,
+    isNaN: isNaN(percentualAtingido),
+    isFinite: isFinite(percentualAtingido)
+  });
+  
+  // Verifica se é um número válido
+  if (!isFinite(percentualArredondado) || isNaN(percentualArredondado)) {
+    console.warn('⚠️ Percentual inválido:', percentualAtingido);
+    return { faixa: "não elegível", valor: 0 };
+  }
+  
   const faixa = faixasBonificacao.find(
-    f => percentualAcumulado >= f.percentualMin && percentualAcumulado <= f.percentualMax
+    f => percentualArredondado >= f.percentualMin && percentualArredondado <= f.percentualMax
   );
+  
+  console.log('🔍 Busca de faixa:', {
+    percentual: percentualArredondado,
+    faixaEncontrada: faixa?.faixa || 'NENHUMA',
+    todasFaixas: faixasBonificacao.map(f => ({
+      faixa: f.faixa,
+      min: f.percentualMin,
+      max: f.percentualMax,
+      match: percentualArredondado >= f.percentualMin && percentualArredondado <= f.percentualMax
+    }))
+  });
   
   if (!faixa) return { faixa: "não elegível", valor: 0 };
   
