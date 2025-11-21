@@ -251,6 +251,9 @@ export default function BonificacaoComercial() {
   // Estado para controlar qual campo está sendo editado
   const [campoEmEdicao, setCampoEmEdicao] = useState<string | null>(null);
   
+  // Estado temporário para o valor durante a edição (string com vírgula)
+  const [valorEmEdicao, setValorEmEdicao] = useState<string>("");
+  
   // Estado para armazenar contatos 100% editáveis
   const [contatosEditaveis, setContatosEditaveis] = useState<Record<string, string>>({
     "2025-08": "OK",
@@ -271,17 +274,29 @@ export default function BonificacaoComercial() {
     return <Badge className="bg-red-100 text-red-800">Retração</Badge>;
   };
 
-  const handleFaturamentoChange = (mes: string, valor: string) => {
-    // Remove espaços e caracteres inválidos, depois substitui TODAS as vírgulas por ponto
-    const valorLimpo = valor.trim().replace(/[^\d.,]/g, '').replace(/,/g, '.');
-    
-    // Converte para número
+  const handleFaturamentoChange = (valor: string) => {
+    // Apenas atualiza o valor temporário durante a edição (permite vírgulas e pontos)
+    setValorEmEdicao(valor.replace(/[^\d.,]/g, ''));
+  };
+  
+  const handleFaturamentoBlur = (mes: string) => {
+    // Quando perde o foco, converte o valor para número
+    const valorLimpo = valorEmEdicao.replace(/\./g, '').replace(',', '.');
     const valorNumerico = valorLimpo && valorLimpo !== '.' ? parseFloat(valorLimpo) : 0;
     
     setFaturamentosEditaveis(prev => ({
       ...prev,
       [mes]: valorNumerico
     }));
+    
+    setCampoEmEdicao(null);
+    setValorEmEdicao("");
+  };
+  
+  const handleFaturamentoFocus = (mes: string, valorAtual: number) => {
+    setCampoEmEdicao(mes);
+    // Mostra o valor atual formatado com vírgula durante a edição
+    setValorEmEdicao(valorAtual > 0 ? String(valorAtual).replace('.', ',') : '');
   };
 
   const handleContatosChange = (mes: string, valor: string) => {
@@ -493,18 +508,16 @@ export default function BonificacaoComercial() {
                       {campoEmEdicao === dado.mes ? (
                         <input
                           type="text"
-                          value={faturamentosEditaveis[dado.mes] !== undefined && faturamentosEditaveis[dado.mes] !== 0
-                            ? String(faturamentosEditaveis[dado.mes]).replace('.', ',')
-                            : String(dado.faturamentoRealizadoCarteira || '').replace('.', ',')}
-                          onChange={(e) => handleFaturamentoChange(dado.mes, e.target.value)}
-                          onBlur={() => setCampoEmEdicao(null)}
+                          value={valorEmEdicao}
+                          onChange={(e) => handleFaturamentoChange(e.target.value)}
+                          onBlur={() => handleFaturamentoBlur(dado.mes)}
                           className="w-full text-right bg-muted border border-border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary"
                           placeholder="0,00"
                           autoFocus
                         />
                       ) : (
                         <div 
-                          onClick={() => setCampoEmEdicao(dado.mes)}
+                          onClick={() => handleFaturamentoFocus(dado.mes, dado.faturamentoRealizadoCarteira)}
                           className="cursor-pointer hover:bg-muted/50 rounded px-2 py-1"
                         >
                           {formatCurrency(dado.faturamentoRealizadoCarteira)}
