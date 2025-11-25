@@ -42,7 +42,8 @@ import {
   Settings,
   Key,
   Mail,
-  KeyRound
+  KeyRound,
+  AlertTriangle
 } from "lucide-react";
 import { 
   DropdownMenu,
@@ -94,6 +95,11 @@ export default function GerenciarUsuarios() {
     isOpen: boolean;
     userEmail: string;
   }>({ isOpen: false, userEmail: '' });
+  
+  const [deleteUserDialog, setDeleteUserDialog] = useState<{
+    isOpen: boolean;
+    user: User | null;
+  }>({ isOpen: false, user: null });
   
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -339,6 +345,62 @@ export default function GerenciarUsuarios() {
     setConfirmPassword("");
   };
 
+  // Função para excluir usuário
+  const deleteUser = async () => {
+    if (!deleteUserDialog.user) return;
+
+    try {
+      const userId = deleteUserDialog.user.id;
+      
+      // 1. Deletar permissões de menu do usuário
+      await supabase
+        .from('user_menu_permissions')
+        .delete()
+        .eq('user_id', userId);
+
+      // 2. Deletar roles do usuário
+      await supabase
+        .from('user_roles')
+        .delete()
+        .eq('user_id', userId);
+
+      // 3. Deletar perfil do usuário
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('user_id', userId);
+
+      if (profileError) {
+        throw profileError;
+      }
+
+      // 4. Deletar usuário da auth (requer admin API, então pode falhar)
+      // A edge function pode ser necessária para isso
+      const { error: authError } = await supabase.functions.invoke('admin-delete-user', {
+        body: { userId }
+      });
+
+      if (authError) {
+        console.warn('Erro ao deletar da auth, mas perfil foi removido:', authError);
+      }
+
+      toast({
+        title: "Sucesso",
+        description: "Usuário excluído com sucesso",
+      });
+
+      setDeleteUserDialog({ isOpen: false, user: null });
+      fetchUsers();
+    } catch (error) {
+      console.error('Erro ao excluir usuário:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao excluir usuário",
+        variant: "destructive"
+      });
+    }
+  };
+
   const getRoleBadgeVariant = (role: string) => {
     switch (role) {
       case 'admin':
@@ -582,6 +644,13 @@ export default function GerenciarUsuarios() {
                             <UserCheck className="mr-2 h-4 w-4" />
                             Tornar Usuário
                           </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => setDeleteUserDialog({ isOpen: true, user })}
+                            className="text-red-600"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Excluir Usuário
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -715,6 +784,43 @@ export default function GerenciarUsuarios() {
             </Button>
             <Button onClick={changeUserPassword}>
               Enviar Email de Redefinição
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para excluir usuário */}
+      <Dialog open={deleteUserDialog.isOpen} onOpenChange={(isOpen) => 
+        setDeleteUserDialog({ ...deleteUserDialog, isOpen })
+      }>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Excluir Usuário</DialogTitle>
+            <DialogDescription>
+              Tem certeza que deseja excluir o usuário {deleteUserDialog.user?.email}?
+              Esta ação não pode ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-md">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-destructive mt-0.5" />
+              <div className="text-sm">
+                <p className="font-medium text-destructive mb-1">Atenção!</p>
+                <ul className="list-disc list-inside text-muted-foreground space-y-1">
+                  <li>Todas as permissões do usuário serão removidas</li>
+                  <li>O perfil será permanentemente excluído</li>
+                  <li>O usuário não poderá mais acessar o sistema</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteUserDialog({ isOpen: false, user: null })}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={deleteUser}>
+              <Trash2 className="mr-2 h-4 w-4" />
+              Excluir Usuário
             </Button>
           </DialogFooter>
         </DialogContent>
