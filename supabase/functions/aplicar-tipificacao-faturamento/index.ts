@@ -39,6 +39,9 @@ serve(async (req) => {
     // TIPOS VÁLIDOS DE FATURAMENTO (para validação)
     const TIPOS_VALIDOS_FATURAMENTO = ['CO-FT', 'CO-NF', 'NC-FT', 'NC-NF', 'NC1-NF'];
     
+    // Clientes que precisam ser forçadamente retipificados (override)
+    const CLIENTES_FORCAR_RETIPIFICACAO = ['RADI-IMAGEM'];
+    
     // 1. Primeiro: Limpar tipos inválidos se houver período especificado
     if (periodo_referencia) {
       console.log('🧹 Verificando e limpando tipos de faturamento inválidos...');
@@ -66,6 +69,22 @@ serve(async (req) => {
           console.error('❌ Erro ao limpar tipos inválidos:', cleanError);
         } else {
           console.log('✅ Tipos inválidos limpos com sucesso');
+        }
+      }
+      
+      // Forçar retipificação de clientes específicos que foram tipificados incorretamente
+      for (const cliente of CLIENTES_FORCAR_RETIPIFICACAO) {
+        console.log(`🔄 Forçando retipificação de ${cliente}...`);
+        const { error: forceError, count } = await supabaseClient
+          .from('volumetria_mobilemed')
+          .update({ tipo_faturamento: null, tipo_cliente: null })
+          .eq('periodo_referencia', periodo_referencia)
+          .eq('EMPRESA', cliente);
+        
+        if (forceError) {
+          console.error(`❌ Erro ao forçar retipificação de ${cliente}:`, forceError);
+        } else {
+          console.log(`✅ ${count || 0} registros de ${cliente} marcados para retipificação`);
         }
       }
     }
