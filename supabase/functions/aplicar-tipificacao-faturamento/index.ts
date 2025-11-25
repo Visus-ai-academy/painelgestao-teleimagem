@@ -36,15 +36,50 @@ serve(async (req) => {
 
     console.log(`🔄 Aplicando tipificação de faturamento - Arquivo: ${arquivo_fonte}, Lote: ${lote_upload}, Período: ${periodo_referencia}`);
 
-    // 1. Buscar registros que precisam de tipificação
+    // TIPOS VÁLIDOS DE FATURAMENTO (para validação)
+    const TIPOS_VALIDOS_FATURAMENTO = ['CO-FT', 'CO-NF', 'NC-FT', 'NC-NF', 'NC1-NF'];
+    
+    // 1. Primeiro: Limpar tipos inválidos se houver período especificado
+    if (periodo_referencia) {
+      console.log('🧹 Verificando e limpando tipos de faturamento inválidos...');
+      
+      const { data: registrosInvalidos, error: checkError } = await supabaseClient
+        .from('volumetria_mobilemed')
+        .select('tipo_faturamento, COUNT(*)', { count: 'exact' })
+        .eq('periodo_referencia', periodo_referencia)
+        .not('tipo_faturamento', 'is', null)
+        .not('tipo_faturamento', 'in', `(${TIPOS_VALIDOS_FATURAMENTO.join(',')})`);
+
+      if (checkError) {
+        console.error('❌ Erro ao verificar tipos inválidos:', checkError);
+      } else if (registrosInvalidos && registrosInvalidos.length > 0) {
+        console.log(`⚠️ Encontrados tipos inválidos que serão limpos:`, registrosInvalidos);
+        
+        // Limpar tipos inválidos (definir como NULL)
+        const { error: cleanError } = await supabaseClient
+          .from('volumetria_mobilemed')
+          .update({ tipo_faturamento: null, tipo_cliente: null })
+          .eq('periodo_referencia', periodo_referencia)
+          .not('tipo_faturamento', 'in', `(${TIPOS_VALIDOS_FATURAMENTO.join(',')})`);
+
+        if (cleanError) {
+          console.error('❌ Erro ao limpar tipos inválidos:', cleanError);
+        } else {
+          console.log('✅ Tipos inválidos limpos com sucesso');
+        }
+      }
+    }
+
+    // 2. Buscar registros que precisam de tipificação
     let query = supabaseClient
       .from('volumetria_mobilemed')
       .select('id, "EMPRESA", "MODALIDADE", "ESPECIALIDADE", "CATEGORIA", "PRIORIDADE", "MEDICO"');
 
     // Aplicar filtros conforme parâmetros
     if (periodo_referencia) {
-      // Filtrar por período e apenas registros sem tipo de faturamento
-      query = query.eq('periodo_referencia', periodo_referencia).is('tipo_faturamento', null);
+      // Filtrar por período e apenas registros sem tipo de faturamento válido
+      query = query.eq('periodo_referencia', periodo_referencia)
+        .or(`tipo_faturamento.is.null,tipo_faturamento.not.in.(${TIPOS_VALIDOS_FATURAMENTO.join(',')})`);
     } else if (arquivo_fonte && lote_upload) {
       query = query.eq('arquivo_fonte', arquivo_fonte).eq('lote_upload', lote_upload);
     } else if (arquivo_fonte) {
@@ -334,19 +369,22 @@ serve(async (req) => {
 
     console.log(`📊 Processamento concluído: ${registrosAtualizados} atualizados, ${erros} erros`);
 
-    // 7. Estatísticas finais
-    const { data: stats, error: statsError } = await supabaseClient
-      .from('volumetria_mobilemed')
-      .select('tipo_faturamento')
-      .not('tipo_faturamento', 'is', null);
-
+    // 7. Estatísticas finais do período (se especificado)
     let estatisticas = {};
-    if (!statsError && stats) {
-      const contadores = stats.reduce((acc: any, record: any) => {
-        acc[record.tipo_faturamento] = (acc[record.tipo_faturamento] || 0) + 1;
-        return acc;
-      }, {});
-      estatisticas = contadores;
+    if (periodo_referencia) {
+      const { data: stats, error: statsError } = await supabaseClient
+        .from('volumetria_mobilemed')
+        .select('tipo_faturamento')
+        .eq('periodo_referencia', periodo_referencia)
+        .not('tipo_faturamento', 'is', null);
+
+      if (!statsError && stats) {
+        const contadores = stats.reduce((acc: any, record: any) => {
+          acc[record.tipo_faturamento] = (acc[record.tipo_faturamento] || 0) + 1;
+          return acc;
+        }, {});
+        estatisticas = contadores;
+      }
     }
 
     const resultado = {
@@ -355,12 +393,13 @@ serve(async (req) => {
       registros_processados: registrosProcessados,
       registros_atualizados: registrosAtualizados,
       registros_erro: erros,
-      estatisticas_tipos: estatisticas,
+      breakdown_tipos: estatisticas,
+      tipos_validos: TIPOS_VALIDOS_FATURAMENTO,
       regras_aplicadas: [
-        'Tipificação baseada nas MESMAS REGRAS usadas no demonstrativo de faturamento',
-        'tipo_cliente: CO (cliente do tipo CO) / NC (Cliente do tipo NC)',
-        'tipo_faturamento: CO-FT (CO com faturamento) / NC-FT (NC faturado) / NC-NF (NC não faturado)',
-        'Regras específicas por cliente NC implementadas'
+        'TIPOS VÁLIDOS: CO-FT (CO faturado), CO-NF (CO não faturado), NC-FT (NC faturado), NC-NF (NC não faturado), NC1-NF (NC1 não faturado)',
+        'TIPOS DE CLIENTE: CO (Consolidado), NC (Não Consolidado), NC1 (Não Consolidado tipo 1)',
+        'Clientes NC: CBU, CDICARDIO, CDIGOIAS, CICOMANGRA, CISP, CLIRAM, CRWANDERLEY, DIAGMAX-PR, GOLD, PRODIMAGEM, RADMED, TRANSDUSON, ZANELLO, CEMVALENCA, RMPADUA, RADI-IMAGEM',
+        'Tipos inválidos foram automaticamente limpos e reprocessados'
       ],
       data_processamento: new Date().toISOString()
     };
