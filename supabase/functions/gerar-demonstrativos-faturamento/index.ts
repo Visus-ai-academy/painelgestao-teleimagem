@@ -63,7 +63,8 @@ serve(async (req) => {
           cobrar_integracao,
           impostos_ab_min,
           percentual_iss,
-          simples
+          simples,
+          tem_franquia
         ),
         contratos_clientes(
           tipo_faturamento,
@@ -666,9 +667,10 @@ serve(async (req) => {
 
       // Aplicar valores de Portal e Integração: se há valor no campo, cobrar sempre
       if (parametros) {
-        // Franquia: respeitar flag aplicar_franquia (tem lógica de volume/frequência)
-        if (!parametros.aplicar_franquia) {
-          console.log(`📋 ${nomeFantasia}: Franquia DESABILITADA por parâmetro`);
+        // Franquia: respeitar flag aplicar_franquia E tem_franquia (tem lógica de volume/frequência)
+        const aplicarFranquiaFlag = parametros.aplicar_franquia ?? parametros.tem_franquia ?? false;
+        if (!aplicarFranquiaFlag) {
+          console.log(`📋 ${nomeFantasia}: Franquia DESABILITADA por parâmetro (aplicar_franquia=${parametros.aplicar_franquia}, tem_franquia=${parametros.tem_franquia})`);
           valorFranquia = 0;
           detalhesFranquia = { tipo: 'desabilitado', valor_aplicado: 0, motivo: 'Franquia desabilitada' };
         }
@@ -697,7 +699,7 @@ serve(async (req) => {
           let regra = 'nao_aplica';
           let valorCalculado = 0;
 
-          if (parametros.aplicar_franquia) {
+          if (aplicarFranquiaFlag) {
             if (frequenciaContinua) {
               if (frequenciaPorVolume) {
                 if (totalExames < volumeFranquia) {
