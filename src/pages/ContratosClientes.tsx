@@ -93,6 +93,8 @@ interface ContratoCliente {
   consideraPlantao?: boolean;
   condVolume?: string;
   diaVencimento?: number;
+  diaFechamento?: number;
+  formaCobranca?: string;
   descontoPercentual?: number;
   acrescimoPercentual?: number;
   faixasVolume?: any[];
@@ -109,8 +111,6 @@ interface ContratoCliente {
   tipoFaturamento?: string;
   impostosAbMin?: number;
   simples?: boolean;
-  diaFechamento?: number;
-  formaCobranca?: string;
   parametrosStatus?: string;
   percentualISS?: number;
   // Histórico de alterações
@@ -405,6 +405,8 @@ export default function ContratosClientes() {
           consideraPlantao: Boolean(contrato.considera_plantao),
           condVolume: contrato.cond_volume || 'MOD/ESP/CAT',
           diaVencimento: Number(contrato.dia_vencimento || 10),
+          diaFechamento: Number(parametros?.dia_fechamento || contrato.dia_fechamento || 7),
+          formaCobranca: parametros?.forma_cobranca || contrato.forma_pagamento || 'Não informado',
           descontoPercentual: Number(contrato.desconto_percentual || 0),
           acrescimoPercentual: Number(contrato.acrescimo_percentual || 0),
           faixasVolume: Array.isArray(contrato.faixas_volume) ? contrato.faixas_volume : [],
@@ -431,9 +433,6 @@ export default function ContratosClientes() {
           impostosAbMin: Number(parametros?.impostos_ab_min ?? contrato.impostos_ab_min ?? 0),
           simples: Boolean(parametros?.simples ?? contrato.simples ?? false),
           percentualISS: Number(parametros?.percentual_iss ?? 0),
-          // Campos adicionais dos parâmetros
-          diaFechamento: parametros?.dia_fechamento ?? contrato.dia_fechamento ?? 7,
-          formaCobranca: parametros?.forma_cobranca ?? 'mensal',
           parametrosStatus: parametros ? 'Configurado' : 'Não configurado'
         };
       });
@@ -1393,8 +1392,42 @@ export default function ContratosClientes() {
                       <p className="text-sm">{(contratoVisualizando || contratoEditando)?.cliente}</p>
                     </div>
                     <div>
+                      <Label className="text-sm font-medium">Número do Contrato</Label>
+                      <p className="text-sm">{(contratoVisualizando || contratoEditando)?.numeroContrato || 'Não informado'}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">Razão Social</Label>
+                      <p className="text-sm">{(contratoVisualizando || contratoEditando)?.razaoSocial || 'Não informado'}</p>
+                    </div>
+                    <div>
                       <Label className="text-sm font-medium">CNPJ</Label>
                       <p className="text-sm">{(contratoVisualizando || contratoEditando)?.cnpj || 'Não informado'}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">Endereço</Label>
+                      <p className="text-sm">{(contratoVisualizando || contratoEditando)?.endereco || 'Não informado'}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">Telefone</Label>
+                      <p className="text-sm">{(contratoVisualizando || contratoEditando)?.telefone || 'Não informado'}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">Email Financeiro</Label>
+                      <p className="text-sm">{(contratoVisualizando || contratoEditando)?.emailFinanceiro || 'Não informado'}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">Email Operacional</Label>
+                      <p className="text-sm">{(contratoVisualizando || contratoEditando)?.emailOperacional || 'Não informado'}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">Responsável</Label>
+                      <p className="text-sm">{(contratoVisualizando || contratoEditando)?.responsavel || 'Não informado'}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">Tipo Faturamento</Label>
+                      <Badge variant="outline">
+                        {(contratoVisualizando || contratoEditando)?.tipoFaturamento || 'CO-FT'}
+                      </Badge>
                     </div>
                     <div>
                       <Label className="text-sm font-medium">Data de Início</Label>
@@ -1419,6 +1452,28 @@ export default function ContratosClientes() {
                       ) : (
                         <p className="text-sm">{new Date((contratoVisualizando || contratoEditando)!.dataFim).toLocaleDateString('pt-BR')}</p>
                       )}
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">Dia de Vencimento</Label>
+                      {showEditarContrato ? (
+                        <Input 
+                          type="number" 
+                          min="1"
+                          max="31"
+                          value={editDiaVencimento} 
+                          onChange={(e) => setEditDiaVencimento(Number(e.target.value) || "")} 
+                        />
+                      ) : (
+                        <p className="text-sm">{(contratoVisualizando || contratoEditando)?.diaVencimento || 'Não informado'}</p>
+                      )}
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">Dia de Fechamento</Label>
+                      <p className="text-sm">{(contratoVisualizando || contratoEditando)?.diaFechamento || 'Não informado'}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">Forma de Cobrança</Label>
+                      <p className="text-sm">{(contratoVisualizando || contratoEditando)?.formaCobranca || 'Não informado'}</p>
                     </div>
                     <div>
                       <Label className="text-sm font-medium">Status</Label>
