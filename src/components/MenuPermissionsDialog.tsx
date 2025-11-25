@@ -34,34 +34,65 @@ const menuOptions: MenuOption[] = [
   { key: 'operacional', label: 'Operacional', defaultRoles: ['admin', 'manager'] },
   { key: 'financeiro', label: 'Financeiro', defaultRoles: ['admin', 'manager'] },
   { key: 'people', label: 'People', defaultRoles: ['admin', 'manager'] },
+  { key: 'clientes', label: 'Clientes', defaultRoles: ['admin', 'manager'] },
   { key: 'contratos', label: 'Contratos', defaultRoles: ['admin', 'manager'] },
   { key: 'configuracao', label: 'Configuração', defaultRoles: ['admin'] },
+  { key: 'controle-regras', label: 'Controle de Regras', defaultRoles: ['admin'] },
+  { key: 'relatorio-implementacoes', label: 'Relatório de Implementações', defaultRoles: ['admin'] },
+  { key: 'gerenciar-cadastros', label: 'Gerenciar Cadastros', defaultRoles: ['admin'] },
+  { key: 'limpar-dados', label: 'Limpar Dados', defaultRoles: ['admin'] },
+  
+  // Sub-menus do Dashboard
+  { key: 'dashboard-faturamento', label: 'Faturamento', defaultRoles: ['admin', 'manager'], isSubMenu: true, parentMenu: 'dashboard' },
+  { key: 'dashboard-volumetria', label: 'Volumetria', defaultRoles: ['admin', 'manager', 'user'], isSubMenu: true, parentMenu: 'dashboard' },
+  { key: 'dashboard-qualidade', label: 'Qualidade', defaultRoles: ['admin', 'manager'], isSubMenu: true, parentMenu: 'dashboard' },
+  { key: 'mapa-distribuicao', label: 'Mapa Distribuição', defaultRoles: ['admin', 'manager'], isSubMenu: true, parentMenu: 'dashboard' },
   
   // Sub-menus do Operacional
   { key: 'operacional-producao', label: 'Produção', defaultRoles: ['admin', 'manager'], isSubMenu: true, parentMenu: 'operacional' },
   { key: 'operacional-qualidade', label: 'Qualidade', defaultRoles: ['admin', 'manager'], isSubMenu: true, parentMenu: 'operacional' },
   { key: 'escala', label: 'Escala', defaultRoles: ['admin', 'manager'], isSubMenu: true, parentMenu: 'operacional' },
-  { key: 'medicos-ativos', label: 'Médicos Ativos', defaultRoles: ['admin', 'manager'], isSubMenu: true, parentMenu: 'operacional' },
+  { key: 'pcp', label: 'PCP', defaultRoles: ['admin', 'manager'], isSubMenu: true, parentMenu: 'operacional' },
+  { key: 'dados-volumetria', label: 'Dados MobileMed', defaultRoles: ['admin', 'manager'], isSubMenu: true, parentMenu: 'operacional' },
+  { key: 'relatorio-exclusoes', label: 'Relatório Exclusões', defaultRoles: ['admin', 'manager'], isSubMenu: true, parentMenu: 'operacional' },
+  { key: 'comparativo', label: 'Comparativo', defaultRoles: ['admin', 'manager'], isSubMenu: true, parentMenu: 'operacional' },
+  
+  // Sub-menus da Qualidade
+  { key: 'treinamento-equipe', label: 'Treinamento Equipe', defaultRoles: ['admin', 'manager'], isSubMenu: true, parentMenu: 'operacional-qualidade' },
   
   // Sub-menus do Financeiro
   { key: 'gerar-faturamento', label: 'Gerar Faturamento', defaultRoles: ['admin', 'manager'], isSubMenu: true, parentMenu: 'financeiro' },
   { key: 'pagamento-medico', label: 'Pagamento Médico', defaultRoles: ['admin'], isSubMenu: true, parentMenu: 'financeiro' },
   { key: 'bonificacao-comercial', label: 'Bonificação Comercial', defaultRoles: ['admin', 'manager'], isSubMenu: true, parentMenu: 'financeiro' },
   { key: 'regua-cobranca', label: 'Régua de Cobrança', defaultRoles: ['admin', 'manager'], isSubMenu: true, parentMenu: 'financeiro' },
+  { key: 'documentacao-faturamento', label: 'Documentação', defaultRoles: ['admin', 'manager'], isSubMenu: true, parentMenu: 'financeiro' },
+  { key: 'fluxo-caixa', label: 'Fluxo de Caixa', defaultRoles: ['admin'], isSubMenu: true, parentMenu: 'financeiro' },
+  { key: 'dre', label: 'DRE', defaultRoles: ['admin'], isSubMenu: true, parentMenu: 'financeiro' },
   
   // Sub-menus do People
   { key: 'colaboradores', label: 'Colaboradores', defaultRoles: ['admin', 'manager'], isSubMenu: true, parentMenu: 'people' },
+  { key: 'medicos-ativos', label: 'Médicos Ativos', defaultRoles: ['admin', 'manager'], isSubMenu: true, parentMenu: 'people' },
   { key: 'plano-carreira', label: 'Plano de Carreira', defaultRoles: ['admin'], isSubMenu: true, parentMenu: 'people' },
   { key: 'desenvolvimento', label: 'Desenvolvimento', defaultRoles: ['admin'], isSubMenu: true, parentMenu: 'people' },
-  { key: 'bonificacao', label: 'Bonificação', defaultRoles: ['admin', 'manager'], isSubMenu: true, parentMenu: 'people' },
-  { key: 'treinamento-equipe', label: 'Treinamento Equipe', defaultRoles: ['admin', 'manager'], isSubMenu: true, parentMenu: 'people' },
+  { key: 'bonificacao-people', label: 'Bonificação', defaultRoles: ['admin'], isSubMenu: true, parentMenu: 'people' },
+  
+  // Sub-menus dos Clientes
+  { key: 'cadastro-clientes', label: 'Cadastro de Clientes', defaultRoles: ['admin', 'manager'], isSubMenu: true, parentMenu: 'clientes' },
   
   // Sub-menus dos Contratos
   { key: 'contratos-clientes', label: 'Contratos Clientes', defaultRoles: ['admin', 'manager'], isSubMenu: true, parentMenu: 'contratos' },
+  { key: 'contratos-fornecedores', label: 'Contratos Fornecedores', defaultRoles: ['admin'], isSubMenu: true, parentMenu: 'contratos' },
   
   // Sub-menus da Configuração
+  { key: 'configuracao-faturamento', label: 'Configuração de Faturamento', defaultRoles: ['admin'], isSubMenu: true, parentMenu: 'configuracao' },
   { key: 'usuarios', label: 'Gerenciar Usuários', defaultRoles: ['admin'], isSubMenu: true, parentMenu: 'configuracao' },
-  { key: 'configuracao-faturamento', label: 'Faturamento', defaultRoles: ['admin'], isSubMenu: true, parentMenu: 'configuracao' },
+  { key: 'logomarca', label: 'Logomarca', defaultRoles: ['admin'], isSubMenu: true, parentMenu: 'configuracao' },
+  { key: 'listas', label: 'Gerenciar Listas', defaultRoles: ['admin'], isSubMenu: true, parentMenu: 'configuracao' },
+  { key: 'estrutura-vendas', label: 'Estrutura de Vendas', defaultRoles: ['admin'], isSubMenu: true, parentMenu: 'configuracao' },
+  { key: 'configuracao-importacao', label: 'Configuração Importação', defaultRoles: ['admin'], isSubMenu: true, parentMenu: 'configuracao' },
+  { key: 'arquitetura', label: 'Arquitetura do Projeto', defaultRoles: ['admin'], isSubMenu: true, parentMenu: 'configuracao' },
+  { key: 'seguranca', label: 'Segurança', defaultRoles: ['admin'], isSubMenu: true, parentMenu: 'configuracao' },
+  { key: 'mapeamento-visual', label: 'Mapeamento Visual', defaultRoles: ['admin'], isSubMenu: true, parentMenu: 'configuracao' },
 ];
 
 export const MenuPermissionsDialog: React.FC<MenuPermissionsDialogProps> = ({
