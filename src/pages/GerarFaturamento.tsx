@@ -176,12 +176,13 @@ export default function GerarFaturamento() {
       console.warn('Falha ao ler demonstrativos do localStorage:', e);
     }
     
-    // 2) Fallback: verificar na tabela de faturamento (DB)
+    // 2) Fallback: verificar na tabela de demonstrativos calculados (DB)
     try {
       const { count } = await supabase
-        .from('faturamento')
-        .select('cliente_nome', { count: 'exact', head: true })
-        .eq('periodo_referencia', periodoSelecionado);
+        .from('demonstrativos_faturamento_calculados')
+        .select('id', { count: 'exact', head: true })
+        .eq('periodo_referencia', periodoSelecionado)
+        .eq('status', 'calculado');
       
       const temDados = !!count && count > 0;
       setDemonstrativoGerado(temDados);
