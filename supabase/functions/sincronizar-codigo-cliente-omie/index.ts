@@ -23,11 +23,19 @@ interface OmieApiRequest {
 }
 
 interface OmieContrato {
-  codigo_contrato: string;
-  nContrato: string;
-  vigencia_inicial: string;
-  vigencia_final: string;
+  nCodCtr: number;
+  cNumCtr: string;
+  dVigInicial: string;
+  dVigFinal: string;
   [key: string]: any;
+}
+
+// Função para converter data do formato DD/MM/YYYY para YYYY-MM-DD
+function converterDataOmie(dataOmie: string): string | null {
+  if (!dataOmie) return null;
+  const partes = dataOmie.split('/');
+  if (partes.length !== 3) return null;
+  return `${partes[2]}-${partes[1]}-${partes[0]}`;
 }
 
 // Função para buscar cliente no OMIE diretamente
@@ -134,7 +142,7 @@ async function buscarContratosOmie(codigoClienteOmie: string) {
 
     console.log(`Consultando API OMIE - ListarContratos (página ${pagina})...`);
 
-    const response = await fetch('https://app.omie.com.br/api/v1/geral/contratos/', {
+    const response = await fetch('https://app.omie.com.br/api/v1/servicos/contrato/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(buscarContratosReq),
@@ -145,7 +153,7 @@ async function buscarContratosOmie(codigoClienteOmie: string) {
     }
 
     const dados = await response.json();
-    const lista = dados.contratos_servico || [];
+    const lista = dados.contratoCadastro || [];
     console.log(`API OMIE retornou ${lista.length} contratos na página ${pagina}`);
 
     if (lista.length === 0) break;
@@ -274,23 +282,25 @@ serve(async (req) => {
 
           // Buscar contrato correspondente no OMIE
           const contratoOmie = contratosOmie.find((co: OmieContrato) => 
-            co.nContrato && String(co.nContrato).trim() === String(contrato.numero_contrato).trim()
+            co.cabecalho?.cNumCtr && String(co.cabecalho.cNumCtr).trim() === String(contrato.numero_contrato).trim()
           );
 
-          if (contratoOmie) {
+          if (contratoOmie && contratoOmie.cabecalho) {
             // Atualizar contrato com dados do OMIE
             const updateData: any = {
               omie_codigo_cliente: codigoOmie,
-              omie_codigo_contrato: String(contratoOmie.codigo_contrato),
+              omie_codigo_contrato: String(contratoOmie.cabecalho.nCodCtr),
               omie_data_sincronizacao: agora
             };
 
             // Atualizar datas apenas se existirem no OMIE
-            if (contratoOmie.vigencia_inicial) {
-              updateData.data_inicio = contratoOmie.vigencia_inicial;
+            if (contratoOmie.cabecalho.dVigInicial) {
+              const dataInicio = converterDataOmie(contratoOmie.cabecalho.dVigInicial);
+              if (dataInicio) updateData.data_inicio = dataInicio;
             }
-            if (contratoOmie.vigencia_final) {
-              updateData.data_fim = contratoOmie.vigencia_final;
+            if (contratoOmie.cabecalho.dVigFinal) {
+              const dataFim = converterDataOmie(contratoOmie.cabecalho.dVigFinal);
+              if (dataFim) updateData.data_fim = dataFim;
             }
 
             const { error: updContratoError } = await supabase
@@ -308,11 +318,13 @@ serve(async (req) => {
             } else {
               // Atualizar também parametros_faturamento com as mesmas datas
               const updateParamsData: any = {};
-              if (contratoOmie.vigencia_inicial) {
-                updateParamsData.data_inicio_contrato = contratoOmie.vigencia_inicial;
+              if (contratoOmie.cabecalho.dVigInicial) {
+                const dataInicio = converterDataOmie(contratoOmie.cabecalho.dVigInicial);
+                if (dataInicio) updateParamsData.data_inicio_contrato = dataInicio;
               }
-              if (contratoOmie.vigencia_final) {
-                updateParamsData.data_termino_contrato = contratoOmie.vigencia_final;
+              if (contratoOmie.cabecalho.dVigFinal) {
+                const dataFim = converterDataOmie(contratoOmie.cabecalho.dVigFinal);
+                if (dataFim) updateParamsData.data_termino_contrato = dataFim;
               }
 
               if (Object.keys(updateParamsData).length > 0) {
@@ -326,9 +338,9 @@ serve(async (req) => {
               detalhesContratos.push({
                 contrato_id: contrato.id,
                 numero_contrato: contrato.numero_contrato,
-                omie_codigo_contrato: contratoOmie.codigo_contrato,
-                data_inicio: contratoOmie.vigencia_inicial || contrato.data_inicio,
-                data_fim: contratoOmie.vigencia_final || contrato.data_fim,
+                omie_codigo_contrato: contratoOmie.cabecalho.nCodCtr,
+                data_inicio: converterDataOmie(contratoOmie.cabecalho.dVigInicial) || contrato.data_inicio,
+                data_fim: converterDataOmie(contratoOmie.cabecalho.dVigFinal) || contrato.data_fim,
                 status: 'atualizado'
               });
             }
