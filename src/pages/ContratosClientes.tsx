@@ -908,8 +908,20 @@ export default function ContratosClientes() {
 
           if (error) {
             console.error(`Erro ao sincronizar ${cliente.nome}:`, error);
+            
+            // Detectar erro 500 da API OMIE (credenciais inválidas)
+            if (error.message?.includes('500') || error.message?.includes('Internal Server Error')) {
+              toast({
+                title: "⚠️ Erro de Credenciais OMIE",
+                description: "A API OMIE retornou erro 500. Verifique se OMIE_APP_KEY e OMIE_APP_SECRET estão corretos.",
+                variant: "destructive",
+              });
+              setSincronizandoOmie(false);
+              return; // Para a sincronização
+            }
+            
             erros++;
-          } else if (!data.success) {
+          } else if (!data?.success) {
             console.log(`Cliente não encontrado: ${cliente.nome}`);
             naoEncontrados++;
           } else {
@@ -930,6 +942,18 @@ export default function ContratosClientes() {
 
         } catch (e: any) {
           console.error(`Erro ao processar ${cliente.nome}:`, e);
+          
+          // Detectar erro de conexão com API OMIE
+          if (e.message?.includes('Failed to send a request to the Edge Function')) {
+            toast({
+              title: "❌ Erro de Conexão",
+              description: "Não foi possível conectar à API OMIE. Verifique as credenciais OMIE_APP_KEY e OMIE_APP_SECRET.",
+              variant: "destructive",
+            });
+            setSincronizandoOmie(false);
+            return; // Para a sincronização
+          }
+          
           erros++;
           setProgressoSync({ 
             total: clientesParaSincronizar.length, 
@@ -1129,7 +1153,7 @@ export default function ContratosClientes() {
           {sincronizandoOmie ? (
             <>
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-              Sincronizando...
+              Sincronizando... {progressoSync.processados}/{progressoSync.total}
             </>
           ) : (
             <>
@@ -1138,6 +1162,43 @@ export default function ContratosClientes() {
             </>
           )}
         </Button>
+        
+        {/* Card de Progresso da Sincronização */}
+        {sincronizandoOmie && progressoSync.total > 0 && (
+          <Card className="mt-4">
+            <CardHeader>
+              <CardTitle className="text-lg">Progresso da Sincronização OMIE</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Processados:</span>
+                  <span className="font-semibold">{progressoSync.processados} / {progressoSync.total}</span>
+                </div>
+                <div className="w-full bg-secondary rounded-full h-2">
+                  <div 
+                    className="bg-primary h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${(progressoSync.processados / progressoSync.total) * 100}%` }}
+                  />
+                </div>
+                <div className="grid grid-cols-3 gap-4 text-sm mt-4">
+                  <div className="text-center">
+                    <div className="text-green-600 font-semibold">{progressoSync.processados - progressoSync.erros - progressoSync.naoEncontrados}</div>
+                    <div className="text-muted-foreground">Sucesso</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-yellow-600 font-semibold">{progressoSync.naoEncontrados}</div>
+                    <div className="text-muted-foreground">Não encontrados</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-red-600 font-semibold">{progressoSync.erros}</div>
+                    <div className="text-muted-foreground">Erros</div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Button variant="outline">
           <Download className="h-4 w-4 mr-2" />
