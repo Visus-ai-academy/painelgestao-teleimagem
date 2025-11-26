@@ -871,62 +871,104 @@ export default function ContratosClientes() {
       
       toast({
         title: "Iniciando sincronização",
-        description: "Buscando códigos reais dos clientes no Omie...",
+        description: "Preparando fila de processamento...",
       });
 
-      const { data, error } = await supabase.functions.invoke('sincronizar-codigo-cliente-omie', {
-        body: {
-          apenas_sem_codigo: false, // sincronizar todos os clientes para atualizar datas de vigência
-          limite: 1000
-        }
+      // 1. Iniciar a fila
+      const { data: inicioData, error: inicioError } = await supabase.functions.invoke('sincronizar-codigo-cliente-omie', {
+        body: { iniciar_fila: true, apenas_sem_codigo: false }
       });
 
-      if (error) {
-        throw new Error(error.message);
+      if (inicioError) {
+        throw new Error(inicioError.message);
       }
 
-      const resultado = data;
+      const resultado = inicioData as any;
       
-      if (resultado.success) {
-        // Nova resposta com informações sobre processamento por lotes
-        if (resultado.requer_nova_execucao) {
-          toast({
-            title: "Sincronização parcial concluída",
-            description: `${resultado.atualizados} códigos sincronizados. Restam ${resultado.total_restantes} clientes. Clique novamente para continuar.`,
-            duration: 10000,
-          });
-        } else {
-          toast({
-            title: "Sincronização concluída",
-            description: `${resultado.atualizados} códigos Omie sincronizados com sucesso. ${resultado.nao_encontrados || 0} não encontrados no Omie.`,
-          });
-        }
-
-        // Se houver erros, mostrar em um toast separado
-        if (resultado.erros > 0) {
-          toast({
-            title: "Atenção",
-            description: `${resultado.erros} clientes com erro durante sincronização. Verifique os logs para mais detalhes.`,
-            variant: "destructive",
-          });
-        }
-
-        // Recarregar contratos para exibir os códigos atualizados
-        await carregarContratos();
-      } else {
-        throw new Error(resultado.error || 'Erro desconhecido na sincronização');
+      if (!resultado.fila_iniciada) {
+        toast({
+          title: "Nenhum cliente para sincronizar",
+          description: resultado.message,
+        });
+        setSincronizandoOmie(false);
+        return;
       }
+
+      toast({
+        title: "Sincronização iniciada",
+        description: `Processando ${resultado.total_clientes} clientes. Acompanhe o progresso.`,
+      });
+
+      // 2. Processar fila continuamente
+      await processarFilaContinuamente();
 
     } catch (error: any) {
       console.error('Erro ao sincronizar códigos Omie:', error);
       toast({
         title: "Erro na sincronização",
-        description: error.message || 'Erro desconhecido',
+        description: error.message || "Erro ao conectar com o servidor",
         variant: "destructive",
       });
-    } finally {
       setSincronizandoOmie(false);
     }
+  };
+
+  const processarFilaContinuamente = async () => {
+    let tentativasErro = 0;
+    const MAX_TENTATIVAS_ERRO = 3;
+
+    while (tentativasErro < MAX_TENTATIVAS_ERRO) {
+      try {
+        // Verificar status da fila
+        const { data: statusData, error: statusError } = await supabase.functions.invoke('sincronizar-codigo-cliente-omie', {
+          body: {}
+        });
+
+        if (statusError) {
+          tentativasErro++;
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          continue;
+        }
+
+        const status = statusData as any;
+        const filaInfo = status.fila_status;
+
+        // Se não há mais pendentes, finalizar
+        if (filaInfo.pendente === 0 && filaInfo.processando === 0) {
+          setSincronizandoOmie(false);
+          
+          toast({
+            title: "Sincronização concluída",
+            description: `✓ ${filaInfo.concluido} sincronizados | ⚠ ${filaInfo.nao_encontrado} não encontrados | ✗ ${filaInfo.erro} erros`,
+          });
+          
+          // Recarregar contratos
+          await carregarContratos();
+          return;
+        }
+
+        // Processar próximo cliente da fila
+        await supabase.functions.invoke('processar-fila-omie', {});
+        
+        // Aguardar 3 segundos antes de processar próximo
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        tentativasErro = 0; // Reset contador de erros
+        
+      } catch (error) {
+        console.error('Erro ao processar fila:', error);
+        tentativasErro++;
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      }
+    }
+
+    // Se chegou aqui, deu erro muitas vezes
+    toast({
+      title: "Erro no processamento",
+      description: "Muitas tentativas falharam. Recarregue a página e tente novamente.",
+      variant: "destructive",
+    });
+    setSincronizandoOmie(false);
   };
 
   // Filtros e ordenação

@@ -1790,6 +1790,62 @@ export type Database = {
         }
         Relationships: []
       }
+      fila_sincronizacao_omie: {
+        Row: {
+          cliente_id: string
+          cliente_nome: string
+          cnpj: string | null
+          concluido_em: string | null
+          created_at: string
+          erro_mensagem: string | null
+          id: string
+          iniciado_em: string | null
+          max_tentativas: number
+          omie_codigo_cliente: string | null
+          status: string
+          tentativas: number
+          updated_at: string
+        }
+        Insert: {
+          cliente_id: string
+          cliente_nome: string
+          cnpj?: string | null
+          concluido_em?: string | null
+          created_at?: string
+          erro_mensagem?: string | null
+          id?: string
+          iniciado_em?: string | null
+          max_tentativas?: number
+          omie_codigo_cliente?: string | null
+          status?: string
+          tentativas?: number
+          updated_at?: string
+        }
+        Update: {
+          cliente_id?: string
+          cliente_nome?: string
+          cnpj?: string | null
+          concluido_em?: string | null
+          created_at?: string
+          erro_mensagem?: string | null
+          id?: string
+          iniciado_em?: string | null
+          max_tentativas?: number
+          omie_codigo_cliente?: string | null
+          status?: string
+          tentativas?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fila_sincronizacao_omie_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       historico_contratos: {
         Row: {
           aplicado_em: string | null
