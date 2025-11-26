@@ -7,30 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface SyncRequest {
-  clientes?: string[];      // nomes (case-insensitive)
-  cliente_ids?: string[];   // UUIDs
-  cnpjs?: string[];         // CNPJs
-  apenas_sem_codigo?: boolean; // se true, busca apenas clientes com omie_codigo_cliente NULL
-  limite?: number;          // limite de clientes no modo sem filtro
-}
-
-interface OmieApiRequest {
-  call: string;
-  app_key: string;
-  app_secret: string;
-  param: any[];
-}
-
-interface OmieContrato {
-  nCodCtr: number;
-  cNumCtr: string;
-  dVigInicial: string;
-  dVigFinal: string;
-  [key: string]: any;
-}
-
-// Função para converter data do formato DD/MM/YYYY para YYYY-MM-DD
 function converterDataOmie(dataOmie: string): string | null {
   if (!dataOmie) return null;
   const partes = dataOmie.split('/');
@@ -38,92 +14,37 @@ function converterDataOmie(dataOmie: string): string | null {
   return `${partes[2]}-${partes[1]}-${partes[0]}`;
 }
 
-// Função para adicionar delay entre requisições
-function delay(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-// Função para fazer requisição com retry exponencial
-async function fetchWithRetry(url: string, options: any, maxRetries = 7): Promise<Response> {
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      const response = await fetch(url, options);
-      
-      // Se receber 425 (Too Early), 429 (Too Many Requests) ou 500 (Internal Server Error), esperar e tentar novamente
-      if (response.status === 425 || response.status === 429 || response.status === 500) {
-        const waitTime = Math.pow(2, attempt) * 5000; // 5s, 10s, 20s, 40s, 80s, 160s, 320s
-        console.log(`Erro ${response.status} detectado. Aguardando ${waitTime}ms antes de tentar novamente (tentativa ${attempt + 1}/${maxRetries})...`);
-        await delay(waitTime);
-        continue;
-      }
-      
-      return response;
-    } catch (error) {
-      if (attempt === maxRetries - 1) throw error;
-      const waitTime = Math.pow(2, attempt) * 3000; // 3s, 6s, 12s, 24s, 48s, 96s, 192s
-      console.log(`Erro na requisição. Aguardando ${waitTime}ms antes de tentar novamente (tentativa ${attempt + 1}/${maxRetries})...`);
-      await delay(waitTime);
-    }
-  }
-  
-  throw new Error('Máximo de tentativas excedido');
-}
-
-// Função para buscar cliente no OMIE diretamente
-async function buscarClienteOmie(cnpj: string, nomeCliente: string) {
-  const omieAppKey = Deno.env.get('OMIE_APP_KEY');
-  const omieAppSecret = Deno.env.get('OMIE_APP_SECRET');
-
-  if (!omieAppKey || !omieAppSecret) {
-    throw new Error('Credenciais do OMIE não configuradas');
-  }
-
-  console.log(`Buscando cliente no OMIE - CNPJ: ${cnpj}, Nome: ${nomeCliente}`);
-
-  // Paginar resultados e tentar casar por CNPJ (normalizado) e, se necessário, por nome
+async function buscarClienteOmie(cnpj: string, nomeCliente: string, appKey: string, appSecret: string) {
   const digits = (cnpj || '').replace(/\D/g, '');
   const norm = (s: string) => (s || '').toLowerCase().trim();
   const alvoNome = norm(nomeCliente);
 
   for (let pagina = 1; pagina <= 50; pagina++) {
-    const buscarClienteReq: OmieApiRequest = {
-      call: "ListarClientes",
-      app_key: omieAppKey,
-      app_secret: omieAppSecret,
-      param: [{
-        pagina,
-        registros_por_pagina: 100,
-      }],
-    };
-
-    console.log(`Consultando API OMIE - ListarClientes (página ${pagina})...`);
-
-    const response = await fetchWithRetry('https://app.omie.com.br/api/v1/geral/clientes/', {
+    const response = await fetch('https://app.omie.com.br/api/v1/geral/clientes/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(buscarClienteReq),
+      body: JSON.stringify({
+        call: "ListarClientes",
+        app_key: appKey,
+        app_secret: appSecret,
+        param: [{ pagina, registros_por_pagina: 100 }],
+      }),
     });
 
     if (!response.ok) {
       throw new Error(`Erro na API do OMIE: ${response.status} - ${response.statusText}`);
     }
 
-    // Aguardar 5 segundos entre requisições para evitar rate limiting
-    await delay(5000);
-
     const dados = await response.json();
     const lista = dados.clientes_cadastro || [];
-    console.log(`API OMIE retornou ${lista.length} clientes na página ${pagina}`);
 
-    if (lista.length === 0) break; // fim da paginação
+    if (lista.length === 0) break;
 
-    // 1) Tentar por CNPJ (somente dígitos)
     let clienteEncontrado = lista.find((cliente: any) => {
       const cnpjResp = String(cliente.cnpj_cpf || '').replace(/\D/g, '');
       return cnpjResp && digits && cnpjResp === digits;
     });
 
-    // 2) Se não encontrou por CNPJ, tentar por nome (razao_social ou nome_fantasia)
     if (!clienteEncontrado && alvoNome) {
       clienteEncontrado = lista.find((cliente: any) =>
         norm(cliente.razao_social).includes(alvoNome) ||
@@ -132,7 +53,6 @@ async function buscarClienteOmie(cnpj: string, nomeCliente: string) {
     }
 
     if (clienteEncontrado) {
-      console.log(`Cliente encontrado no OMIE: ${clienteEncontrado.razao_social} - Código: ${clienteEncontrado.codigo_cliente_omie}`);
       return {
         codigo_omie: clienteEncontrado.codigo_cliente_omie,
         razao_social: clienteEncontrado.razao_social,
@@ -141,220 +61,45 @@ async function buscarClienteOmie(cnpj: string, nomeCliente: string) {
       };
     }
 
-    // Se retornou menos que a página cheia, não há próximas páginas
     if (lista.length < 100) break;
   }
 
   return null;
 }
 
-// Função para buscar contratos no OMIE por código de cliente
-async function buscarContratosOmie(codigoClienteOmie: string) {
-  const omieAppKey = Deno.env.get('OMIE_APP_KEY');
-  const omieAppSecret = Deno.env.get('OMIE_APP_SECRET');
-
-  if (!omieAppKey || !omieAppSecret) {
-    throw new Error('Credenciais do OMIE não configuradas');
-  }
-
-  console.log(`Buscando contratos no OMIE para cliente código: ${codigoClienteOmie}`);
-
-  const contratos: OmieContrato[] = [];
+async function buscarContratosOmie(codigoClienteOmie: string, appKey: string, appSecret: string) {
+  const contratos: any[] = [];
 
   for (let pagina = 1; pagina <= 20; pagina++) {
-    const buscarContratosReq: OmieApiRequest = {
-      call: "ListarContratos",
-      app_key: omieAppKey,
-      app_secret: omieAppSecret,
-      param: [{
-        pagina,
-        registros_por_pagina: 100,
-        apenas_importado_api: 'N',
-        filtrar_por_cliente: codigoClienteOmie
-      }],
-    };
-
-    console.log(`Consultando API OMIE - ListarContratos (página ${pagina})...`);
-
-    const response = await fetchWithRetry('https://app.omie.com.br/api/v1/servicos/contrato/', {
+    const response = await fetch('https://app.omie.com.br/api/v1/servicos/contrato/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(buscarContratosReq),
+      body: JSON.stringify({
+        call: "ListarContratos",
+        app_key: appKey,
+        app_secret: appSecret,
+        param: [{
+          pagina,
+          registros_por_pagina: 100,
+          apenas_importado_api: 'N',
+          filtrar_por_cliente: codigoClienteOmie
+        }],
+      }),
     });
 
     if (!response.ok) {
       throw new Error(`Erro na API do OMIE: ${response.status} - ${response.statusText}`);
     }
 
-    // Aguardar 5 segundos entre requisições para evitar rate limiting
-    await delay(5000);
-
     const dados = await response.json();
     const lista = dados.contratoCadastro || [];
-    console.log(`API OMIE retornou ${lista.length} contratos na página ${pagina}`);
 
     if (lista.length === 0) break;
-
     contratos.push(...lista);
-
     if (lista.length < 100) break;
   }
 
   return contratos;
-}
-
-// Função para processar clientes de forma síncrona (processamento direto)
-async function processarClientesSincrono(
-  clientesData: any[],
-  supabase: any
-) {
-  console.log(`Iniciando processamento SÍNCRONO de ${clientesData.length} clientes`);
-  
-  const DELAY_ENTRE_CLIENTES = 20000; // 20 segundos entre cada cliente para evitar sobrecarga
-  
-  let atualizados = 0;
-  let naoEncontrados = 0;
-  let erros = 0;
-  const errosDetalhados: string[] = [];
-
-  for (let i = 0; i < clientesData.length; i++) {
-    const c = clientesData[i];
-    
-    try {
-      console.log(`[${i+1}/${clientesData.length}] Processando cliente: ${c.nome}`);
-      
-      let codigoOmie = c.omie_codigo_cliente;
-      const agora = new Date().toISOString();
-
-      // Se não tem código OMIE, buscar no OMIE
-      if (!codigoOmie) {
-        if (!c.cnpj) {
-          console.log(`Cliente ${c.nome} sem CNPJ - pulando`);
-          naoEncontrados++;
-          continue;
-        }
-
-        const encontrado = await buscarClienteOmie(c.cnpj, c.nome);
-        
-        if (!encontrado?.codigo_omie) {
-          console.log(`Cliente ${c.nome} não encontrado no Omie`);
-          naoEncontrados++;
-          continue;
-        }
-
-        codigoOmie = String(encontrado.codigo_omie);
-
-        const { error: updClienteError } = await supabase
-          .from('clientes')
-          .update({ omie_codigo_cliente: codigoOmie, omie_data_sincronizacao: agora })
-          .eq('id', c.id);
-
-        if (updClienteError) throw updClienteError;
-        console.log(`Cliente ${c.nome} - código OMIE atualizado: ${codigoOmie}`);
-      }
-
-      // Buscar contratos do sistema para este cliente
-      const { data: contratosCliente, error: contratosError } = await supabase
-        .from('contratos_clientes')
-        .select('id, numero_contrato, data_inicio, data_fim')
-        .eq('cliente_id', c.id)
-        .in('status', ['ativo', 'vencido']);
-
-      if (contratosError) throw contratosError;
-
-      // Buscar contratos no OMIE
-      const contratosOmie = await buscarContratosOmie(codigoOmie);
-      console.log(`Cliente ${c.nome} - encontrados ${contratosOmie.length} contratos no OMIE`);
-      
-      let contratosAtualizados = 0;
-
-      // Para cada contrato do sistema, tentar casar com OMIE pelo numero_contrato
-      for (const contrato of contratosCliente || []) {
-        if (!contrato.numero_contrato) continue;
-
-        const contratoOmie = contratosOmie.find((co: OmieContrato) => 
-          co.cabecalho?.cNumCtr && String(co.cabecalho.cNumCtr).trim() === String(contrato.numero_contrato).trim()
-        );
-
-        if (contratoOmie && contratoOmie.cabecalho) {
-          const updateData: any = {
-            omie_codigo_cliente: codigoOmie,
-            omie_codigo_contrato: String(contratoOmie.cabecalho.nCodCtr),
-            omie_data_sincronizacao: agora
-          };
-
-          if (contratoOmie.cabecalho.dVigInicial) {
-            const dataInicio = converterDataOmie(contratoOmie.cabecalho.dVigInicial);
-            if (dataInicio) updateData.data_inicio = dataInicio;
-          }
-          if (contratoOmie.cabecalho.dVigFinal) {
-            const dataFim = converterDataOmie(contratoOmie.cabecalho.dVigFinal);
-            if (dataFim) updateData.data_fim = dataFim;
-          }
-
-          const { error: updContratoError } = await supabase
-            .from('contratos_clientes')
-            .update(updateData)
-            .eq('id', contrato.id);
-
-          if (!updContratoError) {
-            // Atualizar também parametros_faturamento com as mesmas datas
-            const updateParamsData: any = {};
-            if (contratoOmie.cabecalho.dVigInicial) {
-              const dataInicio = converterDataOmie(contratoOmie.cabecalho.dVigInicial);
-              if (dataInicio) updateParamsData.data_inicio_contrato = dataInicio;
-            }
-            if (contratoOmie.cabecalho.dVigFinal) {
-              const dataFim = converterDataOmie(contratoOmie.cabecalho.dVigFinal);
-              if (dataFim) updateParamsData.data_termino_contrato = dataFim;
-            }
-
-            if (Object.keys(updateParamsData).length > 0) {
-              await supabase
-                .from('parametros_faturamento')
-                .update(updateParamsData)
-                .eq('numero_contrato', contrato.numero_contrato);
-            }
-
-            contratosAtualizados++;
-            console.log(`✓ Contrato ${contrato.numero_contrato} sincronizado`);
-          }
-        } else {
-          // Apenas atualizar código do cliente no contrato
-          await supabase
-            .from('contratos_clientes')
-            .update({ omie_codigo_cliente: codigoOmie, omie_data_sincronizacao: agora })
-            .eq('id', contrato.id);
-        }
-      }
-
-      console.log(`✓ Cliente ${c.nome} - ${contratosAtualizados} contratos atualizados`);
-      atualizados++;
-      
-      // Delay entre clientes (exceto no último)
-      if (i < clientesData.length - 1) {
-        console.log(`Aguardando ${DELAY_ENTRE_CLIENTES/1000}s antes do próximo cliente...`);
-        await delay(DELAY_ENTRE_CLIENTES);
-      }
-    } catch (e: any) {
-      const msgErro = `Cliente ${c.nome}: ${e?.message || String(e)}`;
-      console.error(`✗ ${msgErro}`);
-      errosDetalhados.push(msgErro);
-      erros++;
-      
-      // Delay maior em caso de erro para dar tempo da API se recuperar
-      if (i < clientesData.length - 1) {
-        await delay(30000);
-      }
-    }
-  }
-
-  return {
-    atualizados,
-    naoEncontrados,
-    erros,
-    errosDetalhados
-  };
 }
 
 serve(async (req) => {
@@ -368,93 +113,150 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const body: SyncRequest = await req.json().catch(() => ({}));
-    const { clientes, cliente_ids, cnpjs, apenas_sem_codigo = false, iniciar_fila = false } = body || {};
+    const omieAppKey = Deno.env.get('OMIE_APP_KEY');
+    const omieAppSecret = Deno.env.get('OMIE_APP_SECRET');
 
-    console.log('Requisição recebida:', { ...body, iniciar_fila });
-
-    // Se iniciar_fila = true, popular fila e retornar
-    if (iniciar_fila) {
-      // Limpar fila anterior (opcional - comentar se quiser manter histórico)
-      await supabase.from('fila_sincronizacao_omie').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-
-      // Buscar todos os clientes
-      let query = supabase
-        .from('clientes')
-        .select('id, nome, cnpj, omie_codigo_cliente');
-
-      if (cliente_ids && cliente_ids.length > 0) {
-        query = query.in('id', cliente_ids);
-      } else if (cnpjs && cnpjs.length > 0) {
-        query = query.in('cnpj', cnpjs);
-      } else if (clientes && clientes.length > 0) {
-        const orCond = clientes.map((n) => `nome.ilike.%${n}%`).join(',');
-        query = query.or(orCond);
-      } else if (apenas_sem_codigo) {
-        query = query.is('omie_codigo_cliente', null).not('cnpj', 'is', null);
-      }
-
-      const { data: clientesData, error: listError } = await query;
-      if (listError) throw listError;
-
-      if (!clientesData || clientesData.length === 0) {
-        return new Response(JSON.stringify({
-          success: true,
-          message: 'Nenhum cliente encontrado',
-          total_clientes: 0
-        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-      }
-
-      // Inserir clientes na fila
-      const filaItems = clientesData.map(c => ({
-        cliente_id: c.id,
-        cliente_nome: c.nome,
-        cnpj: c.cnpj,
-        omie_codigo_cliente: c.omie_codigo_cliente,
-        status: 'pendente'
-      }));
-
-      const { error: insertError } = await supabase
-        .from('fila_sincronizacao_omie')
-        .insert(filaItems);
-
-      if (insertError) throw insertError;
-
-      console.log(`${clientesData.length} clientes adicionados à fila`);
-
-      return new Response(JSON.stringify({
-        success: true,
-        message: `Fila iniciada com ${clientesData.length} clientes`,
-        total_clientes: clientesData.length,
-        fila_iniciada: true
-      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    if (!omieAppKey || !omieAppSecret) {
+      throw new Error('Credenciais OMIE não configuradas. Verifique OMIE_APP_KEY e OMIE_APP_SECRET.');
     }
 
-    // Se não for iniciar_fila, retornar status da fila
-    const { data: statusFila } = await supabase
-      .from('fila_sincronizacao_omie')
-      .select('status')
-      .then(result => ({
-        data: {
-          pendente: result.data?.filter(f => f.status === 'pendente').length || 0,
-          processando: result.data?.filter(f => f.status === 'processando').length || 0,
-          concluido: result.data?.filter(f => f.status === 'concluido').length || 0,
-          erro: result.data?.filter(f => f.status === 'erro').length || 0,
-          nao_encontrado: result.data?.filter(f => f.status === 'nao_encontrado').length || 0,
-          total: result.data?.length || 0
+    const body = await req.json();
+    const { cliente_id } = body;
+
+    if (!cliente_id) {
+      throw new Error('cliente_id é obrigatório');
+    }
+
+    console.log(`Processando cliente ID: ${cliente_id}`);
+
+    // Buscar dados do cliente
+    const { data: cliente, error: clienteError } = await supabase
+      .from('clientes')
+      .select('id, nome, cnpj, omie_codigo_cliente')
+      .eq('id', cliente_id)
+      .single();
+
+    if (clienteError || !cliente) {
+      throw new Error('Cliente não encontrado');
+    }
+
+    let codigoOmie = cliente.omie_codigo_cliente;
+
+    // Se não tem código OMIE, buscar
+    if (!codigoOmie) {
+      if (!cliente.cnpj) {
+        return new Response(JSON.stringify({
+          success: false,
+          message: 'Cliente sem CNPJ',
+          cliente_nome: cliente.nome
+        }), { 
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        });
+      }
+
+      const encontrado = await buscarClienteOmie(cliente.cnpj, cliente.nome, omieAppKey, omieAppSecret);
+      
+      if (!encontrado?.codigo_omie) {
+        return new Response(JSON.stringify({
+          success: false,
+          message: 'Cliente não encontrado no OMIE',
+          cliente_nome: cliente.nome
+        }), { 
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        });
+      }
+
+      codigoOmie = String(encontrado.codigo_omie);
+
+      await supabase
+        .from('clientes')
+        .update({ 
+          omie_codigo_cliente: codigoOmie,
+          omie_data_sincronizacao: new Date().toISOString()
+        })
+        .eq('id', cliente.id);
+    }
+
+    // Buscar contratos do cliente
+    const { data: contratosCliente } = await supabase
+      .from('contratos_clientes')
+      .select('id, numero_contrato, data_inicio, data_fim')
+      .eq('cliente_id', cliente.id)
+      .in('status', ['ativo', 'vencido']);
+
+    // Buscar contratos no OMIE
+    const contratosOmie = await buscarContratosOmie(codigoOmie, omieAppKey, omieAppSecret);
+    
+    let contratosAtualizados = 0;
+
+    // Sincronizar contratos
+    for (const contrato of contratosCliente || []) {
+      if (!contrato.numero_contrato) continue;
+
+      const contratoOmie = contratosOmie.find((co: any) => 
+        co.cabecalho?.cNumCtr && String(co.cabecalho.cNumCtr).trim() === String(contrato.numero_contrato).trim()
+      );
+
+      if (contratoOmie?.cabecalho) {
+        const updateData: any = {
+          omie_codigo_cliente: codigoOmie,
+          omie_codigo_contrato: String(contratoOmie.cabecalho.nCodCtr),
+          omie_data_sincronizacao: new Date().toISOString()
+        };
+
+        if (contratoOmie.cabecalho.dVigInicial) {
+          const dataInicio = converterDataOmie(contratoOmie.cabecalho.dVigInicial);
+          if (dataInicio) updateData.data_inicio = dataInicio;
         }
-      }));
+        if (contratoOmie.cabecalho.dVigFinal) {
+          const dataFim = converterDataOmie(contratoOmie.cabecalho.dVigFinal);
+          if (dataFim) updateData.data_fim = dataFim;
+        }
+
+        await supabase
+          .from('contratos_clientes')
+          .update(updateData)
+          .eq('id', contrato.id);
+
+        // Atualizar parametros_faturamento
+        const updateParamsData: any = {};
+        if (contratoOmie.cabecalho.dVigInicial) {
+          const dataInicio = converterDataOmie(contratoOmie.cabecalho.dVigInicial);
+          if (dataInicio) updateParamsData.data_inicio_contrato = dataInicio;
+        }
+        if (contratoOmie.cabecalho.dVigFinal) {
+          const dataFim = converterDataOmie(contratoOmie.cabecalho.dVigFinal);
+          if (dataFim) updateParamsData.data_termino_contrato = dataFim;
+        }
+
+        if (Object.keys(updateParamsData).length > 0) {
+          await supabase
+            .from('parametros_faturamento')
+            .update(updateParamsData)
+            .eq('numero_contrato', contrato.numero_contrato);
+        }
+
+        contratosAtualizados++;
+      }
+    }
 
     return new Response(JSON.stringify({
       success: true,
-      fila_status: statusFila
+      message: `Cliente ${cliente.nome} sincronizado com sucesso`,
+      cliente_nome: cliente.nome,
+      contratos_atualizados: contratosAtualizados
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error: any) {
-    console.error('Erro na função sincronizar-codigo-cliente-omie:', error);
-    return new Response(JSON.stringify({ success: false, error: error?.message || String(error) }), {
+    console.error('Erro:', error);
+    return new Response(JSON.stringify({ 
+      success: false, 
+      error: error?.message || String(error) 
+    }), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
 });
