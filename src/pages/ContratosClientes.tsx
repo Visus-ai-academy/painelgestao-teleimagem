@@ -888,15 +888,26 @@ export default function ContratosClientes() {
       const resultado = data;
       
       if (resultado.success) {
-        if (resultado.status === 'processando') {
+        // Nova resposta com informações sobre processamento por lotes
+        if (resultado.requer_nova_execucao) {
           toast({
-            title: "Sincronização em andamento",
-            description: `Processando ${resultado.total_clientes} clientes em background. Aguarde alguns minutos e recarregue a página para ver os resultados.`,
+            title: "Sincronização parcial concluída",
+            description: `${resultado.atualizados} códigos sincronizados. Restam ${resultado.total_restantes} clientes. Clique novamente para continuar.`,
+            duration: 10000,
           });
         } else {
           toast({
             title: "Sincronização concluída",
-            description: `${resultado.atualizados || 0} códigos Omie sincronizados com sucesso. ${resultado.nao_encontrados || 0} não encontrados no Omie.`,
+            description: `${resultado.atualizados} códigos Omie sincronizados com sucesso. ${resultado.nao_encontrados || 0} não encontrados no Omie.`,
+          });
+        }
+
+        // Se houver erros, mostrar em um toast separado
+        if (resultado.erros > 0) {
+          toast({
+            title: "Atenção",
+            description: `${resultado.erros} clientes com erro durante sincronização. Verifique os logs para mais detalhes.`,
+            variant: "destructive",
           });
         }
 
