@@ -19,6 +19,7 @@ interface DemonstrativoCliente {
   detalhes_exames: any[];
   detalhes_tributacao: any;
   tipo_faturamento?: string;
+  tipo_cliente?: string;
 }
 
 serve(async (req) => {
@@ -47,10 +48,12 @@ serve(async (req) => {
         nome_fantasia,
         nome_mobilemed,
         ativo,
+        tipo_cliente,
         parametros_faturamento(
           id,
           status,
           ativo,
+          tipo_cliente,
           aplicar_franquia,
           valor_franquia,
           volume_franquia,
@@ -67,6 +70,7 @@ serve(async (req) => {
         ),
         contratos_clientes(
           tipo_faturamento,
+          tipo_cliente,
           numero_contrato
         )
       `)
@@ -101,6 +105,9 @@ serve(async (req) => {
           : cliente.parametros_faturamento;
         const contrato = cliente.contratos_clientes?.[0];
         const tipoFaturamento = contrato?.tipo_faturamento || 'CO-FT';
+        
+        // Buscar tipo_cliente do contrato, parâmetros ou cliente (em ordem de prioridade)
+        const tipoCliente = contrato?.tipo_cliente || parametros?.tipo_cliente || cliente.tipo_cliente || 'CO';
 
       // Regras de faturamento:
       // - CO-NF DEVE gerar demonstrativo e relatório (mas não envia email/NF)
@@ -903,6 +910,8 @@ serve(async (req) => {
         cliente_id: demo.cliente_id,
         cliente_nome: demo.cliente_nome,
         periodo_referencia: periodo,
+        tipo_cliente: demo.tipo_cliente || 'CO',
+        tipo_faturamento: demo.tipo_faturamento || 'CO-FT',
         total_exames: demo.total_exames || 0,
         valor_exames: demo.valor_exames || 0,
         valor_franquia: demo.valor_franquia || 0,
