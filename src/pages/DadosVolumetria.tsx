@@ -25,7 +25,6 @@ import { FinalizarUploadsTravados } from '@/components/FinalizarUploadsTravados'
 import { AplicarTipificacaoGeral } from "@/components/AplicarTipificacaoGeral";
 import { IndicadorTipificacao } from '@/components/IndicadorTipificacao';
 import { DemonstrativoVolumetriaPorCliente } from '@/components/DemonstrativoVolumetriaPorCliente';
-import { LimparTiposInvalidosDefinitivo } from '@/components/LimparTiposInvalidosDefinitivo';
 import { VolumetriaProvider } from "@/contexts/VolumetriaContext";
 import { useToast } from "@/hooks/use-toast";
 import { useUploadStatus } from "@/hooks/useUploadStatus";
@@ -220,11 +219,8 @@ export default function DadosVolumetria() {
           </TabsContent>
 
           <TabsContent value="sistema-regras" className="space-y-6">
-            {/* 🚨 LIMPAR TIPOS INVÁLIDOS - PRIORIDADE MÁXIMA */}
-            <LimparTiposInvalidosDefinitivo />
-            
             {/* Tipificação Geral - TODOS os clientes (CO, NC e NC1) */}
-            <AplicarTipificacaoGeral 
+            <AplicarTipificacaoGeral
               onCorrecaoConcluida={() => setRefreshTipificacao(prev => prev + 1)}
             />
             
