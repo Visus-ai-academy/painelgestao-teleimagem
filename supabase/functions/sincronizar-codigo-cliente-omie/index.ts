@@ -263,20 +263,36 @@ serve(async (req) => {
       .eq('cliente_id', cliente.id)
       .in('status', ['ativo', 'vencido']);
 
+    console.log(`📋 Contratos no banco local: ${contratosCliente?.length || 0}`);
+    if (contratosCliente && contratosCliente.length > 0) {
+      console.log(`📋 Números de contrato no banco:`, contratosCliente.map(c => c.numero_contrato));
+    }
+
     // Buscar contratos no OMIE
     const contratosOmie = await buscarContratosOmie(codigoOmie, omieAppKey, omieAppSecret);
+    
+    console.log(`📋 Contratos no OMIE: ${contratosOmie.length}`);
+    if (contratosOmie.length > 0) {
+      console.log(`📋 Números de contrato no OMIE:`, contratosOmie.map((c: any) => c.cabecalho?.cNumCtr));
+    }
     
     let contratosAtualizados = 0;
 
     // Sincronizar contratos
     for (const contrato of contratosCliente || []) {
-      if (!contrato.numero_contrato) continue;
+      if (!contrato.numero_contrato) {
+        console.log(`⚠️ Contrato ${contrato.id} sem número, pulando`);
+        continue;
+      }
+
+      console.log(`🔍 Buscando match para contrato local: ${contrato.numero_contrato}`);
 
       const contratoOmie = contratosOmie.find((co: any) => 
         co.cabecalho?.cNumCtr && String(co.cabecalho.cNumCtr).trim() === String(contrato.numero_contrato).trim()
       );
 
       if (contratoOmie?.cabecalho) {
+        console.log(`✅ Match encontrado! Contrato OMIE: ${contratoOmie.cabecalho.cNumCtr}`);
         const updateData: any = {
           omie_codigo_cliente: codigoOmie,
           omie_codigo_contrato: String(contratoOmie.cabecalho.nCodCtr),
@@ -285,17 +301,31 @@ serve(async (req) => {
 
         if (contratoOmie.cabecalho.dVigInicial) {
           const dataInicio = converterDataOmie(contratoOmie.cabecalho.dVigInicial);
-          if (dataInicio) updateData.data_inicio = dataInicio;
+          if (dataInicio) {
+            updateData.data_inicio = dataInicio;
+            console.log(`📅 Data início OMIE: ${contratoOmie.cabecalho.dVigInicial} → ${dataInicio}`);
+          }
         }
         if (contratoOmie.cabecalho.dVigFinal) {
           const dataFim = converterDataOmie(contratoOmie.cabecalho.dVigFinal);
-          if (dataFim) updateData.data_fim = dataFim;
+          if (dataFim) {
+            updateData.data_fim = dataFim;
+            console.log(`📅 Data fim OMIE: ${contratoOmie.cabecalho.dVigFinal} → ${dataFim}`);
+          }
         }
 
-        await supabase
+        console.log(`💾 Atualizando contratos_clientes:`, updateData);
+
+        const { error: updateError } = await supabase
           .from('contratos_clientes')
           .update(updateData)
           .eq('id', contrato.id);
+
+        if (updateError) {
+          console.error(`❌ Erro ao atualizar contrato ${contrato.id}:`, updateError);
+        } else {
+          console.log(`✅ Contrato ${contrato.numero_contrato} atualizado com sucesso`);
+        }
 
         // Atualizar parametros_faturamento
         const updateParamsData: any = {};
@@ -309,13 +339,22 @@ serve(async (req) => {
         }
 
         if (Object.keys(updateParamsData).length > 0) {
-          await supabase
+          console.log(`💾 Atualizando parametros_faturamento:`, updateParamsData);
+          const { error: paramsError } = await supabase
             .from('parametros_faturamento')
             .update(updateParamsData)
             .eq('numero_contrato', contrato.numero_contrato);
+
+          if (paramsError) {
+            console.error(`❌ Erro ao atualizar parâmetros:`, paramsError);
+          } else {
+            console.log(`✅ Parâmetros atualizados para contrato ${contrato.numero_contrato}`);
+          }
         }
 
         contratosAtualizados++;
+      } else {
+        console.log(`❌ Nenhum match encontrado no OMIE para contrato: ${contrato.numero_contrato}`);
       }
     }
 
