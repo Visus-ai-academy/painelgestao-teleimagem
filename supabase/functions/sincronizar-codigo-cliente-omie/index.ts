@@ -369,64 +369,85 @@ serve(async (req) => {
     );
 
     const body: SyncRequest = await req.json().catch(() => ({}));
-    const { clientes, cliente_ids, cnpjs, apenas_sem_codigo = false } = body || {};
+    const { clientes, cliente_ids, cnpjs, apenas_sem_codigo = false, iniciar_fila = false } = body || {};
 
-    console.log('Iniciando sincronização de códigos Omie (cliente) com parâmetros:', body);
+    console.log('Requisição recebida:', { ...body, iniciar_fila });
 
-    // Montar query base - buscar TODOS os clientes que precisam sincronizar
-    let query = supabase
-      .from('clientes')
-      .select('id, nome, cnpj, omie_codigo_cliente');
+    // Se iniciar_fila = true, popular fila e retornar
+    if (iniciar_fila) {
+      // Limpar fila anterior (opcional - comentar se quiser manter histórico)
+      await supabase.from('fila_sincronizacao_omie').delete().neq('id', '00000000-0000-0000-0000-000000000000');
 
-    if (cliente_ids && cliente_ids.length > 0) {
-      query = query.in('id', cliente_ids);
-    } else if (cnpjs && cnpjs.length > 0) {
-      query = query.in('cnpj', cnpjs);
-    } else if (clientes && clientes.length > 0) {
-      const orCond = clientes.map((n) => `nome.ilike.%${n}%`).join(',');
-      query = query.or(orCond);
-    } else if (apenas_sem_codigo) {
-      query = query.is('omie_codigo_cliente', null).not('cnpj', 'is', null);
-    }
-    // Se nenhum filtro foi fornecido, buscar todos os clientes ativos
+      // Buscar todos os clientes
+      let query = supabase
+        .from('clientes')
+        .select('id, nome, cnpj, omie_codigo_cliente');
 
-    const { data: clientesData, error: listError } = await query;
-    if (listError) throw listError;
+      if (cliente_ids && cliente_ids.length > 0) {
+        query = query.in('id', cliente_ids);
+      } else if (cnpjs && cnpjs.length > 0) {
+        query = query.in('cnpj', cnpjs);
+      } else if (clientes && clientes.length > 0) {
+        const orCond = clientes.map((n) => `nome.ilike.%${n}%`).join(',');
+        query = query.or(orCond);
+      } else if (apenas_sem_codigo) {
+        query = query.is('omie_codigo_cliente', null).not('cnpj', 'is', null);
+      }
 
-    if (!clientesData || clientesData.length === 0) {
+      const { data: clientesData, error: listError } = await query;
+      if (listError) throw listError;
+
+      if (!clientesData || clientesData.length === 0) {
+        return new Response(JSON.stringify({
+          success: true,
+          message: 'Nenhum cliente encontrado',
+          total_clientes: 0
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      // Inserir clientes na fila
+      const filaItems = clientesData.map(c => ({
+        cliente_id: c.id,
+        cliente_nome: c.nome,
+        cnpj: c.cnpj,
+        omie_codigo_cliente: c.omie_codigo_cliente,
+        status: 'pendente'
+      }));
+
+      const { error: insertError } = await supabase
+        .from('fila_sincronizacao_omie')
+        .insert(filaItems);
+
+      if (insertError) throw insertError;
+
+      console.log(`${clientesData.length} clientes adicionados à fila`);
+
       return new Response(JSON.stringify({
         success: true,
-        message: 'Nenhum cliente encontrado para sincronizar',
-        total_clientes: 0
+        message: `Fila iniciada com ${clientesData.length} clientes`,
+        total_clientes: clientesData.length,
+        fila_iniciada: true
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    console.log(`Total de ${clientesData.length} clientes para sincronizar`);
+    // Se não for iniciar_fila, retornar status da fila
+    const { data: statusFila } = await supabase
+      .from('fila_sincronizacao_omie')
+      .select('status')
+      .then(result => ({
+        data: {
+          pendente: result.data?.filter(f => f.status === 'pendente').length || 0,
+          processando: result.data?.filter(f => f.status === 'processando').length || 0,
+          concluido: result.data?.filter(f => f.status === 'concluido').length || 0,
+          erro: result.data?.filter(f => f.status === 'erro').length || 0,
+          nao_encontrado: result.data?.filter(f => f.status === 'nao_encontrado').length || 0,
+          total: result.data?.length || 0
+        }
+      }));
 
-    // NOVA ABORDAGEM: Processar apenas os primeiros 3 clientes de forma SÍNCRONA
-    // Isso evita problemas de timeout e permite múltiplas execuções
-    const LIMITE_POR_EXECUCAO = 3;
-    const clientesParaProcessar = clientesData.slice(0, LIMITE_POR_EXECUCAO);
-    const clientesRestantes = clientesData.length - clientesParaProcessar.length;
-    
-    console.log(`Processando ${clientesParaProcessar.length} clientes nesta execução (${clientesRestantes} restantes)`);
-
-    // Processar de forma síncrona
-    const resultado = await processarClientesSincrono(clientesParaProcessar, supabase);
-
-    // Retornar resultado completo
     return new Response(JSON.stringify({
       success: true,
-      message: clientesRestantes > 0 
-        ? `${resultado.atualizados} clientes sincronizados. Ainda restam ${clientesRestantes} clientes. Execute novamente para continuar.`
-        : `Sincronização concluída! ${resultado.atualizados} clientes sincronizados.`,
-      atualizados: resultado.atualizados,
-      nao_encontrados: resultado.naoEncontrados,
-      erros: resultado.erros,
-      erros_detalhados: resultado.errosDetalhados,
-      total_processados: clientesParaProcessar.length,
-      total_restantes: clientesRestantes,
-      requer_nova_execucao: clientesRestantes > 0
+      fila_status: statusFila
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error: any) {
