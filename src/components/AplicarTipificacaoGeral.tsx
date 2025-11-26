@@ -128,7 +128,7 @@ export const AplicarTipificacaoGeral = ({ onCorrecaoConcluida }: AplicarTipifica
           )}
         </CardTitle>
         <CardDescription>
-          Aplica regras de tipificação para TODOS os clientes (CO, NC e NC1) e corrige automaticamente contratos NC
+          Aplica regras de tipificação para TODOS os clientes do período (CO, NC e NC1)
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -190,10 +190,7 @@ export const AplicarTipificacaoGeral = ({ onCorrecaoConcluida }: AplicarTipifica
             <CheckCircle className="h-4 w-4 text-green-600" />
             <AlertDescription>
               <div className="space-y-1">
-                <p><strong>Correção executada com sucesso!</strong></p>
-                {resultado.contratos_corrigidos > 0 && (
-                  <p>Contratos NC corrigidos: {resultado.contratos_corrigidos}</p>
-                )}
+                <p><strong>Tipificação executada com sucesso!</strong></p>
                 <p>Total de registros: {resultado.registros_processados?.toLocaleString()}</p>
                 <p>Registros tipificados: {resultado.registros_atualizados?.toLocaleString()}</p>
                 {resultado.breakdown_tipos && (
