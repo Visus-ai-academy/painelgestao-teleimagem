@@ -51,7 +51,7 @@ async function fetchWithRetry(url: string, options: any, maxRetries = 3): Promis
       
       // Se receber 425 (Too Early) ou 429 (Too Many Requests), esperar e tentar novamente
       if (response.status === 425 || response.status === 429) {
-        const waitTime = Math.pow(2, attempt) * 1000; // 1s, 2s, 4s
+        const waitTime = Math.pow(2, attempt) * 2000; // 2s, 4s, 8s
         console.log(`Rate limit detectado (${response.status}). Aguardando ${waitTime}ms antes de tentar novamente (tentativa ${attempt + 1}/${maxRetries})...`);
         await delay(waitTime);
         continue;
@@ -108,8 +108,8 @@ async function buscarClienteOmie(cnpj: string, nomeCliente: string) {
       throw new Error(`Erro na API do OMIE: ${response.status} - ${response.statusText}`);
     }
 
-    // Aguardar 500ms entre requisições para evitar rate limiting
-    await delay(500);
+    // Aguardar 1 segundo entre requisições para evitar rate limiting
+    await delay(1000);
 
     const dados = await response.json();
     const lista = dados.clientes_cadastro || [];
@@ -186,8 +186,8 @@ async function buscarContratosOmie(codigoClienteOmie: string) {
       throw new Error(`Erro na API do OMIE: ${response.status} - ${response.statusText}`);
     }
 
-    // Aguardar 500ms entre requisições para evitar rate limiting
-    await delay(500);
+    // Aguardar 1 segundo entre requisições para evitar rate limiting
+    await delay(1000);
 
     const dados = await response.json();
     const lista = dados.contratoCadastro || [];
@@ -215,7 +215,7 @@ serve(async (req) => {
     );
 
     const body: SyncRequest = await req.json().catch(() => ({}));
-    const { clientes, cliente_ids, cnpjs, apenas_sem_codigo = true, limite = 10 } = body || {};
+    const { clientes, cliente_ids, cnpjs, apenas_sem_codigo = false, limite = 200 } = body || {};
 
     console.log('Iniciando sincronização de códigos Omie (cliente) com parâmetros:', body);
 
@@ -259,8 +259,8 @@ serve(async (req) => {
 
     for (const c of clientesData) {
       try {
-        // Aguardar 500ms entre cada cliente para evitar rate limiting
-        await delay(500);
+        // Aguardar 1 segundo entre cada cliente para evitar rate limiting
+        await delay(1000);
         
         let codigoOmie = c.omie_codigo_cliente;
         const agora = new Date().toISOString();
