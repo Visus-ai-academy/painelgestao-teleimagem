@@ -69,6 +69,8 @@ async function buscarClienteOmie(cnpj: string, nomeCliente: string, appKey: stri
 
 async function buscarContratosOmie(codigoClienteOmie: string, appKey: string, appSecret: string) {
   const contratos: any[] = [];
+  
+  console.log(`🔍 Buscando contratos para cliente OMIE: ${codigoClienteOmie}`);
 
   for (let pagina = 1; pagina <= 20; pagina++) {
     const response = await fetch('https://app.omie.com.br/api/v1/servicos/contrato/', {
@@ -81,13 +83,14 @@ async function buscarContratosOmie(codigoClienteOmie: string, appKey: string, ap
         param: [{
           pagina,
           registros_por_pagina: 100,
-          apenas_importado_api: 'N',
-          filtrar_por_cliente: codigoClienteOmie
+          apenas_importado_api: 'N'
         }],
       }),
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`❌ Erro na API OMIE - Status: ${response.status}, Body: ${errorText}`);
       throw new Error(`Erro na API do OMIE: ${response.status} - ${response.statusText}`);
     }
 
@@ -95,10 +98,19 @@ async function buscarContratosOmie(codigoClienteOmie: string, appKey: string, ap
     const lista = dados.contratoCadastro || [];
 
     if (lista.length === 0) break;
-    contratos.push(...lista);
+    
+    // Filtrar contratos deste cliente
+    const contratosCliente = lista.filter((contrato: any) => 
+      contrato.cabecalho?.nCodCli && String(contrato.cabecalho.nCodCli) === String(codigoClienteOmie)
+    );
+    
+    console.log(`📄 Página ${pagina}: ${contratosCliente.length} contratos do cliente`);
+    contratos.push(...contratosCliente);
+    
     if (lista.length < 100) break;
   }
-
+  
+  console.log(`✅ Total de contratos encontrados: ${contratos.length}`);
   return contratos;
 }
 
