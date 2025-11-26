@@ -6,36 +6,25 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Lista de clientes NC (deve ser NC no cliente e contrato)
-const CLIENTES_NC = [
-  "CBU",
-  "CDICARDIO",
-  "CDIGOIAS",
-  "CICOMANGRA",
-  "CISP",
-  "CLIRAM",
-  "CRWANDERLEY",
-  "DIAGMAX-PR",
-  "GOLD",
-  "PRODIMAGEM",
-  "RADMED",
-  "TRANSDUSON",
-  "ZANELLO",
-  "CEMVALENCA",
-  "RMPADUA",
-  "RADI-IMAGEM"
-];
+// Função para buscar o tipo correto do cliente dos parâmetros
+async function buscarTipoClienteParametros(
+  supabase: any,
+  clienteId: string
+): Promise<"CO" | "NC" | "NC1" | null> {
+  const { data: parametros, error } = await supabase
+    .from('parametros_faturamento')
+    .select('tipo_cliente')
+    .eq('cliente_id', clienteId)
+    .eq('ativo', true)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
 
-// Lista de clientes NC1 (deve ser NC1 no cliente e contrato)
-const CLIENTES_NC1: string[] = [
-  // Adicionar clientes NC1 conforme necessário
-];
+  if (error || !parametros) {
+    return null;
+  }
 
-// Função para determinar o tipo correto do cliente
-function determinarTipoCliente(nomeCliente: string): "CO" | "NC" | "NC1" {
-  if (CLIENTES_NC1.includes(nomeCliente)) return "NC1";
-  if (CLIENTES_NC.includes(nomeCliente)) return "NC";
-  return "CO";
+  return parametros.tipo_cliente;
 }
 
 serve(async (req) => {
@@ -48,7 +37,7 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    console.log('🔄 Iniciando sincronização de tipo_cliente baseada nas regras de negócio...');
+    console.log('🔄 Iniciando sincronização de tipo_cliente baseada nos parâmetros de faturamento...');
 
     // Buscar todos os clientes ativos
     const { data: clientes, error: fetchError } = await supabase
@@ -63,7 +52,7 @@ serve(async (req) => {
 
     console.log(`📊 Total de clientes ativos: ${clientes?.length || 0}`);
 
-    // Identificar clientes que precisam ter o tipo corrigido
+    // Identificar clientes que precisam ter o tipo corrigido baseado nos parâmetros
     const clientesParaCorrigir: Array<{
       id: string;
       nome: string;
@@ -72,7 +61,14 @@ serve(async (req) => {
     }> = [];
 
     for (const cliente of clientes || []) {
-      const tipoCorreto = determinarTipoCliente(cliente.nome);
+      // Buscar o tipo correto dos parâmetros de faturamento
+      const tipoCorreto = await buscarTipoClienteParametros(supabase, cliente.id);
+      
+      // Se não encontrou nos parâmetros, pular este cliente
+      if (!tipoCorreto) {
+        console.log(`⚠️ Cliente ${cliente.nome} não possui parâmetros de faturamento ativos`);
+        continue;
+      }
       
       if (cliente.tipo_cliente !== tipoCorreto) {
         clientesParaCorrigir.push({
@@ -106,7 +102,14 @@ serve(async (req) => {
 
     for (const contrato of contratos || []) {
       const clienteNome = (contrato.clientes as any).nome;
-      const tipoCorreto = determinarTipoCliente(clienteNome);
+      // Buscar o tipo correto dos parâmetros de faturamento
+      const tipoCorreto = await buscarTipoClienteParametros(supabase, contrato.cliente_id);
+      
+      // Se não encontrou nos parâmetros, pular este contrato
+      if (!tipoCorreto) {
+        console.log(`⚠️ Contrato do cliente ${clienteNome} não possui parâmetros de faturamento ativos`);
+        continue;
+      }
       
       if (contrato.tipo_cliente !== tipoCorreto) {
         contratosParaCorrigir.push({
