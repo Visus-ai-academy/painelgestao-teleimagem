@@ -1044,6 +1044,8 @@ export type Database = {
           percentual_iss: number | null
           periodo_referencia: string
           status: string | null
+          tipo_cliente: string | null
+          tipo_faturamento: string | null
           total_exames: number | null
           total_registros: number | null
           updated_at: string | null
@@ -1075,6 +1077,8 @@ export type Database = {
           percentual_iss?: number | null
           periodo_referencia: string
           status?: string | null
+          tipo_cliente?: string | null
+          tipo_faturamento?: string | null
           total_exames?: number | null
           total_registros?: number | null
           updated_at?: string | null
@@ -1106,6 +1110,8 @@ export type Database = {
           percentual_iss?: number | null
           periodo_referencia?: string
           status?: string | null
+          tipo_cliente?: string | null
+          tipo_faturamento?: string | null
           total_exames?: number | null
           total_registros?: number | null
           updated_at?: string | null
