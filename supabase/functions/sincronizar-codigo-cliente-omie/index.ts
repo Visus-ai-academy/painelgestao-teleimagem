@@ -44,15 +44,15 @@ function delay(ms: number): Promise<void> {
 }
 
 // Função para fazer requisição com retry exponencial
-async function fetchWithRetry(url: string, options: any, maxRetries = 3): Promise<Response> {
+async function fetchWithRetry(url: string, options: any, maxRetries = 5): Promise<Response> {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       const response = await fetch(url, options);
       
-      // Se receber 425 (Too Early) ou 429 (Too Many Requests), esperar e tentar novamente
-      if (response.status === 425 || response.status === 429) {
-        const waitTime = Math.pow(2, attempt) * 2000; // 2s, 4s, 8s
-        console.log(`Rate limit detectado (${response.status}). Aguardando ${waitTime}ms antes de tentar novamente (tentativa ${attempt + 1}/${maxRetries})...`);
+      // Se receber 425 (Too Early), 429 (Too Many Requests) ou 500 (Internal Server Error), esperar e tentar novamente
+      if (response.status === 425 || response.status === 429 || response.status === 500) {
+        const waitTime = Math.pow(2, attempt) * 3000; // 3s, 6s, 12s, 24s, 48s
+        console.log(`Erro ${response.status} detectado. Aguardando ${waitTime}ms antes de tentar novamente (tentativa ${attempt + 1}/${maxRetries})...`);
         await delay(waitTime);
         continue;
       }
@@ -60,7 +60,7 @@ async function fetchWithRetry(url: string, options: any, maxRetries = 3): Promis
       return response;
     } catch (error) {
       if (attempt === maxRetries - 1) throw error;
-      const waitTime = Math.pow(2, attempt) * 500; // 500ms, 1s, 2s
+      const waitTime = Math.pow(2, attempt) * 1000; // 1s, 2s, 4s, 8s, 16s
       console.log(`Erro na requisição. Aguardando ${waitTime}ms antes de tentar novamente (tentativa ${attempt + 1}/${maxRetries})...`);
       await delay(waitTime);
     }
@@ -108,8 +108,8 @@ async function buscarClienteOmie(cnpj: string, nomeCliente: string) {
       throw new Error(`Erro na API do OMIE: ${response.status} - ${response.statusText}`);
     }
 
-    // Aguardar 1 segundo entre requisições para evitar rate limiting
-    await delay(1000);
+    // Aguardar 2 segundos entre requisições para evitar rate limiting
+    await delay(2000);
 
     const dados = await response.json();
     const lista = dados.clientes_cadastro || [];
@@ -186,8 +186,8 @@ async function buscarContratosOmie(codigoClienteOmie: string) {
       throw new Error(`Erro na API do OMIE: ${response.status} - ${response.statusText}`);
     }
 
-    // Aguardar 1 segundo entre requisições para evitar rate limiting
-    await delay(1000);
+    // Aguardar 2 segundos entre requisições para evitar rate limiting
+    await delay(2000);
 
     const dados = await response.json();
     const lista = dados.contratoCadastro || [];
@@ -215,7 +215,7 @@ serve(async (req) => {
     );
 
     const body: SyncRequest = await req.json().catch(() => ({}));
-    const { clientes, cliente_ids, cnpjs, apenas_sem_codigo = false, limite = 200 } = body || {};
+    const { clientes, cliente_ids, cnpjs, apenas_sem_codigo = false, limite = 5 } = body || {};
 
     console.log('Iniciando sincronização de códigos Omie (cliente) com parâmetros:', body);
 
@@ -259,8 +259,8 @@ serve(async (req) => {
 
     for (const c of clientesData) {
       try {
-        // Aguardar 1 segundo entre cada cliente para evitar rate limiting
-        await delay(1000);
+        // Aguardar 3 segundos entre cada cliente para evitar rate limiting
+        await delay(3000);
         
         let codigoOmie = c.omie_codigo_cliente;
         const agora = new Date().toISOString();
