@@ -38,6 +38,11 @@ function converterDataOmie(dataOmie: string): string | null {
   return `${partes[2]}-${partes[1]}-${partes[0]}`;
 }
 
+// Função para adicionar delay entre requisições
+function delay(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 // Função para buscar cliente no OMIE diretamente
 async function buscarClienteOmie(cnpj: string, nomeCliente: string) {
   const omieAppKey = Deno.env.get('OMIE_APP_KEY');
@@ -76,6 +81,9 @@ async function buscarClienteOmie(cnpj: string, nomeCliente: string) {
     if (!response.ok) {
       throw new Error(`Erro na API do OMIE: ${response.status} - ${response.statusText}`);
     }
+
+    // Aguardar 500ms entre requisições para evitar rate limiting
+    await delay(500);
 
     const dados = await response.json();
     const lista = dados.clientes_cadastro || [];
@@ -152,6 +160,9 @@ async function buscarContratosOmie(codigoClienteOmie: string) {
       throw new Error(`Erro na API do OMIE: ${response.status} - ${response.statusText}`);
     }
 
+    // Aguardar 500ms entre requisições para evitar rate limiting
+    await delay(500);
+
     const dados = await response.json();
     const lista = dados.contratoCadastro || [];
     console.log(`API OMIE retornou ${lista.length} contratos na página ${pagina}`);
@@ -222,6 +233,9 @@ serve(async (req) => {
 
     for (const c of clientesData) {
       try {
+        // Aguardar 1 segundo entre cada cliente para evitar rate limiting
+        await delay(1000);
+        
         let codigoOmie = c.omie_codigo_cliente;
         const agora = new Date().toISOString();
 
