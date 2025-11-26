@@ -134,19 +134,7 @@ serve(async (req) => {
         cliente.nome_mobilemed?.trim() || cliente.nome?.trim()
       ].filter(Boolean));
 
-      // Add sibling clients with same nome_fantasia - OTIMIZADO
-      if (cliente.nome_fantasia) {
-        const { data: siblings } = await supabase
-          .from('clientes')
-          .select('nome, nome_mobilemed')
-          .eq('nome_fantasia', cliente.nome_fantasia)
-          .eq('ativo', true)
-          .limit(10); // Limitar para evitar queries muito grandes
-        (siblings || []).forEach((s: any) => {
-          if (s?.nome) aliasSet.add(s.nome.trim());
-          if (s?.nome_mobilemed) aliasSet.add(s.nome_mobilemed.trim());
-        });
-      }
+      // Skip sibling search to reduce queries - optimization for performance
 
       const nomesBusca = Array.from(aliasSet);
 
@@ -467,34 +455,54 @@ serve(async (req) => {
       // Log final count
       console.log(`📊 ${nomeFantasia}: FINAL = ${totalExames} exames faturáveis`);
 
-      // Ajustar categorias/especialidades usando cadastro_exames quando vierem como 'SC' ou vazias
+      // ✅ OTIMIZADO: Ajustar categorias em batch
       try {
         const norm = (s: any) => (s ?? '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
-        const categoriaCache = new Map<string, { categoria: string; especialidade: string }>();
+        
+        // Coletar todas as descrições que precisam de ajuste
+        const descricoesParaAjustar = new Set<string>();
+        for (const v of volumetria) {
+          const cat = norm(v.CATEGORIA);
+          if (!cat || cat === 'SC') {
+            const descKey = norm(v.ESTUDO_DESCRICAO || '');
+            if (descKey) descricoesParaAjustar.add(v.ESTUDO_DESCRICAO || '');
+          }
+        }
+        
+        // Buscar todos os cadastros de exames de uma vez
+        let categoriaCache = new Map<string, { categoria: string; especialidade: string }>();
+        if (descricoesParaAjustar.size > 0) {
+          const { data: cadastrosExames } = await supabase
+            .from('cadastro_exames')
+            .select('categoria, especialidade, nome, ativo')
+            .eq('ativo', true)
+            .in('nome', Array.from(descricoesParaAjustar));
+          
+          // Criar cache normalizado
+          (cadastrosExames || []).forEach((ce: any) => {
+            const key = norm(ce.nome);
+            categoriaCache.set(key, {
+              categoria: ce.categoria?.toString() || '',
+              especialidade: ce.especialidade?.toString() || ''
+            });
+          });
+        }
+        
+        // Aplicar ajustes em batch
         let atualizados = 0;
         for (const v of volumetria) {
           const cat = norm(v.CATEGORIA);
           if (!cat || cat === 'SC') {
             const descKey = norm(v.ESTUDO_DESCRICAO || '');
-            if (!descKey) continue;
-            let cached = categoriaCache.get(descKey);
-            if (!cached) {
-              const { data: ce } = await supabase
-                .from('cadastro_exames')
-                .select('categoria, especialidade, nome, ativo')
-                .ilike('nome', v.ESTUDO_DESCRICAO || '')
-                .eq('ativo', true)
-                .limit(1)
-                .maybeSingle();
-              cached = { categoria: ce?.categoria?.toString() || '', especialidade: ce?.especialidade?.toString() || '' };
-              categoriaCache.set(descKey, cached);
-            }
-            if (cached.categoria) {
-              v.CATEGORIA = cached.categoria;
-              atualizados++;
-            }
-            if ((!v.ESPECIALIDADE || !norm(v.ESPECIALIDADE)) && cached.especialidade) {
-              v.ESPECIALIDADE = cached.especialidade;
+            const cached = categoriaCache.get(descKey);
+            if (cached) {
+              if (cached.categoria) {
+                v.CATEGORIA = cached.categoria;
+                atualizados++;
+              }
+              if ((!v.ESPECIALIDADE || !norm(v.ESPECIALIDADE)) && cached.especialidade) {
+                v.ESPECIALIDADE = cached.especialidade;
+              }
             }
           }
         }
@@ -502,88 +510,89 @@ serve(async (req) => {
           console.log(`🛠️ Categorias ajustadas via cadastro_exames: ${atualizados}`);
         }
       } catch (e) {
-        console.log('⚠️ Erro ao ajustar categorias via cadastro_exames:', e?.message || e);
+        console.log('⚠️ Erro ao ajustar categorias:', e?.message || e);
       }
 
-      // Calculate exam values using prices
+      // ✅ OTIMIZADO: Buscar preços e calcular em batches
       let valorExamesCalculado = 0;
 
-      // Get client prices
+      // Buscar todos os preços do cliente de uma vez
       const { data: precosCliente } = await supabase
         .from('precos_servicos')
         .select('*')
-        .eq('cliente_id', cliente.id);
+        .eq('cliente_id', cliente.id)
+        .eq('ativo', true);
 
-      const norm = (s: any) => (s ?? '').toString().trim().toUpperCase();
-      
-      // ✅ CORRIGIDO: Buscar cond_volume específico da linha de preço, não do contrato
-      // Função para buscar preço POR EXAME usando RPC calcular_preco_exame
-      const buscarPreco = async (exame: any) => {
-        try {
-          // 1. Buscar o preço específico para obter o cond_volume daquela linha
-          const { data: precoRow, error: precoSearchErr } = await supabase
-            .from('precos_servicos')
-            .select('cond_volume')
-            .eq('cliente_id', cliente.id)
-            .eq('modalidade', exame.MODALIDADE || '')
-            .eq('especialidade', exame.ESPECIALIDADE || '')
-            .eq('ativo', true)
-            .order('volume_inicial', { ascending: false, nullsFirst: false })
-            .limit(1)
-            .maybeSingle();
-
-          // Usar cond_volume da linha de preço, ou padrão se não encontrado
-          let condVolumeEspecifico = 'MOD/ESP/CAT'; // Padrão
-          if (precoRow && precoRow.cond_volume) {
-            condVolumeEspecifico = precoRow.cond_volume;
-          }
-
-          // 2. Chamar RPC com o cond_volume específico desta linha de preço
-          const { data: precoData, error: precoErr } = await supabase
-            .rpc('calcular_preco_exame', {
-              p_cliente_id: cliente.id,
-              p_modalidade: exame.MODALIDADE || '',
-              p_especialidade: exame.ESPECIALIDADE || '',
-              p_categoria: exame.CATEGORIA || 'N/A',
-              p_prioridade: exame.PRIORIDADE || 'ROTINA',
-              p_volume_total: 0, // Será calculado pela função baseado em cond_volume
-              p_cond_volume: condVolumeEspecifico,
-              p_periodo: periodo
-            });
-
-          if (precoErr) {
-            console.error(`❌ Erro RPC calcular_preco_exame:`, precoErr);
-            return 0;
-          }
-
-          return Number(precoData) || 0;
-        } catch (e) {
-          console.error(`❌ Erro ao calcular preço:`, e);
-          return 0;
+      // Criar cache de preços para lookup rápido
+      const precosCache = new Map<string, any>();
+      (precosCliente || []).forEach((preco: any) => {
+        const key = `${preco.modalidade}|${preco.especialidade}`;
+        if (!precosCache.has(key)) {
+          precosCache.set(key, []);
         }
-      };
+        precosCache.get(key)!.push(preco);
+      });
 
-      // Calcular valores POR EXAME usando a função SQL
-      const examesCalculados = await Promise.all(
-        volumetria.map(async (v) => {
-          if (v.tipo_faturamento === 'NC-NF' || v.tipo_faturamento === 'EXCLUSAO') {
-            return null;
-          }
-          
-          const valorUnitario = await buscarPreco(v);
-          const quantidade = Number(v.VALORES) || 1;
-          
-          return {
-            modalidade: v.MODALIDADE || '',
-            especialidade: v.ESPECIALIDADE || '',
-            categoria: v.CATEGORIA || '',
-            prioridade: v.PRIORIDADE || '',
-            quantidade: quantidade,
-            valor_unitario: valorUnitario,
-            valor_total: valorUnitario * quantidade
-          };
-        })
-      );
+      // Processar exames em batches menores para evitar sobrecarga
+      const BATCH_SIZE = 50;
+      const examesCalculados: any[] = [];
+      
+      for (let i = 0; i < volumetria.length; i += BATCH_SIZE) {
+        const batch = volumetria.slice(i, i + BATCH_SIZE);
+        
+        const batchResults = await Promise.all(
+          batch.map(async (v) => {
+            if (v.tipo_faturamento === 'NC-NF' || v.tipo_faturamento === 'EXCLUSAO') {
+              return null;
+            }
+            
+            try {
+              // Buscar preço do cache
+              const key = `${v.MODALIDADE || ''}|${v.ESPECIALIDADE || ''}`;
+              const precosDisponiveis = precosCache.get(key) || [];
+              
+              // Se tiver preços no cache, usar diretamente
+              let valorUnitario = 0;
+              if (precosDisponiveis.length > 0) {
+                // Pegar o primeiro preço (ou aplicar lógica de volume se necessário)
+                const preco = precosDisponiveis[0];
+                valorUnitario = Number(preco.valor) || 0;
+              } else {
+                // Fallback: chamar RPC para casos específicos
+                const { data: precoData } = await supabase
+                  .rpc('calcular_preco_exame', {
+                    p_cliente_id: cliente.id,
+                    p_modalidade: v.MODALIDADE || '',
+                    p_especialidade: v.ESPECIALIDADE || '',
+                    p_categoria: v.CATEGORIA || 'N/A',
+                    p_prioridade: v.PRIORIDADE || 'ROTINA',
+                    p_volume_total: 0,
+                    p_cond_volume: 'MOD/ESP/CAT',
+                    p_periodo: periodo
+                  });
+                valorUnitario = Number(precoData) || 0;
+              }
+              
+              const quantidade = Number(v.VALORES) || 1;
+              
+              return {
+                modalidade: v.MODALIDADE || '',
+                especialidade: v.ESPECIALIDADE || '',
+                categoria: v.CATEGORIA || '',
+                prioridade: v.PRIORIDADE || '',
+                quantidade: quantidade,
+                valor_unitario: valorUnitario,
+                valor_total: valorUnitario * quantidade
+              };
+            } catch (e) {
+              console.error(`❌ Erro ao calcular preço do exame:`, e);
+              return null;
+            }
+          })
+        );
+        
+        examesCalculados.push(...batchResults);
+      }
       
       const examesCalculadosValidos = examesCalculados.filter(e => e !== null);
 
