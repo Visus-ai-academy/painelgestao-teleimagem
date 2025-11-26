@@ -44,14 +44,14 @@ function delay(ms: number): Promise<void> {
 }
 
 // Função para fazer requisição com retry exponencial
-async function fetchWithRetry(url: string, options: any, maxRetries = 5): Promise<Response> {
+async function fetchWithRetry(url: string, options: any, maxRetries = 7): Promise<Response> {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       const response = await fetch(url, options);
       
       // Se receber 425 (Too Early), 429 (Too Many Requests) ou 500 (Internal Server Error), esperar e tentar novamente
       if (response.status === 425 || response.status === 429 || response.status === 500) {
-        const waitTime = Math.pow(2, attempt) * 3000; // 3s, 6s, 12s, 24s, 48s
+        const waitTime = Math.pow(2, attempt) * 5000; // 5s, 10s, 20s, 40s, 80s, 160s, 320s
         console.log(`Erro ${response.status} detectado. Aguardando ${waitTime}ms antes de tentar novamente (tentativa ${attempt + 1}/${maxRetries})...`);
         await delay(waitTime);
         continue;
@@ -60,7 +60,7 @@ async function fetchWithRetry(url: string, options: any, maxRetries = 5): Promis
       return response;
     } catch (error) {
       if (attempt === maxRetries - 1) throw error;
-      const waitTime = Math.pow(2, attempt) * 1000; // 1s, 2s, 4s, 8s, 16s
+      const waitTime = Math.pow(2, attempt) * 3000; // 3s, 6s, 12s, 24s, 48s, 96s, 192s
       console.log(`Erro na requisição. Aguardando ${waitTime}ms antes de tentar novamente (tentativa ${attempt + 1}/${maxRetries})...`);
       await delay(waitTime);
     }
@@ -108,8 +108,8 @@ async function buscarClienteOmie(cnpj: string, nomeCliente: string) {
       throw new Error(`Erro na API do OMIE: ${response.status} - ${response.statusText}`);
     }
 
-    // Aguardar 2 segundos entre requisições para evitar rate limiting
-    await delay(2000);
+    // Aguardar 5 segundos entre requisições para evitar rate limiting
+    await delay(5000);
 
     const dados = await response.json();
     const lista = dados.clientes_cadastro || [];
@@ -186,8 +186,8 @@ async function buscarContratosOmie(codigoClienteOmie: string) {
       throw new Error(`Erro na API do OMIE: ${response.status} - ${response.statusText}`);
     }
 
-    // Aguardar 2 segundos entre requisições para evitar rate limiting
-    await delay(2000);
+    // Aguardar 5 segundos entre requisições para evitar rate limiting
+    await delay(5000);
 
     const dados = await response.json();
     const lista = dados.contratoCadastro || [];
@@ -210,7 +210,7 @@ async function processarClientesSincrono(
 ) {
   console.log(`Iniciando processamento SÍNCRONO de ${clientesData.length} clientes`);
   
-  const DELAY_ENTRE_CLIENTES = 8000; // 8 segundos entre cada cliente para evitar sobrecarga
+  const DELAY_ENTRE_CLIENTES = 20000; // 20 segundos entre cada cliente para evitar sobrecarga
   
   let atualizados = 0;
   let naoEncontrados = 0;
@@ -344,7 +344,7 @@ async function processarClientesSincrono(
       
       // Delay maior em caso de erro para dar tempo da API se recuperar
       if (i < clientesData.length - 1) {
-        await delay(15000);
+        await delay(30000);
       }
     }
   }
@@ -403,9 +403,9 @@ serve(async (req) => {
 
     console.log(`Total de ${clientesData.length} clientes para sincronizar`);
 
-    // NOVA ABORDAGEM: Processar apenas os primeiros 15 clientes de forma SÍNCRONA
+    // NOVA ABORDAGEM: Processar apenas os primeiros 3 clientes de forma SÍNCRONA
     // Isso evita problemas de timeout e permite múltiplas execuções
-    const LIMITE_POR_EXECUCAO = 15;
+    const LIMITE_POR_EXECUCAO = 3;
     const clientesParaProcessar = clientesData.slice(0, LIMITE_POR_EXECUCAO);
     const clientesRestantes = clientesData.length - clientesParaProcessar.length;
     
