@@ -214,37 +214,36 @@ serve(async (req) => {
 
     for (const c of clientesData) {
       try {
-        // Se já tem código, pular
-        if (c.omie_codigo_cliente) {
-          resultados.push({ cliente: c.nome, cnpj: c.cnpj, pulado: true, motivo: 'já possui omie_codigo_cliente' });
-          continue;
-        }
-
-        if (!c.cnpj) {
-          resultados.push({ cliente: c.nome, cnpj: null, sucesso: false, erro: 'Cliente sem CNPJ' });
-          naoEncontrados++;
-          continue;
-        }
-
-        // Buscar no Omie diretamente
-        const encontrado = await buscarClienteOmie(c.cnpj, c.nome);
-        
-        if (!encontrado?.codigo_omie) {
-          resultados.push({ cliente: c.nome, cnpj: c.cnpj, sucesso: false, erro: 'Cliente não encontrado no Omie' });
-          naoEncontrados++;
-          continue;
-        }
-
-        const codigoOmie = String(encontrado.codigo_omie);
+        let codigoOmie = c.omie_codigo_cliente;
         const agora = new Date().toISOString();
 
-        // Atualizar cliente
-        const { error: updClienteError } = await supabase
-          .from('clientes')
-          .update({ omie_codigo_cliente: codigoOmie, omie_data_sincronizacao: agora })
-          .eq('id', c.id);
+        // Se não tem código OMIE, buscar no OMIE
+        if (!codigoOmie) {
+          if (!c.cnpj) {
+            resultados.push({ cliente: c.nome, cnpj: null, sucesso: false, erro: 'Cliente sem CNPJ' });
+            naoEncontrados++;
+            continue;
+          }
 
-        if (updClienteError) throw updClienteError;
+          // Buscar no Omie diretamente
+          const encontrado = await buscarClienteOmie(c.cnpj, c.nome);
+          
+          if (!encontrado?.codigo_omie) {
+            resultados.push({ cliente: c.nome, cnpj: c.cnpj, sucesso: false, erro: 'Cliente não encontrado no Omie' });
+            naoEncontrados++;
+            continue;
+          }
+
+          codigoOmie = String(encontrado.codigo_omie);
+
+          // Atualizar cliente com código OMIE
+          const { error: updClienteError } = await supabase
+            .from('clientes')
+            .update({ omie_codigo_cliente: codigoOmie, omie_data_sincronizacao: agora })
+            .eq('id', c.id);
+
+          if (updClienteError) throw updClienteError;
+        }
 
         // Buscar contratos do sistema para este cliente
         const { data: contratosCliente, error: contratosError } = await supabase
