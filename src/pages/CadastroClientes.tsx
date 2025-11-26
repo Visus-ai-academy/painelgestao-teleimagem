@@ -335,6 +335,39 @@ export default function CadastroClientes() {
           onClick={async () => {
             try {
               const { data, error } = await supabase.functions
+                .invoke('sincronizar-tipo-cliente');
+              
+              if (error) throw error;
+              
+              if (data.success) {
+                toast({
+                  title: "Sincronização concluída!",
+                  description: `${data.clientesAtualizados} clientes atualizados com o tipo_cliente dos contratos`,
+                });
+                carregarClientes();
+                refreshStats();
+              } else {
+                throw new Error(data.error || 'Erro na sincronização');
+              }
+            } catch (error: any) {
+              toast({
+                title: "Erro ao sincronizar",
+                description: error.message,
+                variant: "destructive"
+              });
+            }
+          }}
+          variant="outline"
+          className="flex items-center gap-2"
+        >
+          <FileText className="h-4 w-4" />
+          Sincronizar Tipo Cliente
+        </Button>
+        
+        <Button 
+          onClick={async () => {
+            try {
+              const { data, error } = await supabase.functions
                 .invoke('limpar-clientes');
               
               if (error) throw error;
