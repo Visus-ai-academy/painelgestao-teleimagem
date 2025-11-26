@@ -203,152 +203,158 @@ async function buscarContratosOmie(codigoClienteOmie: string) {
   return contratos;
 }
 
-// Função para processar clientes em background
-async function processarClientesBackground(
+// Função para processar clientes de forma síncrona (processamento direto)
+async function processarClientesSincrono(
   clientesData: any[],
   supabase: any
 ) {
-  console.log(`[Background] Iniciando processamento de ${clientesData.length} clientes em background`);
+  console.log(`Iniciando processamento SÍNCRONO de ${clientesData.length} clientes`);
   
-  const CHUNK_SIZE = 5; // Processar 5 clientes por chunk
-  const DELAY_ENTRE_CLIENTES = 3000; // 3 segundos entre clientes
-  const DELAY_ENTRE_CHUNKS = 5000; // 5 segundos entre chunks
+  const DELAY_ENTRE_CLIENTES = 8000; // 8 segundos entre cada cliente para evitar sobrecarga
   
   let atualizados = 0;
   let naoEncontrados = 0;
   let erros = 0;
+  const errosDetalhados: string[] = [];
 
-  // Dividir clientes em chunks
-  for (let i = 0; i < clientesData.length; i += CHUNK_SIZE) {
-    const chunk = clientesData.slice(i, i + CHUNK_SIZE);
-    console.log(`[Background] Processando chunk ${Math.floor(i / CHUNK_SIZE) + 1} de ${Math.ceil(clientesData.length / CHUNK_SIZE)}`);
+  for (let i = 0; i < clientesData.length; i++) {
+    const c = clientesData[i];
     
-    for (const c of chunk) {
-      try {
-        console.log(`[Background] Processando cliente: ${c.nome}`);
-        await delay(DELAY_ENTRE_CLIENTES);
-        
-        let codigoOmie = c.omie_codigo_cliente;
-        const agora = new Date().toISOString();
+    try {
+      console.log(`[${i+1}/${clientesData.length}] Processando cliente: ${c.nome}`);
+      
+      let codigoOmie = c.omie_codigo_cliente;
+      const agora = new Date().toISOString();
 
-        // Se não tem código OMIE, buscar no OMIE
-        if (!codigoOmie) {
-          if (!c.cnpj) {
-            console.log(`[Background] Cliente ${c.nome} sem CNPJ - pulando`);
-            naoEncontrados++;
-            continue;
-          }
-
-          const encontrado = await buscarClienteOmie(c.cnpj, c.nome);
-          
-          if (!encontrado?.codigo_omie) {
-            console.log(`[Background] Cliente ${c.nome} não encontrado no Omie`);
-            naoEncontrados++;
-            continue;
-          }
-
-          codigoOmie = String(encontrado.codigo_omie);
-
-          const { error: updClienteError } = await supabase
-            .from('clientes')
-            .update({ omie_codigo_cliente: codigoOmie, omie_data_sincronizacao: agora })
-            .eq('id', c.id);
-
-          if (updClienteError) throw updClienteError;
-          console.log(`[Background] Cliente ${c.nome} - código OMIE atualizado: ${codigoOmie}`);
+      // Se não tem código OMIE, buscar no OMIE
+      if (!codigoOmie) {
+        if (!c.cnpj) {
+          console.log(`Cliente ${c.nome} sem CNPJ - pulando`);
+          naoEncontrados++;
+          continue;
         }
 
-        // Buscar contratos do sistema para este cliente
-        const { data: contratosCliente, error: contratosError } = await supabase
-          .from('contratos_clientes')
-          .select('id, numero_contrato, data_inicio, data_fim')
-          .eq('cliente_id', c.id)
-          .in('status', ['ativo', 'vencido']);
-
-        if (contratosError) throw contratosError;
-
-        // Buscar contratos no OMIE
-        const contratosOmie = await buscarContratosOmie(codigoOmie);
-        console.log(`[Background] Cliente ${c.nome} - encontrados ${contratosOmie.length} contratos no OMIE`);
+        const encontrado = await buscarClienteOmie(c.cnpj, c.nome);
         
-        let contratosAtualizados = 0;
+        if (!encontrado?.codigo_omie) {
+          console.log(`Cliente ${c.nome} não encontrado no Omie`);
+          naoEncontrados++;
+          continue;
+        }
 
-        // Para cada contrato do sistema, tentar casar com OMIE pelo numero_contrato
-        for (const contrato of contratosCliente || []) {
-          if (!contrato.numero_contrato) continue;
+        codigoOmie = String(encontrado.codigo_omie);
 
-          const contratoOmie = contratosOmie.find((co: OmieContrato) => 
-            co.cabecalho?.cNumCtr && String(co.cabecalho.cNumCtr).trim() === String(contrato.numero_contrato).trim()
-          );
+        const { error: updClienteError } = await supabase
+          .from('clientes')
+          .update({ omie_codigo_cliente: codigoOmie, omie_data_sincronizacao: agora })
+          .eq('id', c.id);
 
-          if (contratoOmie && contratoOmie.cabecalho) {
-            const updateData: any = {
-              omie_codigo_cliente: codigoOmie,
-              omie_codigo_contrato: String(contratoOmie.cabecalho.nCodCtr),
-              omie_data_sincronizacao: agora
-            };
+        if (updClienteError) throw updClienteError;
+        console.log(`Cliente ${c.nome} - código OMIE atualizado: ${codigoOmie}`);
+      }
 
+      // Buscar contratos do sistema para este cliente
+      const { data: contratosCliente, error: contratosError } = await supabase
+        .from('contratos_clientes')
+        .select('id, numero_contrato, data_inicio, data_fim')
+        .eq('cliente_id', c.id)
+        .in('status', ['ativo', 'vencido']);
+
+      if (contratosError) throw contratosError;
+
+      // Buscar contratos no OMIE
+      const contratosOmie = await buscarContratosOmie(codigoOmie);
+      console.log(`Cliente ${c.nome} - encontrados ${contratosOmie.length} contratos no OMIE`);
+      
+      let contratosAtualizados = 0;
+
+      // Para cada contrato do sistema, tentar casar com OMIE pelo numero_contrato
+      for (const contrato of contratosCliente || []) {
+        if (!contrato.numero_contrato) continue;
+
+        const contratoOmie = contratosOmie.find((co: OmieContrato) => 
+          co.cabecalho?.cNumCtr && String(co.cabecalho.cNumCtr).trim() === String(contrato.numero_contrato).trim()
+        );
+
+        if (contratoOmie && contratoOmie.cabecalho) {
+          const updateData: any = {
+            omie_codigo_cliente: codigoOmie,
+            omie_codigo_contrato: String(contratoOmie.cabecalho.nCodCtr),
+            omie_data_sincronizacao: agora
+          };
+
+          if (contratoOmie.cabecalho.dVigInicial) {
+            const dataInicio = converterDataOmie(contratoOmie.cabecalho.dVigInicial);
+            if (dataInicio) updateData.data_inicio = dataInicio;
+          }
+          if (contratoOmie.cabecalho.dVigFinal) {
+            const dataFim = converterDataOmie(contratoOmie.cabecalho.dVigFinal);
+            if (dataFim) updateData.data_fim = dataFim;
+          }
+
+          const { error: updContratoError } = await supabase
+            .from('contratos_clientes')
+            .update(updateData)
+            .eq('id', contrato.id);
+
+          if (!updContratoError) {
+            // Atualizar também parametros_faturamento com as mesmas datas
+            const updateParamsData: any = {};
             if (contratoOmie.cabecalho.dVigInicial) {
               const dataInicio = converterDataOmie(contratoOmie.cabecalho.dVigInicial);
-              if (dataInicio) updateData.data_inicio = dataInicio;
+              if (dataInicio) updateParamsData.data_inicio_contrato = dataInicio;
             }
             if (contratoOmie.cabecalho.dVigFinal) {
               const dataFim = converterDataOmie(contratoOmie.cabecalho.dVigFinal);
-              if (dataFim) updateData.data_fim = dataFim;
+              if (dataFim) updateParamsData.data_termino_contrato = dataFim;
             }
 
-            const { error: updContratoError } = await supabase
-              .from('contratos_clientes')
-              .update(updateData)
-              .eq('id', contrato.id);
-
-            if (!updContratoError) {
-              // Atualizar também parametros_faturamento com as mesmas datas
-              const updateParamsData: any = {};
-              if (contratoOmie.cabecalho.dVigInicial) {
-                const dataInicio = converterDataOmie(contratoOmie.cabecalho.dVigInicial);
-                if (dataInicio) updateParamsData.data_inicio_contrato = dataInicio;
-              }
-              if (contratoOmie.cabecalho.dVigFinal) {
-                const dataFim = converterDataOmie(contratoOmie.cabecalho.dVigFinal);
-                if (dataFim) updateParamsData.data_termino_contrato = dataFim;
-              }
-
-              if (Object.keys(updateParamsData).length > 0) {
-                await supabase
-                  .from('parametros_faturamento')
-                  .update(updateParamsData)
-                  .eq('numero_contrato', contrato.numero_contrato);
-              }
-
-              contratosAtualizados++;
-              console.log(`[Background] Contrato ${contrato.numero_contrato} sincronizado com sucesso`);
+            if (Object.keys(updateParamsData).length > 0) {
+              await supabase
+                .from('parametros_faturamento')
+                .update(updateParamsData)
+                .eq('numero_contrato', contrato.numero_contrato);
             }
-          } else {
-            // Apenas atualizar código do cliente no contrato
-            await supabase
-              .from('contratos_clientes')
-              .update({ omie_codigo_cliente: codigoOmie, omie_data_sincronizacao: agora })
-              .eq('id', contrato.id);
+
+            contratosAtualizados++;
+            console.log(`✓ Contrato ${contrato.numero_contrato} sincronizado`);
           }
+        } else {
+          // Apenas atualizar código do cliente no contrato
+          await supabase
+            .from('contratos_clientes')
+            .update({ omie_codigo_cliente: codigoOmie, omie_data_sincronizacao: agora })
+            .eq('id', contrato.id);
         }
-
-        console.log(`[Background] Cliente ${c.nome} - ${contratosAtualizados} contratos atualizados`);
-        atualizados++;
-      } catch (e) {
-        console.error(`[Background] Erro ao sincronizar cliente ${c.nome}:`, e);
-        erros++;
       }
-    }
-    
-    // Delay entre chunks (exceto no último chunk)
-    if (i + CHUNK_SIZE < clientesData.length) {
-      console.log(`[Background] Aguardando ${DELAY_ENTRE_CHUNKS}ms antes do próximo chunk...`);
-      await delay(DELAY_ENTRE_CHUNKS);
+
+      console.log(`✓ Cliente ${c.nome} - ${contratosAtualizados} contratos atualizados`);
+      atualizados++;
+      
+      // Delay entre clientes (exceto no último)
+      if (i < clientesData.length - 1) {
+        console.log(`Aguardando ${DELAY_ENTRE_CLIENTES/1000}s antes do próximo cliente...`);
+        await delay(DELAY_ENTRE_CLIENTES);
+      }
+    } catch (e: any) {
+      const msgErro = `Cliente ${c.nome}: ${e?.message || String(e)}`;
+      console.error(`✗ ${msgErro}`);
+      errosDetalhados.push(msgErro);
+      erros++;
+      
+      // Delay maior em caso de erro para dar tempo da API se recuperar
+      if (i < clientesData.length - 1) {
+        await delay(15000);
+      }
     }
   }
 
-  console.log(`[Background] Processamento concluído - Atualizados: ${atualizados}, Não encontrados: ${naoEncontrados}, Erros: ${erros}`);
+  return {
+    atualizados,
+    naoEncontrados,
+    erros,
+    errosDetalhados
+  };
 }
 
 serve(async (req) => {
@@ -397,17 +403,30 @@ serve(async (req) => {
 
     console.log(`Total de ${clientesData.length} clientes para sincronizar`);
 
-    // Iniciar processamento em background
-    EdgeRuntime.waitUntil(
-      processarClientesBackground(clientesData, supabase)
-    );
+    // NOVA ABORDAGEM: Processar apenas os primeiros 15 clientes de forma SÍNCRONA
+    // Isso evita problemas de timeout e permite múltiplas execuções
+    const LIMITE_POR_EXECUCAO = 15;
+    const clientesParaProcessar = clientesData.slice(0, LIMITE_POR_EXECUCAO);
+    const clientesRestantes = clientesData.length - clientesParaProcessar.length;
+    
+    console.log(`Processando ${clientesParaProcessar.length} clientes nesta execução (${clientesRestantes} restantes)`);
 
-    // Retornar imediatamente
+    // Processar de forma síncrona
+    const resultado = await processarClientesSincrono(clientesParaProcessar, supabase);
+
+    // Retornar resultado completo
     return new Response(JSON.stringify({
       success: true,
-      message: `Sincronização iniciada em background para ${clientesData.length} clientes`,
-      total_clientes: clientesData.length,
-      status: 'processando'
+      message: clientesRestantes > 0 
+        ? `${resultado.atualizados} clientes sincronizados. Ainda restam ${clientesRestantes} clientes. Execute novamente para continuar.`
+        : `Sincronização concluída! ${resultado.atualizados} clientes sincronizados.`,
+      atualizados: resultado.atualizados,
+      nao_encontrados: resultado.naoEncontrados,
+      erros: resultado.erros,
+      erros_detalhados: resultado.errosDetalhados,
+      total_processados: clientesParaProcessar.length,
+      total_restantes: clientesRestantes,
+      requer_nova_execucao: clientesRestantes > 0
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error: any) {
