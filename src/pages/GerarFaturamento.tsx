@@ -1169,6 +1169,10 @@ export default function GerarFaturamento() {
       setDemonstrativosGeradosPorCliente(new Set());
       setDemonstrativoGerado(false);
       
+      // 6. ✅ FORÇAR RELOAD DO RESUMO GERAL: Disparar evento customizado
+      console.log('🔄 [LIMPEZA] Disparando evento para recarregar Resumo Geral...');
+      window.dispatchEvent(new CustomEvent('resumo-geral-reload', { detail: { periodo } }));
+      
       console.log('✅ [LIMPEZA] Limpeza concluída com sucesso');
       
       toast({
@@ -1236,7 +1240,14 @@ export default function GerarFaturamento() {
       console.log('📊 [VOLUMETRIA] Clientes únicos encontrados:', clientesUnicosVolumetria.length, clientesUnicosVolumetria);
 
       if (clientesUnicosVolumetria.length === 0) {
-        throw new Error(`Nenhum cliente encontrado na volumetria para o período ${periodoSelecionado}`);
+        throw new Error(
+          `❌ Nenhum dado de volumetria encontrado para o período ${periodoSelecionado}.\n\n` +
+          `Por favor, faça o upload dos dados de volumetria na aba "Upload" antes de gerar os demonstrativos.\n\n` +
+          `Passos:\n` +
+          `1. Vá para a aba "Upload"\n` +
+          `2. Faça o upload do arquivo de volumetria do período ${periodoSelecionado}\n` +
+          `3. Retorne para a aba "Gerar" e tente novamente`
+        );
       }
 
       setStatusProcessamento({
@@ -2746,6 +2757,20 @@ export default function GerarFaturamento() {
                   };
                   
                   carregarDemonstrativosDB();
+                  
+                  // ✅ Escutar evento de limpeza para recarregar automaticamente
+                  const handleReload = (event: any) => {
+                    if (event.detail?.periodo === periodoSelecionado) {
+                      console.log('🔄 [RESUMO GERAL] Recarregando após limpeza...');
+                      carregarDemonstrativosDB();
+                    }
+                  };
+                  
+                  window.addEventListener('resumo-geral-reload', handleReload);
+                  
+                  return () => {
+                    window.removeEventListener('resumo-geral-reload', handleReload);
+                  };
                 }, [periodoSelecionado, filtroTipoCliente, filtroTipoFaturamento]);
                 
                 if (carregandoResumo) {
