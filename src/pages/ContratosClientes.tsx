@@ -865,42 +865,88 @@ export default function ContratosClientes() {
   };
 
   // Função para sincronizar códigos Omie
+  const [progressoSync, setProgressoSync] = useState({ total: 0, processados: 0, erros: 0, naoEncontrados: 0 });
+
   const sincronizarCodigosOmie = async () => {
     try {
       setSincronizandoOmie(true);
-      
-      toast({
-        title: "Iniciando sincronização",
-        description: "Preparando fila de processamento...",
-      });
+      setProgressoSync({ total: 0, processados: 0, erros: 0, naoEncontrados: 0 });
 
-      // 1. Iniciar a fila
-      const { data: inicioData, error: inicioError } = await supabase.functions.invoke('sincronizar-codigo-cliente-omie', {
-        body: { iniciar_fila: true, apenas_sem_codigo: false }
-      });
+      // Buscar todos os clientes únicos com contratos ativos
+      const clientesIds = Array.from(new Set(contratos.map(c => c.clienteId).filter(Boolean)));
+      const { data: clientesParaSincronizar, error: clientesError } = await supabase
+        .from('clientes')
+        .select('id, nome')
+        .in('id', clientesIds);
 
-      if (inicioError) {
-        throw new Error(inicioError.message);
-      }
-
-      const resultado = inicioData as any;
-      
-      if (!resultado.fila_iniciada) {
+      if (clientesError || !clientesParaSincronizar || clientesParaSincronizar.length === 0) {
         toast({
-          title: "Nenhum cliente para sincronizar",
-          description: resultado.message,
+          title: "Nenhum cliente encontrado",
+          description: "Não há clientes para sincronizar",
         });
         setSincronizandoOmie(false);
         return;
       }
 
+      setProgressoSync(prev => ({ ...prev, total: clientesParaSincronizar.length }));
+
       toast({
         title: "Sincronização iniciada",
-        description: `Processando ${resultado.total_clientes} clientes. Acompanhe o progresso.`,
+        description: `Processando ${clientesParaSincronizar.length} clientes...`,
       });
 
-      // 2. Processar fila continuamente
-      await processarFilaContinuamente();
+      let processados = 0;
+      let erros = 0;
+      let naoEncontrados = 0;
+
+      // Processar 1 cliente por vez com delay
+      for (const cliente of clientesParaSincronizar) {
+        try {
+          const { data, error } = await supabase.functions.invoke('sincronizar-codigo-cliente-omie', {
+            body: { cliente_id: cliente.id }
+          });
+
+          if (error) {
+            console.error(`Erro ao sincronizar ${cliente.nome}:`, error);
+            erros++;
+          } else if (!data.success) {
+            console.log(`Cliente não encontrado: ${cliente.nome}`);
+            naoEncontrados++;
+          } else {
+            processados++;
+          }
+
+          setProgressoSync({ 
+            total: clientesParaSincronizar.length, 
+            processados: processados + erros + naoEncontrados,
+            erros, 
+            naoEncontrados 
+          });
+
+          // Delay de 10 segundos entre cada cliente
+          if (processados + erros + naoEncontrados < clientesParaSincronizar.length) {
+            await new Promise(resolve => setTimeout(resolve, 10000));
+          }
+
+        } catch (e: any) {
+          console.error(`Erro ao processar ${cliente.nome}:`, e);
+          erros++;
+          setProgressoSync({ 
+            total: clientesParaSincronizar.length, 
+            processados: processados + erros + naoEncontrados,
+            erros, 
+            naoEncontrados 
+          });
+        }
+      }
+
+      // Recarregar dados
+      await carregarContratos();
+
+      toast({
+        title: "Sincronização concluída",
+        description: `✓ ${processados} sincronizados | ⚠ ${naoEncontrados} não encontrados | ✗ ${erros} erros`,
+      });
 
     } catch (error: any) {
       console.error('Erro ao sincronizar códigos Omie:', error);
@@ -909,66 +955,9 @@ export default function ContratosClientes() {
         description: error.message || "Erro ao conectar com o servidor",
         variant: "destructive",
       });
+    } finally {
       setSincronizandoOmie(false);
     }
-  };
-
-  const processarFilaContinuamente = async () => {
-    let tentativasErro = 0;
-    const MAX_TENTATIVAS_ERRO = 3;
-
-    while (tentativasErro < MAX_TENTATIVAS_ERRO) {
-      try {
-        // Verificar status da fila
-        const { data: statusData, error: statusError } = await supabase.functions.invoke('sincronizar-codigo-cliente-omie', {
-          body: {}
-        });
-
-        if (statusError) {
-          tentativasErro++;
-          await new Promise(resolve => setTimeout(resolve, 5000));
-          continue;
-        }
-
-        const status = statusData as any;
-        const filaInfo = status.fila_status;
-
-        // Se não há mais pendentes, finalizar
-        if (filaInfo.pendente === 0 && filaInfo.processando === 0) {
-          setSincronizandoOmie(false);
-          
-          toast({
-            title: "Sincronização concluída",
-            description: `✓ ${filaInfo.concluido} sincronizados | ⚠ ${filaInfo.nao_encontrado} não encontrados | ✗ ${filaInfo.erro} erros`,
-          });
-          
-          // Recarregar contratos
-          await carregarContratos();
-          return;
-        }
-
-        // Processar próximo cliente da fila
-        await supabase.functions.invoke('processar-fila-omie', {});
-        
-        // Aguardar 3 segundos antes de processar próximo
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        
-        tentativasErro = 0; // Reset contador de erros
-        
-      } catch (error) {
-        console.error('Erro ao processar fila:', error);
-        tentativasErro++;
-        await new Promise(resolve => setTimeout(resolve, 5000));
-      }
-    }
-
-    // Se chegou aqui, deu erro muitas vezes
-    toast({
-      title: "Erro no processamento",
-      description: "Muitas tentativas falharam. Recarregue a página e tente novamente.",
-      variant: "destructive",
-    });
-    setSincronizandoOmie(false);
   };
 
   // Filtros e ordenação
