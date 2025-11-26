@@ -876,7 +876,7 @@ export default function ContratosClientes() {
 
       const { data, error } = await supabase.functions.invoke('sincronizar-codigo-cliente-omie', {
         body: {
-          apenas_sem_codigo: true, // sincronizar apenas clientes sem código Omie
+          apenas_sem_codigo: false, // sincronizar todos os clientes para atualizar datas de vigência
           limite: 1000
         }
       });
