@@ -306,6 +306,22 @@ serve(async (req) => {
                 erro: updContratoError.message
               });
             } else {
+              // Atualizar também parametros_faturamento com as mesmas datas
+              const updateParamsData: any = {};
+              if (contratoOmie.vigencia_inicial) {
+                updateParamsData.data_inicio_contrato = contratoOmie.vigencia_inicial;
+              }
+              if (contratoOmie.vigencia_final) {
+                updateParamsData.data_termino_contrato = contratoOmie.vigencia_final;
+              }
+
+              if (Object.keys(updateParamsData).length > 0) {
+                await supabase
+                  .from('parametros_faturamento')
+                  .update(updateParamsData)
+                  .eq('numero_contrato', contrato.numero_contrato);
+              }
+
               contratosAtualizados++;
               detalhesContratos.push({
                 contrato_id: contrato.id,
