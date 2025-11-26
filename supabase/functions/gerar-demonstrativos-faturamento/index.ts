@@ -100,14 +100,16 @@ serve(async (req) => {
 
     for (const cliente of clientes) {
       try {
-        const parametros = Array.isArray(cliente.parametros_faturamento)
-          ? (cliente.parametros_faturamento.find((p: any) => p?.ativo === true || p?.status === 'A' || p?.status === 'Ativo') || cliente.parametros_faturamento[0])
-          : cliente.parametros_faturamento;
-        const contrato = cliente.contratos_clientes?.[0];
-        const tipoFaturamento = contrato?.tipo_faturamento || 'CO-FT';
-        
-        // Buscar tipo_cliente do contrato, parâmetros ou cliente (em ordem de prioridade)
-        const tipoCliente = contrato?.tipo_cliente || parametros?.tipo_cliente || cliente.tipo_cliente || 'CO';
+      const parametros = Array.isArray(cliente.parametros_faturamento)
+        ? (cliente.parametros_faturamento.find((p: any) => p?.ativo === true || p?.status === 'A' || p?.status === 'Ativo') || cliente.parametros_faturamento[0])
+        : cliente.parametros_faturamento;
+      const contrato = cliente.contratos_clientes?.[0];
+      
+      // Prioridade: parametros > contrato > fallback (parametros é source of truth)
+      const tipoFaturamento = parametros?.tipo_faturamento || contrato?.tipo_faturamento || 'CO-FT';
+      const tipoCliente = parametros?.tipo_cliente || contrato?.tipo_cliente || cliente.tipo_cliente || 'CO';
+      
+      console.log(`🔍 ${cliente.nome}: tipo_faturamento=${tipoFaturamento}, tipo_cliente=${tipoCliente} (fonte: ${parametros?.tipo_faturamento ? 'parametros' : contrato?.tipo_faturamento ? 'contrato' : 'fallback'})`);
 
       // Regras de faturamento:
       // - CO-NF DEVE gerar demonstrativo e relatório (mas não envia email/NF)
@@ -920,8 +922,8 @@ serve(async (req) => {
         cliente_id: demo.cliente_id,
         cliente_nome: demo.cliente_nome,
         periodo_referencia: periodo,
-        tipo_cliente: demo.tipo_cliente || 'CO',
-        tipo_faturamento: demo.tipo_faturamento || 'CO-FT',
+        tipo_cliente: demo.tipo_cliente, // Não usar fallback - deve vir do demonstrativo
+        tipo_faturamento: demo.tipo_faturamento, // Não usar fallback - deve vir do demonstrativo
         total_exames: demo.total_exames || 0,
         valor_exames: demo.valor_exames || 0,
         valor_franquia: demo.valor_franquia || 0,
