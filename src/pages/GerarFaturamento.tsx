@@ -2512,13 +2512,69 @@ export default function GerarFaturamento() {
           {/* Resumo Geral com Filtros */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileBarChart2 className="h-5 w-5" />
-                Resumo Geral - {periodoSelecionado}
-              </CardTitle>
-              <CardDescription>
-                Estatísticas e filtros por tipo de cliente e faturamento
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileBarChart2 className="h-5 w-5" />
+                    Resumo Geral - {periodoSelecionado}
+                  </CardTitle>
+                  <CardDescription>
+                    Estatísticas e filtros por tipo de cliente e faturamento
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    try {
+                      toast({
+                        title: "Atualizando cache",
+                        description: "Sincronizando dados do banco com o cache local...",
+                      });
+                      
+                      // Buscar demonstrativos atualizados do banco
+                      const { data, error } = await supabase
+                        .from('demonstrativos_faturamento_calculados')
+                        .select('*')
+                        .eq('periodo_referencia', periodoSelecionado);
+                      
+                      if (error) throw error;
+                      
+                      // Atualizar localStorage com dados do banco
+                      const dadosParaSalvar = {
+                        demonstrativos: data || [],
+                        resumo: {
+                          total_clientes: data?.length || 0,
+                          total_exames_geral: data?.reduce((s, d) => s + (d.total_exames || 0), 0) || 0,
+                          valor_bruto_geral: data?.reduce((s, d) => s + (d.valor_bruto_total || 0), 0) || 0,
+                          valor_liquido_geral: data?.reduce((s, d) => s + (d.valor_liquido || 0), 0) || 0,
+                        },
+                        periodo: periodoSelecionado,
+                        timestamp: new Date().toISOString()
+                      };
+                      
+                      localStorage.setItem(`demonstrativos_completos_${periodoSelecionado}`, JSON.stringify(dadosParaSalvar));
+                      
+                      toast({
+                        title: "Cache atualizado",
+                        description: `${data?.length || 0} demonstrativo(s) sincronizado(s)`,
+                      });
+                      
+                      // Forçar recarregamento do componente
+                      window.location.reload();
+                    } catch (error: any) {
+                      toast({
+                        title: "Erro ao atualizar cache",
+                        description: error.message,
+                        variant: "destructive",
+                      });
+                    }
+                  }}
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Atualizar Cache
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Filtros */}
@@ -2558,8 +2614,42 @@ export default function GerarFaturamento() {
 
               {/* Estatísticas Filtradas */}
               {(() => {
-                const demonstrativosCompletos = localStorage.getItem(`demonstrativos_completos_${periodoSelecionado}`);
-                if (!demonstrativosCompletos) {
+                // ✅ SEMPRE buscar do banco de dados (fonte principal) ao invés do localStorage
+                const [demonstrativosDB, setDemonstrativosDB] = useState<any[]>([]);
+                const [carregandoResumo, setCarregandoResumo] = useState(true);
+                
+                useEffect(() => {
+                  const carregarDemonstrativosDB = async () => {
+                    setCarregandoResumo(true);
+                    try {
+                      const { data, error } = await supabase
+                        .from('demonstrativos_faturamento_calculados')
+                        .select('*')
+                        .eq('periodo_referencia', periodoSelecionado);
+                      
+                      if (error) throw error;
+                      setDemonstrativosDB(data || []);
+                    } catch (error) {
+                      console.error('Erro ao carregar demonstrativos:', error);
+                      setDemonstrativosDB([]);
+                    } finally {
+                      setCarregandoResumo(false);
+                    }
+                  };
+                  
+                  carregarDemonstrativosDB();
+                }, [periodoSelecionado, filtroTipoCliente, filtroTipoFaturamento]);
+                
+                if (carregandoResumo) {
+                  return (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <FileBarChart2 className="h-12 w-12 mx-auto mb-4 opacity-50 animate-pulse" />
+                      <p>Carregando estatísticas...</p>
+                    </div>
+                  );
+                }
+                
+                if (demonstrativosDB.length === 0) {
                   return (
                     <div className="text-center py-8 text-muted-foreground">
                       <FileBarChart2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -2569,12 +2659,9 @@ export default function GerarFaturamento() {
                 }
 
                 try {
-                  const dados = JSON.parse(demonstrativosCompletos);
-                  const demonstrativos = dados.demonstrativos || [];
-
-                  // Aplicar filtros
-                  const demonstrativosFiltrados = demonstrativos.filter((demo: any) => {
-                    const tipoCliente = demo.tipo_cliente || demo.tipo || '';
+                  // Aplicar filtros nos dados do banco
+                  const demonstrativosFiltrados = demonstrativosDB.filter((demo: any) => {
+                    const tipoCliente = demo.tipo_cliente || '';
                     const tipoFaturamento = demo.tipo_faturamento || '';
 
                     const passaTipoCliente = filtroTipoCliente === "todos" || tipoCliente === filtroTipoCliente;
@@ -2585,21 +2672,21 @@ export default function GerarFaturamento() {
 
                   const totalClientes = demonstrativosFiltrados.length;
                   const totalExames = demonstrativosFiltrados.reduce((s: number, d: any) => 
-                    s + Number(d.total_exames || d.total_laudos || 0), 0
+                    s + Number(d.total_exames || 0), 0
                   );
                   const valorBruto = demonstrativosFiltrados.reduce((s: number, d: any) => 
-                    s + Number(d.valor_bruto_total || d.valor_bruto || 0), 0
+                    s + Number(d.valor_bruto_total || 0), 0
                   );
-                  const valorTotal = demonstrativosFiltrados.reduce((s: number, d: any) => 
-                    s + Number(d.valor_total_faturamento || d.valor_total || 0), 0
+                  const valorLiquido = demonstrativosFiltrados.reduce((s: number, d: any) => 
+                    s + Number(d.valor_liquido || 0), 0
                   );
 
                   // Estatísticas por tipo
                   const porTipoCliente = demonstrativosFiltrados.reduce((acc: any, d: any) => {
-                    const tipo = d.tipo_cliente || d.tipo || 'Não definido';
+                    const tipo = d.tipo_cliente || 'Não definido';
                     if (!acc[tipo]) acc[tipo] = { count: 0, valor: 0 };
                     acc[tipo].count++;
-                    acc[tipo].valor += Number(d.valor_total_faturamento || d.valor_total || 0);
+                    acc[tipo].valor += Number(d.valor_liquido || 0);
                     return acc;
                   }, {});
 
@@ -2607,7 +2694,7 @@ export default function GerarFaturamento() {
                     const tipo = d.tipo_faturamento || 'Não definido';
                     if (!acc[tipo]) acc[tipo] = { count: 0, valor: 0 };
                     acc[tipo].count++;
-                    acc[tipo].valor += Number(d.valor_total_faturamento || d.valor_total || 0);
+                    acc[tipo].valor += Number(d.valor_liquido || 0);
                     return acc;
                   }, {});
 
@@ -2650,9 +2737,9 @@ export default function GerarFaturamento() {
                         <div className="p-4 rounded-lg bg-gradient-to-br from-orange-50 to-orange-100 border border-orange-200">
                           <div className="flex items-center justify-between">
                             <div>
-                              <p className="text-sm font-medium text-orange-700">Valor Total</p>
+                              <p className="text-sm font-medium text-orange-700">Valor Líquido</p>
                               <p className="text-2xl font-bold text-orange-900">
-                                {valorTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                {valorLiquido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                               </p>
                             </div>
                             <FileBarChart2 className="h-8 w-8 text-orange-600 opacity-50" />
