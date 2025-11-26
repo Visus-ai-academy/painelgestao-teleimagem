@@ -856,7 +856,8 @@ serve(async (req) => {
           total_impostos: totalImpostos,
           valor_liquido: valorLiquido
         },
-        tipo_faturamento: tipoFaturamento
+        tipo_faturamento: tipoFaturamento,
+        tipo_cliente: tipoCliente
       };
 
       console.log(`✅ ${nomeFantasia} - Demonstrativo final:`, {
