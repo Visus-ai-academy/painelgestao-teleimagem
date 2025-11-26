@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { CheckCircle2, AlertCircle, Clock, Settings, ChevronDown } from 'lucide-react';
+import { Settings, ChevronDown } from 'lucide-react';
 
 interface StatusRegras {
   aplicacoes_automaticas: number;
@@ -13,7 +13,7 @@ interface StatusRegras {
   sistema_ativo: boolean;
 }
 
-// Lista das 27 regras aplicadas automaticamente - SISTEMA COMPLETO
+// Lista das 25 regras aplicadas automaticamente - SISTEMA COMPLETO
 const REGRAS_SISTEMA = [
   {
     id: 'v001',
@@ -288,7 +288,7 @@ export function AutoRegrasMaster() {
     try {
       console.log(`⚡ APLICAÇÃO AUTOMÁTICA iniciada para ${tipo_arquivo}`);
       
-      // Aplicar TODAS as 27 regras automaticamente usando a função unificada
+      // Aplicar TODAS as 25 regras automaticamente usando a função unificada
       const { data, error } = await supabase.functions.invoke('aplicar-regras-sistema-completo', {
         body: {
           arquivo_fonte: tipo_arquivo,
@@ -376,31 +376,13 @@ export function AutoRegrasMaster() {
           Sistema Automático de Regras
         </CardTitle>
         <CardDescription>
-          Aplicação automática garantida das 27 regras de negócio sempre que dados são inseridos
+          Aplicação automática garantida das 25 regras de negócio sempre que dados são inseridos
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="flex justify-center mb-4">
           <div className="flex flex-col items-center space-y-2">
-            <CheckCircle2 className="h-8 w-8 text-green-500" />
-            <span className="text-2xl font-bold">{status.aplicacoes_automaticas}</span>
-            <span className="text-sm text-muted-foreground">Sucessos Automáticos</span>
-          </div>
-          
-          <div className="flex flex-col items-center space-y-2">
-            <AlertCircle className="h-8 w-8 text-destructive" />
-            <span className="text-2xl font-bold">{status.falhas_automaticas}</span>
-            <span className="text-sm text-muted-foreground">Falhas</span>
-          </div>
-          
-          <div className="flex flex-col items-center space-y-2">
-            <Clock className="h-8 w-8 text-blue-500" />
-            <span className="text-xs font-mono">{status.ultima_aplicacao || 'Nunca'}</span>
-            <span className="text-sm text-muted-foreground">Última Aplicação</span>
-          </div>
-          
-          <div className="flex flex-col items-center space-y-2">
-            <Badge variant={status.sistema_ativo ? "default" : "destructive"}>
+            <Badge variant={status.sistema_ativo ? "default" : "destructive"} className="text-base px-4 py-2">
               {status.sistema_ativo ? "ATIVO" : "INATIVO"}
             </Badge>
             <span className="text-sm text-muted-foreground">Status do Sistema</span>
@@ -418,7 +400,7 @@ export function AutoRegrasMaster() {
           <Collapsible open={mostrarRegras} onOpenChange={setMostrarRegras}>
             <CollapsibleTrigger className="flex items-center gap-2 w-full p-3 bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors">
               <ChevronDown className={`h-4 w-4 transition-transform ${mostrarRegras ? 'rotate-180' : ''}`} />
-              <span className="font-semibold">Ver Lista das 27 Regras Aplicadas Automaticamente</span>
+              <span className="font-semibold">Ver Lista das 25 Regras Aplicadas Automaticamente</span>
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-2">
               <div className="grid gap-4 p-4 bg-muted/30 rounded-lg">
