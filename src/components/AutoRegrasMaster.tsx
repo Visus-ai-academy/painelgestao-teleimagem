@@ -178,10 +178,10 @@ const REGRAS_SISTEMA = [
   },
   {
     id: 'v022',
-    nome: 'Tipificação por Categoria ONCO',
+    nome: 'Categoria ONCOLOGIA',
     categoria: 'Faturamento',
-    criterio: 'Define tipo_faturamento = "oncologia" quando categoria contém "onco".',
-    implementacao: 'Aplicado durante processamento de tipificação'
+    criterio: 'Define CATEGORIA = "ONCOLOGIA" quando descrição do estudo contém "onco".',
+    implementacao: 'Edge function: aplicar-27-regras-completas (v021)'
   },
   {
     id: 'v023',
@@ -199,10 +199,10 @@ const REGRAS_SISTEMA = [
   },
   {
     id: 'v025',
-    nome: 'Tipificação Padrão',
+    nome: 'Tipificação de Faturamento (REMOVIDA)',
     categoria: 'Faturamento',
-    criterio: 'Define tipo_faturamento = "padrao" para todos os outros casos não cobertos pelas regras específicas.',
-    implementacao: 'Aplicado durante processamento de tipificação'
+    criterio: 'Regra removida. Tipificação é feita APENAS pela função aplicar-tipificacao-faturamento com tipos válidos: CO-FT, CO-NF, NC-FT, NC-NF, NC1-NF.',
+    implementacao: 'Edge function: aplicar-tipificacao-faturamento'
   },
   {
     id: 'v026',

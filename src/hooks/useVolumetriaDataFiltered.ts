@@ -195,13 +195,15 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
       
       if (filters.tipoFaturamento !== 'todos') {
         allData = allData.filter(item => {
-          // Mapear o tipo de faturamento selecionado para o campo do banco
+          // Filtrar pelo tipo de faturamento exato do registro
           if (filters.tipoFaturamento === 'CO-FT') {
-            return item.tipo_cliente === 'CO'; // Clientes CO sempre são faturados
+            return item.tipo_faturamento === 'CO-FT' || item.tipo_cliente === 'CO';
           } else if (filters.tipoFaturamento === 'NC-FT') {
-            return item.tipo_cliente === 'NC' && item.tipo_faturamento !== 'padrao';
+            return item.tipo_faturamento === 'NC-FT';
           } else if (filters.tipoFaturamento === 'NC-NF') {
-            return item.tipo_cliente === 'NC' && item.tipo_faturamento === 'padrao';
+            return item.tipo_faturamento === 'NC-NF';
+          } else if (filters.tipoFaturamento === 'NC1-NF') {
+            return item.tipo_faturamento === 'NC1-NF';
           }
           return true;
         });
