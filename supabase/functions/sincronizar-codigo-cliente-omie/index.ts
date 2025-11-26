@@ -69,10 +69,11 @@ async function buscarClienteOmie(cnpj: string, nomeCliente: string, appKey: stri
 
 async function buscarContratosOmie(codigoClienteOmie: string, appKey: string, appSecret: string) {
   const contratos: any[] = [];
+  let paginasSemResultado = 0;
   
   console.log(`🔍 Buscando contratos para cliente OMIE: ${codigoClienteOmie}`);
 
-  for (let pagina = 1; pagina <= 20; pagina++) {
+  for (let pagina = 1; pagina <= 10; pagina++) {
     const response = await fetch('https://app.omie.com.br/api/v1/servicos/contrato/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -106,6 +107,18 @@ async function buscarContratosOmie(codigoClienteOmie: string, appKey: string, ap
     
     console.log(`📄 Página ${pagina}: ${contratosCliente.length} contratos do cliente`);
     contratos.push(...contratosCliente);
+    
+    // Se não encontrou nenhum contrato do cliente nesta página, incrementa contador
+    if (contratosCliente.length === 0) {
+      paginasSemResultado++;
+      // Se 3 páginas seguidas sem resultados, para de buscar
+      if (paginasSemResultado >= 3) {
+        console.log(`⏹️ Parando busca: 3 páginas sem contratos do cliente`);
+        break;
+      }
+    } else {
+      paginasSemResultado = 0; // Reseta contador se encontrou contratos
+    }
     
     if (lista.length < 100) break;
   }
