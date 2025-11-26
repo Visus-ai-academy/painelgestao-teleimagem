@@ -121,7 +121,72 @@ serve(async (req) => {
     }
 
     const body = await req.json();
-    const { cliente_id } = body;
+    const { cliente_id, test_credentials } = body;
+
+    // Endpoint para testar credenciais
+    if (test_credentials) {
+      console.log('🔐 Testando credenciais OMIE...');
+      
+      try {
+        const testResponse = await fetch('https://app.omie.com.br/api/v1/geral/clientes/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            call: "ListarClientes",
+            app_key: omieAppKey,
+            app_secret: omieAppSecret,
+            param: [{ pagina: 1, registros_por_pagina: 1 }],
+          }),
+        });
+
+        const statusCode = testResponse.status;
+        console.log(`📡 Status da API OMIE: ${statusCode}`);
+
+        if (statusCode === 500) {
+          return new Response(JSON.stringify({
+            success: false,
+            valid: false,
+            message: '❌ Credenciais INVÁLIDAS - API retornou erro 500',
+            details: 'Verifique se OMIE_APP_KEY e OMIE_APP_SECRET estão corretos no painel OMIE'
+          }), { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          });
+        }
+
+        if (!testResponse.ok) {
+          return new Response(JSON.stringify({
+            success: false,
+            valid: false,
+            message: `❌ Erro na API OMIE - Status ${statusCode}`,
+            details: await testResponse.text()
+          }), { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          });
+        }
+
+        const data = await testResponse.json();
+        
+        return new Response(JSON.stringify({
+          success: true,
+          valid: true,
+          message: '✅ Credenciais VÁLIDAS - API OMIE funcionando!',
+          details: `Total de registros acessíveis: ${data.total_de_registros || 'N/A'}`
+        }), { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        });
+
+      } catch (error: any) {
+        console.error('❌ Erro ao testar credenciais:', error);
+        return new Response(JSON.stringify({
+          success: false,
+          valid: false,
+          message: '❌ Erro ao conectar com API OMIE',
+          details: error.message
+        }), { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        });
+      }
+    }
 
     if (!cliente_id) {
       throw new Error('cliente_id é obrigatório');

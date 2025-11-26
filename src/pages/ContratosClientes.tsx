@@ -866,6 +866,49 @@ export default function ContratosClientes() {
 
   // Função para sincronizar códigos Omie
   const [progressoSync, setProgressoSync] = useState({ total: 0, processados: 0, erros: 0, naoEncontrados: 0 });
+  const [testingCredentials, setTestingCredentials] = useState(false);
+  const [credentialsValid, setCredentialsValid] = useState<boolean | null>(null);
+
+  // Testar credenciais OMIE
+  const testarCredenciaisOmie = async () => {
+    try {
+      setTestingCredentials(true);
+      setCredentialsValid(null);
+
+      const { data, error } = await supabase.functions.invoke('sincronizar-codigo-cliente-omie', {
+        body: { test_credentials: true }
+      });
+
+      if (error) {
+        toast({
+          title: "❌ Erro ao testar credenciais",
+          description: error.message,
+          variant: "destructive",
+        });
+        setCredentialsValid(false);
+        return;
+      }
+
+      setCredentialsValid(data.valid);
+      
+      toast({
+        title: data.valid ? "✅ Credenciais Válidas" : "❌ Credenciais Inválidas",
+        description: data.message,
+        variant: data.valid ? "default" : "destructive",
+      });
+
+    } catch (error: any) {
+      console.error('Erro ao testar credenciais:', error);
+      toast({
+        title: "❌ Erro ao testar",
+        description: error.message || "Erro desconhecido",
+        variant: "destructive",
+      });
+      setCredentialsValid(false);
+    } finally {
+      setTestingCredentials(false);
+    }
+  };
 
   const sincronizarCodigosOmie = async () => {
     try {
@@ -1146,9 +1189,30 @@ export default function ContratosClientes() {
         </Button>
 
         <Button
+          onClick={testarCredenciaisOmie}
+          disabled={testingCredentials}
+          variant="outline"
+          className="border-blue-600 text-blue-600 hover:bg-blue-50"
+        >
+          {testingCredentials ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+              Testando...
+            </>
+          ) : (
+            <>
+              {credentialsValid === true && <CheckCircle className="h-4 w-4 mr-2 text-green-600" />}
+              {credentialsValid === false && <AlertCircle className="h-4 w-4 mr-2 text-red-600" />}
+              {credentialsValid === null && <AlertCircle className="h-4 w-4 mr-2" />}
+              Testar Credenciais OMIE
+            </>
+          )}
+        </Button>
+
+        <Button
           onClick={sincronizarCodigosOmie}
-          disabled={sincronizandoOmie}
-          className="bg-blue-600 hover:bg-blue-700 text-white"
+          disabled={sincronizandoOmie || credentialsValid !== true}
+          className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
         >
           {sincronizandoOmie ? (
             <>
@@ -1162,6 +1226,37 @@ export default function ContratosClientes() {
             </>
           )}
         </Button>
+        
+        {/* Status das Credenciais */}
+        {credentialsValid !== null && (
+          <Card className={`mt-4 ${credentialsValid ? 'border-green-500' : 'border-red-500'}`}>
+            <CardContent className="pt-4">
+              <div className="flex items-center gap-3">
+                {credentialsValid ? (
+                  <>
+                    <CheckCircle className="h-8 w-8 text-green-600" />
+                    <div>
+                      <p className="font-semibold text-green-600">✅ Credenciais OMIE Válidas</p>
+                      <p className="text-sm text-muted-foreground">
+                        API OMIE está respondendo corretamente. Você pode sincronizar agora.
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <AlertCircle className="h-8 w-8 text-red-600" />
+                    <div>
+                      <p className="font-semibold text-red-600">❌ Credenciais OMIE Inválidas</p>
+                      <p className="text-sm text-muted-foreground">
+                        A API OMIE retornou erro. Verifique OMIE_APP_KEY e OMIE_APP_SECRET.
+                      </p>
+                    </div>
+                  </>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
         
         {/* Card de Progresso da Sincronização */}
         {sincronizandoOmie && progressoSync.total > 0 && (
