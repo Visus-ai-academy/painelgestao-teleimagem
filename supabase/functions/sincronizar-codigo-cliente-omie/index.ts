@@ -43,6 +43,32 @@ function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// Função para fazer requisição com retry exponencial
+async function fetchWithRetry(url: string, options: any, maxRetries = 3): Promise<Response> {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const response = await fetch(url, options);
+      
+      // Se receber 425 (Too Early) ou 429 (Too Many Requests), esperar e tentar novamente
+      if (response.status === 425 || response.status === 429) {
+        const waitTime = Math.pow(2, attempt) * 2000; // 2s, 4s, 8s
+        console.log(`Rate limit detectado (${response.status}). Aguardando ${waitTime}ms antes de tentar novamente (tentativa ${attempt + 1}/${maxRetries})...`);
+        await delay(waitTime);
+        continue;
+      }
+      
+      return response;
+    } catch (error) {
+      if (attempt === maxRetries - 1) throw error;
+      const waitTime = Math.pow(2, attempt) * 1000;
+      console.log(`Erro na requisição. Aguardando ${waitTime}ms antes de tentar novamente (tentativa ${attempt + 1}/${maxRetries})...`);
+      await delay(waitTime);
+    }
+  }
+  
+  throw new Error('Máximo de tentativas excedido');
+}
+
 // Função para buscar cliente no OMIE diretamente
 async function buscarClienteOmie(cnpj: string, nomeCliente: string) {
   const omieAppKey = Deno.env.get('OMIE_APP_KEY');
@@ -72,7 +98,7 @@ async function buscarClienteOmie(cnpj: string, nomeCliente: string) {
 
     console.log(`Consultando API OMIE - ListarClientes (página ${pagina})...`);
 
-    const response = await fetch('https://app.omie.com.br/api/v1/geral/clientes/', {
+    const response = await fetchWithRetry('https://app.omie.com.br/api/v1/geral/clientes/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(buscarClienteReq),
@@ -82,8 +108,8 @@ async function buscarClienteOmie(cnpj: string, nomeCliente: string) {
       throw new Error(`Erro na API do OMIE: ${response.status} - ${response.statusText}`);
     }
 
-    // Aguardar 500ms entre requisições para evitar rate limiting
-    await delay(500);
+    // Aguardar 1 segundo entre requisições para evitar rate limiting
+    await delay(1000);
 
     const dados = await response.json();
     const lista = dados.clientes_cadastro || [];
@@ -150,7 +176,7 @@ async function buscarContratosOmie(codigoClienteOmie: string) {
 
     console.log(`Consultando API OMIE - ListarContratos (página ${pagina})...`);
 
-    const response = await fetch('https://app.omie.com.br/api/v1/servicos/contrato/', {
+    const response = await fetchWithRetry('https://app.omie.com.br/api/v1/servicos/contrato/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(buscarContratosReq),
@@ -160,8 +186,8 @@ async function buscarContratosOmie(codigoClienteOmie: string) {
       throw new Error(`Erro na API do OMIE: ${response.status} - ${response.statusText}`);
     }
 
-    // Aguardar 500ms entre requisições para evitar rate limiting
-    await delay(500);
+    // Aguardar 1 segundo entre requisições para evitar rate limiting
+    await delay(1000);
 
     const dados = await response.json();
     const lista = dados.contratoCadastro || [];
@@ -233,8 +259,8 @@ serve(async (req) => {
 
     for (const c of clientesData) {
       try {
-        // Aguardar 1 segundo entre cada cliente para evitar rate limiting
-        await delay(1000);
+        // Aguardar 2 segundos entre cada cliente para evitar rate limiting
+        await delay(2000);
         
         let codigoOmie = c.omie_codigo_cliente;
         const agora = new Date().toISOString();
