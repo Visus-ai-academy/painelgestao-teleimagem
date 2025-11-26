@@ -23,7 +23,6 @@ import { SystemDateTime } from '@/components/SystemDateTime';
 import { LimparUploadTravado } from '@/components/LimparUploadTravado';
 import { FinalizarUploadsTravados } from '@/components/FinalizarUploadsTravados';
 import { AplicarTipificacaoGeral } from "@/components/AplicarTipificacaoGeral";
-import { CorrigirTipificacaoNC } from '@/components/CorrigirTipificacaoNC';
 import { IndicadorTipificacao } from '@/components/IndicadorTipificacao';
 import { DemonstrativoVolumetriaPorCliente } from '@/components/DemonstrativoVolumetriaPorCliente';
 import { VolumetriaProvider } from "@/contexts/VolumetriaContext";
@@ -220,13 +219,8 @@ export default function DadosVolumetria() {
           </TabsContent>
 
           <TabsContent value="sistema-regras" className="space-y-6">
-            {/* Tipificação Geral - TODOS os clientes */}
+            {/* Tipificação Geral - TODOS os clientes (CO, NC e NC1) */}
             <AplicarTipificacaoGeral 
-              onCorrecaoConcluida={() => setRefreshTipificacao(prev => prev + 1)}
-            />
-
-            {/* Correção de Tipificação NC */}
-            <CorrigirTipificacaoNC 
               onCorrecaoConcluida={() => setRefreshTipificacao(prev => prev + 1)}
             />
             

@@ -36,6 +36,60 @@ serve(async (req) => {
 
     console.log(`🔄 Aplicando tipificação de faturamento - Arquivo: ${arquivo_fonte}, Lote: ${lote_upload}, Período: ${periodo_referencia}`);
 
+    // PASSO 1: Corrigir tipo_cliente nos contratos de clientes NC (apenas quando periodo_referencia é fornecido)
+    let contratosCorrigidos = 0;
+    if (periodo_referencia) {
+      console.log('🔧 Verificando e corrigindo contratos de clientes NC...');
+      
+      const { data: clientesNC, error: clientesError } = await supabaseClient
+        .from('clientes')
+        .select(`
+          id,
+          nome,
+          contratos_clientes (
+            id,
+            tipo_cliente,
+            status
+          )
+        `)
+        .in('nome', CLIENTES_NC);
+
+      if (!clientesError && clientesNC && clientesNC.length > 0) {
+        console.log(`📋 Encontrados ${clientesNC.length} clientes NC no sistema`);
+
+        const contratosParaCorrigir: string[] = [];
+        for (const cliente of clientesNC) {
+          if (cliente.contratos_clientes) {
+            for (const contrato of cliente.contratos_clientes) {
+              if (contrato.tipo_cliente !== 'NC' && contrato.status === 'ativo') {
+                contratosParaCorrigir.push(contrato.id);
+                console.log(`⚠️  ${cliente.nome}: contrato ${contrato.id} com tipo_cliente incorreto (${contrato.tipo_cliente})`);
+              }
+            }
+          }
+        }
+
+        if (contratosParaCorrigir.length > 0) {
+          console.log(`🔧 Corrigindo ${contratosParaCorrigir.length} contratos...`);
+          for (const contratoId of contratosParaCorrigir) {
+            const { error: updateError } = await supabaseClient
+              .from('contratos_clientes')
+              .update({ tipo_cliente: 'NC' })
+              .eq('id', contratoId);
+
+            if (updateError) {
+              console.error(`❌ Erro ao corrigir contrato ${contratoId}:`, updateError);
+            } else {
+              contratosCorrigidos++;
+            }
+          }
+          console.log(`✅ ${contratosCorrigidos} contratos corrigidos`);
+        } else {
+          console.log(`✅ Todos os contratos já estão corretos`);
+        }
+      }
+    }
+
     // TIPOS VÁLIDOS DE FATURAMENTO (para validação)
     const TIPOS_VALIDOS_FATURAMENTO = ['CO-FT', 'CO-NF', 'NC-FT', 'NC-NF', 'NC1-NF'];
     
@@ -412,6 +466,7 @@ serve(async (req) => {
       registros_processados: registrosProcessados,
       registros_atualizados: registrosAtualizados,
       registros_erro: erros,
+      contratos_corrigidos: contratosCorrigidos,
       breakdown_tipos: estatisticas,
       tipos_validos: TIPOS_VALIDOS_FATURAMENTO,
       regras_aplicadas: [
