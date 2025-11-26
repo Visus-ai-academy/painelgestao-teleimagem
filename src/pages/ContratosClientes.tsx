@@ -888,10 +888,17 @@ export default function ContratosClientes() {
       const resultado = data;
       
       if (resultado.success) {
-        toast({
-          title: "Sincronização concluída",
-          description: `${resultado.atualizados} códigos Omie sincronizados com sucesso. ${resultado.nao_encontrados} não encontrados no Omie.`,
-        });
+        if (resultado.status === 'processando') {
+          toast({
+            title: "Sincronização em andamento",
+            description: `Processando ${resultado.total_clientes} clientes em background. Aguarde alguns minutos e recarregue a página para ver os resultados.`,
+          });
+        } else {
+          toast({
+            title: "Sincronização concluída",
+            description: `${resultado.atualizados || 0} códigos Omie sincronizados com sucesso. ${resultado.nao_encontrados || 0} não encontrados no Omie.`,
+          });
+        }
 
         // Recarregar contratos para exibir os códigos atualizados
         await carregarContratos();
