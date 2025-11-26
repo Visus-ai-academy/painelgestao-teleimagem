@@ -340,9 +340,12 @@ export default function CadastroClientes() {
               if (error) throw error;
               
               if (data.success) {
+                const msg = data.clientesAtualizados > 0 || data.contratosAtualizados > 0
+                  ? `${data.clientesAtualizados} clientes e ${data.contratosAtualizados} contratos corrigidos`
+                  : 'Todos já estão corretos';
                 toast({
                   title: "Sincronização concluída!",
-                  description: `${data.clientesAtualizados} clientes atualizados com o tipo_cliente dos contratos`,
+                  description: msg,
                 });
                 carregarClientes();
                 refreshStats();
