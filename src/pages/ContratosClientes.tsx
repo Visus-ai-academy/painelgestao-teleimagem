@@ -578,7 +578,7 @@ export default function ContratosClientes() {
     try {
       setIsCreatingContracts(true);
       
-      // 1. Buscar TODOS os parâmetros ativos COM dados do cliente (incluindo nome_fantasia)
+      // 1. Buscar TODOS os parâmetros (todos os status: A, I, C) COM dados do cliente
       const { data: todosParametros, error: parametrosError } = await supabase
         .from('parametros_faturamento')
         .select(`
@@ -593,8 +593,7 @@ export default function ContratosClientes() {
             telefone,
             email
           )
-        `)
-        .eq('status', 'A');
+        `);
       
       if (parametrosError) throw parametrosError;
       
@@ -607,7 +606,7 @@ export default function ContratosClientes() {
         return;
       }
 
-      console.log(`🔍 Encontrados ${todosParametros.length} parâmetros com STATUS='A'`);
+      console.log(`🔍 Encontrados ${todosParametros.length} parâmetros (todos os status)`);
       
       // Log específico para os clientes de interesse
       const clientesAlvo = ['GOLD', 'GOLD_RMX', 'PRN', 'RMPADUA'];
@@ -863,7 +862,8 @@ export default function ContratosClientes() {
       for (const alvo of clientesAlvoStatus) {
         const parametrosAlvo = todosParametros.filter(p => p.nome_fantasia?.includes(alvo));
         if (parametrosAlvo.length > 0) {
-          console.log(`   ${alvo}: ${parametrosAlvo.length} parâmetro(s) encontrado(s) com STATUS='A'`);
+          const statusInfo = parametrosAlvo.map(p => p.status).join(', ');
+          console.log(`   ${alvo}: ${parametrosAlvo.length} parâmetro(s) encontrado(s) [Status: ${statusInfo}]`);
         } else {
           console.log(`   ${alvo}: ❌ Nenhum parâmetro encontrado`);
         }
