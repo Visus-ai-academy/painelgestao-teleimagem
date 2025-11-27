@@ -624,9 +624,9 @@ export default function ContratosClientes() {
         console.log('');
       }
 
-      // 2. Agrupar parâmetros por (cliente_id + numero_contrato)
-      // Chave: "clienteId|numeroContrato" onde numeroContrato pode ser null
-      // Isso garante que cada cliente_id único tenha seu próprio contrato
+      // 2. Agrupar parâmetros por (nome_fantasia + numero_contrato)
+      // Chave: "nomeFantasia|numeroContrato" onde numeroContrato pode ser null
+      // Isso garante que múltiplos parâmetros com mesmo nome_fantasia + numero_contrato = 1 contrato
       const parametrosAgrupados = new Map<string, typeof todosParametros>();
       
       todosParametros.forEach(parametro => {
@@ -636,9 +636,9 @@ export default function ContratosClientes() {
           return;
         }
         
-        const clienteId = cliente.id;
+        const nomeFantasia = (parametro.nome_fantasia?.trim() || cliente.nome_fantasia?.trim() || cliente.nome?.trim() || 'SEM_NOME').toUpperCase();
         const numeroContratoNormalizado = parametro.numero_contrato?.trim() || null;
-        const chave = `${clienteId}|${numeroContratoNormalizado}`;
+        const chave = `${nomeFantasia}|${numeroContratoNormalizado}`;
         
         if (!parametrosAgrupados.has(chave)) {
           parametrosAgrupados.set(chave, []);
@@ -646,43 +646,93 @@ export default function ContratosClientes() {
         parametrosAgrupados.get(chave)!.push(parametro);
       });
 
-      console.log(`📦 ${parametrosAgrupados.size} contratos únicos a serem criados (agrupados por Cliente ID + Número)`);
+      console.log(`📦 ${parametrosAgrupados.size} contratos únicos a serem criados (agrupados por Nome Fantasia + Número)`);
       
       // Log dos grupos DETALHADO
       for (const [chave, params] of parametrosAgrupados) {
-        const cliente = params[0]?.clientes as any;
-        const nomeFantasiaGrupo = params[0]?.nome_fantasia || cliente?.nome_fantasia;
+        const [nomeFantasiaChave] = chave.split('|');
         const nomes = ['GOLD', 'GOLD_RMX', 'PRN', 'RMPADUA'];
         
-        if (nomes.some(n => nomeFantasiaGrupo?.includes(n))) {
-          console.log(`  🎯 ALVO ${chave}: ${params.length} parâmetro(s) - ${nomeFantasiaGrupo} (Cliente ID: ${cliente?.id})`);
+        if (nomes.some(n => nomeFantasiaChave?.includes(n))) {
+          console.log(`  🎯 ALVO ${chave}: ${params.length} parâmetro(s) com ${new Set(params.map(p => (p.clientes as any)?.id)).size} cliente_id(s) diferentes`);
         } else {
-          console.log(`  🔑 ${chave}: ${params.length} parâmetro(s) - ${nomeFantasiaGrupo}`);
+          console.log(`  🔑 ${chave}: ${params.length} parâmetro(s)`);
         }
       }
 
       // 3. Buscar todos os contratos existentes para verificar duplicatas
       const { data: contratosExistentes, error: contratosError } = await supabase
         .from('contratos_clientes')
-        .select('id, cliente_id, numero_contrato');
+        .select('id, cliente_id, numero_contrato, clientes!inner(nome, nome_fantasia)');
       
       if (contratosError) throw contratosError;
 
-      // Criar Set com chaves existentes (cliente_id + numero_contrato)
+      // Criar Set com chaves existentes (nome_fantasia + numero_contrato)
       const contratosExistentesSet = new Set(
-        contratosExistentes?.map(c => `${c.cliente_id}|${c.numero_contrato?.trim() || null}`) || []
+        contratosExistentes?.map(c => {
+          const cliente = (c as any).clientes;
+          const nomeFantasia = (cliente?.nome_fantasia?.trim() || cliente?.nome?.trim() || 'SEM_NOME').toUpperCase();
+          return `${nomeFantasia}|${c.numero_contrato?.trim() || null}`;
+        }) || []
       );
 
       let contratosGerados = 0;
       let contratosPulados = 0;
       const erros: string[] = [];
       
-      // 4. Para cada grupo (cliente_id + numero_contrato), criar 1 contrato se não existir
+      // 4. Para cada grupo (nome_fantasia + numero_contrato), criar 1 contrato se não existir
       console.log(`\n🔍 === INICIANDO GERAÇÃO DE ${parametrosAgrupados.size} GRUPOS DE CONTRATOS ===\n`);
       
       for (const [chave, parametrosGrupo] of parametrosAgrupados.entries()) {
-        // Pegar o primeiro parâmetro do grupo como representante
-        const parametroRepresentante = parametrosGrupo[0];
+        const [nomeFantasiaChave, numeroContratoChave] = chave.split('|');
+        const numeroContratoParam = numeroContratoChave === 'null' ? null : numeroContratoChave;
+        
+        console.log(`\n📋 PROCESSANDO: "${nomeFantasiaChave}" + "${numeroContratoParam || 'SEM NÚMERO'}"`);
+        console.log(`   Parâmetros agrupados: ${parametrosGrupo.length}`);
+        
+        // Verificar duplicata usando nome_fantasia + numero_contrato
+        const contratoJaExiste = contratosExistentesSet.has(chave);
+
+        if (contratoJaExiste) {
+          console.log(`   ⏭️ PULADO (já existe contrato para "${nomeFantasiaChave}" + "${numeroContratoParam || 'SEM NÚMERO'}")\n`);
+          contratosPulados++;
+          continue;
+        }
+        
+        // Selecionar o melhor cliente_id para este grupo
+        // Se há múltiplos cliente_ids, escolher o que melhor combina com nome_fantasia
+        const clienteIds = [...new Set(parametrosGrupo.map(p => (p.clientes as any)?.id).filter(Boolean))];
+        console.log(`   Cliente IDs no grupo: ${clienteIds.join(', ')}`);
+        
+        let clienteIdSelecionado = clienteIds[0];
+        
+        if (clienteIds.length > 1) {
+          // Buscar clientes para comparar nome_fantasia
+          const { data: clientesCandidatos } = await supabase
+            .from('clientes')
+            .select('id, nome, nome_fantasia, razao_social')
+            .in('id', clienteIds);
+          
+          console.log(`   🔍 Comparando ${clientesCandidatos?.length} clientes candidatos:`);
+          clientesCandidatos?.forEach(c => {
+            console.log(`      - ID: ${c.id} | nome_fantasia: ${c.nome_fantasia} | razao_social: ${c.razao_social}`);
+          });
+          
+          // Tentar encontrar cliente com nome_fantasia que combina exatamente (case-insensitive)
+          const clienteExato = clientesCandidatos?.find(c => 
+            c.nome_fantasia?.trim().toUpperCase() === nomeFantasiaChave
+          );
+          
+          if (clienteExato) {
+            clienteIdSelecionado = clienteExato.id;
+            console.log(`   ✅ Selecionado cliente ${clienteExato.id} (nome_fantasia exato: "${clienteExato.nome_fantasia}")`);
+          } else {
+            console.log(`   ⚠️ Nenhum match exato, usando primeiro cliente_id: ${clienteIdSelecionado}`);
+          }
+        }
+        
+        // Pegar parâmetro representante do cliente selecionado
+        const parametroRepresentante = parametrosGrupo.find(p => (p.clientes as any)?.id === clienteIdSelecionado) || parametrosGrupo[0];
         const cliente = parametroRepresentante.clientes as any;
         
         if (!cliente) {
@@ -690,27 +740,13 @@ export default function ContratosClientes() {
           continue;
         }
         
-        const nomeFantasia = parametroRepresentante.nome_fantasia?.trim() || cliente.nome_fantasia?.trim() || cliente.nome?.trim() || 'SEM_NOME';
-        const numeroContratoParam = parametroRepresentante.numero_contrato?.trim() || null;
+        const nomeFantasia = nomeFantasiaChave; // Nome fantasia do grupo (já normalizado)
         
-        console.log(`\n📋 PROCESSANDO: Cliente ID ${cliente.id} - "${nomeFantasia}" + "${numeroContratoParam || 'SEM NÚMERO'}"`);
-        console.log(`   Parâmetros agrupados: ${parametrosGrupo.length}`);
-        console.log(`   Cliente.nome: ${cliente.nome}`);
-        console.log(`   Cliente.nome_fantasia: ${cliente.nome_fantasia}`);
-        console.log(`   Parâmetro.nome_fantasia: ${parametroRepresentante.nome_fantasia}`);
-        
-        // Verificar duplicata: buscar contratos existentes usando cliente_id + numero_contrato
-        const chaveContrato = `${cliente.id}|${numeroContratoParam}`;
-        const contratoJaExiste = contratosExistentesSet.has(chaveContrato);
-
-        if (contratoJaExiste) {
-          console.log(`   ⏭️ PULADO (já existe contrato para Cliente ID ${cliente.id} + Número ${numeroContratoParam || 'SEM NÚMERO'})\n`);
-          contratosPulados++;
-          continue;
-        }
-        
-        console.log(`   ✨ CRIANDO novo contrato para "${nomeFantasia}"...`);
-        console.log(`      Cliente ID: ${cliente.id}`);
+        console.log(`   ✨ CRIANDO novo contrato para "${nomeFantasiaChave}"...`);
+        console.log(`      Cliente ID selecionado: ${cliente.id}`);
+        console.log(`      Cliente nome: ${cliente.nome}`);
+        console.log(`      Cliente nome_fantasia: ${cliente.nome_fantasia}`);
+        console.log(`      Cliente razao_social: ${cliente.razao_social}`);
 
         // 5. Buscar preços configurados para o cliente
         const { data: precosCliente, error: precosError } = await supabase
