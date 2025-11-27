@@ -539,40 +539,67 @@ export default function ContratosClientes() {
     }
   }, [contratoEditando]);
 
-  // Função para gerar contratos automaticamente
+  // Função para gerar contratos automaticamente baseado nos parâmetros
   const gerarContratosAutomaticos = async () => {
     try {
       setIsCreatingContracts(true);
       
-      // 1. Buscar todos os clientes ativos primeiro
-      const { data: todosClientes, error: clientesError } = await supabase
-        .from('clientes')
+      // 1. Buscar TODOS os parâmetros ativos (não apenas de clientes sem contrato)
+      const { data: todosParametros, error: parametrosError } = await supabase
+        .from('parametros_faturamento')
         .select('*')
-        .eq('ativo', true);
+        .eq('status', 'A');
       
-      if (clientesError) throw clientesError;
+      if (parametrosError) throw parametrosError;
       
-      // 2. Filtrar clientes que já têm contrato
-      const clienteIdsComContrato = contratos.map(c => c.clienteId);
-      const clientesSemContrato = todosClientes?.filter(cliente => 
-        !clienteIdsComContrato.includes(cliente.id)
-      ) || [];
-      
-      if (clientesSemContrato.length === 0) {
+      if (!todosParametros || todosParametros.length === 0) {
         toast({
-          title: "Nenhum cliente encontrado",
-          description: "Todos os clientes ativos já possuem contratos.",
+          title: "Nenhum parâmetro encontrado",
+          description: "Não há parâmetros ativos para gerar contratos.",
           variant: "default",
         });
         return;
       }
 
-      console.log(`🔍 Encontrados ${clientesSemContrato.length} clientes sem contrato`);
+      console.log(`🔍 Encontrados ${todosParametros.length} parâmetros ativos`);
+
+      // 2. Buscar todos os contratos existentes
+      const { data: contratosExistentes, error: contratosError } = await supabase
+        .from('contratos_clientes')
+        .select('cliente_id, numero_contrato');
+      
+      if (contratosError) throw contratosError;
 
       let contratosGerados = 0;
+      let contratosPulados = 0;
       
-      for (const cliente of clientesSemContrato) {
-        // 2. Buscar preços configurados para o cliente
+      // 3. Para cada parâmetro, verificar se já existe contrato correspondente
+      for (const parametro of todosParametros) {
+        // Verificar se já existe contrato com mesmo cliente_id + numero_contrato
+        const contratoJaExiste = contratosExistentes?.some(contrato => 
+          contrato.cliente_id === parametro.cliente_id && 
+          contrato.numero_contrato === parametro.numero_contrato
+        );
+
+        if (contratoJaExiste) {
+          console.log(`⏭️ Pulando contrato já existente: Cliente ID ${parametro.cliente_id} - Contrato ${parametro.numero_contrato}`);
+          contratosPulados++;
+          continue;
+        }
+
+        // 4. Buscar informações do cliente
+        const { data: cliente, error: clienteError } = await supabase
+          .from('clientes')
+          .select('*')
+          .eq('id', parametro.cliente_id)
+          .single();
+        
+        if (clienteError || !cliente) {
+          console.error(`Erro ao buscar cliente ID ${parametro.cliente_id}:`, clienteError);
+          continue;
+        }
+
+        // 5. Buscar preços configurados para o cliente
         const { data: precosCliente, error: precosError } = await supabase
           .from('precos_servicos')
           .select('*')
@@ -580,22 +607,9 @@ export default function ContratosClientes() {
         
         if (precosError) {
           console.error(`Erro ao buscar preços para cliente ${cliente.nome}:`, precosError);
-          continue;
-        }
-
-        // 3. Buscar parâmetros de faturamento para o cliente
-        const { data: parametrosCliente, error: parametrosError } = await supabase
-          .from('parametros_faturamento')
-          .select('*')
-          .eq('cliente_id', cliente.id)
-          .eq('status', 'A')
-          .maybeSingle();
-
-        if (parametrosError) {
-          console.error(`Erro ao buscar parâmetros para cliente ${cliente.nome}:`, parametrosError);
         }
         
-        // 4. Calcular data de início e fim do contrato
+        // 6. Calcular data de início e fim do contrato
         const dataInicio = new Date().toISOString().split('T')[0];
         const dataFim = new Date();
         dataFim.setFullYear(dataFim.getFullYear() + 1); // 1 ano de contrato
@@ -612,28 +626,27 @@ export default function ContratosClientes() {
           })) : [];
 
         // Preparar configurações baseadas nos parâmetros de faturamento
-        const configuracoesFranquia = parametrosCliente ? {
-            tem_franquia: parametrosCliente.aplicar_franquia,
-            valor_franquia: parametrosCliente.valor_franquia,
-            volume_franquia: parametrosCliente.volume_franquia,
-            valor_acima_franquia: parametrosCliente.valor_acima_franquia,
-            frequencia_continua: parametrosCliente.frequencia_continua,
-            frequencia_por_volume: parametrosCliente.frequencia_por_volume
-          } : {};
+        const configuracoesFranquia = {
+          tem_franquia: parametro.aplicar_franquia,
+          valor_franquia: parametro.valor_franquia,
+          volume_franquia: parametro.volume_franquia,
+          valor_acima_franquia: parametro.valor_acima_franquia,
+          frequencia_continua: parametro.frequencia_continua,
+          frequencia_por_volume: parametro.frequencia_por_volume
+        };
 
-        const configuracoesIntegracao = parametrosCliente ? {
-          cobra_integracao: parametrosCliente.cobrar_integracao,
-          valor_integracao: parametrosCliente.valor_integracao,
-          portal_laudos: parametrosCliente.portal_laudos,
-          incluir_medico_solicitante: parametrosCliente.incluir_medico_solicitante,
-          incluir_access_number: parametrosCliente.incluir_access_number,
-          incluir_empresa_origem: parametrosCliente.incluir_empresa_origem
-        } : {};
+        const configuracoesIntegracao = {
+          cobra_integracao: parametro.cobrar_integracao,
+          valor_integracao: parametro.valor_integracao,
+          portal_laudos: parametro.portal_laudos,
+          incluir_medico_solicitante: parametro.incluir_medico_solicitante,
+          incluir_access_number: parametro.incluir_access_number,
+          incluir_empresa_origem: parametro.incluir_empresa_origem
+        };
         
-        // 5. Criar contrato no banco
-        // Usar número de contrato dos parâmetros; se ausente, deixar em branco (NULL)
-        const numeroContrato = (parametrosCliente?.numero_contrato && String(parametrosCliente.numero_contrato).trim())
-          ? String(parametrosCliente.numero_contrato).trim()
+        // 7. Criar contrato no banco
+        const numeroContrato = (parametro.numero_contrato && String(parametro.numero_contrato).trim())
+          ? String(parametro.numero_contrato).trim()
           : null;
         
         const { error: contratoError } = await supabase
@@ -648,34 +661,34 @@ export default function ContratosClientes() {
             modalidades: precosCliente && precosCliente.length > 0 ? [...new Set(precosCliente.map(p => p.modalidade))] : [],
             especialidades: precosCliente && precosCliente.length > 0 ? [...new Set(precosCliente.map(p => p.especialidade))] : [],
             tem_precos_configurados: precosCliente && precosCliente.length > 0,
-            tem_parametros_configurados: parametrosCliente ? true : false,
+            tem_parametros_configurados: true,
             considera_plantao: false,
             cond_volume: 'MOD/ESP/CAT',
-            dia_vencimento: parametrosCliente?.forma_cobranca === 'Mensal' ? 10 : 30,
+            dia_vencimento: parametro.forma_cobranca === 'Mensal' ? 10 : 30,
             desconto_percentual: 0,
             acrescimo_percentual: 0,
             faixas_volume: [],
             configuracoes_franquia: configuracoesFranquia,
             configuracoes_integracao: configuracoesIntegracao,
-            // Campos adicionais dos parâmetros
-            tipo_faturamento: parametrosCliente?.tipo_faturamento || 'CO-FT',
-            forma_pagamento: parametrosCliente?.forma_cobranca || 'Mensal',
-            observacoes_contratuais: (precosCliente && precosCliente.length > 0) 
-              ? (parametrosCliente ? `Parâmetros: ${parametrosCliente.tipo_faturamento || 'CO-FT'}` : 'Aguardando configuração de parâmetros')
-              : 'Aguardando configuração de preços e parâmetros'
+            tipo_faturamento: parametro.tipo_faturamento || 'CO-FT',
+            tipo_cliente: parametro.tipo_cliente || 'CO',
+            forma_pagamento: parametro.forma_cobranca || 'Mensal',
+            dia_fechamento: parametro.dia_fechamento || 7,
+            observacoes_contratuais: `Gerado automaticamente a partir de parâmetros - ${parametro.tipo_faturamento || 'CO-FT'}`
           });
         
         if (contratoError) {
-          console.error(`Erro ao criar contrato para cliente ${cliente.nome}:`, contratoError);
+          console.error(`❌ Erro ao criar contrato para cliente ${cliente.nome} (${parametro.numero_contrato}):`, contratoError);
           continue;
         }
         
+        console.log(`✅ Contrato criado: ${cliente.nome} - ${parametro.numero_contrato}`);
         contratosGerados++;
       }
       
       toast({
         title: "Contratos gerados com sucesso!",
-        description: `${contratosGerados} contratos foram criados automaticamente com seus respectivos parâmetros.`,
+        description: `${contratosGerados} novos contratos criados. ${contratosPulados} contratos já existiam.`,
       });
       
       // Recarregar lista de contratos
