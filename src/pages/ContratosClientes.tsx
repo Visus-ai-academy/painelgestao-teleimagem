@@ -699,51 +699,38 @@ export default function ContratosClientes() {
           continue;
         }
         
-        // Selecionar o melhor cliente_id para este grupo
-        // Se há múltiplos cliente_ids, escolher o que melhor combina com nome_fantasia
-        const clienteIds = [...new Set(parametrosGrupo.map(p => (p.clientes as any)?.id).filter(Boolean))];
-        console.log(`   Cliente IDs no grupo: ${clienteIds.join(', ')}`);
+        // SEMPRE buscar o cliente correto baseado no nome_fantasia do grupo
+        // Os cliente_ids nos parâmetros podem estar incorretos
+        console.log(`   🔍 Buscando cliente correto para nome_fantasia="${nomeFantasiaChave}"...`);
         
-        let clienteIdSelecionado = clienteIds[0];
+        const { data: clienteCorreto, error: clienteErro } = await supabase
+          .from('clientes')
+          .select('id, nome, nome_fantasia, razao_social')
+          .eq('nome_fantasia', nomeFantasiaChave)
+          .limit(1)
+          .single();
         
-        if (clienteIds.length > 1) {
-          // Buscar clientes para comparar nome_fantasia
-          const { data: clientesCandidatos } = await supabase
-            .from('clientes')
-            .select('id, nome, nome_fantasia, razao_social')
-            .in('id', clienteIds);
-          
-          console.log(`   🔍 Comparando ${clientesCandidatos?.length} clientes candidatos:`);
-          clientesCandidatos?.forEach(c => {
-            console.log(`      - ID: ${c.id} | nome_fantasia: ${c.nome_fantasia} | razao_social: ${c.razao_social}`);
-          });
-          
-          // Tentar encontrar cliente com nome_fantasia que combina exatamente (case-insensitive)
-          const clienteExato = clientesCandidatos?.find(c => 
-            c.nome_fantasia?.trim().toUpperCase() === nomeFantasiaChave
-          );
-          
-          if (clienteExato) {
-            clienteIdSelecionado = clienteExato.id;
-            console.log(`   ✅ Selecionado cliente ${clienteExato.id} (nome_fantasia exato: "${clienteExato.nome_fantasia}")`);
-          } else {
-            console.log(`   ⚠️ Nenhum match exato, usando primeiro cliente_id: ${clienteIdSelecionado}`);
-          }
-        }
-        
-        // Pegar parâmetro representante do cliente selecionado
-        const parametroRepresentante = parametrosGrupo.find(p => (p.clientes as any)?.id === clienteIdSelecionado) || parametrosGrupo[0];
-        const cliente = parametroRepresentante.clientes as any;
-        
-        if (!cliente) {
-          console.warn('⚠️ Cliente não encontrado para parâmetro:', parametroRepresentante.id);
+        if (clienteErro || !clienteCorreto) {
+          console.error(`   ❌ Erro ao buscar cliente: ${clienteErro?.message}`);
+          console.error(`   ⚠️ Pulando grupo "${nomeFantasiaChave}" por não encontrar cliente correspondente`);
+          erros.push(`Cliente não encontrado para "${nomeFantasiaChave}"`);
           continue;
         }
         
-        const nomeFantasia = nomeFantasiaChave; // Nome fantasia do grupo (já normalizado)
+        const clienteIdSelecionado = clienteCorreto.id;
+        console.log(`   ✅ Cliente encontrado: ${clienteCorreto.razao_social} (ID: ${clienteIdSelecionado})`);
+        console.log(`      nome_fantasia: ${clienteCorreto.nome_fantasia}`);
+        
+        // Usar o cliente correto encontrado (não o do parâmetro)
+        const cliente = clienteCorreto;
+        
+        // Pegar um parâmetro representante para dados adicionais
+        const parametroRepresentante = parametrosGrupo[0];
+        
+        const nomeFantasia = cliente.nome_fantasia; // Nome fantasia do cliente correto
         
         console.log(`   ✨ CRIANDO novo contrato para "${nomeFantasiaChave}"...`);
-        console.log(`      Cliente ID selecionado: ${cliente.id}`);
+        console.log(`      Cliente ID: ${cliente.id}`);
         console.log(`      Cliente nome: ${cliente.nome}`);
         console.log(`      Cliente nome_fantasia: ${cliente.nome_fantasia}`);
         console.log(`      Cliente razao_social: ${cliente.razao_social}`);
