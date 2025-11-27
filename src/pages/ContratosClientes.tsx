@@ -339,6 +339,9 @@ export default function ContratosClientes() {
         const cliente = contrato.clientes;
         const parametros = parametrosPorCliente[contrato.cliente_id] || (cliente?.nome_fantasia ? parametrosPorNome[cliente.nome_fantasia] : null) || null;
         
+        // Extrair nome_fantasia das observações_contratuais se disponível
+        const nomeFantasiaGerado = contrato.observacoes_contratuais?.match(/Gerado: ([A-Z_]+)/)?.[1];
+        
         const hoje = new Date();
         hoje.setHours(0, 0, 0, 0); // Normalizar para início do dia
         const dataFim = new Date(parametros?.data_termino_contrato || contrato.data_fim || contrato.data_inicio);
@@ -384,7 +387,7 @@ export default function ContratosClientes() {
         return {
           id: contrato.id,
           clienteId: cliente?.id || '',
-          cliente: parametros?.nome_fantasia || cliente?.nome_fantasia || cliente?.nome || 'Cliente não encontrado',
+          cliente: nomeFantasiaGerado || parametros?.nome_fantasia || cliente?.nome_fantasia || cliente?.nome || 'Cliente não encontrado',
           cnpj: parametros?.cnpj || cliente?.cnpj || '',
           // Priorizar dados dos parâmetros de faturamento para sincronização
           dataInicio: parametros?.data_inicio_contrato ? new Date(parametros.data_inicio_contrato).toISOString().split('T')[0] : contrato.data_inicio || '',
@@ -800,7 +803,7 @@ export default function ContratosClientes() {
             tipo_cliente: parametroRepresentante.tipo_cliente || 'CO',
             forma_pagamento: parametroRepresentante.forma_cobranca || 'Mensal',
             dia_fechamento: parametroRepresentante.dia_fechamento || 7,
-            observacoes_contratuais: `Gerado automaticamente - ${parametrosGrupo.length} parâmetro(s) - ${parametroRepresentante.tipo_faturamento || 'CO-FT'}`
+            observacoes_contratuais: `Gerado: ${nomeFantasia} | ${parametrosGrupo.length} parâmetro(s) | ${parametroRepresentante.tipo_faturamento || 'CO-FT'}`
           });
         
          if (contratoError) {
