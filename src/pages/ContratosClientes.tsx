@@ -1554,7 +1554,7 @@ export default function ContratosClientes() {
                       'hover:bg-muted/50'
                     }
                   >
-                    <TableCell className="font-medium">{contrato.cliente}</TableCell>
+                     <TableCell className="font-medium">{contrato.cliente}</TableCell>
                     <TableCell>{contrato.numeroContrato || 'Não informado'}</TableCell>
                     <TableCell>{contrato.razaoSocial}</TableCell>
                     <TableCell>
