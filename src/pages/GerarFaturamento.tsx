@@ -1093,6 +1093,8 @@ export default function GerarFaturamento() {
     console.log('🗑️ [LIMPEZA] Iniciando limpeza de dados do período:', periodo);
     
     try {
+      console.log('🗑️ [LIMPEZA] Chamando edge function limpar-faturamento-periodo...');
+      
       // Chamar edge function de limpeza
       const { data: limpezaData, error: limpezaError } = await supabase.functions.invoke(
         'limpar-faturamento-periodo',
@@ -1101,12 +1103,20 @@ export default function GerarFaturamento() {
         }
       );
 
+      console.log('📊 [LIMPEZA] Resposta da edge function:', limpezaData);
+
       if (limpezaError) {
         console.error('❌ [LIMPEZA] Erro ao chamar edge function:', limpezaError);
         throw limpezaError;
       }
 
-      console.log('✅ [LIMPEZA] Edge function executada:', limpezaData);
+      if (!limpezaData?.success) {
+        console.error('❌ [LIMPEZA] Edge function retornou erro:', limpezaData);
+        throw new Error(limpezaData?.error || 'Erro na limpeza');
+      }
+
+      console.log('✅ [LIMPEZA] Edge function executada com sucesso');
+      console.log('📊 [LIMPEZA] Resultados:', limpezaData?.resultados);
 
       // Limpar localStorage e estados relacionados
       console.log('🗑️ [LIMPEZA] Limpando cache local...');
@@ -1123,17 +1133,18 @@ export default function GerarFaturamento() {
       
       toast({
         title: "Dados limpos",
-        description: `Dados anteriores do período ${periodo} foram removidos`,
+        description: `${limpezaData?.resultados?.faturamento || 0} registros de faturamento, ${limpezaData?.resultados?.demonstrativos || 0} demonstrativos e ${limpezaData?.resultados?.pdfs_removidos || 0} PDFs removidos`,
         variant: "default",
       });
       
     } catch (error) {
       console.error('❌ [LIMPEZA] Erro durante limpeza:', error);
       toast({
-        title: "Aviso",
-        description: "Alguns dados anteriores podem não ter sido removidos completamente",
-        variant: "default",
+        title: "Erro na limpeza",
+        description: error instanceof Error ? error.message : "Erro ao limpar dados anteriores",
+        variant: "destructive",
       });
+      throw error; // Re-throw para parar o processamento
     }
   };
 

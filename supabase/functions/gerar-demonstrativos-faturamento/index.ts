@@ -39,7 +39,7 @@ serve(async (req) => {
       throw new Error('Período é obrigatório');
     }
 
-    // Buscar clientes ativos
+    // Buscar clientes ativos - USAR !inner para LEFT JOIN (não filtrar clientes sem parâmetros)
     let clientesQuery = supabase
       .from('clientes')
       .select(`
@@ -49,11 +49,12 @@ serve(async (req) => {
         nome_mobilemed,
         ativo,
         tipo_cliente,
-        parametros_faturamento(
+        parametros_faturamento!left(
           id,
           status,
           ativo,
           tipo_cliente,
+          tipo_faturamento,
           aplicar_franquia,
           valor_franquia,
           volume_franquia,
@@ -68,7 +69,7 @@ serve(async (req) => {
           percentual_iss,
           simples
         ),
-        contratos_clientes(
+        contratos_clientes!left(
           tipo_faturamento,
           tipo_cliente,
           numero_contrato
@@ -120,7 +121,7 @@ serve(async (req) => {
       const parametros = Array.isArray(cliente.parametros_faturamento)
         ? (cliente.parametros_faturamento.find((p: any) => p?.ativo === true || p?.status === 'A' || p?.status === 'Ativo') || cliente.parametros_faturamento[0])
         : cliente.parametros_faturamento;
-      const contrato = cliente.contratos_clientes?.[0];
+      const contrato = Array.isArray(cliente.contratos_clientes) ? cliente.contratos_clientes[0] : cliente.contratos_clientes;
       
       // Prioridade: parametros > contrato > fallback (parametros é source of truth)
       const tipoFaturamento = parametros?.tipo_faturamento || contrato?.tipo_faturamento || 'CO-FT';
