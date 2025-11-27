@@ -2599,7 +2599,7 @@ export type Database = {
           {
             foreignKeyName: "parametros_faturamento_cliente_id_fkey"
             columns: ["cliente_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "clientes"
             referencedColumns: ["id"]
           },
