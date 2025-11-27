@@ -624,10 +624,19 @@ export default function ContratosClientes() {
         console.log('');
       }
 
-      // 2. Agrupar parâmetros por (cliente_id + numero_contrato)
-      // Chave: "clienteId|numeroContrato" onde numeroContrato pode ser null
-      // Isso garante que cada cliente único com seu contrato específico gere 1 contrato
-      const parametrosAgrupados = new Map<string, typeof todosParametros>();
+
+      // ========================================
+      // LÓGICA HÍBRIDA DE AGRUPAMENTO
+      // ========================================
+      // Fase 1: Agrupar por nome_fantasia + numero_contrato
+      // Fase 2: Para cada grupo, verificar CNPJs:
+      //   - Mesmo CNPJ em todos cliente_ids → 1 contrato (PRN: 38 unidades → 1 contrato)
+      //   - CNPJs diferentes → contratos separados por cliente_id
+      
+      console.log('\n🔍 FASE 1: Agrupando por nome_fantasia + numero_contrato...');
+      
+      const gruposPorNomeContrato = new Map<string, typeof todosParametros>();
+      const erros: string[] = []; // Declarar erros aqui, antes de usar
       
       todosParametros.forEach(parametro => {
         const cliente = parametro.clientes as any;
@@ -636,33 +645,120 @@ export default function ContratosClientes() {
           return;
         }
         
-        const clienteId = cliente.id;
+        const nomeFantasia = (parametro.nome_fantasia?.trim() || cliente.nome_fantasia?.trim() || cliente.nome?.trim() || 'SEM_NOME').toUpperCase();
         const numeroContratoNormalizado = parametro.numero_contrato?.trim() || null;
-        const chave = `${clienteId}|${numeroContratoNormalizado}`;
+        const chave = `${nomeFantasia}|${numeroContratoNormalizado}`;
         
-        if (!parametrosAgrupados.has(chave)) {
-          parametrosAgrupados.set(chave, []);
+        if (!gruposPorNomeContrato.has(chave)) {
+          gruposPorNomeContrato.set(chave, []);
         }
-        parametrosAgrupados.get(chave)!.push(parametro);
+        gruposPorNomeContrato.get(chave)!.push(parametro);
       });
 
-      console.log(`📦 ${parametrosAgrupados.size} contratos únicos a serem criados (agrupados por Cliente ID + Número)`);
+      console.log(`📦 ${gruposPorNomeContrato.size} grupos por nome_fantasia + numero_contrato`);
       
-      // Log dos grupos DETALHADO
-      for (const [chave, params] of parametrosAgrupados) {
-        const [clienteIdChave] = chave.split('|');
-        const primeiroParam = params[0];
-        const cliente = primeiroParam?.clientes as any;
-        const nomeFantasia = cliente?.nome_fantasia || cliente?.nome || 'SEM_NOME';
+      console.log('\n🔍 FASE 2: Analisando CNPJs e decidindo consolidação...');
+      
+      // Estrutura final: cada entrada = 1 contrato a ser criado
+      interface ContratoParaCriar {
+        chaveUnica: string; // Para verificar duplicatas
+        clienteId: string; // Cliente que será usado no contrato
+        numeroContrato: string | null;
+        nomeFantasia: string;
+        parametros: typeof todosParametros;
+      }
+      
+      const contratosParaCriar: ContratoParaCriar[] = [];
+      
+      for (const [chaveGrupo, parametrosGrupo] of gruposPorNomeContrato.entries()) {
+        const [nomeFantasiaChave, numeroContratoChave] = chaveGrupo.split('|');
+        const numeroContratoParam = numeroContratoChave === 'null' ? null : numeroContratoChave;
         
-        const nomesAlvo = ['GOLD', 'GOLD_RMX', 'PRN', 'RMPADUA'];
+        // Buscar todos os cliente_ids únicos deste grupo
+        const clienteIdsUnicos = [...new Set(parametrosGrupo.map(p => (p.clientes as any)?.id).filter(Boolean))];
         
-        if (nomesAlvo.some(n => nomeFantasia?.includes(n))) {
-          console.log(`  🎯 ALVO ${nomeFantasia} (ID: ${clienteIdChave.substring(0, 8)}...): ${params.length} parâmetro(s)`);
+        console.log(`\n📋 Grupo: "${nomeFantasiaChave}" + "${numeroContratoParam || 'SEM NÚMERO'}"`);
+        console.log(`   Parâmetros: ${parametrosGrupo.length} | Cliente IDs únicos: ${clienteIdsUnicos.length}`);
+        
+        if (clienteIdsUnicos.length === 1) {
+          // Caso simples: apenas 1 cliente_id → criar 1 contrato
+          console.log(`   ✅ 1 cliente_id → Criar 1 contrato`);
+          contratosParaCriar.push({
+            chaveUnica: `${clienteIdsUnicos[0]}|${numeroContratoParam}`,
+            clienteId: clienteIdsUnicos[0],
+            numeroContrato: numeroContratoParam,
+            nomeFantasia: nomeFantasiaChave,
+            parametros: parametrosGrupo
+          });
         } else {
-          console.log(`  🔑 ${nomeFantasia} (ID: ${clienteIdChave.substring(0, 8)}...): ${params.length} parâmetro(s)`);
+          // Caso complexo: múltiplos cliente_ids → verificar CNPJs
+          console.log(`   🔍 Múltiplos cliente_ids → Verificando CNPJs...`);
+          
+          const { data: clientesData, error: clientesError } = await supabase
+            .from('clientes')
+            .select('id, nome_fantasia, cnpj, razao_social')
+            .in('id', clienteIdsUnicos);
+          
+          if (clientesError || !clientesData || clientesData.length === 0) {
+            console.error(`   ❌ Erro ao buscar clientes: ${clientesError?.message}`);
+            erros.push(`Erro ao buscar clientes para "${nomeFantasiaChave}"`);
+            continue;
+          }
+          
+          // Verificar se todos compartilham o mesmo CNPJ
+          const cnpjsUnicos = [...new Set(clientesData.map(c => c.cnpj).filter(Boolean))];
+          
+          console.log(`   CNPJs únicos: ${cnpjsUnicos.length} (${cnpjsUnicos.join(', ')})`);
+          
+          if (cnpjsUnicos.length === 1) {
+            // Todos compartilham o mesmo CNPJ → Consolidar em 1 contrato
+            console.log(`   ✅ Mesmo CNPJ em todos → Consolidar em 1 contrato`);
+            
+            // Escolher o cliente representante (preferencialmente o que tem nome_fantasia exato)
+            const clienteRepresentante = clientesData.find(c => 
+              c.nome_fantasia?.trim().toUpperCase() === nomeFantasiaChave
+            ) || clientesData[0];
+            
+            console.log(`   Cliente representante: ${clienteRepresentante.nome_fantasia} (${clienteRepresentante.cnpj})`);
+            
+            contratosParaCriar.push({
+              chaveUnica: `${clienteRepresentante.id}|${numeroContratoParam}`,
+              clienteId: clienteRepresentante.id,
+              numeroContrato: numeroContratoParam,
+              nomeFantasia: nomeFantasiaChave,
+              parametros: parametrosGrupo
+            });
+          } else {
+            // CNPJs diferentes → Criar contratos separados por cliente_id
+            console.log(`   ⚠️ CNPJs diferentes → Criar ${clienteIdsUnicos.length} contratos separados`);
+            
+            for (const clienteId of clienteIdsUnicos) {
+              const parametrosDoCliente = parametrosGrupo.filter(p => (p.clientes as any)?.id === clienteId);
+              const clienteInfo = clientesData.find(c => c.id === clienteId);
+              
+              console.log(`      - Cliente: ${clienteInfo?.nome_fantasia} (CNPJ: ${clienteInfo?.cnpj})`);
+              
+              contratosParaCriar.push({
+                chaveUnica: `${clienteId}|${numeroContratoParam}`,
+                clienteId: clienteId,
+                numeroContrato: numeroContratoParam,
+                nomeFantasia: nomeFantasiaChave,
+                parametros: parametrosDoCliente
+              });
+            }
+          }
         }
       }
+
+      console.log(`\n📊 TOTAL DE CONTRATOS A CRIAR: ${contratosParaCriar.length}`);
+      
+      // Log específico dos casos importantes
+      const alvos = ['GOLD', 'GOLD_RMX', 'PRN', 'RMPADUA'];
+      contratosParaCriar.forEach(c => {
+        if (alvos.some(a => c.nomeFantasia.includes(a))) {
+          console.log(`  🎯 ${c.nomeFantasia} | Contrato: ${c.numeroContrato || 'SEM NÚMERO'} | Parâmetros: ${c.parametros.length}`);
+        }
+      });
 
       // 3. Buscar todos os contratos existentes para verificar duplicatas
       const { data: contratosExistentes, error: contratosError } = await supabase
@@ -671,7 +767,7 @@ export default function ContratosClientes() {
       
       if (contratosError) throw contratosError;
 
-      // Criar Set com chaves existentes (cliente_id + numero_contrato)
+      // Criar Set com chaves existentes
       const contratosExistentesSet = new Set(
         contratosExistentes?.map(c => 
           `${c.cliente_id}|${c.numero_contrato?.trim() || null}`
@@ -680,51 +776,40 @@ export default function ContratosClientes() {
 
       let contratosGerados = 0;
       let contratosPulados = 0;
-      const erros: string[] = [];
       
-      // 4. Para cada grupo (cliente_id + numero_contrato), criar 1 contrato se não existir
-      console.log(`\n🔍 === INICIANDO GERAÇÃO DE ${parametrosAgrupados.size} GRUPOS DE CONTRATOS ===\n`);
+      // 4. Criar os contratos
+      console.log(`\n🔍 === INICIANDO CRIAÇÃO DE ${contratosParaCriar.length} CONTRATOS ===\n`);
       
-      for (const [chave, parametrosGrupo] of parametrosAgrupados.entries()) {
-        const [clienteIdChave, numeroContratoChave] = chave.split('|');
-        const numeroContratoParam = numeroContratoChave === 'null' ? null : numeroContratoChave;
-        
-        // Buscar dados do cliente usando o cliente_id do grupo
-        const { data: clienteDados, error: clienteErro } = await supabase
-          .from('clientes')
-          .select('id, nome, nome_fantasia, razao_social')
-          .eq('id', clienteIdChave)
-          .limit(1)
-          .single();
-        
-        if (clienteErro || !clienteDados) {
-          console.error(`   ❌ Erro ao buscar cliente ID ${clienteIdChave}: ${clienteErro?.message}`);
-          erros.push(`Cliente não encontrado para ID="${clienteIdChave}"`);
-          continue;
-        }
-        
-        console.log(`\n📋 PROCESSANDO: "${clienteDados.nome_fantasia}" (ID: ${clienteIdChave.substring(0, 8)}...) + "${numeroContratoParam || 'SEM NÚMERO'}"`);
-        console.log(`   Parâmetros agrupados: ${parametrosGrupo.length}`);
-        console.log(`   Cliente: ${clienteDados.nome_fantasia} - ${clienteDados.razao_social}`);
-        
-        // Verificar duplicata usando cliente_id + numero_contrato
-        const contratoJaExiste = contratosExistentesSet.has(chave);
-
-        if (contratoJaExiste) {
-          console.log(`   ⏭️ PULADO (já existe contrato para este cliente + número)\n`);
+      for (const contratoInfo of contratosParaCriar) {
+        // Verificar se já existe
+        if (contratosExistentesSet.has(contratoInfo.chaveUnica)) {
+          console.log(`⏭️ PULADO: "${contratoInfo.nomeFantasia}" + "${contratoInfo.numeroContrato || 'SEM NÚMERO'}" (já existe)`);
           contratosPulados++;
           continue;
         }
         
-        const cliente = clienteDados;
-        const parametroRepresentante = parametrosGrupo[0];
-        const nomeFantasia = cliente.nome_fantasia;
+        // Buscar dados completos do cliente
+        const { data: clienteDados, error: clienteErro } = await supabase
+          .from('clientes')
+          .select('id, nome, nome_fantasia, razao_social, cnpj')
+          .eq('id', contratoInfo.clienteId)
+          .limit(1)
+          .single();
         
-        console.log(`   ✨ CRIANDO novo contrato...`);
-        console.log(`      Cliente ID: ${cliente.id}`);
-        console.log(`      Cliente nome: ${cliente.nome}`);
-        console.log(`      Cliente nome_fantasia: ${cliente.nome_fantasia}`);
-        console.log(`      Cliente razao_social: ${cliente.razao_social}`);
+        if (clienteErro || !clienteDados) {
+          console.error(`   ❌ Erro ao buscar cliente ID ${contratoInfo.clienteId}: ${clienteErro?.message}`);
+          erros.push(`Cliente não encontrado para ID="${contratoInfo.clienteId}"`);
+          continue;
+        }
+        
+        console.log(`\n✨ CRIANDO: "${contratoInfo.nomeFantasia}" + "${contratoInfo.numeroContrato || 'SEM NÚMERO'}"`);
+        console.log(`   Cliente: ${clienteDados.nome_fantasia} - ${clienteDados.razao_social}`);
+        console.log(`   CNPJ: ${clienteDados.cnpj}`);
+        console.log(`   Parâmetros consolidados: ${contratoInfo.parametros.length}`);
+        
+        const cliente = clienteDados;
+        const parametroRepresentante = contratoInfo.parametros[0];
+        const nomeFantasia = cliente.nome_fantasia;
 
         // 5. Buscar preços configurados para o cliente
         const { data: precosCliente, error: precosError } = await supabase
@@ -778,7 +863,7 @@ export default function ContratosClientes() {
           .from('contratos_clientes')
           .insert({
             cliente_id: cliente.id,
-            numero_contrato: numeroContratoParam,
+            numero_contrato: contratoInfo.numeroContrato,
             data_inicio: dataInicio,
             data_fim: dataFim.toISOString().split('T')[0],
             status: 'ativo',
@@ -799,15 +884,15 @@ export default function ContratosClientes() {
             tipo_cliente: parametroRepresentante.tipo_cliente || 'CO',
             forma_pagamento: parametroRepresentante.forma_cobranca || 'Mensal',
             dia_fechamento: parametroRepresentante.dia_fechamento || 7,
-            observacoes_contratuais: `Gerado: ${nomeFantasia} | ${parametrosGrupo.length} parâmetro(s) | ${parametroRepresentante.tipo_faturamento || 'CO-FT'}`
+            observacoes_contratuais: `Gerado: ${nomeFantasia} | ${contratoInfo.parametros.length} parâmetro(s) | ${parametroRepresentante.tipo_faturamento || 'CO-FT'}`
           });
         
          if (contratoError) {
           console.error(`❌ ERRO ao criar contrato para "${nomeFantasia}":`, contratoError);
           console.error(`   Cliente ID: ${cliente.id} Nome: ${cliente.nome}`);
-          console.error(`   Número contrato: ${numeroContratoParam || 'SEM NÚMERO'}`);
+          console.error(`   Número contrato: ${contratoInfo.numeroContrato || 'SEM NÚMERO'}`);
           console.error(`   Detalhes:`, JSON.stringify(contratoError, null, 2));
-          const erro = `❌ Cliente ${cliente.nome} (${numeroContratoParam || 'sem número'}): ${contratoError.message}`;
+          const erro = `❌ Cliente ${cliente.nome} (${contratoInfo.numeroContrato || 'sem número'}): ${contratoError.message}`;
           console.error(erro);
           erros.push(erro);
           continue;
@@ -817,8 +902,8 @@ export default function ContratosClientes() {
         console.log(`   ✅ CONTRATO CRIADO!`);
         console.log(`      Cliente: ${nomeFantasia}`);
         console.log(`      Cliente ID: ${cliente.id}`);
-        console.log(`      Número: ${numeroContratoParam || 'SEM NÚMERO'}`);
-        console.log(`      Parâmetros: ${parametrosGrupo.length}\n`);
+        console.log(`      Número: ${contratoInfo.numeroContrato || 'SEM NÚMERO'}`);
+        console.log(`      Parâmetros: ${contratoInfo.parametros.length}\n`);
       }
       
       console.log(`\n📊 === RESUMO FINAL ===`);
