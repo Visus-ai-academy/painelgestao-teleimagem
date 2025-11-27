@@ -131,7 +131,30 @@ serve(async (req) => {
 
     console.log(`📊 Processando ${registros.length} registros para tipificação`);
 
-    // 2. Lista de médicos da Equipe 2 (usada por múltiplos clientes NC)
+    // 2. Buscar parâmetros de todos os clientes para obter tipo_cliente configurado
+    console.log('🔍 Buscando parâmetros de clientes...');
+    const { data: parametros, error: parametrosError } = await supabaseClient
+      .from('parametros_faturamento')
+      .select('cliente_nome, tipo_cliente');
+
+    if (parametrosError) {
+      console.error('❌ Erro ao buscar parâmetros:', parametrosError);
+      throw parametrosError;
+    }
+
+    // Criar mapa de parâmetros por nome de cliente (normalizado)
+    const parametrosMap = new Map<string, TipoCliente>();
+    if (parametros) {
+      parametros.forEach(p => {
+        if (p.cliente_nome && p.tipo_cliente) {
+          const nomeNormalizado = p.cliente_nome.toUpperCase().trim();
+          parametrosMap.set(nomeNormalizado, p.tipo_cliente as TipoCliente);
+        }
+      });
+      console.log(`✅ ${parametrosMap.size} parâmetros de clientes carregados`);
+    }
+
+    // 3. Lista de médicos da Equipe 2 (usada por múltiplos clientes NC)
     const MEDICOS_EQUIPE_2 = [
       'Dr. Antonio Gualberto Chianca Filho', 'Dr. Daniel Chrispim', 'Dr. Efraim Da Silva Ferreira', 
       'Dr. Felipe Falcão de Sá', 'Dr. Guilherme N. Schincariol', 'Dr. Gustavo Andreis', 
@@ -156,16 +179,18 @@ serve(async (req) => {
       'CDICARDIO', 'CDIGOIAS', 'CISP', 'CRWANDERLEY', 'DIAGMAX-PR', 'GOLD', 'PRODIMAGEM', 'TRANSDUSON', 'ZANELLO'
     ];
 
-    // 5. Função para determinar tipo de faturamento usando MESMA lógica do demonstrativo
+    // 5. Função para determinar tipo de faturamento
+    // NOVA LÓGICA: Busca tipo_cliente dos parâmetros, depois aplica regras específicas para FT/NF
     function determinarTipoFaturamento(
       nomeCliente: string,
       modalidade: string,
       especialidade: string,
       categoria: string,
       prioridade: string,
-      medico: string
+      medico: string,
+      parametrosMap: Map<string, TipoCliente>
     ): { tipo_faturamento: TipoFaturamento, tipo_cliente: TipoCliente } {
-      const nomeUpper = nomeCliente.toUpperCase();
+      const nomeUpper = nomeCliente.toUpperCase().trim();
       const modalidadeUpper = (modalidade || '').toUpperCase();
       const especialidadeUpper = (especialidade || '').toUpperCase();
       const categoriaUpper = (categoria || '').toUpperCase();
@@ -182,122 +207,146 @@ serve(async (req) => {
       const temMedicoEquipe2 = MEDICOS_EQUIPE_2.some(med => medicoStr.includes(med));
       const isRodrigoVaz = medicoUpper.includes('RODRIGO VAZ') || medicoUpper.includes('RODRIGO VAZ DE LIMA');
 
-      // Verificar se é cliente NC
-      const isClienteNC = CLIENTES_NC.some(nc => nomeUpper.includes(nc));
+      // PASSO 1: Buscar tipo_cliente dos parâmetros configurados
+      let tipo_cliente: TipoCliente = 'CO'; // Default
       
-      if (!isClienteNC) {
-        // Cliente CO: fatura tudo (CO-FT)
+      // Tentar buscar tipo_cliente dos parâmetros (busca exata e parcial)
+      if (parametrosMap.has(nomeUpper)) {
+        tipo_cliente = parametrosMap.get(nomeUpper)!;
+      } else {
+        // Tentar match parcial (cliente pode estar nos parâmetros com nome levemente diferente)
+        for (const [clienteParam, tipoParam] of parametrosMap.entries()) {
+          if (nomeUpper.includes(clienteParam) || clienteParam.includes(nomeUpper)) {
+            tipo_cliente = tipoParam;
+            break;
+          }
+        }
+      }
+
+      // PASSO 2: Para clientes CO, verificar se há regras específicas que mudam para CO-NF
+      if (tipo_cliente === 'CO') {
+        // Cliente CO padrão fatura tudo (CO-FT)
+        // Apenas se tiver regra específica muda para CO-NF
         return { tipo_faturamento: 'CO-FT', tipo_cliente: 'CO' };
       }
 
-      // ===== REGRAS ESPECÍFICAS POR CLIENTE NC =====
-
-      // CEDIDIAG: NC-FT = MEDICINA INTERNA (exceto Dr. Rodrigo Vaz de Lima)
-      if (nomeUpper === 'CEDIDIAG') {
-        if (isRodrigoVaz) {
-          return { tipo_faturamento: 'NC-NF', tipo_cliente: 'NC' };
-        }
-        if (isMedicinaInterna) {
-          return { tipo_faturamento: 'NC-FT', tipo_cliente: 'NC' };
-        }
-        return { tipo_faturamento: 'NC-NF', tipo_cliente: 'NC' };
+      // PASSO 3: Para clientes NC e NC1, aplicar regras específicas para determinar FT ou NF
+      const isClienteNC = CLIENTES_NC.some(nc => nomeUpper.includes(nc));
+      
+      if (!isClienteNC && tipo_cliente !== 'NC' && tipo_cliente !== 'NC1') {
+        // Se não está na lista NC e não está configurado como NC/NC1, é CO
+        return { tipo_faturamento: 'CO-FT', tipo_cliente: 'CO' };
       }
 
-      // CBU: NC-FT = Plantão OU (CT+MI) OU (MR+MI) (exceto Rodrigo Vaz)
+      // ===== REGRAS ESPECÍFICAS POR CLIENTE NC/NC1 PARA DETERMINAR FT OU NF =====
+      // Agora o tipo_cliente já vem dos parâmetros, só determinar o sufixo -FT ou -NF
+
+      // CEDIDIAG: FT = MEDICINA INTERNA (exceto Dr. Rodrigo Vaz de Lima)
+      if (nomeUpper === 'CEDIDIAG') {
+        if (isRodrigoVaz) {
+          return { tipo_faturamento: `${tipo_cliente}-NF` as TipoFaturamento, tipo_cliente };
+        }
+        if (isMedicinaInterna) {
+          return { tipo_faturamento: `${tipo_cliente}-FT` as TipoFaturamento, tipo_cliente };
+        }
+        return { tipo_faturamento: `${tipo_cliente}-NF` as TipoFaturamento, tipo_cliente };
+      }
+
+      // CBU: FT = Plantão OU (CT+MI) OU (MR+MI) (exceto Rodrigo Vaz)
       if (nomeUpper.includes('CBU')) {
         if (isRodrigoVaz) {
-          return { tipo_faturamento: 'NC-NF', tipo_cliente: 'NC' };
+          return { tipo_faturamento: `${tipo_cliente}-NF` as TipoFaturamento, tipo_cliente };
         }
         if (isPlantao) {
-          return { tipo_faturamento: 'NC-FT', tipo_cliente: 'NC' };
+          return { tipo_faturamento: `${tipo_cliente}-FT` as TipoFaturamento, tipo_cliente };
         }
         const isCT = modalidadeUpper === 'CT';
         const isMR = modalidadeUpper === 'MR' || modalidadeUpper === 'RM';
         if ((isCT && isMedicinaInterna) || (isMR && isMedicinaInterna)) {
-          return { tipo_faturamento: 'NC-FT', tipo_cliente: 'NC' };
+          return { tipo_faturamento: `${tipo_cliente}-FT` as TipoFaturamento, tipo_cliente };
         }
-        return { tipo_faturamento: 'NC-NF', tipo_cliente: 'NC' };
+        return { tipo_faturamento: `${tipo_cliente}-NF` as TipoFaturamento, tipo_cliente };
       }
 
-      // CLIRAM: NC-FT = Cardio E Plantão (ambos)
+      // CLIRAM: FT = Cardio E Plantão (ambos)
       if (nomeUpper.includes('CLIRAM')) {
         if (isCardio && isPlantao) {
-          return { tipo_faturamento: 'NC-FT', tipo_cliente: 'NC' };
+          return { tipo_faturamento: `${tipo_cliente}-FT` as TipoFaturamento, tipo_cliente };
         }
-        return { tipo_faturamento: 'NC-NF', tipo_cliente: 'NC' };
+        return { tipo_faturamento: `${tipo_cliente}-NF` as TipoFaturamento, tipo_cliente };
       }
 
-      // RADI-IMAGEM: NC-FT = Plantão OU MI OU Equipe2 OU Cardio OU Neurobrain OU Mamas
+      // RADI-IMAGEM: FT = Plantão OU MI OU Equipe2 OU Cardio OU Neurobrain OU Mamas
       if (nomeUpper.includes('RADI-IMAGEM') || nomeUpper.includes('RADI_IMAGEM')) {
         if (isPlantao || isMedicinaInterna || temMedicoEquipe2 || isCardio || isNeurobrain || isMamas) {
-          return { tipo_faturamento: 'NC-FT', tipo_cliente: 'NC' };
+          return { tipo_faturamento: `${tipo_cliente}-FT` as TipoFaturamento, tipo_cliente };
         }
-        return { tipo_faturamento: 'NC-NF', tipo_cliente: 'NC' };
+        return { tipo_faturamento: `${tipo_cliente}-NF` as TipoFaturamento, tipo_cliente };
       }
 
-      // RADMED: NC-FT = Plantão OU ((CT/MR) E (MI/MUSCULO/NEURO)) (exceto Rodrigo Vaz)
+      // RADMED: FT = Plantão OU ((CT/MR) E (MI/MUSCULO/NEURO)) (exceto Rodrigo Vaz)
       if (nomeUpper.includes('RADMED')) {
         if (isRodrigoVaz) {
-          return { tipo_faturamento: 'NC-NF', tipo_cliente: 'NC' };
+          return { tipo_faturamento: `${tipo_cliente}-NF` as TipoFaturamento, tipo_cliente };
         }
         if (isPlantao) {
-          return { tipo_faturamento: 'NC-FT', tipo_cliente: 'NC' };
+          return { tipo_faturamento: `${tipo_cliente}-FT` as TipoFaturamento, tipo_cliente };
         }
         const isCTouMR = modalidadeUpper === 'CT' || modalidadeUpper === 'MR' || modalidadeUpper === 'RM';
         const isMusculoEsqueletico = especialidadeUpper.includes('MUSCULO ESQUELETICO');
         const isNeuro = especialidadeUpper.includes('NEURO');
         if (isCTouMR && (isMedicinaInterna || isMusculoEsqueletico || isNeuro)) {
-          return { tipo_faturamento: 'NC-FT', tipo_cliente: 'NC' };
+          return { tipo_faturamento: `${tipo_cliente}-FT` as TipoFaturamento, tipo_cliente };
         }
-        return { tipo_faturamento: 'NC-NF', tipo_cliente: 'NC' };
+        return { tipo_faturamento: `${tipo_cliente}-NF` as TipoFaturamento, tipo_cliente };
       }
 
-      // CEMVALENCA_RX: NC-FT = apenas RX
+      // CEMVALENCA_RX: FT = apenas RX
       if (nomeUpper.includes('CEMVALENCA_RX')) {
         if (modalidadeUpper === 'RX') {
-          return { tipo_faturamento: 'NC-FT', tipo_cliente: 'NC' };
+          return { tipo_faturamento: `${tipo_cliente}-FT` as TipoFaturamento, tipo_cliente };
         }
-        return { tipo_faturamento: 'NC-NF', tipo_cliente: 'NC' };
+        return { tipo_faturamento: `${tipo_cliente}-NF` as TipoFaturamento, tipo_cliente };
       }
 
-      // CEMVALENCA_PL: NC-FT = apenas PLANTÃO
+      // CEMVALENCA_PL: FT = apenas PLANTÃO
       if (nomeUpper.includes('CEMVALENCA_PL')) {
         if (isPlantao) {
-          return { tipo_faturamento: 'NC-FT', tipo_cliente: 'NC' };
+          return { tipo_faturamento: `${tipo_cliente}-FT` as TipoFaturamento, tipo_cliente };
         }
-        return { tipo_faturamento: 'NC-NF', tipo_cliente: 'NC' };
+        return { tipo_faturamento: `${tipo_cliente}-NF` as TipoFaturamento, tipo_cliente };
       }
 
-      // CEMVALENCA: NC-FT = Plantão OU MI OU Equipe2 OU Cardio OU Neurobrain OU MAMA
+      // CEMVALENCA: FT = Plantão OU MI OU Equipe2 OU Cardio OU Neurobrain OU MAMA
       if (nomeUpper.includes('CEMVALENCA') && !nomeUpper.includes('CEMVALENCA_RX') && !nomeUpper.includes('CEMVALENCA_PL')) {
         if (isPlantao || isMedicinaInterna || isCardio || isMamas || isNeurobrain || temMedicoEquipe2) {
-          return { tipo_faturamento: 'NC-FT', tipo_cliente: 'NC' };
+          return { tipo_faturamento: `${tipo_cliente}-FT` as TipoFaturamento, tipo_cliente };
         }
-        return { tipo_faturamento: 'NC-NF', tipo_cliente: 'NC' };
+        return { tipo_faturamento: `${tipo_cliente}-NF` as TipoFaturamento, tipo_cliente };
       }
 
-      // RMPADUA: NC-FT = Plantão OU MI OU Equipe2 OU Cardio OU Neurobrain
+      // RMPADUA: FT = Plantão OU MI OU Equipe2 OU Cardio OU Neurobrain
       if (nomeUpper.includes('RMPADUA')) {
         if (isPlantao || isMedicinaInterna || isCardio || isNeurobrain || temMedicoEquipe2) {
-          return { tipo_faturamento: 'NC-FT', tipo_cliente: 'NC' };
+          return { tipo_faturamento: `${tipo_cliente}-FT` as TipoFaturamento, tipo_cliente };
         }
-        return { tipo_faturamento: 'NC-NF', tipo_cliente: 'NC' };
+        return { tipo_faturamento: `${tipo_cliente}-NF` as TipoFaturamento, tipo_cliente };
       }
 
       // Outros clientes NC: Cardio OU Plantão
       const isCardioOuPlantao = CLIENTES_CARDIO_OU_PLANTAO.some(nc => nomeUpper.includes(nc));
       if (isCardioOuPlantao) {
         if (isCardio || isPlantao) {
-          return { tipo_faturamento: 'NC-FT', tipo_cliente: 'NC' };
+          return { tipo_faturamento: `${tipo_cliente}-FT` as TipoFaturamento, tipo_cliente };
         }
-        return { tipo_faturamento: 'NC-NF', tipo_cliente: 'NC' };
+        return { tipo_faturamento: `${tipo_cliente}-NF` as TipoFaturamento, tipo_cliente };
       }
 
-      // Qualquer outro cliente NC sem regra específica: NC-NF
-      return { tipo_faturamento: 'NC-NF', tipo_cliente: 'NC' };
+      // Qualquer outro cliente NC/NC1 sem regra específica: NF
+      return { tipo_faturamento: `${tipo_cliente}-NF` as TipoFaturamento, tipo_cliente };
     }
 
-    // 5. Calcular tipificação para todos os registros primeiro
+    // 6. Calcular tipificação para todos os registros primeiro
     console.log(`📊 Calculando tipificação para ${registros.length} registros...`);
     
     const updates = registros.map(registro => {
@@ -307,7 +356,8 @@ serve(async (req) => {
         registro.ESPECIALIDADE || '',
         registro.CATEGORIA || '',
         registro.PRIORIDADE || '',
-        registro.MEDICO || ''
+        registro.MEDICO || '',
+        parametrosMap
       );
 
       return {
@@ -319,8 +369,7 @@ serve(async (req) => {
 
     console.log(`✅ Tipificação calculada. Iniciando atualização em massa...`);
 
-    // 6. Processar updates em batches maiores (1000 por vez) usando upsert
-    // 6. Processar updates em batches agrupando por tipo para reduzir chamadas
+    // 7. Processar updates em batches agrupando por tipo para reduzir chamadas
     const BATCH_SIZE = 1000;
     let registrosProcessados = 0;
     let registrosAtualizados = 0;
@@ -388,7 +437,7 @@ serve(async (req) => {
 
     console.log(`📊 Processamento concluído: ${registrosAtualizados} atualizados, ${erros} erros`);
 
-    // 7. Estatísticas finais do período (se especificado)
+    // 8. Estatísticas finais do período (se especificado)
     let estatisticas = {};
     if (periodo_referencia) {
       const { data: stats, error: statsError } = await supabaseClient
