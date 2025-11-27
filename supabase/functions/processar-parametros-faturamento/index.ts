@@ -485,38 +485,22 @@ serve(async (req) => {
           percentual_reajuste_fixo: 0
         };
 
-        // Verificar se já existe baseado no cliente_id (se existir) ou nome_mobilemed
+        // Verificar se já existe baseado em nome_fantasia (identificador único de cada parâmetro)
+        // Um cliente pode ter múltiplos contratos/parâmetros com nomes diferentes
         let existente;
-        if (parametroData.cliente_id) {
-          const { data } = await supabase
-            .from('parametros_faturamento')
-            .select('id')
-            .eq('cliente_id', parametroData.cliente_id)
-            .maybeSingle();
-          existente = data;
-        } else {
-          // Se não tem cliente_id, verifica por nome_mobilemed
-          const { data } = await supabase
-            .from('parametros_faturamento')
-            .select('id')
-            .eq('nome_mobilemed', parametroData.nome_mobilemed)
-            .maybeSingle();
-          existente = data;
-        }
+        const { data } = await supabase
+          .from('parametros_faturamento')
+          .select('id')
+          .eq('nome_fantasia', parametroData.nome_fantasia || parametroData.nome_mobilemed)
+          .maybeSingle();
+        existente = data;
 
         if (existente) {
-          // Atualizar existente
-          let updateQuery = supabase
+          // Atualizar existente baseado em nome_fantasia
+          const { error: updateError } = await supabase
             .from('parametros_faturamento')
-            .update(parametroData);
-          
-          if (parametroData.cliente_id) {
-            updateQuery = updateQuery.eq('cliente_id', parametroData.cliente_id);
-          } else {
-            updateQuery = updateQuery.eq('nome_mobilemed', parametroData.nome_mobilemed);
-          }
-          
-          const { error: updateError } = await updateQuery;
+            .update(parametroData)
+            .eq('nome_fantasia', parametroData.nome_fantasia || parametroData.nome_mobilemed);
 
           if (updateError) throw updateError;
           atualizados++;
