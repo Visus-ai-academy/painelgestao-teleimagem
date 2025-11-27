@@ -46,17 +46,18 @@ serve(async (req) => {
     if (periodo_referencia) {
       console.log('🧹 Verificando e limpando tipos de faturamento inválidos...');
       
-      const { data: registrosInvalidos, error: checkError } = await supabaseClient
+      // Contar registros com tipos inválidos
+      const { count: countInvalidos, error: checkError } = await supabaseClient
         .from('volumetria_mobilemed')
-        .select('tipo_faturamento, COUNT(*)', { count: 'exact' })
+        .select('*', { count: 'exact', head: true })
         .eq('periodo_referencia', periodo_referencia)
         .not('tipo_faturamento', 'is', null)
         .not('tipo_faturamento', 'in', `(${TIPOS_VALIDOS_FATURAMENTO.join(',')})`);
 
       if (checkError) {
         console.error('❌ Erro ao verificar tipos inválidos:', checkError);
-      } else if (registrosInvalidos && registrosInvalidos.length > 0) {
-        console.log(`⚠️ Encontrados tipos inválidos que serão limpos:`, registrosInvalidos);
+      } else if (countInvalidos && countInvalidos > 0) {
+        console.log(`⚠️ Encontrados ${countInvalidos} registros com tipos inválidos que serão limpos`);
         
         // Limpar tipos inválidos (definir como NULL)
         const { error: cleanError } = await supabaseClient
@@ -135,7 +136,7 @@ serve(async (req) => {
     console.log('🔍 Buscando parâmetros de clientes...');
     const { data: parametros, error: parametrosError } = await supabaseClient
       .from('parametros_faturamento')
-      .select('cliente_nome, tipo_cliente, tipo_faturamento');
+      .select('nome_fantasia, tipo_cliente, tipo_faturamento');
 
     if (parametrosError) {
       console.error('❌ Erro ao buscar parâmetros:', parametrosError);
@@ -146,8 +147,8 @@ serve(async (req) => {
     const parametrosMap = new Map<string, { tipo_cliente: TipoCliente, tipo_faturamento?: TipoFaturamento }>();
     if (parametros) {
       parametros.forEach(p => {
-        if (p.cliente_nome && p.tipo_cliente) {
-          const nomeNormalizado = p.cliente_nome.toUpperCase().trim();
+        if (p.nome_fantasia && p.tipo_cliente) {
+          const nomeNormalizado = p.nome_fantasia.toUpperCase().trim();
           parametrosMap.set(nomeNormalizado, {
             tipo_cliente: p.tipo_cliente as TipoCliente,
             tipo_faturamento: p.tipo_faturamento as TipoFaturamento | undefined
