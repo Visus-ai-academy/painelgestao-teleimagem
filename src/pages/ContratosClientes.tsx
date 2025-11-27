@@ -677,6 +677,8 @@ export default function ContratosClientes() {
       const erros: string[] = [];
       
       // 6. Para cada grupo (nome_fantasia + numero_contrato), criar 1 contrato se não existir
+      console.log(`\n🔍 === INICIANDO GERAÇÃO DE ${parametrosAgrupados.size} GRUPOS DE CONTRATOS ===\n`);
+      
       for (const [chave, parametrosGrupo] of parametrosAgrupados.entries()) {
         // Pegar o primeiro parâmetro do grupo como representante
         const parametroRepresentante = parametrosGrupo[0];
@@ -691,20 +693,39 @@ export default function ContratosClientes() {
         const nomeFantasia = parametroRepresentante.nome_fantasia?.trim() || cliente.nome_fantasia?.trim() || cliente.nome?.trim() || 'SEM_NOME';
         const numeroContratoParam = parametroRepresentante.numero_contrato?.trim() || null;
         
+        console.log(`\n📋 PROCESSANDO: "${nomeFantasia}" + "${numeroContratoParam || 'SEM NÚMERO'}"`);
+        console.log(`   Parâmetros agrupados: ${parametrosGrupo.length}`);
+        console.log(`   Cliente ID: ${cliente.id}`);
+        console.log(`   Cliente.nome: ${cliente.nome}`);
+        console.log(`   Cliente.nome_fantasia: ${cliente.nome_fantasia}`);
+        console.log(`   Parâmetro.nome_fantasia: ${parametroRepresentante.nome_fantasia}`);
+        
         // Verificar duplicata: buscar contratos existentes usando nome_fantasia do parâmetro
         const contratoJaExiste = contratosExistentes?.some(contrato => {
           const chaveExistente = `${contrato.cliente_id}|${contrato.numero_contrato?.trim() || null}`;
           const nomeFantasiaExistente = mapaParametrosExistentes.get(chaveExistente);
           const numeroContratoExistente = contrato.numero_contrato?.trim() || null;
           
-          return nomeFantasiaExistente === nomeFantasia && numeroContratoExistente === numeroContratoParam;
+          const match = nomeFantasiaExistente === nomeFantasia && numeroContratoExistente === numeroContratoParam;
+          
+          if (match) {
+            console.log(`   ⚠️ DUPLICATA! Contrato já existe:`);
+            console.log(`      ID: ${contrato.id}`);
+            console.log(`      Cliente ID: ${contrato.cliente_id}`);
+            console.log(`      Nome fantasia: ${nomeFantasiaExistente}`);
+            console.log(`      Número: ${numeroContratoExistente || 'SEM NÚMERO'}`);
+          }
+          
+          return match;
         });
 
         if (contratoJaExiste) {
-          console.log(`⏭️ Pulando duplicata: ${nomeFantasia} - Contrato ${numeroContratoParam || '(sem número)'} (${parametrosGrupo.length} parâmetros)`);
+          console.log(`   ⏭️ PULADO\n`);
           contratosPulados++;
           continue;
         }
+        
+        console.log(`   ✨ CRIANDO novo contrato...`);
 
 
         // 6. Buscar preços configurados para o cliente
@@ -782,16 +803,28 @@ export default function ContratosClientes() {
             observacoes_contratuais: `Gerado automaticamente - ${parametrosGrupo.length} parâmetro(s) - ${parametroRepresentante.tipo_faturamento || 'CO-FT'}`
           });
         
-        if (contratoError) {
+         if (contratoError) {
           const erro = `❌ Cliente ${cliente.nome} (${numeroContratoParam || 'sem número'}): ${contratoError.message}`;
           console.error(erro);
           erros.push(erro);
           continue;
         }
         
-        console.log(`✅ Contrato criado: ${nomeFantasia} - ${numeroContratoParam || '(sem número)'} [${parametrosGrupo.length} parâmetro(s) agrupados]`);
+        console.log(`   ✅ CONTRATO CRIADO!`);
+        console.log(`      Cliente: ${nomeFantasia}`);
+        console.log(`      Número: ${numeroContratoParam || 'SEM NÚMERO'}`);
+        console.log(`      Parâmetros: ${parametrosGrupo.length}\n`);
         contratosGerados++;
       }
+      
+      console.log(`\n📊 === RESUMO FINAL ===`);
+      console.log(`   ✅ Criados: ${contratosGerados}`);
+      console.log(`   ⏭️ Já existiam: ${contratosPulados}`);
+      if (erros.length > 0) {
+        console.log(`   ❌ Erros: ${erros.length}`);
+        erros.forEach(erro => console.log(`      ${erro}`));
+      }
+      console.log(`\n=====================\n`);
       
       // Mensagem final com resumo
       const descricao = [
