@@ -608,35 +608,26 @@ export default function ContratosClientes() {
 
       console.log(`🔍 Encontrados ${todosParametros.length} parâmetros (todos os status)`);
       
-      // Log específico para os clientes de interesse
-      const clientesAlvo = ['GOLD', 'GOLD_RMX', 'PRN', 'RMPADUA'];
-      const parametrosAlvo = todosParametros.filter(p => {
-        const nomeFantasia = p.nome_fantasia?.trim();
-        return clientesAlvo.some(alvo => nomeFantasia?.includes(alvo));
-      });
+      const erros: string[] = [];
+
+      // ========================================
+      // LÓGICA SIMPLES: AGRUPAR POR nome_fantasia + numero_contrato
+      // ========================================
+      // Se a combinação (nome_fantasia + numero_contrato) for EXATAMENTE IGUAL,
+      // gerar apenas 1 contrato consolidado.
+      // Se diferir, gerar contratos separados.
       
-      if (parametrosAlvo.length > 0) {
-        console.log(`\n🎯 PARÂMETROS DOS CLIENTES ALVO (${parametrosAlvo.length}):`);
-        parametrosAlvo.forEach(p => {
-          const cliente = p.clientes as any;
-          console.log(`   - ${p.nome_fantasia} | Contrato: ${p.numero_contrato || 'SEM NÚMERO'} | Cliente: ${cliente?.nome} | Cliente Ativo: ${cliente?.ativo} | Param Status: ${p.status}`);
-        });
-        console.log('');
+      console.log('\n🔍 Agrupando por nome_fantasia + numero_contrato...');
+      
+      interface ContratoParaCriar {
+        chaveUnica: string;
+        clienteId: string;
+        numeroContrato: string | null;
+        nomeFantasia: string;
+        parametros: typeof todosParametros;
       }
-
-
-      // ========================================
-      // LÓGICA HÍBRIDA DE AGRUPAMENTO
-      // ========================================
-      // Fase 1: Agrupar por nome_fantasia + numero_contrato
-      // Fase 2: Para cada grupo, verificar CNPJs:
-      //   - Mesmo CNPJ em todos cliente_ids → 1 contrato (PRN: 38 unidades → 1 contrato)
-      //   - CNPJs diferentes → contratos separados por cliente_id
-      
-      console.log('\n🔍 FASE 1: Agrupando por nome_fantasia + numero_contrato...');
       
       const gruposPorNomeContrato = new Map<string, typeof todosParametros>();
-      const erros: string[] = []; // Declarar erros aqui, antes de usar
       
       todosParametros.forEach(parametro => {
         const cliente = parametro.clientes as any;
@@ -655,105 +646,41 @@ export default function ContratosClientes() {
         gruposPorNomeContrato.get(chave)!.push(parametro);
       });
 
-      console.log(`📦 ${gruposPorNomeContrato.size} grupos por nome_fantasia + numero_contrato`);
+      console.log(`📦 ${gruposPorNomeContrato.size} grupos únicos (nome_fantasia + numero_contrato)`);
       
-      console.log('\n🔍 FASE 2: Analisando CNPJs e decidindo consolidação...');
-      
-      // Estrutura final: cada entrada = 1 contrato a ser criado
-      interface ContratoParaCriar {
-        chaveUnica: string; // Para verificar duplicatas
-        clienteId: string; // Cliente que será usado no contrato
-        numeroContrato: string | null;
-        nomeFantasia: string;
-        parametros: typeof todosParametros;
-      }
-      
+      // Para cada grupo único, criar 1 contrato
       const contratosParaCriar: ContratoParaCriar[] = [];
       
       for (const [chaveGrupo, parametrosGrupo] of gruposPorNomeContrato.entries()) {
         const [nomeFantasiaChave, numeroContratoChave] = chaveGrupo.split('|');
         const numeroContratoParam = numeroContratoChave === 'null' ? null : numeroContratoChave;
         
-        // Buscar todos os cliente_ids únicos deste grupo
-        const clienteIdsUnicos = [...new Set(parametrosGrupo.map(p => (p.clientes as any)?.id).filter(Boolean))];
+        // Buscar o cliente_id (usar o primeiro parâmetro do grupo como referência)
+        const primeiroParametro = parametrosGrupo[0];
+        const clienteId = (primeiroParametro.clientes as any)?.id;
+        
+        if (!clienteId) {
+          console.error(`❌ Grupo "${nomeFantasiaChave}" sem cliente_id válido`);
+          erros.push(`Grupo "${nomeFantasiaChave}" sem cliente_id válido`);
+          continue;
+        }
         
         console.log(`\n📋 Grupo: "${nomeFantasiaChave}" + "${numeroContratoParam || 'SEM NÚMERO'}"`);
-        console.log(`   Parâmetros: ${parametrosGrupo.length} | Cliente IDs únicos: ${clienteIdsUnicos.length}`);
+        console.log(`   Parâmetros consolidados: ${parametrosGrupo.length}`);
         
-        if (clienteIdsUnicos.length === 1) {
-          // Caso simples: apenas 1 cliente_id → criar 1 contrato
-          console.log(`   ✅ 1 cliente_id → Criar 1 contrato`);
-          contratosParaCriar.push({
-            chaveUnica: `${clienteIdsUnicos[0]}|${numeroContratoParam}`,
-            clienteId: clienteIdsUnicos[0],
-            numeroContrato: numeroContratoParam,
-            nomeFantasia: nomeFantasiaChave,
-            parametros: parametrosGrupo
-          });
-        } else {
-          // Caso complexo: múltiplos cliente_ids → verificar CNPJs
-          console.log(`   🔍 Múltiplos cliente_ids → Verificando CNPJs...`);
-          
-          const { data: clientesData, error: clientesError } = await supabase
-            .from('clientes')
-            .select('id, nome_fantasia, cnpj, razao_social')
-            .in('id', clienteIdsUnicos);
-          
-          if (clientesError || !clientesData || clientesData.length === 0) {
-            console.error(`   ❌ Erro ao buscar clientes: ${clientesError?.message}`);
-            erros.push(`Erro ao buscar clientes para "${nomeFantasiaChave}"`);
-            continue;
-          }
-          
-          // Verificar se todos compartilham o mesmo CNPJ
-          const cnpjsUnicos = [...new Set(clientesData.map(c => c.cnpj).filter(Boolean))];
-          
-          console.log(`   CNPJs únicos: ${cnpjsUnicos.length} (${cnpjsUnicos.join(', ')})`);
-          
-          if (cnpjsUnicos.length === 1) {
-            // Todos compartilham o mesmo CNPJ → Consolidar em 1 contrato
-            console.log(`   ✅ Mesmo CNPJ em todos → Consolidar em 1 contrato`);
-            
-            // Escolher o cliente representante (preferencialmente o que tem nome_fantasia exato)
-            const clienteRepresentante = clientesData.find(c => 
-              c.nome_fantasia?.trim().toUpperCase() === nomeFantasiaChave
-            ) || clientesData[0];
-            
-            console.log(`   Cliente representante: ${clienteRepresentante.nome_fantasia} (${clienteRepresentante.cnpj})`);
-            
-            contratosParaCriar.push({
-              chaveUnica: `${clienteRepresentante.id}|${numeroContratoParam}`,
-              clienteId: clienteRepresentante.id,
-              numeroContrato: numeroContratoParam,
-              nomeFantasia: nomeFantasiaChave,
-              parametros: parametrosGrupo
-            });
-          } else {
-            // CNPJs diferentes → Criar contratos separados por cliente_id
-            console.log(`   ⚠️ CNPJs diferentes → Criar ${clienteIdsUnicos.length} contratos separados`);
-            
-            for (const clienteId of clienteIdsUnicos) {
-              const parametrosDoCliente = parametrosGrupo.filter(p => (p.clientes as any)?.id === clienteId);
-              const clienteInfo = clientesData.find(c => c.id === clienteId);
-              
-              console.log(`      - Cliente: ${clienteInfo?.nome_fantasia} (CNPJ: ${clienteInfo?.cnpj})`);
-              
-              contratosParaCriar.push({
-                chaveUnica: `${clienteId}|${numeroContratoParam}`,
-                clienteId: clienteId,
-                numeroContrato: numeroContratoParam,
-                nomeFantasia: nomeFantasiaChave,
-                parametros: parametrosDoCliente
-              });
-            }
-          }
-        }
+        contratosParaCriar.push({
+          chaveUnica: `${clienteId}|${numeroContratoParam}`,
+          clienteId: clienteId,
+          numeroContrato: numeroContratoParam,
+          nomeFantasia: nomeFantasiaChave,
+          parametros: parametrosGrupo
+        });
       }
 
       console.log(`\n📊 TOTAL DE CONTRATOS A CRIAR: ${contratosParaCriar.length}`);
       
       // Log específico dos casos importantes
-      const alvos = ['GOLD', 'GOLD_RMX', 'PRN', 'RMPADUA'];
+      const alvos = ['GOLD', 'GOLD_RMX', 'PRN', 'RMPADUA', 'VIVERCLIN', 'MEDCENTER_PI', 'INTERCOR', 'CEDIDIAG'];
       contratosParaCriar.forEach(c => {
         if (alvos.some(a => c.nomeFantasia.includes(a))) {
           console.log(`  🎯 ${c.nomeFantasia} | Contrato: ${c.numeroContrato || 'SEM NÚMERO'} | Parâmetros: ${c.parametros.length}`);
