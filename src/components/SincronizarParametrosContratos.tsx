@@ -91,7 +91,8 @@ export function SincronizarParametrosContratos() {
               .select('*')
               .eq('nome_fantasia', contrato.clientes.nome_fantasia)
               .eq('ativo', true)
-              .maybeSingle();
+              .limit(1)
+              .single();
 
             if (parametrosPorNomeError && parametrosPorNomeError.code !== 'PGRST116') {
               throw new Error(`Erro ao buscar parâmetros por nome_fantasia: ${parametrosPorNomeError.message}`);
