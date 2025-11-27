@@ -485,34 +485,17 @@ serve(async (req) => {
           percentual_reajuste_fixo: 0
         };
 
-        // Verificar se já existe baseado em nome_fantasia (identificador único de cada parâmetro)
-        // Um cliente pode ter múltiplos contratos/parâmetros com nomes diferentes
-        let existente;
-        const { data } = await supabase
+        // Cada linha do Excel é um parâmetro único - inserir direto sem verificação de duplicação
+        // Múltiplos parâmetros podem ter o mesmo nome_fantasia (ex: RMPADUA com 3 parâmetros)
+        const { error: insertError } = await supabase
           .from('parametros_faturamento')
-          .select('id')
-          .eq('nome_fantasia', parametroData.nome_fantasia || parametroData.nome_mobilemed)
-          .maybeSingle();
-        existente = data;
+          .insert(parametroData);
 
-        if (existente) {
-          // Atualizar existente baseado em nome_fantasia
-          const { error: updateError } = await supabase
-            .from('parametros_faturamento')
-            .update(parametroData)
-            .eq('nome_fantasia', parametroData.nome_fantasia || parametroData.nome_mobilemed);
-
-          if (updateError) throw updateError;
-          atualizados++;
-        } else {
-          // Inserir novo
-          const { error: insertError } = await supabase
-            .from('parametros_faturamento')
-            .insert(parametroData);
-
-          if (insertError) throw insertError;
-          inseridos++;
+        if (insertError) {
+          console.error('Erro ao inserir parâmetro:', insertError);
+          throw insertError;
         }
+        inseridos++;
 
         console.log(`Linha ${i + 1}: Processada com sucesso - ${nomeEmpresa}`);
 
