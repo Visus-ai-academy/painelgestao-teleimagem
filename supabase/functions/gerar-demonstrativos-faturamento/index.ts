@@ -98,7 +98,24 @@ serve(async (req) => {
     const demonstrativos: DemonstrativoCliente[] = [];
     const clientesProcessados = new Set<string>(); // Track by nome_fantasia to avoid duplicates
 
-    for (const cliente of clientes) {
+    // Batch processing configuration - process 30 clients per batch to avoid timeout
+    const BATCH_SIZE = 30;
+    const totalClientes = clientes.length;
+    let clientesProcessadosCount = 0;
+    let clientesPuladosCount = 0;
+    
+    console.log(`📊 INICIANDO PROCESSAMENTO: ${totalClientes} clientes total`);
+    console.log(`📦 Configuração: ${BATCH_SIZE} clientes por lote`);
+    
+    // Process clients in batches
+    for (let i = 0; i < totalClientes; i += BATCH_SIZE) {
+      const batch = clientes.slice(i, Math.min(i + BATCH_SIZE, totalClientes));
+      const batchNumber = Math.floor(i / BATCH_SIZE) + 1;
+      const totalBatches = Math.ceil(totalClientes / BATCH_SIZE);
+      
+      console.log(`\n🔄 LOTE ${batchNumber}/${totalBatches}: Processando clientes ${i + 1} a ${Math.min(i + BATCH_SIZE, totalClientes)}`);
+      
+      for (const cliente of batch) {
       try {
       const parametros = Array.isArray(cliente.parametros_faturamento)
         ? (cliente.parametros_faturamento.find((p: any) => p?.ativo === true || p?.status === 'A' || p?.status === 'Ativo') || cliente.parametros_faturamento[0])
@@ -118,6 +135,7 @@ serve(async (req) => {
       const tiposNaoFaturados = ['NC-NF'];
       if (tiposNaoFaturados.includes(tipoFaturamento)) {
         console.log(`⚠️ Cliente ${cliente.nome} pulado - Tipo faturamento: ${tipoFaturamento} (não gera demonstrativo)`);
+        clientesPuladosCount++;
         continue;
       }
 
@@ -125,9 +143,11 @@ serve(async (req) => {
       const nomeFantasia = cliente.nome_fantasia || cliente.nome;
       if (clientesProcessados.has(nomeFantasia)) {
         console.log(`⚠️ Cliente ${cliente.nome} pulado - Já processado como ${nomeFantasia}`);
+        clientesPuladosCount++;
         continue;
       }
       clientesProcessados.add(nomeFantasia);
+      clientesProcessadosCount++;
 
       // Buscar volumetria usando multiple search strategies - OTIMIZADO
       const aliasSet = new Set<string>([
@@ -199,6 +219,7 @@ serve(async (req) => {
       // Filter out NC-NF and EXCLUSAO records based on CLIENT tipo_faturamento
       if (tipoFaturamento === 'NC-NF' || tipoFaturamento === 'EXCLUSAO') {
         console.log(`⚠️ Cliente ${nomeFantasia} é ${tipoFaturamento} - Pulando processamento`);
+        clientesPuladosCount++;
         continue;
       }
       console.log(`✅ Cliente ${nomeFantasia}: ${volumetria.length} registros com tipo_faturamento=${tipoFaturamento}`);
@@ -896,6 +917,19 @@ serve(async (req) => {
       // Continue processing other clients instead of failing the entire batch
     }
   }
+  
+      // Batch progress log
+      console.log(`\n✅ LOTE ${batchNumber}/${totalBatches} CONCLUÍDO`);
+      console.log(`   📊 Demonstrativos gerados neste lote: ${demonstrativos.length - (i === 0 ? 0 : demonstrativos.length)}`);
+      console.log(`   📈 Total de demonstrativos acumulados: ${demonstrativos.length}`);
+      console.log(`   ⏭️  Clientes processados: ${clientesProcessadosCount} | Pulados: ${clientesPuladosCount}`);
+    }
+    
+    console.log(`\n🎉 PROCESSAMENTO COMPLETO`);
+    console.log(`   📊 Total de demonstrativos gerados: ${demonstrativos.length}`);
+    console.log(`   👥 Clientes processados: ${clientesProcessadosCount} | Pulados: ${clientesPuladosCount}`);
+    console.log(`   📦 Total de lotes processados: ${Math.ceil(totalClientes / BATCH_SIZE)}`);
+
 
     // ✅ FIX 4: Calculate summary correctly
     const resumo = {
