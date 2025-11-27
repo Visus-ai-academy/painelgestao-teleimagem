@@ -131,11 +131,11 @@ serve(async (req) => {
 
     console.log(`📊 Processando ${registros.length} registros para tipificação`);
 
-    // 2. Buscar parâmetros de todos os clientes para obter tipo_cliente configurado
+    // 2. Buscar parâmetros de todos os clientes para obter tipo_cliente e tipo_faturamento configurados
     console.log('🔍 Buscando parâmetros de clientes...');
     const { data: parametros, error: parametrosError } = await supabaseClient
       .from('parametros_faturamento')
-      .select('cliente_nome, tipo_cliente');
+      .select('cliente_nome, tipo_cliente, tipo_faturamento');
 
     if (parametrosError) {
       console.error('❌ Erro ao buscar parâmetros:', parametrosError);
@@ -143,12 +143,15 @@ serve(async (req) => {
     }
 
     // Criar mapa de parâmetros por nome de cliente (normalizado)
-    const parametrosMap = new Map<string, TipoCliente>();
+    const parametrosMap = new Map<string, { tipo_cliente: TipoCliente, tipo_faturamento?: TipoFaturamento }>();
     if (parametros) {
       parametros.forEach(p => {
         if (p.cliente_nome && p.tipo_cliente) {
           const nomeNormalizado = p.cliente_nome.toUpperCase().trim();
-          parametrosMap.set(nomeNormalizado, p.tipo_cliente as TipoCliente);
+          parametrosMap.set(nomeNormalizado, {
+            tipo_cliente: p.tipo_cliente as TipoCliente,
+            tipo_faturamento: p.tipo_faturamento as TipoFaturamento | undefined
+          });
         }
       });
       console.log(`✅ ${parametrosMap.size} parâmetros de clientes carregados`);
@@ -188,7 +191,7 @@ serve(async (req) => {
       categoria: string,
       prioridade: string,
       medico: string,
-      parametrosMap: Map<string, TipoCliente>
+      parametrosMap: Map<string, { tipo_cliente: TipoCliente, tipo_faturamento?: TipoFaturamento }>
     ): { tipo_faturamento: TipoFaturamento, tipo_cliente: TipoCliente } {
       const nomeUpper = nomeCliente.toUpperCase().trim();
       const modalidadeUpper = (modalidade || '').toUpperCase();
@@ -207,27 +210,31 @@ serve(async (req) => {
       const temMedicoEquipe2 = MEDICOS_EQUIPE_2.some(med => medicoStr.includes(med));
       const isRodrigoVaz = medicoUpper.includes('RODRIGO VAZ') || medicoUpper.includes('RODRIGO VAZ DE LIMA');
 
-      // PASSO 1: Buscar tipo_cliente dos parâmetros configurados
+      // PASSO 1: Buscar tipo_cliente e tipo_faturamento dos parâmetros configurados
       let tipo_cliente: TipoCliente = 'CO'; // Default
+      let tipo_faturamento_param: TipoFaturamento | undefined = undefined;
       
-      // Tentar buscar tipo_cliente dos parâmetros (busca exata e parcial)
+      // Tentar buscar parâmetros (busca exata e parcial)
       if (parametrosMap.has(nomeUpper)) {
-        tipo_cliente = parametrosMap.get(nomeUpper)!;
+        const params = parametrosMap.get(nomeUpper)!;
+        tipo_cliente = params.tipo_cliente;
+        tipo_faturamento_param = params.tipo_faturamento;
       } else {
         // Tentar match parcial (cliente pode estar nos parâmetros com nome levemente diferente)
-        for (const [clienteParam, tipoParam] of parametrosMap.entries()) {
+        for (const [clienteParam, params] of parametrosMap.entries()) {
           if (nomeUpper.includes(clienteParam) || clienteParam.includes(nomeUpper)) {
-            tipo_cliente = tipoParam;
+            tipo_cliente = params.tipo_cliente;
+            tipo_faturamento_param = params.tipo_faturamento;
             break;
           }
         }
       }
 
-      // PASSO 2: Para clientes CO, verificar se há regras específicas que mudam para CO-NF
+      // PASSO 2: Para clientes CO, usar tipo_faturamento dos parâmetros (CO-FT ou CO-NF)
       if (tipo_cliente === 'CO') {
-        // Cliente CO padrão fatura tudo (CO-FT)
-        // Apenas se tiver regra específica muda para CO-NF
-        return { tipo_faturamento: 'CO-FT', tipo_cliente: 'CO' };
+        // Usar tipo_faturamento configurado nos parâmetros, ou CO-FT como padrão
+        const tipoFat = tipo_faturamento_param || 'CO-FT';
+        return { tipo_faturamento: tipoFat as TipoFaturamento, tipo_cliente: 'CO' };
       }
 
       // PASSO 3: Para clientes NC e NC1, aplicar regras específicas para determinar FT ou NF
@@ -342,7 +349,14 @@ serve(async (req) => {
         return { tipo_faturamento: `${tipo_cliente}-NF` as TipoFaturamento, tipo_cliente };
       }
 
-      // Qualquer outro cliente NC/NC1 sem regra específica: NF
+      // Qualquer outro cliente NC/NC1 sem regra específica:
+      // Se tem tipo_faturamento configurado nos parâmetros, usar esse
+      if (tipo_faturamento_param) {
+        // Se for NC-FT ou NC1-FT nos parâmetros, mas chegou aqui sem passar por regras específicas,
+        // significa que não tem regras hardcoded, então aplicar o tipo dos parâmetros
+        return { tipo_faturamento: tipo_faturamento_param, tipo_cliente };
+      }
+      // Se não tem tipo_faturamento nos parâmetros, usar padrão NF
       return { tipo_faturamento: `${tipo_cliente}-NF` as TipoFaturamento, tipo_cliente };
     }
 
