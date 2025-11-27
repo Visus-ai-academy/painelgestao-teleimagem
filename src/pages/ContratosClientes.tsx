@@ -294,14 +294,10 @@ export default function ContratosClientes() {
         return;
       }
 
-      // Buscar parâmetros de faturamento separadamente para evitar duplicatas
+      // Buscar parâmetros de faturamento - match por cliente_id + numero_contrato
       const clienteIds = contratosData?.map(c => c.cliente_id) || [];
-      const nomesFantasia = (contratosData || [])
-        .map(c => c.clientes?.nome_fantasia)
-        .filter((n: any) => Boolean(n)) as string[];
-
-      let parametrosPorCliente: Record<string, any> = {};
-      let parametrosPorNome: Record<string, any> = {};
+      
+      let parametrosPorContratoId: Record<string, any> = {}; // Chave: contrato_id -> parâmetro
       
       if (clienteIds.length > 0) {
         const { data: parametrosData } = await supabase
@@ -309,26 +305,24 @@ export default function ContratosClientes() {
           .select('*')
           .in('cliente_id', clienteIds);
         
-        // Organizar parâmetros por cliente_id (pegar o mais recente para cada cliente)
-        parametrosData?.forEach(param => {
-          if (!parametrosPorCliente[param.cliente_id] || 
-              parametrosPorCliente[param.cliente_id].updated_at < param.updated_at) {
-            parametrosPorCliente[param.cliente_id] = param;
-          }
-        });
-      }
-
-      if (nomesFantasia.length > 0) {
-        const uniqueNomes = Array.from(new Set(nomesFantasia));
-        const { data: paramsByNome } = await supabase
-          .from('parametros_faturamento')
-          .select('*')
-          .in('nome_fantasia', uniqueNomes);
-
-        paramsByNome?.forEach((p: any) => {
-          const key = (p.nome_fantasia || '').toString();
-          if (!parametrosPorNome[key] || parametrosPorNome[key].updated_at < p.updated_at) {
-            parametrosPorNome[key] = p;
+        // Para cada contrato, buscar o parâmetro correspondente por cliente_id + numero_contrato
+        contratosData?.forEach(contrato => {
+          const parametrosDoCliente = parametrosData?.filter(p => p.cliente_id === contrato.cliente_id);
+          
+          if (parametrosDoCliente && parametrosDoCliente.length > 0) {
+            // Tentar match por numero_contrato exato
+            let parametroMatch = parametrosDoCliente.find(p => 
+              p.numero_contrato?.trim() === contrato.numero_contrato?.trim()
+            );
+            
+            // Se não encontrou por numero_contrato, usar o mais recente do cliente
+            if (!parametroMatch) {
+              parametroMatch = parametrosDoCliente.reduce((mais_recente, atual) => 
+                atual.updated_at > mais_recente.updated_at ? atual : mais_recente
+              );
+            }
+            
+            parametrosPorContratoId[contrato.id] = parametroMatch;
           }
         });
       }
@@ -336,7 +330,7 @@ export default function ContratosClientes() {
       // Transformar dados do Supabase para o formato da interface
       const contratosFormatados: ContratoCliente[] = (contratosData || []).map(contrato => {
         const cliente = contrato.clientes;
-        const parametros = parametrosPorCliente[contrato.cliente_id] || (cliente?.nome_fantasia ? parametrosPorNome[cliente.nome_fantasia] : null) || null;
+        const parametros = parametrosPorContratoId[contrato.id] || null;
         
         // Extrair nome_fantasia das observações_contratuais se disponível
         const nomeFantasiaGerado = contrato.observacoes_contratuais?.match(/Gerado: ([A-Z_]+)/)?.[1];
