@@ -636,9 +636,15 @@ export default function ContratosClientes() {
 
       console.log(`📦 ${parametrosAgrupados.size} contratos únicos a serem criados (agrupados por Nome Fantasia + Número)`);
       
-      // Log dos grupos
+      // Log dos grupos DETALHADO
       for (const [chave, params] of parametrosAgrupados) {
-        console.log(`  🔑 ${chave}: ${params.length} parâmetro(s)`);
+        const nomes = ['GOLD', 'GOLD_RMX', 'PRN', 'RMPADUA'];
+        const nomeFantasiaGrupo = params[0]?.nome_fantasia;
+        if (nomes.includes(nomeFantasiaGrupo)) {
+          console.log(`  🎯 ALVO ${chave}: ${params.length} parâmetro(s) - Cliente IDs:`, params.map(p => (p.clientes as any)?.id));
+        } else {
+          console.log(`  🔑 ${chave}: ${params.length} parâmetro(s)`);
+        }
       }
 
       // 3. Buscar todos os clientes para mapear nome_fantasia -> IDs de clientes
@@ -723,12 +729,13 @@ export default function ContratosClientes() {
         });
 
         if (contratoJaExiste) {
-          console.log(`   ⏭️ PULADO\n`);
+          console.log(`   ⏭️ PULADO (já existe)\n`);
           contratosPulados++;
           continue;
         }
         
-        console.log(`   ✨ CRIANDO novo contrato...`);
+        console.log(`   ✨ CRIANDO novo contrato para "${nomeFantasia}"...`);
+        console.log(`      Cliente ID: ${cliente.id}`);
 
 
         // 6. Buscar preços configurados para o cliente
@@ -777,6 +784,7 @@ export default function ContratosClientes() {
         };
         
         // 8. Criar contrato no banco
+        console.log(`      📝 Inserindo contrato no banco para "${nomeFantasia}"...`);
         
         const { error: contratoError } = await supabase
           .from('contratos_clientes')
@@ -807,14 +815,21 @@ export default function ContratosClientes() {
           });
         
          if (contratoError) {
+          console.error(`❌ ERRO ao criar contrato para "${nomeFantasia}":`, contratoError);
+          console.error(`   Cliente ID: ${cliente.id} Nome: ${cliente.nome}`);
+          console.error(`   Número contrato: ${numeroContratoParam || 'SEM NÚMERO'}`);
+          console.error(`   Detalhes:`, JSON.stringify(contratoError, null, 2));
           const erro = `❌ Cliente ${cliente.nome} (${numeroContratoParam || 'sem número'}): ${contratoError.message}`;
           console.error(erro);
           erros.push(erro);
           continue;
         }
         
+        contratosGerados++;
         console.log(`   ✅ CONTRATO CRIADO!`);
         console.log(`      Cliente: ${nomeFantasia}`);
+        console.log(`      Cliente ID: ${cliente.id}`);
+        console.log(`      Número: ${numeroContratoParam || 'SEM NÚMERO'}\n`);
         console.log(`      Número: ${numeroContratoParam || 'SEM NÚMERO'}`);
         console.log(`      Parâmetros: ${parametrosGrupo.length}\n`);
         contratosGerados++;
