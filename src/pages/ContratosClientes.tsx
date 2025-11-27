@@ -282,7 +282,6 @@ export default function ContratosClientes() {
             ativo
           )
         `)
-        .eq('clientes.ativo', true)
         .in('status', ['ativo', 'vencido']);
 
       if (error) {
@@ -608,7 +607,23 @@ export default function ContratosClientes() {
         return;
       }
 
-      console.log(`🔍 Encontrados ${todosParametros.length} parâmetros ativos`);
+      console.log(`🔍 Encontrados ${todosParametros.length} parâmetros com STATUS='A'`);
+      
+      // Log específico para os clientes de interesse
+      const clientesAlvo = ['GOLD', 'GOLD_RMX', 'PRN', 'RMPADUA'];
+      const parametrosAlvo = todosParametros.filter(p => {
+        const nomeFantasia = p.nome_fantasia?.trim();
+        return clientesAlvo.some(alvo => nomeFantasia?.includes(alvo));
+      });
+      
+      if (parametrosAlvo.length > 0) {
+        console.log(`\n🎯 PARÂMETROS DOS CLIENTES ALVO (${parametrosAlvo.length}):`);
+        parametrosAlvo.forEach(p => {
+          const cliente = p.clientes as any;
+          console.log(`   - ${p.nome_fantasia} | Contrato: ${p.numero_contrato || 'SEM NÚMERO'} | Cliente: ${cliente?.nome} | Cliente Ativo: ${cliente?.ativo} | Param Status: ${p.status}`);
+        });
+        console.log('');
+      }
 
       // 2. Agrupar parâmetros por (nome_fantasia + numero_contrato)
       // Chave: "nome_fantasia|numeroContrato" onde numeroContrato pode ser null
@@ -625,8 +640,6 @@ export default function ContratosClientes() {
         const nomeFantasia = parametro.nome_fantasia?.trim() || cliente.nome_fantasia?.trim() || cliente.nome?.trim() || 'SEM_NOME';
         const numeroContratoNormalizado = parametro.numero_contrato?.trim() || null;
         const chave = `${nomeFantasia}|${numeroContratoNormalizado}`;
-        
-        console.log(`📝 Parâmetro: ${nomeFantasia} - Contrato: ${numeroContratoNormalizado} - Cliente ID: ${cliente.id}`);
         
         if (!parametrosAgrupados.has(chave)) {
           parametrosAgrupados.set(chave, []);
@@ -829,18 +842,31 @@ export default function ContratosClientes() {
         console.log(`   ✅ CONTRATO CRIADO!`);
         console.log(`      Cliente: ${nomeFantasia}`);
         console.log(`      Cliente ID: ${cliente.id}`);
-        console.log(`      Número: ${numeroContratoParam || 'SEM NÚMERO'}\n`);
         console.log(`      Número: ${numeroContratoParam || 'SEM NÚMERO'}`);
         console.log(`      Parâmetros: ${parametrosGrupo.length}\n`);
-        contratosGerados++;
       }
       
       console.log(`\n📊 === RESUMO FINAL ===`);
+      
+      console.log(`\n=====================`);
+      console.log(`📊 RESUMO FINAL:`);
       console.log(`   ✅ Criados: ${contratosGerados}`);
       console.log(`   ⏭️ Já existiam: ${contratosPulados}`);
       if (erros.length > 0) {
         console.log(`   ❌ Erros: ${erros.length}`);
         erros.forEach(erro => console.log(`      ${erro}`));
+      }
+      
+      // Verificar se os clientes alvo foram gerados
+      const clientesAlvoStatus = ['GOLD', 'GOLD_RMX', 'PRN', 'RMPADUA'];
+      console.log(`\n🎯 STATUS DOS CLIENTES ALVO:`);
+      for (const alvo of clientesAlvoStatus) {
+        const parametrosAlvo = todosParametros.filter(p => p.nome_fantasia?.includes(alvo));
+        if (parametrosAlvo.length > 0) {
+          console.log(`   ${alvo}: ${parametrosAlvo.length} parâmetro(s) encontrado(s) com STATUS='A'`);
+        } else {
+          console.log(`   ${alvo}: ❌ Nenhum parâmetro encontrado`);
+        }
       }
       console.log(`\n=====================\n`);
       
