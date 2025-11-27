@@ -576,10 +576,21 @@ export default function ContratosClientes() {
     try {
       setIsCreatingContracts(true);
       
-      // 1. Buscar TODOS os parâmetros ativos
+      // 1. Buscar TODOS os parâmetros ativos COM dados do cliente (incluindo CNPJ)
       const { data: todosParametros, error: parametrosError } = await supabase
         .from('parametros_faturamento')
-        .select('*')
+        .select(`
+          *,
+          clientes:cliente_id (
+            id,
+            nome,
+            cnpj,
+            razao_social,
+            endereco,
+            telefone,
+            email
+          )
+        `)
         .eq('status', 'A');
       
       if (parametrosError) throw parametrosError;
@@ -595,13 +606,20 @@ export default function ContratosClientes() {
 
       console.log(`🔍 Encontrados ${todosParametros.length} parâmetros ativos`);
 
-      // 2. Agrupar parâmetros por (cliente_id + numero_contrato)
-      // Chave: "clienteId|numeroContrato" onde numeroContrato pode ser null
+      // 2. Agrupar parâmetros por (CNPJ + numero_contrato)
+      // Chave: "CNPJ|numeroContrato" onde numeroContrato pode ser null
       const parametrosAgrupados = new Map<string, typeof todosParametros>();
       
       todosParametros.forEach(parametro => {
+        const cliente = parametro.clientes as any;
+        if (!cliente) {
+          console.warn('⚠️ Parâmetro sem cliente:', parametro.id);
+          return;
+        }
+        
+        const cnpjNormalizado = cliente.cnpj?.trim() || null;
         const numeroContratoNormalizado = parametro.numero_contrato?.trim() || null;
-        const chave = `${parametro.cliente_id}|${numeroContratoNormalizado}`;
+        const chave = `${cnpjNormalizado}|${numeroContratoNormalizado}`;
         
         if (!parametrosAgrupados.has(chave)) {
           parametrosAgrupados.set(chave, []);
@@ -609,9 +627,16 @@ export default function ContratosClientes() {
         parametrosAgrupados.get(chave)!.push(parametro);
       });
 
-      console.log(`📦 ${parametrosAgrupados.size} contratos únicos a serem criados (agrupados por cliente + número)`);
+      console.log(`📦 ${parametrosAgrupados.size} contratos únicos a serem criados (agrupados por CNPJ + número)`);
 
-      // 3. Buscar todos os contratos existentes para evitar duplicatas
+      // 3. Buscar todos os clientes para mapear CNPJ -> IDs de clientes
+      const { data: todosClientes, error: clientesError } = await supabase
+        .from('clientes')
+        .select('id, cnpj');
+      
+      if (clientesError) throw clientesError;
+
+      // 4. Buscar todos os contratos existentes
       const { data: contratosExistentes, error: contratosError } = await supabase
         .from('contratos_clientes')
         .select('id, cliente_id, numero_contrato');
@@ -622,38 +647,38 @@ export default function ContratosClientes() {
       let contratosPulados = 0;
       const erros: string[] = [];
       
-      // 4. Para cada grupo, criar 1 contrato se não existir
+      // 5. Para cada grupo (CNPJ + numero_contrato), criar 1 contrato se não existir
       for (const [chave, parametrosGrupo] of parametrosAgrupados.entries()) {
         // Pegar o primeiro parâmetro do grupo como representante
         const parametroRepresentante = parametrosGrupo[0];
+        const cliente = parametroRepresentante.clientes as any;
+        
+        if (!cliente) {
+          console.warn('⚠️ Cliente não encontrado para parâmetro:', parametroRepresentante.id);
+          continue;
+        }
+        
+        const cnpjNormalizado = cliente.cnpj?.trim() || null;
         const numeroContratoParam = parametroRepresentante.numero_contrato?.trim() || null;
         
-        // Verificar duplicata: mesmo cliente_id + mesmo numero_contrato
+        // Verificar duplicata: buscar todos os cliente_ids com o mesmo CNPJ
+        const clienteIdsComMesmoCnpj = todosClientes
+          ?.filter(c => (c.cnpj?.trim() || null) === cnpjNormalizado)
+          .map(c => c.id) || [];
+        
+        // Verificar se já existe contrato com esse CNPJ + numero_contrato
         const contratoJaExiste = contratosExistentes?.some(contrato => {
           const numeroContratoExistente = contrato.numero_contrato?.trim() || null;
-          return contrato.cliente_id === parametroRepresentante.cliente_id && 
+          return clienteIdsComMesmoCnpj.includes(contrato.cliente_id) && 
                  numeroContratoExistente === numeroContratoParam;
         });
 
         if (contratoJaExiste) {
-          console.log(`⏭️ Pulando duplicata: Cliente ID ${parametroRepresentante.cliente_id} - Contrato ${numeroContratoParam || '(sem número)'} (${parametrosGrupo.length} parâmetros)`);
+          console.log(`⏭️ Pulando duplicata: CNPJ ${cnpjNormalizado} - Contrato ${numeroContratoParam || '(sem número)'} (${parametrosGrupo.length} parâmetros)`);
           contratosPulados++;
           continue;
         }
 
-        // 5. Buscar informações do cliente
-        const { data: cliente, error: clienteError } = await supabase
-          .from('clientes')
-          .select('*')
-          .eq('id', parametroRepresentante.cliente_id)
-          .single();
-        
-        if (clienteError || !cliente) {
-          const erro = `❌ Erro ao buscar cliente ID ${parametroRepresentante.cliente_id}: ${clienteError?.message}`;
-          console.error(erro);
-          erros.push(erro);
-          continue;
-        }
 
         // 6. Buscar preços configurados para o cliente
         const { data: precosCliente, error: precosError } = await supabase
@@ -737,7 +762,7 @@ export default function ContratosClientes() {
           continue;
         }
         
-        console.log(`✅ Contrato criado: ${cliente.nome} - ${numeroContratoParam || '(sem número)'} [${parametrosGrupo.length} parâmetro(s) agrupados]`);
+        console.log(`✅ Contrato criado: ${cliente.nome} - ${numeroContratoParam || '(sem número)'} [${parametrosGrupo.length} parâmetro(s) agrupados - CNPJ: ${cnpjNormalizado}]`);
         contratosGerados++;
       }
       
