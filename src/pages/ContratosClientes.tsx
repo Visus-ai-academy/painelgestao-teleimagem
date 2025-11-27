@@ -384,7 +384,7 @@ export default function ContratosClientes() {
         return {
           id: contrato.id,
           clienteId: cliente?.id || '',
-          cliente: cliente?.nome_fantasia || cliente?.nome || 'Cliente não encontrado',
+          cliente: parametros?.nome_fantasia || cliente?.nome_fantasia || cliente?.nome || 'Cliente não encontrado',
           cnpj: parametros?.cnpj || cliente?.cnpj || '',
           // Priorizar dados dos parâmetros de faturamento para sincronização
           dataInicio: parametros?.data_inicio_contrato ? new Date(parametros.data_inicio_contrato).toISOString().split('T')[0] : contrato.data_inicio || '',
@@ -618,7 +618,8 @@ export default function ContratosClientes() {
           return;
         }
         
-        const nomeFantasia = cliente.nome_fantasia?.trim() || cliente.nome?.trim() || 'SEM_NOME';
+        // USAR NOME_FANTASIA DO PARÂMETRO, não do cliente
+        const nomeFantasia = parametro.nome_fantasia?.trim() || cliente.nome_fantasia?.trim() || cliente.nome?.trim() || 'SEM_NOME';
         const numeroContratoNormalizado = parametro.numero_contrato?.trim() || null;
         const chave = `${nomeFantasia}|${numeroContratoNormalizado}`;
         
@@ -644,26 +645,38 @@ export default function ContratosClientes() {
       
       if (clientesError) throw clientesError;
 
-      // 4. Buscar todos os contratos existentes com dados do cliente
+      // 4. Buscar todos os contratos existentes COM seus parâmetros para comparação correta
       const { data: contratosExistentes, error: contratosError } = await supabase
         .from('contratos_clientes')
         .select(`
           id, 
           cliente_id, 
-          numero_contrato,
-          clientes:cliente_id (
-            nome_fantasia,
-            nome
-          )
+          numero_contrato
         `);
       
       if (contratosError) throw contratosError;
+
+      // 5. Buscar os parâmetros dos contratos existentes para obter nome_fantasia correto
+      const clienteIdsExistentes = contratosExistentes?.map(c => c.cliente_id) || [];
+      const { data: parametrosExistentes } = await supabase
+        .from('parametros_faturamento')
+        .select('cliente_id, nome_fantasia, numero_contrato')
+        .in('cliente_id', clienteIdsExistentes);
+
+      // Criar mapa de cliente_id -> nome_fantasia do parâmetro
+      const mapaParametrosExistentes = new Map();
+      parametrosExistentes?.forEach(p => {
+        const chave = `${p.cliente_id}|${p.numero_contrato?.trim() || null}`;
+        if (!mapaParametrosExistentes.has(chave)) {
+          mapaParametrosExistentes.set(chave, p.nome_fantasia?.trim() || '');
+        }
+      });
 
       let contratosGerados = 0;
       let contratosPulados = 0;
       const erros: string[] = [];
       
-      // 5. Para cada grupo (nome_fantasia + numero_contrato), criar 1 contrato se não existir
+      // 6. Para cada grupo (nome_fantasia + numero_contrato), criar 1 contrato se não existir
       for (const [chave, parametrosGrupo] of parametrosAgrupados.entries()) {
         // Pegar o primeiro parâmetro do grupo como representante
         const parametroRepresentante = parametrosGrupo[0];
@@ -674,15 +687,17 @@ export default function ContratosClientes() {
           continue;
         }
         
-        const nomeFantasia = cliente.nome_fantasia?.trim() || cliente.nome?.trim() || 'SEM_NOME';
+        // USAR NOME_FANTASIA DO PARÂMETRO, não do cliente
+        const nomeFantasia = parametroRepresentante.nome_fantasia?.trim() || cliente.nome_fantasia?.trim() || cliente.nome?.trim() || 'SEM_NOME';
         const numeroContratoParam = parametroRepresentante.numero_contrato?.trim() || null;
         
-        // Verificar duplicata: verificar se já existe contrato com esse nome_fantasia + numero_contrato
+        // Verificar duplicata: buscar contratos existentes usando nome_fantasia do parâmetro
         const contratoJaExiste = contratosExistentes?.some(contrato => {
-          const clienteContrato = contrato.clientes as any;
-          const nomeFantasiaContrato = clienteContrato?.nome_fantasia?.trim() || clienteContrato?.nome?.trim() || 'SEM_NOME';
+          const chaveExistente = `${contrato.cliente_id}|${contrato.numero_contrato?.trim() || null}`;
+          const nomeFantasiaExistente = mapaParametrosExistentes.get(chaveExistente);
           const numeroContratoExistente = contrato.numero_contrato?.trim() || null;
-          return nomeFantasiaContrato === nomeFantasia && numeroContratoExistente === numeroContratoParam;
+          
+          return nomeFantasiaExistente === nomeFantasia && numeroContratoExistente === numeroContratoParam;
         });
 
         if (contratoJaExiste) {
