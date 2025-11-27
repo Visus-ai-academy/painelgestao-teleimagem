@@ -1224,206 +1224,126 @@ export default function GerarFaturamento() {
     });
 
     try {
-      // Primeiro: Verificar quantos clientes únicos existem na volumetria
-      console.log('🔍 [VERIFICACAO] Contando clientes únicos na volumetria...');
-      const { data: clientesVolumetria, error: errorVolumetria } = await supabase
-        .from('volumetria_mobilemed')
-        .select('"Cliente_Nome_Fantasia", "EMPRESA"')
-        .eq('periodo_referencia', periodoSelecionado)
-        .not('"EMPRESA"', 'is', null);
+      // ✅ MUDANÇA CRÍTICA: Buscar TODOS os clientes ativos (não apenas os da volumetria)
+      // Isso garante que todos os clientes configurados sejam processados, mesmo que não tenham volumetria
+      console.log('🔍 [VERIFICACAO] Buscando TODOS os clientes ativos com parâmetros...');
+      const { data: todosClientes, error: errorClientes } = await supabase
+        .from('clientes')
+        .select('id, nome, nome_fantasia, nome_mobilemed')
+        .eq('ativo', true);
 
-      if (errorVolumetria) {
-        throw new Error('Erro ao consultar volumetria: ' + errorVolumetria.message);
+      if (errorClientes) {
+        throw new Error('Erro ao buscar clientes: ' + errorClientes.message);
       }
 
-      const clientesUnicosVolumetria = [...new Set(clientesVolumetria?.map(c => c.Cliente_Nome_Fantasia || c.EMPRESA).filter(Boolean) || [])];
-      console.log('📊 [VOLUMETRIA] Clientes únicos encontrados:', clientesUnicosVolumetria.length, clientesUnicosVolumetria);
-
-      if (clientesUnicosVolumetria.length === 0) {
-        throw new Error(
-          `❌ Nenhum dado de volumetria encontrado para o período ${periodoSelecionado}.\n\n` +
-          `Por favor, faça o upload dos dados de volumetria na aba "Upload" antes de gerar os demonstrativos.\n\n` +
-          `Passos:\n` +
-          `1. Vá para a aba "Upload"\n` +
-          `2. Faça o upload do arquivo de volumetria do período ${periodoSelecionado}\n` +
-          `3. Retorne para a aba "Gerar" e tente novamente`
-        );
+      if (!todosClientes || todosClientes.length === 0) {
+        throw new Error('Nenhum cliente ativo encontrado no sistema');
       }
+
+      console.log('📊 [CLIENTES] Total de clientes ativos encontrados:', todosClientes.length);
 
       setStatusProcessamento({
         processando: true,
-        mensagem: `Processando ${clientesUnicosVolumetria.length} clientes da volumetria...`,
+        mensagem: `Processando ${todosClientes.length} clientes...`,
         progresso: 30
       });
 
-      console.log('📡 [EDGE_FUNCTION] Chamando gerar-demonstrativos-faturamento em lotes para período:', periodoSelecionado);
+      console.log('📡 [EDGE_FUNCTION] Chamando gerar-demonstrativos-faturamento para TODOS os clientes ativos');
+      console.log('📡 [EDGE_FUNCTION] Período:', periodoSelecionado);
+      console.log('📡 [EDGE_FUNCTION] Deixando edge function determinar quais clientes processar baseado em volumetria e parâmetros');
 
-      // Processar em lotes MENORES (5 clientes) para garantir que NUNCA dê timeout
-      // Reduzimos drasticamente o tamanho dos lotes para processar de forma mais confiável
-      const chunkSize = 5;
-      const chunks: string[][] = [];
-      for (let i = 0; i < clientesUnicosVolumetria.length; i += chunkSize) {
-        chunks.push(clientesUnicosVolumetria.slice(i, i + chunkSize));
-      }
+      // ✅ SIMPLIFICAÇÃO: Chamar edge function UMA VEZ SEM especificar clientes
+      // A edge function vai buscar TODOS os clientes ativos e processar em lotes internamente
+      const chunks: string[][] = [[]]; // Um chunk vazio indica "processar todos"
 
       const todosDemonstrativos: any[] = [];
       const todosAlertas: string[] = [];
       let clientesProcessados = 0;
       const lotesComErro: number[] = []; // Rastrear lotes que falharam para retry
       
-      // 🎯 Inicializar monitoramento de lotes
+      // 🎯 UMA CHAMADA ÚNICA para processar TODOS os clientes
       setMostrarMonitoramento(true);
       setTempoInicioProcessamento(Date.now());
-      const lotesIniciais: LoteStatus[] = chunks.map((lote, idx) => ({
-        numero: idx + 1,
-        total: chunks.length,
-        clientes: lote,
-        status: 'aguardando'
-      }));
+      const lotesIniciais: LoteStatus[] = [{
+        numero: 1,
+        total: 1,
+        clientes: ['TODOS OS CLIENTES'],
+        status: 'processando',
+        tempoInicio: Date.now()
+      }];
       setLotesMonitoramento(lotesIniciais);
 
-      for (let i = 0; i < chunks.length; i++) {
-        const lote = chunks[i];
+      try {
+        console.log('📡 [EDGE_FUNCTION] Chamando gerar-demonstrativos-faturamento (TODOS OS CLIENTES)...');
         
-        // 🎯 Atualizar status do lote para "processando"
-        setLotesMonitoramento(prev => prev.map((l, idx) => 
-          idx === i 
-            ? { ...l, status: 'processando', tempoInicio: Date.now() }
-            : l
-        ));
+        // Timeout de 10 minutos (600 segundos) para processar todos
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 600000);
         
-        // Marcar clientes do lote como processando
-        setClientesProcessandoDemonstrativo(prev => {
-          const newSet = new Set(prev);
-          lote.forEach(cliente => newSet.add(cliente));
-          return newSet;
-        });
-        
-        setStatusProcessamento({
-          processando: true,
-          mensagem: `Processando lote ${i + 1}/${chunks.length} (${lote.length} clientes)...`,
-          progresso: 30 + Math.round(((i) / chunks.length) * 35)
-        });
-
-        // TENTATIVAS MÚLTIPLAS: Tentar até 2 vezes em caso de falha
-        let tentativasRestantes = 2;
-        let sucessoLote = false;
-        
-        while (tentativasRestantes > 0 && !sucessoLote) {
-          try {
-            // 🎯 Se está em retry, atualizar status
-            if (tentativasRestantes < 2) {
-              setLotesMonitoramento(prev => prev.map((l, idx) => 
-                idx === i 
-                  ? { ...l, status: 'retry', tentativasRestantes: tentativasRestantes }
-                  : l
-              ));
-            }
-            
-            // Timeout de 3 minutos (180 segundos) por lote
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 180000);
-            
-            const { data, error } = await supabase.functions.invoke('gerar-demonstrativos-faturamento', {
-              body: {
-                periodo: periodoSelecionado,
-                clientes: lote
-              }
-            });
-            
-            clearTimeout(timeoutId);
-
-            console.log(`[LOTE ${i + 1}/${chunks.length}] Data:`, data);
-            console.log(`[LOTE ${i + 1}/${chunks.length}] Error:`, error);
-
-            if (error || !data?.success) {
-              throw new Error(error?.message || data?.error || 'Erro desconhecido');
-            }
-
-            // Sucesso! Processar dados do lote
-            sucessoLote = true;
-            clientesProcessados += data?.resumo?.clientes_processados || 0;
-            const demonstrativosDoLote = data?.demonstrativos || [];
-            todosDemonstrativos.push(...demonstrativosDoLote);
-            
-            // 🎯 Atualizar status do lote para "concluido"
-            setLotesMonitoramento(prev => prev.map((l, idx) => 
-              idx === i 
-                ? { 
-                    ...l, 
-                    status: 'concluido', 
-                    tempoFim: Date.now(),
-                    demonstrativosGerados: demonstrativosDoLote.length
-                  }
-                : l
-            ));
-            
-            // ✅ Atualizar status individual dos clientes processados com sucesso
-            if (demonstrativosDoLote.length > 0) {
-              const clientesFinalizados = demonstrativosDoLote.map(d => d.cliente_nome).filter(Boolean);
-              
-              // Marcar como concluídos
-              setDemonstrativosGeradosPorCliente(prev => {
-                const newSet = new Set(prev);
-                clientesFinalizados.forEach(cliente => newSet.add(cliente));
-                return newSet;
-              });
-              
-              // Remover de processamento
-              setClientesProcessandoDemonstrativo(prev => {
-                const newSet = new Set(prev);
-                clientesFinalizados.forEach(cliente => newSet.delete(cliente));
-                return newSet;
-              });
-              
-              // Salvar progresso no localStorage
-              const clientesAtualizados = Array.from(new Set([
-                ...Array.from(demonstrativosGeradosPorCliente),
-                ...clientesFinalizados
-              ]));
-              localStorage.setItem(`demonstrativosGerados_${periodoSelecionado}`, JSON.stringify(clientesAtualizados));
-              
-              console.log(`✅ Lote ${i + 1} finalizado: ${clientesFinalizados.length} demonstrativos gerados`);
-            }
-            
-            if (Array.isArray(data?.alertas)) todosAlertas.push(...data.alertas);
-
-          } catch (loteError) {
-            tentativasRestantes--;
-            
-            if (tentativasRestantes > 0) {
-              console.warn(`⚠️ Lote ${i + 1}/${chunks.length} falhou. Tentando novamente... (${tentativasRestantes} tentativas restantes)`);
-              // Aguardar 2 segundos antes de tentar novamente
-              await new Promise(resolve => setTimeout(resolve, 2000));
-            } else {
-              // Todas as tentativas falharam
-              console.error(`❌ Lote ${i + 1}/${chunks.length} falhou após todas as tentativas:`, loteError);
-              
-              // 🎯 Atualizar status do lote para "erro"
-              const mensagemErro = loteError instanceof Error ? loteError.message : 'Erro desconhecido';
-              setLotesMonitoramento(prev => prev.map((l, idx) => 
-                idx === i 
-                  ? { 
-                      ...l, 
-                      status: 'erro', 
-                      tempoFim: Date.now(),
-                      erro: mensagemErro
-                    }
-                  : l
-              ));
-              
-              // Remover clientes do lote de processamento
-              setClientesProcessandoDemonstrativo(prev => {
-                const newSet = new Set(prev);
-                lote.forEach(cliente => newSet.delete(cliente));
-                return newSet;
-              });
-              
-              lotesComErro.push(i);
-              todosAlertas.push(`Lote ${i + 1}/${chunks.length} falhou após 2 tentativas`);
-            }
+        const { data, error } = await supabase.functions.invoke('gerar-demonstrativos-faturamento', {
+          body: {
+            periodo: periodoSelecionado
+            // NÃO enviar clientes - deixar edge function buscar TODOS
           }
+        });
+        
+        clearTimeout(timeoutId);
+
+        console.log(`[GERAR_DEMONSTRATIVOS] Data:`, data);
+        console.log(`[GERAR_DEMONSTRATIVOS] Error:`, error);
+
+        if (error || !data?.success) {
+          throw new Error(error?.message || data?.error || 'Erro desconhecido');
         }
+
+        // Sucesso!
+        clientesProcessados = data?.resumo?.clientes_processados || 0;
+        const demonstrativosGerados = data?.demonstrativos || [];
+        todosDemonstrativos.push(...demonstrativosGerados);
+        
+        // 🎯 Atualizar status do lote para "concluido"
+        setLotesMonitoramento([{ 
+          numero: 1, 
+          total: 1,
+          clientes: ['TODOS OS CLIENTES'],
+          status: 'concluido', 
+          tempoInicio: lotesIniciais[0].tempoInicio,
+          tempoFim: Date.now(),
+          demonstrativosGerados: demonstrativosGerados.length
+        }]);
+        
+        // ✅ Atualizar status individual dos clientes processados
+        if (demonstrativosGerados.length > 0) {
+          const clientesFinalizados = demonstrativosGerados.map(d => d.cliente_nome).filter(Boolean);
+          
+          // Marcar como concluídos
+          setDemonstrativosGeradosPorCliente(new Set(clientesFinalizados));
+          
+          // Salvar progresso no localStorage
+          localStorage.setItem(`demonstrativosGerados_${periodoSelecionado}`, JSON.stringify(clientesFinalizados));
+          
+          console.log(`✅ Processamento finalizado: ${clientesFinalizados.length} demonstrativos gerados`);
+        }
+        
+        if (Array.isArray(data?.alertas)) todosAlertas.push(...data.alertas);
+
+      } catch (loteError) {
+        console.error(`❌ Erro ao processar demonstrativos:`, loteError);
+        
+        // 🎯 Atualizar status para "erro"
+        const mensagemErro = loteError instanceof Error ? loteError.message : 'Erro desconhecido';
+        setLotesMonitoramento([{ 
+          numero: 1, 
+          total: 1,
+          clientes: ['TODOS OS CLIENTES'],
+          status: 'erro', 
+          tempoInicio: lotesIniciais[0].tempoInicio,
+          tempoFim: Date.now(),
+          erro: mensagemErro
+        }]);
+        
+        lotesComErro.push(0);
+        todosAlertas.push('Erro ao processar demonstrativos');
       }
       
       // ✅ Limpar TODOS os clientes de processamento ao final
@@ -1457,7 +1377,7 @@ export default function GerarFaturamento() {
 
       // Montar resumo combinado e salvar no localStorage
       const resumoCombinado = {
-        total_clientes: clientesUnicosVolumetria.length,
+        total_clientes: todosClientes.length,
         clientes_processados: clientesProcessados,
         total_exames_geral: todosDemonstrativos.reduce((s, d) => s + (d.total_exames || 0), 0),
         valor_bruto_geral: todosDemonstrativos.reduce((s, d) => s + (d.valor_bruto || 0), 0),
