@@ -33,42 +33,46 @@ export const IndicadorTipificacao = ({ periodoReferencia, onStatusChange }: Indi
     try {
       setLoading(true);
 
-      // Buscar estatísticas de tipificação
+      // Buscar estatísticas de tipificação (com VALORES para contar exames)
       const { data: registros, error } = await supabase
         .from('volumetria_mobilemed')
-        .select('tipo_faturamento')
+        .select('tipo_faturamento, "VALORES"')
         .eq('periodo_referencia', periodoReferencia);
 
       if (error) throw error;
 
-      const total = registros.length;
-      const semTipificacao = registros.filter(r => !r.tipo_faturamento).length;
-      const percentualSemTipificacao = total > 0 ? (semTipificacao / total) * 100 : 0;
+      // Calcular total de EXAMES (soma de VALORES) ao invés de linhas
+      const totalExames = registros.reduce((sum, r) => sum + (Number(r.VALORES) || 0), 0);
+      const examesSemTipificacao = registros
+        .filter(r => !r.tipo_faturamento)
+        .reduce((sum, r) => sum + (Number(r.VALORES) || 0), 0);
+      const percentualSemTipificacao = totalExames > 0 ? (examesSemTipificacao / totalExames) * 100 : 0;
 
-      // Agrupar por tipo_faturamento
+      // Agrupar por tipo_faturamento (somando VALORES)
       const tiposMap = new Map<string, number>();
       registros.forEach(r => {
         const tipo = r.tipo_faturamento || 'SEM_TIPIFICACAO';
-        tiposMap.set(tipo, (tiposMap.get(tipo) || 0) + 1);
+        const valores = Number(r.VALORES) || 0;
+        tiposMap.set(tipo, (tiposMap.get(tipo) || 0) + valores);
       });
 
       const porTipo = Array.from(tiposMap.entries())
         .map(([tipo, count]) => ({
           tipo_faturamento: tipo,
           total: count,
-          percentual: total > 0 ? (count / total) * 100 : 0
+          percentual: totalExames > 0 ? (count / totalExames) * 100 : 0
         }))
         .sort((a, b) => b.total - a.total);
 
       setStats({
-        total_registros: total,
-        sem_tipificacao: semTipificacao,
+        total_registros: totalExames,
+        sem_tipificacao: examesSemTipificacao,
         percentual_sem_tipificacao: percentualSemTipificacao,
         por_tipo: porTipo
       });
 
       // Notificar componente pai sobre o status
-      onStatusChange?.(semTipificacao > 0);
+      onStatusChange?.(examesSemTipificacao > 0);
 
     } catch (error) {
       console.error('Erro ao carregar estatísticas de tipificação:', error);
@@ -175,7 +179,7 @@ export const IndicadorTipificacao = ({ periodoReferencia, onStatusChange }: Indi
           />
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>{(stats.total_registros - stats.sem_tipificacao).toLocaleString('pt-BR')} tipificados</span>
-            <span>{stats.total_registros.toLocaleString('pt-BR')} total</span>
+            <span>{stats.total_registros.toLocaleString('pt-BR')} total exames</span>
           </div>
         </div>
 
@@ -210,7 +214,7 @@ export const IndicadorTipificacao = ({ periodoReferencia, onStatusChange }: Indi
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-sm text-muted-foreground">
-                      {tipo.total.toLocaleString('pt-BR')} registros
+                      {tipo.total.toLocaleString('pt-BR')} exames
                     </span>
                     <Badge 
                       variant={isSemTipificacao ? "destructive" : isValido ? "secondary" : "outline"}
