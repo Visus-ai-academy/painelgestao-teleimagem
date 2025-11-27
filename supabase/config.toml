@@ -98,9 +98,6 @@ verify_jwt = true
 [functions.limpar-faturamento-periodo]
 verify_jwt = true
 
-[functions.limpar-periodo-completo]
-verify_jwt = true
-
 [functions.limpar-precos-base]
 verify_jwt = true
 

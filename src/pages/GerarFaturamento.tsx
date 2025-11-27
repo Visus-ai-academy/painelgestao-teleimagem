@@ -1093,83 +1093,29 @@ export default function GerarFaturamento() {
     console.log('🗑️ [LIMPEZA] Iniciando limpeza de dados do período:', periodo);
     
     try {
-      // 1. Limpar tabela faturamento
-      console.log('🗑️ [LIMPEZA] Removendo registros da tabela faturamento...');
-      const { error: errorFaturamento } = await supabase
-        .from('faturamento')
-        .delete()
-        .eq('periodo_referencia', periodo);
-      
-      if (errorFaturamento) {
-        console.warn('⚠️ [LIMPEZA] Erro ao limpar faturamento:', errorFaturamento);
-      } else {
-        console.log('✅ [LIMPEZA] Tabela faturamento limpa');
-      }
-
-      // 2. Limpar tabela demonstrativos_faturamento_calculados
-      console.log('🗑️ [LIMPEZA] Removendo registros da tabela demonstrativos_faturamento_calculados...');
-      const { error: errorDemonstrativos } = await supabase
-        .from('demonstrativos_faturamento_calculados')
-        .delete()
-        .eq('periodo_referencia', periodo);
-      
-      if (errorDemonstrativos) {
-        console.warn('⚠️ [LIMPEZA] Erro ao limpar demonstrativos:', errorDemonstrativos);
-      } else {
-        console.log('✅ [LIMPEZA] Tabela demonstrativos_faturamento_calculados limpa');
-      }
-
-      // 3. Limpar tabela relatorios_faturamento_status
-      console.log('🗑️ [LIMPEZA] Removendo registros da tabela relatorios_faturamento_status...');
-      const { error: errorRelatorios } = await supabase
-        .from('relatorios_faturamento_status')
-        .delete()
-        .eq('periodo', periodo);
-      
-      if (errorRelatorios) {
-        console.warn('⚠️ [LIMPEZA] Erro ao limpar status de relatórios:', errorRelatorios);
-      } else {
-        console.log('✅ [LIMPEZA] Tabela relatorios_faturamento_status limpa');
-      }
-
-      // 4. Limpar PDFs do storage bucket 'relatorios-faturamento'
-      console.log('🗑️ [LIMPEZA] Removendo PDFs do storage...');
-      const { data: arquivos, error: errorListagem } = await supabase.storage
-        .from('relatorios-faturamento')
-        .list();
-      
-      if (errorListagem) {
-        console.warn('⚠️ [LIMPEZA] Erro ao listar arquivos do storage:', errorListagem);
-      } else if (arquivos && arquivos.length > 0) {
-        // Filtrar arquivos que contêm o período no nome
-        const arquivosDoPeriodo = arquivos
-          .filter(arquivo => arquivo.name.includes(periodo))
-          .map(arquivo => arquivo.name);
-        
-        if (arquivosDoPeriodo.length > 0) {
-          console.log(`🗑️ [LIMPEZA] Encontrados ${arquivosDoPeriodo.length} PDFs do período`);
-          const { error: errorRemocao } = await supabase.storage
-            .from('relatorios-faturamento')
-            .remove(arquivosDoPeriodo);
-          
-          if (errorRemocao) {
-            console.warn('⚠️ [LIMPEZA] Erro ao remover PDFs:', errorRemocao);
-          } else {
-            console.log('✅ [LIMPEZA] PDFs do período removidos');
-          }
-        } else {
-          console.log('ℹ️ [LIMPEZA] Nenhum PDF do período encontrado no storage');
+      // Chamar edge function de limpeza
+      const { data: limpezaData, error: limpezaError } = await supabase.functions.invoke(
+        'limpar-faturamento-periodo',
+        {
+          body: { periodo }
         }
+      );
+
+      if (limpezaError) {
+        console.error('❌ [LIMPEZA] Erro ao chamar edge function:', limpezaError);
+        throw limpezaError;
       }
 
-      // 5. Limpar localStorage e estados relacionados
+      console.log('✅ [LIMPEZA] Edge function executada:', limpezaData);
+
+      // Limpar localStorage e estados relacionados
       console.log('🗑️ [LIMPEZA] Limpando cache local...');
       localStorage.removeItem(`demonstrativos_completos_${periodo}`);
       localStorage.removeItem(`demonstrativosGerados_${periodo}`);
       setDemonstrativosGeradosPorCliente(new Set());
       setDemonstrativoGerado(false);
       
-      // 6. ✅ FORÇAR RELOAD DO RESUMO GERAL: Disparar evento customizado
+      // ✅ FORÇAR RELOAD DO RESUMO GERAL: Disparar evento customizado
       console.log('🔄 [LIMPEZA] Disparando evento para recarregar Resumo Geral...');
       window.dispatchEvent(new CustomEvent('resumo-geral-reload', { detail: { periodo } }));
       
