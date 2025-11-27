@@ -70,8 +70,10 @@ export function SincronizarParametrosContratos() {
       // 2. Processar cada contrato
       for (const contrato of contratos) {
         try {
-          // Buscar parâmetros do cliente
-          const { data: parametros, error: parametrosError } = await supabase
+          const nomeCliente = contrato.clientes?.nome_fantasia || contrato.clientes?.nome || 'Cliente não identificado';
+          
+          // Buscar parâmetros do cliente - primeiro por cliente_id
+          let { data: parametros, error: parametrosError } = await supabase
             .from('parametros_faturamento')
             .select('*')
             .eq('cliente_id', contrato.cliente_id)
@@ -79,10 +81,28 @@ export function SincronizarParametrosContratos() {
             .maybeSingle();
 
           if (parametrosError && parametrosError.code !== 'PGRST116') {
-            throw new Error(`Erro ao buscar parâmetros: ${parametrosError.message}`);
+            throw new Error(`Erro ao buscar parâmetros por cliente_id: ${parametrosError.message}`);
           }
 
-          const nomeCliente = contrato.clientes?.nome_fantasia || contrato.clientes?.nome || 'Cliente não identificado';
+          // Se não encontrou por cliente_id, buscar por nome_fantasia (fallback)
+          if (!parametros && contrato.clientes?.nome_fantasia) {
+            const { data: parametrosPorNome, error: parametrosPorNomeError } = await supabase
+              .from('parametros_faturamento')
+              .select('*')
+              .eq('nome_fantasia', contrato.clientes.nome_fantasia)
+              .eq('ativo', true)
+              .maybeSingle();
+
+            if (parametrosPorNomeError && parametrosPorNomeError.code !== 'PGRST116') {
+              throw new Error(`Erro ao buscar parâmetros por nome_fantasia: ${parametrosPorNomeError.message}`);
+            }
+
+            parametros = parametrosPorNome;
+            
+            if (parametros) {
+              console.log(`🔍 Parâmetros encontrados por nome_fantasia para ${nomeCliente}`);
+            }
+          }
 
           if (!parametros) {
             // Cliente sem parâmetros configurados
