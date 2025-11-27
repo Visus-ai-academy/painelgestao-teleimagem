@@ -622,6 +622,8 @@ export default function ContratosClientes() {
         const numeroContratoNormalizado = parametro.numero_contrato?.trim() || null;
         const chave = `${nomeFantasia}|${numeroContratoNormalizado}`;
         
+        console.log(`📝 Parâmetro: ${nomeFantasia} - Contrato: ${numeroContratoNormalizado} - Cliente ID: ${cliente.id}`);
+        
         if (!parametrosAgrupados.has(chave)) {
           parametrosAgrupados.set(chave, []);
         }
@@ -629,6 +631,11 @@ export default function ContratosClientes() {
       });
 
       console.log(`📦 ${parametrosAgrupados.size} contratos únicos a serem criados (agrupados por Nome Fantasia + Número)`);
+      
+      // Log dos grupos
+      for (const [chave, params] of parametrosAgrupados) {
+        console.log(`  🔑 ${chave}: ${params.length} parâmetro(s)`);
+      }
 
       // 3. Buscar todos os clientes para mapear nome_fantasia -> IDs de clientes
       const { data: todosClientes, error: clientesError } = await supabase
