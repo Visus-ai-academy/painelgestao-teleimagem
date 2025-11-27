@@ -539,12 +539,44 @@ export default function ContratosClientes() {
     }
   }, [contratoEditando]);
 
+  // Função para limpar todos os contratos
+  const limparContratos = async () => {
+    if (!confirm('⚠️ ATENÇÃO: Isso irá deletar TODOS os contratos da base. Deseja continuar?')) {
+      return;
+    }
+
+    try {
+      setIsCreatingContracts(true);
+      
+      const { data, error } = await supabase.functions.invoke('limpar-contratos');
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Contratos limpos!",
+        description: data.message,
+      });
+      
+      await carregarContratos();
+      
+    } catch (error: any) {
+      console.error('Erro ao limpar contratos:', error);
+      toast({
+        title: "Erro ao limpar contratos",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreatingContracts(false);
+    }
+  };
+
   // Função para gerar contratos automaticamente baseado nos parâmetros
   const gerarContratosAutomaticos = async () => {
     try {
       setIsCreatingContracts(true);
       
-      // 1. Buscar TODOS os parâmetros ativos (não apenas de clientes sem contrato)
+      // 1. Buscar TODOS os parâmetros ativos
       const { data: todosParametros, error: parametrosError } = await supabase
         .from('parametros_faturamento')
         .select('*')
@@ -563,26 +595,31 @@ export default function ContratosClientes() {
 
       console.log(`🔍 Encontrados ${todosParametros.length} parâmetros ativos`);
 
-      // 2. Buscar todos os contratos existentes
+      // 2. Buscar todos os contratos existentes para evitar duplicatas
       const { data: contratosExistentes, error: contratosError } = await supabase
         .from('contratos_clientes')
-        .select('cliente_id, numero_contrato');
+        .select('id, cliente_id, numero_contrato');
       
       if (contratosError) throw contratosError;
 
       let contratosGerados = 0;
       let contratosPulados = 0;
+      const erros: string[] = [];
       
-      // 3. Para cada parâmetro, verificar se já existe contrato correspondente
+      // 3. Para cada parâmetro, criar contrato se não existir
       for (const parametro of todosParametros) {
-        // Verificar se já existe contrato com mesmo cliente_id + numero_contrato
-        const contratoJaExiste = contratosExistentes?.some(contrato => 
-          contrato.cliente_id === parametro.cliente_id && 
-          contrato.numero_contrato === parametro.numero_contrato
-        );
+        // Normalizar numero_contrato (null, undefined ou string vazia = null)
+        const numeroContratoParam = parametro.numero_contrato?.trim() || null;
+        
+        // Verificar duplicata: mesmo cliente_id + mesmo numero_contrato (ou ambos null)
+        const contratoJaExiste = contratosExistentes?.some(contrato => {
+          const numeroContratoExistente = contrato.numero_contrato?.trim() || null;
+          return contrato.cliente_id === parametro.cliente_id && 
+                 numeroContratoExistente === numeroContratoParam;
+        });
 
         if (contratoJaExiste) {
-          console.log(`⏭️ Pulando contrato já existente: Cliente ID ${parametro.cliente_id} - Contrato ${parametro.numero_contrato}`);
+          console.log(`⏭️ Pulando duplicata: Cliente ID ${parametro.cliente_id} - Contrato ${numeroContratoParam || '(sem número)'}`);
           contratosPulados++;
           continue;
         }
@@ -678,18 +715,32 @@ export default function ContratosClientes() {
           });
         
         if (contratoError) {
-          console.error(`❌ Erro ao criar contrato para cliente ${cliente.nome} (${parametro.numero_contrato}):`, contratoError);
+          const erro = `❌ Cliente ${cliente.nome} (${numeroContratoParam || 'sem número'}): ${contratoError.message}`;
+          console.error(erro);
+          erros.push(erro);
           continue;
         }
         
-        console.log(`✅ Contrato criado: ${cliente.nome} - ${parametro.numero_contrato}`);
+        console.log(`✅ Contrato criado: ${cliente.nome} - ${numeroContratoParam || '(sem número)'}`);
         contratosGerados++;
       }
       
+      // Mensagem final com resumo
+      const descricao = [
+        `✅ ${contratosGerados} novos contratos criados`,
+        contratosPulados > 0 ? `⏭️ ${contratosPulados} contratos já existiam` : null,
+        erros.length > 0 ? `❌ ${erros.length} erros` : null
+      ].filter(Boolean).join('. ');
+
       toast({
-        title: "Contratos gerados com sucesso!",
-        description: `${contratosGerados} novos contratos criados. ${contratosPulados} contratos já existiam.`,
+        title: "Processo concluído!",
+        description: descricao,
+        variant: erros.length > 0 ? "destructive" : "default",
       });
+
+      if (erros.length > 0) {
+        console.error('Erros encontrados:', erros);
+      }
       
       // Recarregar lista de contratos
       await carregarContratos();
@@ -1183,6 +1234,24 @@ export default function ContratosClientes() {
 
       {/* Ações Principais */}
       <div className="flex gap-4 flex-wrap">
+        <Button 
+          onClick={limparContratos}
+          disabled={isCreatingContracts}
+          variant="destructive"
+        >
+          {isCreatingContracts ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+              Limpando...
+            </>
+          ) : (
+            <>
+              <Trash2 className="h-4 w-4 mr-2" />
+              Limpar Contratos
+            </>
+          )}
+        </Button>
+
         <Button 
           onClick={gerarContratosAutomaticos}
           disabled={isCreatingContracts}
