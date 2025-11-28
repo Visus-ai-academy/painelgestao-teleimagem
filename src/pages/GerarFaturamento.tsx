@@ -1093,30 +1093,71 @@ export default function GerarFaturamento() {
     console.log('🗑️ [LIMPEZA] Iniciando limpeza de dados do período:', periodo);
     
     try {
-      console.log('🗑️ [LIMPEZA] Chamando edge function limpar-faturamento-periodo...');
+      // 1. Limpar demonstrativos do banco
+      console.log('🗑️ [LIMPEZA] 1/4 - Limpando demonstrativos_faturamento_calculados...');
+      const { error: errorDemo, count: countDemo } = await supabase
+        .from('demonstrativos_faturamento_calculados')
+        .delete()
+        .eq('periodo_referencia', periodo)
+        .select();
       
-      // Chamar edge function de limpeza
-      const { data: limpezaData, error: limpezaError } = await supabase.functions.invoke(
-        'limpar-faturamento-periodo',
-        {
-          body: { periodo }
+      if (errorDemo) {
+        console.error('❌ Erro ao limpar demonstrativos:', errorDemo);
+      } else {
+        console.log(`✅ ${countDemo || 0} demonstrativos removidos`);
+      }
+
+      // 2. Limpar faturamento
+      console.log('🗑️ [LIMPEZA] 2/4 - Limpando faturamento...');
+      const { error: errorFat, count: countFat } = await supabase
+        .from('faturamento')
+        .delete()
+        .eq('periodo_referencia', periodo)
+        .select();
+      
+      if (errorFat) {
+        console.error('❌ Erro ao limpar faturamento:', errorFat);
+      } else {
+        console.log(`✅ ${countFat || 0} registros de faturamento removidos`);
+      }
+
+      // 3. Limpar status de relatórios
+      console.log('🗑️ [LIMPEZA] 3/4 - Limpando relatorios_faturamento_status...');
+      const { error: errorRel, count: countRel } = await supabase
+        .from('relatorios_faturamento_status')
+        .delete()
+        .eq('periodo', periodo)
+        .select();
+      
+      if (errorRel) {
+        console.error('❌ Erro ao limpar status de relatórios:', errorRel);
+      } else {
+        console.log(`✅ ${countRel || 0} status de relatórios removidos`);
+      }
+
+      // 4. Limpar PDFs do storage
+      console.log('🗑️ [LIMPEZA] 4/4 - Limpando PDFs do storage...');
+      const { data: arquivos, error: errorList } = await supabase.storage
+        .from('relatorios-faturamento')
+        .list();
+      
+      let pdfsRemovidos = 0;
+      if (!errorList && arquivos && arquivos.length > 0) {
+        const arquivosDoPeriodo = arquivos
+          .filter(arquivo => arquivo.name.includes(periodo))
+          .map(arquivo => arquivo.name);
+        
+        if (arquivosDoPeriodo.length > 0) {
+          const { error: errorRemove } = await supabase.storage
+            .from('relatorios-faturamento')
+            .remove(arquivosDoPeriodo);
+          
+          if (!errorRemove) {
+            pdfsRemovidos = arquivosDoPeriodo.length;
+            console.log(`✅ ${pdfsRemovidos} PDFs removidos`);
+          }
         }
-      );
-
-      console.log('📊 [LIMPEZA] Resposta da edge function:', limpezaData);
-
-      if (limpezaError) {
-        console.error('❌ [LIMPEZA] Erro ao chamar edge function:', limpezaError);
-        throw limpezaError;
       }
-
-      if (!limpezaData?.success) {
-        console.error('❌ [LIMPEZA] Edge function retornou erro:', limpezaData);
-        throw new Error(limpezaData?.error || 'Erro na limpeza');
-      }
-
-      console.log('✅ [LIMPEZA] Edge function executada com sucesso');
-      console.log('📊 [LIMPEZA] Resultados:', limpezaData?.resultados);
 
       // Limpar localStorage e estados relacionados
       console.log('🗑️ [LIMPEZA] Limpando cache local...');
@@ -1132,8 +1173,8 @@ export default function GerarFaturamento() {
       console.log('✅ [LIMPEZA] Limpeza concluída com sucesso');
       
       toast({
-        title: "Dados limpos",
-        description: `${limpezaData?.resultados?.faturamento || 0} registros de faturamento, ${limpezaData?.resultados?.demonstrativos || 0} demonstrativos e ${limpezaData?.resultados?.pdfs_removidos || 0} PDFs removidos`,
+        title: "Dados limpos com sucesso",
+        description: `${countDemo || 0} demonstrativos, ${countFat || 0} faturamentos, ${countRel || 0} status e ${pdfsRemovidos} PDFs removidos`,
         variant: "default",
       });
       
