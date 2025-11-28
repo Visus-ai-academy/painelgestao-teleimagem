@@ -198,32 +198,13 @@ serve(async (req: Request) => {
     console.log(`✅ Após filtros gerais (NC-NF/EXCLUSAO removidos): ${volumetriaFiltrada.length} registros`);
     
     // Log para debug de clientes específicos
-    if (nomeClienteUpper === 'CEDIDIAG' || nomeClienteUpper.includes('CLIRAM') || nomeClienteUpper.includes('RADI')) {
+    if (nomeClienteUpper === 'CEDIDIAG' || nomeClienteUpper.includes('CLIRAM') || nomeClienteUpper.includes('RADI') || nomeClienteUpper.includes('CBU')) {
       const totalExames = volumetriaFiltrada.reduce((acc, vol) => acc + (vol.VALORES || 0), 0);
-      console.log(`📊 ${nomeClienteUpper}: ${volumetriaFiltrada.length} registros | ${totalExames} exames (sem filtros adicionais)`);
+      console.log(`📊 ${nomeClienteUpper}: ${volumetriaFiltrada.length} registros | ${totalExames} exames (sem filtros adicionais - dados do demonstrativo)`);
     }
-    
-    // CBU: Filtro removido - relatório deve refletir exatamente o demonstrativo
-    // Os filtros de faturamento já foram aplicados durante a geração do demonstrativo
-    if (nomeClienteUpper.includes('CBU') && volumetriaFiltrada.length > 0) {
-      const totalExames = volumetriaFiltrada.reduce((acc, vol) => acc + (vol.VALORES || 0), 0);
-      console.log(`✅ CBU: ${volumetriaFiltrada.length} registros | ${totalExames} exames (sem filtro adicional - usando dados do demonstrativo)`);
-    }
-    
-    // Filtros de clientes específicos REMOVIDOS
-    // Relatório deve usar exatamente os dados do demonstrativo sem filtros adicionais
-    // Os filtros de faturamento (NC-FT, NC-NF, regras de clientes) já foram aplicados durante a geração do demonstrativo
-    
-    console.log(`📊 Volumetria filtrada final: ${volumetriaFiltrada.length} registros`);
-    const totalExamesFinal = volumetriaFiltrada.reduce((acc, vol) => acc + (vol.VALORES || 0), 0);
-    console.log(`📊 Total de exames para o relatório: ${totalExamesFinal}`);
     
     // Todos os filtros específicos de clientes foram REMOVIDOS
     // O relatório agora usa exatamente os dados do demonstrativo calculado
-    
-    console.log('📊 Volumetria final após filtros gerais:', volumetriaFiltrada.length, 'registros');
-    const totalExamesFinal = volumetriaFiltrada.reduce((acc, vol) => acc + (vol.VALORES || 0), 0);
-    console.log(`📊 Total de exames: ${totalExamesFinal}`);
 
     // Ajustar categorias/especialidades usando cadastro_exames quando vierem como 'SC' ou vazias
     try {
