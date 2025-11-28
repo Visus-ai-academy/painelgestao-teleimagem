@@ -1197,13 +1197,20 @@ export default function DemonstrativoFaturamento() {
   // ✅ ADICIONAR LISTENER PARA RECARREGAR APÓS LIMPEZA/REGENERAÇÃO
   useEffect(() => {
     const handleReload = (event: any) => {
-      console.log('🔔 [DEMONSTRATIVO ABA] Evento resumo-geral-reload recebido:', event.detail);
+      console.log('🔔🔔🔔 [DEMONSTRATIVO ABA] ===== EVENTO RECEBIDO =====');
+      console.log('🔔 [DEMONSTRATIVO ABA] Event detail:', event.detail);
+      console.log('🔔 [DEMONSTRATIVO ABA] Periodo do evento:', event.detail?.periodo);
+      console.log('🔔 [DEMONSTRATIVO ABA] Periodo atual:', periodo);
+      
       if (!event.detail?.periodo || event.detail.periodo === periodo) {
-        console.log('🔄 [DEMONSTRATIVO ABA] Recarregando demonstrativos...');
+        console.log('🔄 [DEMONSTRATIVO ABA] ✅ RECARREGANDO DADOS...');
         carregarDados();
+      } else {
+        console.log('⏭️ [DEMONSTRATIVO ABA] Período diferente, ignorando');
       }
     };
 
+    console.log('👂 [DEMONSTRATIVO ABA] Registrando listener para resumo-geral-reload');
     window.addEventListener('resumo-geral-reload', handleReload);
 
     return () => {
