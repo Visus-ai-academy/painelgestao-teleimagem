@@ -1167,7 +1167,7 @@ export default function GerarFaturamento() {
       setDemonstrativoGerado(false);
       
       // ✅ FORÇAR RELOAD DO RESUMO GERAL: Disparar evento customizado
-      console.log('🔄 [LIMPEZA] Disparando evento para recarregar Resumo Geral...');
+      console.log('🔄 [LIMPEZA] Disparando evento para recarregar Resumo Geral (ambas as abas)...');
       window.dispatchEvent(new CustomEvent('resumo-geral-reload', { detail: { periodo } }));
       
       console.log('✅ [LIMPEZA] Limpeza concluída com sucesso');
@@ -1514,6 +1514,10 @@ export default function GerarFaturamento() {
       setTimeout(() => {
         verificarDemonstrativoGerado();
         carregarClientes();
+        
+        // ✅ Disparar evento para recarregar Resumo Geral após geração (ambas as abas)
+        console.log('🔄 [GERAÇÃO] Disparando evento para recarregar Resumo Geral após geração...');
+        window.dispatchEvent(new CustomEvent('resumo-geral-reload', { detail: { periodo: periodoSelecionado } }));
       }, 2000);
 
     } catch (error) {
@@ -2657,6 +2661,7 @@ export default function GerarFaturamento() {
                 
                 useEffect(() => {
                   const carregarDemonstrativosDB = async () => {
+                    console.log('🔄 [RESUMO GERAL ABA GERAR] Carregando demonstrativos do banco...');
                     setCarregandoResumo(true);
                     try {
                       const { data, error } = await supabase
@@ -2665,9 +2670,10 @@ export default function GerarFaturamento() {
                         .eq('periodo_referencia', periodoSelecionado);
                       
                       if (error) throw error;
+                      console.log(`✅ [RESUMO GERAL ABA GERAR] ${data?.length || 0} demonstrativos carregados`);
                       setDemonstrativosDB(data || []);
                     } catch (error) {
-                      console.error('Erro ao carregar demonstrativos:', error);
+                      console.error('❌ [RESUMO GERAL ABA GERAR] Erro ao carregar demonstrativos:', error);
                       setDemonstrativosDB([]);
                     } finally {
                       setCarregandoResumo(false);
@@ -2676,10 +2682,11 @@ export default function GerarFaturamento() {
                   
                   carregarDemonstrativosDB();
                   
-                  // ✅ Escutar evento de limpeza para recarregar automaticamente
+                  // ✅ Escutar evento de limpeza/recarga para recarregar automaticamente
                   const handleReload = (event: any) => {
-                    if (event.detail?.periodo === periodoSelecionado) {
-                      console.log('🔄 [RESUMO GERAL] Recarregando após limpeza...');
+                    console.log('🔔 [RESUMO GERAL ABA GERAR] Evento resumo-geral-reload recebido:', event.detail);
+                    if (!event.detail?.periodo || event.detail.periodo === periodoSelecionado) {
+                      console.log('🔄 [RESUMO GERAL ABA GERAR] Recarregando após evento...');
                       carregarDemonstrativosDB();
                     }
                   };
@@ -2687,9 +2694,10 @@ export default function GerarFaturamento() {
                   window.addEventListener('resumo-geral-reload', handleReload);
                   
                   return () => {
+                    console.log('🧹 [RESUMO GERAL ABA GERAR] Removendo listener');
                     window.removeEventListener('resumo-geral-reload', handleReload);
                   };
-                }, [periodoSelecionado, filtroTipoCliente, filtroTipoFaturamento]);
+                }, [periodoSelecionado]); // ✅ CRÍTICO: Remover filtros das dependências para manter listener ativo
                 
                 if (carregandoResumo) {
                   return (

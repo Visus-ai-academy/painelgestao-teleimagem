@@ -865,6 +865,22 @@ serve(async (req) => {
         valorLiquido
       });
 
+      // ✅ DEFENSIVE CHECK: Validar tipo_faturamento e tipo_cliente antes de criar demonstrativo
+      const tipoFaturamentoFinal = tipoFaturamento || parametros?.tipo_faturamento || contrato?.tipo_faturamento || 'CO-FT';
+      const tipoClienteFinal = tipoCliente || parametros?.tipo_cliente || contrato?.tipo_cliente || cliente.tipo_cliente || 'CO';
+      
+      // ⚠️ LOG CRÍTICO: Verificar se valores estão sendo preservados
+      if (!tipoFaturamento || !tipoCliente) {
+        console.warn(`⚠️ VALORES VAZIOS DETECTADOS para ${cliente.nome_fantasia}:`, {
+          tipoFaturamento_inicial: tipoFaturamento,
+          tipoCliente_inicial: tipoCliente,
+          tipoFaturamento_final: tipoFaturamentoFinal,
+          tipoCliente_final: tipoClienteFinal,
+          fonte_parametros: parametros?.tipo_faturamento,
+          fonte_contrato: contrato?.tipo_faturamento
+        });
+      }
+
       const demonstrativo: DemonstrativoCliente = {
         cliente_id: cliente.id,
         cliente_nome: cliente.nome_fantasia || cliente.nome,
@@ -889,9 +905,14 @@ serve(async (req) => {
           total_impostos: totalImpostos,
           valor_liquido: valorLiquido
         },
-        tipo_faturamento: tipoFaturamento,
-        tipo_cliente: tipoCliente
+        tipo_faturamento: tipoFaturamentoFinal, // ✅ Usar valor validado
+        tipo_cliente: tipoClienteFinal // ✅ Usar valor validado
       };
+      
+      console.log(`✅ Demonstrativo criado para ${cliente.nome_fantasia}:`, {
+        tipo_faturamento: demonstrativo.tipo_faturamento,
+        tipo_cliente: demonstrativo.tipo_cliente
+      });
 
       console.log(`✅ ${nomeFantasia} - Demonstrativo final:`, {
         total_exames: demonstrativo.total_exames,
@@ -953,25 +974,36 @@ serve(async (req) => {
     // Save demonstrativos to database first
     console.log('💾 Salvando demonstrativos no banco de dados...');
     try {
-      const recordsToInsert = demonstrativos.map((demo) => ({
-        cliente_id: demo.cliente_id,
-        cliente_nome: demo.cliente_nome,
-        periodo_referencia: periodo,
-        tipo_cliente: demo.tipo_cliente, // Não usar fallback - deve vir do demonstrativo
-        tipo_faturamento: demo.tipo_faturamento, // Não usar fallback - deve vir do demonstrativo
-        total_exames: demo.total_exames || 0,
-        valor_exames: demo.valor_exames || 0,
-        valor_franquia: demo.valor_franquia || 0,
-        valor_portal_laudos: demo.valor_portal_laudos || 0,
-        valor_integracao: demo.valor_integracao || 0,
-        valor_bruto_total: demo.valor_bruto || 0,
-        valor_total_impostos: demo.valor_impostos || 0,
-        valor_liquido: demo.valor_total || 0,
-        detalhes_exames: demo.detalhes_exames || [],
-        detalhes_franquia: demo.detalhes_franquia || {},
-        parametros_utilizados: demo.detalhes_tributacao || {},
-        status: 'calculado'
-      }));
+      const recordsToInsert = demonstrativos.map((demo) => {
+        // ✅ DEFENSIVE VALIDATION: Log e garante que tipo_faturamento e tipo_cliente estão definidos
+        if (!demo.tipo_faturamento || !demo.tipo_cliente) {
+          console.error(`❌ ERRO CRÍTICO: Demonstrativo sem tipificação para ${demo.cliente_nome}:`, {
+            tipo_faturamento: demo.tipo_faturamento,
+            tipo_cliente: demo.tipo_cliente,
+            cliente_id: demo.cliente_id
+          });
+        }
+        
+        return {
+          cliente_id: demo.cliente_id,
+          cliente_nome: demo.cliente_nome,
+          periodo_referencia: periodo,
+          tipo_cliente: demo.tipo_cliente, // Deve estar definido
+          tipo_faturamento: demo.tipo_faturamento, // Deve estar definido
+          total_exames: demo.total_exames || 0,
+          valor_exames: demo.valor_exames || 0,
+          valor_franquia: demo.valor_franquia || 0,
+          valor_portal_laudos: demo.valor_portal_laudos || 0,
+          valor_integracao: demo.valor_integracao || 0,
+          valor_bruto_total: demo.valor_bruto || 0,
+          valor_total_impostos: demo.valor_impostos || 0,
+          valor_liquido: demo.valor_total || 0,
+          detalhes_exames: demo.detalhes_exames || [],
+          detalhes_franquia: demo.detalhes_franquia || {},
+          parametros_utilizados: demo.detalhes_tributacao || {},
+          status: 'calculado'
+        };
+      });
 
       const { error: insertError } = await supabase
         .from('demonstrativos_faturamento_calculados')
