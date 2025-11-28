@@ -162,6 +162,113 @@ export function DemonstrativoFaturamentoCompleto({
 
     console.log('✅ Todos os registros estão tipificados. Iniciando geração de demonstrativos...');
 
+    // 🗑️ PASSO 1: LIMPAR DADOS ANTERIORES DO PERÍODO
+    console.log('🗑️ [LIMPEZA] ===== INICIANDO LIMPEZA =====');
+    console.log('🗑️ [LIMPEZA] Período:', periodo);
+    
+    try {
+      // 1. Limpar demonstrativos do banco
+      console.log('🗑️ [LIMPEZA] 1/4 - Limpando demonstrativos_faturamento_calculados...');
+      const { error: errorDemo, count: countDemo } = await supabase
+        .from('demonstrativos_faturamento_calculados')
+        .delete()
+        .eq('periodo_referencia', periodo)
+        .select();
+      
+      if (errorDemo) {
+        console.error('❌ Erro ao limpar demonstrativos:', errorDemo);
+      } else {
+        console.log(`✅ ${countDemo || 0} demonstrativos removidos`);
+      }
+
+      // 2. Limpar faturamento
+      console.log('🗑️ [LIMPEZA] 2/4 - Limpando faturamento...');
+      const { error: errorFat, count: countFat } = await supabase
+        .from('faturamento')
+        .delete()
+        .eq('periodo_referencia', periodo)
+        .select();
+      
+      if (errorFat) {
+        console.error('❌ Erro ao limpar faturamento:', errorFat);
+      } else {
+        console.log(`✅ ${countFat || 0} registros de faturamento removidos`);
+      }
+
+      // 3. Limpar status de relatórios
+      console.log('🗑️ [LIMPEZA] 3/4 - Limpando relatorios_faturamento_status...');
+      const { error: errorRel, count: countRel } = await supabase
+        .from('relatorios_faturamento_status')
+        .delete()
+        .eq('periodo', periodo)
+        .select();
+      
+      if (errorRel) {
+        console.error('❌ Erro ao limpar status de relatórios:', errorRel);
+      } else {
+        console.log(`✅ ${countRel || 0} status de relatórios removidos`);
+      }
+
+      // 4. Limpar PDFs do storage
+      console.log('🗑️ [LIMPEZA] 4/4 - Limpando PDFs do storage...');
+      const { data: arquivos, error: errorList } = await supabase.storage
+        .from('relatorios-faturamento')
+        .list();
+      
+      let pdfsRemovidos = 0;
+      if (!errorList && arquivos && arquivos.length > 0) {
+        const arquivosDoPeriodo = arquivos
+          .filter(arquivo => arquivo.name.includes(periodo))
+          .map(arquivo => arquivo.name);
+        
+        if (arquivosDoPeriodo.length > 0) {
+          const { error: errorRemove } = await supabase.storage
+            .from('relatorios-faturamento')
+            .remove(arquivosDoPeriodo);
+          
+          if (!errorRemove) {
+            pdfsRemovidos = arquivosDoPeriodo.length;
+            console.log(`✅ ${pdfsRemovidos} PDFs removidos`);
+          }
+        }
+      }
+
+      // Limpar localStorage e estados relacionados
+      console.log('🗑️ [LIMPEZA] Limpando cache local...');
+      localStorage.removeItem(`demonstrativos_completos_${periodo}`);
+      localStorage.removeItem(`demonstrativosGerados_${periodo}`);
+      localStorage.removeItem(storageKey);
+      setDemonstrativos([]);
+      setResumo(null);
+      
+      // ✅ FORÇAR RELOAD DO RESUMO GERAL: Disparar evento customizado
+      console.log('🔄 [LIMPEZA] Disparando evento para recarregar Resumo Geral (ambas as abas)...');
+      window.dispatchEvent(new CustomEvent('resumo-geral-reload', { detail: { periodo } }));
+      
+      console.log('✅ [LIMPEZA] Limpeza concluída com sucesso');
+      
+      toast({
+        title: "Dados limpos com sucesso",
+        description: `${countDemo || 0} demonstrativos, ${countFat || 0} faturamentos, ${countRel || 0} status e ${pdfsRemovidos} PDFs removidos`,
+        variant: "default",
+      });
+      
+    } catch (error) {
+      console.error('❌ [LIMPEZA] ERRO CRÍTICO na limpeza:', error);
+      console.error('❌ [LIMPEZA] Stack trace:', error instanceof Error ? error.stack : 'sem stack');
+      
+      // Disparar evento mesmo em caso de erro parcial para tentar atualizar UI
+      console.log('🔄 [LIMPEZA] Disparando evento apesar do erro...');
+      window.dispatchEvent(new CustomEvent('resumo-geral-reload', { detail: { periodo } }));
+      
+      toast({
+        title: "Erro na limpeza",
+        description: error instanceof Error ? error.message : "Erro ao limpar dados anteriores. Continuando com a geração...",
+        variant: "destructive",
+      });
+      // NÃO fazer throw - deixar a geração continuar
+    }
+
     // Reset todos os status para "Pendente"
     if (onResetarStatus) {
       onResetarStatus();
@@ -269,6 +376,11 @@ export function DemonstrativoFaturamentoCompleto({
 
         if (onStatusChange) onStatusChange('concluido');
         if (onDemonstrativosGerados) onDemonstrativosGerados({ demonstrativos: data.demonstrativos, resumo: data.resumo });
+        
+        // ✅ DISPARAR EVENTO PARA RECARREGAR RESUMO GERAL (fallback path)
+        console.log('🔄 [GERAÇÃO FALLBACK] Disparando evento para recarregar Resumo Geral após geração...');
+        window.dispatchEvent(new CustomEvent('resumo-geral-reload', { detail: { periodo } }));
+        
         toast({ title: 'Demonstrativos gerados!', description: `${data.resumo?.clientes_processados || 0} clientes processados` });
         return;
       }
@@ -400,6 +512,10 @@ export function DemonstrativoFaturamentoCompleto({
         console.log('📤 Enviando callback onDemonstrativosGerados');
         onDemonstrativosGerados({ demonstrativos: dedupedDemonstrativos, resumo: resumoAgregado });
       }
+
+      // ✅ DISPARAR EVENTO PARA RECARREGAR RESUMO GERAL APÓS GERAÇÃO
+      console.log('🔄 [GERAÇÃO] Disparando evento para recarregar Resumo Geral após geração...');
+      window.dispatchEvent(new CustomEvent('resumo-geral-reload', { detail: { periodo } }));
 
       toast({
         title: 'Demonstrativos gerados com sucesso!',
