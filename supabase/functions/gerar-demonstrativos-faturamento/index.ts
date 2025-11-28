@@ -734,43 +734,125 @@ serve(async (req) => {
           let valorCalculado = 0;
 
           if (parametros.aplicar_franquia) {
-            if (frequenciaContinua) {
-              if (frequenciaPorVolume) {
-                if (totalExames < volumeFranquia) {
-                  valorCalculado = valorFranquiaBase;
-                  regra = 'continua_sim_volume_sim_abaixo';
-                } else {
-                  valorCalculado = valorAcimaFranquia > 0 ? valorAcimaFranquia : 0;
-                  regra = valorAcimaFranquia > 0 ? 'continua_sim_volume_sim_acima' : 'continua_sim_volume_sim_acima_sem_valor';
-                }
-              } else {
-                valorCalculado = valorFranquiaBase;
-                regra = 'continua_sim_volume_nao';
-              }
-            } else {
-              // REGRA CRÍTICA: Se frequencia_continua = NÃO e volume zerado, NÃO cobrar franquia
-              if (totalExames === 0) {
+            // ===== IMPLEMENTAÇÃO DAS 11 REGRAS DE FRANQUIA =====
+            
+            if (!frequenciaContinua && !frequenciaPorVolume) {
+              // ===== GRUPO 1: Freq Contínua = NÃO + Freq por Volume = NÃO =====
+              
+              // REGRA 1: Volume=0, ValorAcima=0, Exames>0 → NÃO COBRA
+              if (volumeFranquia === 0 && valorAcimaFranquia === 0 && totalExames > 0) {
                 valorCalculado = 0;
-                regra = 'continua_nao_volume_zerado_sem_cobranca';
-                console.log(`✅ ${nomeFantasia}: Frequência Contínua = NÃO + Volume ZERADO → Franquia NÃO cobrada`);
-              } else if (frequenciaPorVolume) {
-                // Com volume: aplica regra de frequência por volume
+                regra = 'regra_1_nao_cobra';
+                console.log(`✅ ${nomeFantasia}: REGRA 1 - NÃO cobra franquia (Volume=0, Exames>0)`);
+              }
+              // REGRA 2: Volume≠0, ValorAcima=0, Exames=0 → NÃO COBRA
+              else if (volumeFranquia !== 0 && valorAcimaFranquia === 0 && totalExames === 0) {
+                valorCalculado = 0;
+                regra = 'regra_2_nao_cobra';
+                console.log(`✅ ${nomeFantasia}: REGRA 2 - NÃO cobra franquia (Volume≠0, Exames=0)`);
+              }
+              // Caso não coberto pelas regras: não cobra
+              else {
+                valorCalculado = 0;
+                regra = 'grupo_1_outros';
+              }
+            } 
+            else if (!frequenciaContinua && frequenciaPorVolume) {
+              // ===== GRUPO 2: Freq Contínua = NÃO + Freq por Volume = SIM =====
+              
+              // REGRA 3/4: Volume≠0, ValorAcima=0, Exames>0
+              if (volumeFranquia !== 0 && valorAcimaFranquia === 0 && totalExames > 0) {
                 if (totalExames < volumeFranquia) {
                   valorCalculado = valorFranquiaBase;
-                  regra = 'continua_nao_volume_sim_abaixo';
+                  regra = 'regra_3_cobra_abaixo_volume';
+                  console.log(`✅ ${nomeFantasia}: REGRA 3 - Cobra franquia R$ ${valorFranquiaBase.toFixed(2)} (Exames ${totalExames} < Volume ${volumeFranquia})`);
                 } else {
                   valorCalculado = 0;
-                  regra = 'continua_nao_volume_sim_acima';
+                  regra = 'regra_4_nao_cobra_acima_volume';
+                  console.log(`✅ ${nomeFantasia}: REGRA 4 - NÃO cobra franquia (Exames ${totalExames} ≥ Volume ${volumeFranquia})`);
                 }
-              } else {
-                // Sem frequência por volume E sem frequência contínua:
-                // Se tem volume > 0, cobra valor_franquia FIXO (independente do volume_franquia)
-                if (totalExames > 0) {
+              }
+              // REGRA 5: Volume≠0, ValorAcima>0, Exames>0
+              else if (volumeFranquia !== 0 && valorAcimaFranquia > 0 && totalExames > 0) {
+                if (totalExames < volumeFranquia) {
                   valorCalculado = valorFranquiaBase;
-                  regra = 'continua_nao_volume_nao_cobra_fixo';
-                  console.log(`✅ ${nomeFantasia}: Freq Contínua = NÃO + Freq por Volume = NÃO + Volume > 0 → Cobra franquia FIXA: R$ ${valorFranquiaBase.toFixed(2)}`);
+                  regra = 'regra_5_cobra_franquia_abaixo';
+                  console.log(`✅ ${nomeFantasia}: REGRA 5 - Cobra franquia R$ ${valorFranquiaBase.toFixed(2)} (Exames ${totalExames} < Volume ${volumeFranquia})`);
+                } else {
+                  const examesAcima = totalExames - volumeFranquia;
+                  valorCalculado = examesAcima * valorAcimaFranquia;
+                  regra = 'regra_5_cobra_acima_volume';
+                  console.log(`✅ ${nomeFantasia}: REGRA 5 - Cobra franquia R$ ${valorCalculado.toFixed(2)} (${examesAcima} exames × R$ ${valorAcimaFranquia.toFixed(2)})`);
                 }
-                // Se totalExames === 0, já foi tratado acima (linha 752)
+              }
+              // Exames = 0: não cobra
+              else if (totalExames === 0) {
+                valorCalculado = 0;
+                regra = 'grupo_2_sem_exames';
+              }
+              else {
+                valorCalculado = 0;
+                regra = 'grupo_2_outros';
+              }
+            }
+            else if (frequenciaContinua && frequenciaPorVolume) {
+              // ===== GRUPO 3: Freq Contínua = SIM + Freq por Volume = SIM =====
+              
+              // REGRA 6: Volume≠0, ValorAcima=0, Exames>0 → COBRA Valor Franquia
+              if (volumeFranquia !== 0 && valorAcimaFranquia === 0 && totalExames > 0) {
+                valorCalculado = valorFranquiaBase;
+                regra = 'regra_6_cobra_franquia';
+                console.log(`✅ ${nomeFantasia}: REGRA 6 - Cobra franquia R$ ${valorFranquiaBase.toFixed(2)}`);
+              }
+              // REGRA 7: Volume≠0, ValorAcima=0, Exames=0 → COBRA Valor Franquia
+              else if (volumeFranquia !== 0 && valorAcimaFranquia === 0 && totalExames === 0) {
+                valorCalculado = valorFranquiaBase;
+                regra = 'regra_7_cobra_franquia';
+                console.log(`✅ ${nomeFantasia}: REGRA 7 - Cobra franquia R$ ${valorFranquiaBase.toFixed(2)} (Exames=0)`);
+              }
+              // REGRA 8: Volume≠0, ValorAcima>0, Exames=0 → COBRA Valor Franquia
+              else if (volumeFranquia !== 0 && valorAcimaFranquia > 0 && totalExames === 0) {
+                valorCalculado = valorFranquiaBase;
+                regra = 'regra_8_cobra_franquia';
+                console.log(`✅ ${nomeFantasia}: REGRA 8 - Cobra franquia R$ ${valorFranquiaBase.toFixed(2)} (Exames=0)`);
+              }
+              // REGRA 9: Volume≠0, ValorAcima>0, Exames<Volume → COBRA Valor Franquia
+              else if (volumeFranquia !== 0 && valorAcimaFranquia > 0 && totalExames > 0 && totalExames < volumeFranquia) {
+                valorCalculado = valorFranquiaBase;
+                regra = 'regra_9_cobra_franquia';
+                console.log(`✅ ${nomeFantasia}: REGRA 9 - Cobra franquia R$ ${valorFranquiaBase.toFixed(2)} (Exames ${totalExames} < Volume ${volumeFranquia})`);
+              }
+              // Exames > Volume com ValorAcima > 0: cobra valor acima
+              else if (volumeFranquia !== 0 && valorAcimaFranquia > 0 && totalExames >= volumeFranquia) {
+                const examesAcima = totalExames - volumeFranquia;
+                valorCalculado = examesAcima * valorAcimaFranquia;
+                regra = 'grupo_3_cobra_acima_volume';
+                console.log(`✅ ${nomeFantasia}: GRUPO 3 - Cobra franquia R$ ${valorCalculado.toFixed(2)} (${examesAcima} exames × R$ ${valorAcimaFranquia.toFixed(2)})`);
+              }
+              else {
+                valorCalculado = valorFranquiaBase;
+                regra = 'grupo_3_outros';
+              }
+            }
+            else if (frequenciaContinua && !frequenciaPorVolume) {
+              // ===== GRUPO 4: Freq Contínua = SIM + Freq por Volume = NÃO =====
+              
+              // REGRA 10: Volume=0, ValorAcima=0, Exames=0 → COBRA Valor Franquia
+              if (volumeFranquia === 0 && valorAcimaFranquia === 0 && totalExames === 0) {
+                valorCalculado = valorFranquiaBase;
+                regra = 'regra_10_cobra_franquia';
+                console.log(`✅ ${nomeFantasia}: REGRA 10 - Cobra franquia R$ ${valorFranquiaBase.toFixed(2)} (Exames=0)`);
+              }
+              // REGRA 11: Volume=0, ValorAcima=0, Exames>0 → COBRA Valor Franquia
+              else if (volumeFranquia === 0 && valorAcimaFranquia === 0 && totalExames > 0) {
+                valorCalculado = valorFranquiaBase;
+                regra = 'regra_11_cobra_franquia';
+                console.log(`✅ ${nomeFantasia}: REGRA 11 - Cobra franquia R$ ${valorFranquiaBase.toFixed(2)}`);
+              }
+              // Qualquer outro caso: cobra valor franquia base
+              else {
+                valorCalculado = valorFranquiaBase;
+                regra = 'grupo_4_outros';
               }
             }
           }
