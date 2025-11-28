@@ -65,7 +65,7 @@ serve(async (req: Request) => {
     // ✅ CORREÇÃO CRÍTICA: Buscar nome_mobilemed dos parâmetros (fonte de verdade para correlação nome fantasia x nome mobilemed)
     const { data: parametros } = await supabase
       .from('parametros_faturamento')
-      .select('nome_mobilemed')
+      .select('nome_mobilemed, nome_fantasia')
       .eq('cliente_id', cliente_id);
 
     // Coletar todos os nomes mobilemed + variantes do cliente
@@ -74,22 +74,46 @@ serve(async (req: Request) => {
       cliente.nome_fantasia,
       cliente.nome?.replace(/\s+/g, ''),
       cliente.nome_fantasia?.replace(/\s+/g, ''),
+      cliente.nome?.replace(/_/g, ' '),
+      cliente.nome_fantasia?.replace(/_/g, ' '),
     ].filter(Boolean));
 
-    // ✅ CRÍTICO: Adicionar TODOS os nomes mobilemed dos parâmetros (ex: CLINICA_RADI tem "MEDIMAGEMPLUS")
+    // ✅ CRÍTICO: Adicionar TODOS os nomes mobilemed dos parâmetros
+    // Exemplos de correlações:
+    // - CLINICA_RADI (nome_fantasia) → MEDIMAGEMPLUS (nome_mobilemed)
+    // - IMD_CS (nome_fantasia) → IMD_CS, IMDBATATAIS, IMDGUARAI (possíveis na volumetria)
+    // - MATRIZ_ESPLANADA (nome_fantasia) → UNIMED_UBERABA_MATRIZ (nome_mobilemed na volumetria)
+    // - PRN (nome_fantasia) → PRN, PRN TELE_... (múltiplos nome_mobilemed)
     if (parametros && parametros.length > 0) {
       parametros.forEach(p => {
         if (p.nome_mobilemed) {
+          // Adicionar o nome exato
           nomeVariants.add(p.nome_mobilemed);
+          // Variação sem espaços
           nomeVariants.add(p.nome_mobilemed.replace(/\s+/g, ''));
-          // Adicionar também variações com underscores e espaços
+          // Variação com underscores substituídos por espaços
           nomeVariants.add(p.nome_mobilemed.replace(/_/g, ' '));
+          // Variação com espaços substituídos por underscores
           nomeVariants.add(p.nome_mobilemed.replace(/\s+/g, '_'));
+          
+          // ✅ NOVO: Para nomes compostos com TELE_ ou outros prefixos, adicionar também a parte base
+          // Ex: "PRN TELE_ARARAQUARA" → adicionar também "PRN"
+          if (p.nome_mobilemed.includes(' ')) {
+            const partes = p.nome_mobilemed.split(' ');
+            nomeVariants.add(partes[0]); // Primeira parte (ex: PRN)
+          }
+        }
+        
+        // Adicionar também nome_fantasia dos parâmetros como variante
+        if (p.nome_fantasia) {
+          nomeVariants.add(p.nome_fantasia);
+          nomeVariants.add(p.nome_fantasia.replace(/\s+/g, ''));
+          nomeVariants.add(p.nome_fantasia.replace(/_/g, ' '));
         }
       });
     }
 
-    console.log(`🔍 Buscando volumetria para ${cliente.nome_fantasia} usando ${nomeVariants.size} variantes:`, Array.from(nomeVariants));
+    console.log(`🔍 [${cliente.nome_fantasia}] Buscando volumetria com ${nomeVariants.size} variantes:`, Array.from(nomeVariants).sort());
 
     // Buscar por cada variante do nome
     for (const nomeVariant of Array.from(nomeVariants)) {
