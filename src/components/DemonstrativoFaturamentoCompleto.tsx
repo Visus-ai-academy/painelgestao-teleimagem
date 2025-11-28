@@ -241,11 +241,26 @@ export function DemonstrativoFaturamentoCompleto({
       setDemonstrativos([]);
       setResumo(null);
       
-      // ✅ FORÇAR RELOAD DO RESUMO GERAL: Disparar evento customizado
-      console.log('🔄 [LIMPEZA] Disparando evento para recarregar Resumo Geral (ambas as abas)...');
-      window.dispatchEvent(new CustomEvent('resumo-geral-reload', { detail: { periodo } }));
-      
       console.log('✅ [LIMPEZA] Limpeza concluída com sucesso');
+      
+      // ✅ FORÇAR RELOAD DO RESUMO GERAL: Disparar eventos MÚLTIPLAS VEZES com delay
+      console.log('🔄 [LIMPEZA] Disparando eventos para recarregar Resumo Geral...');
+      
+      // Disparar imediatamente
+      window.dispatchEvent(new CustomEvent('resumo-geral-reload', { detail: { periodo } }));
+      console.log('📡 [LIMPEZA] Evento 1 disparado (imediato)');
+      
+      // Disparar após 100ms (garantir que listeners estão ativos)
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('resumo-geral-reload', { detail: { periodo } }));
+        console.log('📡 [LIMPEZA] Evento 2 disparado (100ms)');
+      }, 100);
+      
+      // Disparar após 300ms (garantir que componentes re-renderizaram)
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('resumo-geral-reload', { detail: { periodo } }));
+        console.log('📡 [LIMPEZA] Evento 3 disparado (300ms)');
+      }, 300);
       
       toast({
         title: "Dados limpos com sucesso",
@@ -377,9 +392,15 @@ export function DemonstrativoFaturamentoCompleto({
         if (onStatusChange) onStatusChange('concluido');
         if (onDemonstrativosGerados) onDemonstrativosGerados({ demonstrativos: data.demonstrativos, resumo: data.resumo });
         
-        // ✅ DISPARAR EVENTO PARA RECARREGAR RESUMO GERAL (fallback path)
-        console.log('🔄 [GERAÇÃO FALLBACK] Disparando evento para recarregar Resumo Geral após geração...');
+        // ✅ DISPARAR EVENTOS PARA RECARREGAR RESUMO GERAL (fallback path)
+        console.log('🔄 [GERAÇÃO FALLBACK] Disparando eventos para recarregar Resumo Geral após geração...');
         window.dispatchEvent(new CustomEvent('resumo-geral-reload', { detail: { periodo } }));
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('resumo-geral-reload', { detail: { periodo } }));
+        }, 200);
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('resumo-geral-reload', { detail: { periodo } }));
+        }, 500);
         
         toast({ title: 'Demonstrativos gerados!', description: `${data.resumo?.clientes_processados || 0} clientes processados` });
         return;
@@ -513,9 +534,24 @@ export function DemonstrativoFaturamentoCompleto({
         onDemonstrativosGerados({ demonstrativos: dedupedDemonstrativos, resumo: resumoAgregado });
       }
 
-      // ✅ DISPARAR EVENTO PARA RECARREGAR RESUMO GERAL APÓS GERAÇÃO
-      console.log('🔄 [GERAÇÃO] Disparando evento para recarregar Resumo Geral após geração...');
+      // ✅ DISPARAR EVENTOS PARA RECARREGAR RESUMO GERAL APÓS GERAÇÃO
+      console.log('🔄 [GERAÇÃO] Disparando eventos para recarregar Resumo Geral após geração...');
+      
+      // Disparar imediatamente
       window.dispatchEvent(new CustomEvent('resumo-geral-reload', { detail: { periodo } }));
+      console.log('📡 [GERAÇÃO] Evento 1 disparado (imediato)');
+      
+      // Disparar após 200ms
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('resumo-geral-reload', { detail: { periodo } }));
+        console.log('📡 [GERAÇÃO] Evento 2 disparado (200ms)');
+      }, 200);
+      
+      // Disparar após 500ms
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('resumo-geral-reload', { detail: { periodo } }));
+        console.log('📡 [GERAÇÃO] Evento 3 disparado (500ms)');
+      }, 500);
 
       toast({
         title: 'Demonstrativos gerados com sucesso!',
