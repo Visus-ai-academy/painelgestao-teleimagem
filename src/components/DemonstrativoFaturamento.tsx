@@ -360,7 +360,7 @@ export default function DemonstrativoFaturamento() {
   const carregarDados = async () => {
     setCarregando(true);
     try {
-      console.log('🔍 Carregando demonstrativo de faturamento para período:', periodo);
+      console.log('🔍 [DEMONSTRATIVO ABA] Carregando demonstrativo de faturamento para período:', periodo);
       
       // ✅ BUSCAR PRIMEIRO DO BANCO DE DADOS (fonte principal)
       const { data: demonstrativosDB, error: errorDB } = await supabase
@@ -1192,6 +1192,24 @@ export default function DemonstrativoFaturamento() {
   useEffect(() => {
     hasShownInitialToast.current = false; // Reset flag when period changes
     carregarDados();
+  }, [periodo]);
+
+  // ✅ ADICIONAR LISTENER PARA RECARREGAR APÓS LIMPEZA/REGENERAÇÃO
+  useEffect(() => {
+    const handleReload = (event: any) => {
+      console.log('🔔 [DEMONSTRATIVO ABA] Evento resumo-geral-reload recebido:', event.detail);
+      if (!event.detail?.periodo || event.detail.periodo === periodo) {
+        console.log('🔄 [DEMONSTRATIVO ABA] Recarregando demonstrativos...');
+        carregarDados();
+      }
+    };
+
+    window.addEventListener('resumo-geral-reload', handleReload);
+
+    return () => {
+      console.log('🧹 [DEMONSTRATIVO ABA] Removendo listener');
+      window.removeEventListener('resumo-geral-reload', handleReload);
+    };
   }, [periodo]);
 
   // Escutar mudanças na tabela de faturamento para atualizar automaticamente
