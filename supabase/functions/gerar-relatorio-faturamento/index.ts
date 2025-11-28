@@ -62,16 +62,34 @@ serve(async (req: Request) => {
     // Use the same Map approach as demonstrativo generation to avoid duplicates
     const volumetriaMap = new Map();
     
-    // Buscar usando ILIKE para lidar com variações de nome (ex: "CLINICADIA" vs "CLINICA DIA")
-    const nomeVariants = [
+    // Buscar nome_mobilemed dos parâmetros (fonte de verdade para correlação)
+    const { data: parametros } = await supabase
+      .from('parametros_faturamento')
+      .select('nome_mobilemed')
+      .eq('cliente_id', cliente_id);
+
+    // Coletar todos os nomes mobilemed + variantes do cliente
+    const nomeVariants = new Set([
       cliente.nome,
       cliente.nome_fantasia,
-      cliente.nome?.replace(/\s+/g, ''), // Remove espaços
-      cliente.nome_fantasia?.replace(/\s+/g, ''), // Remove espaços
-    ].filter(Boolean);
+      cliente.nome?.replace(/\s+/g, ''),
+      cliente.nome_fantasia?.replace(/\s+/g, ''),
+    ].filter(Boolean));
+
+    // Adicionar todos os nomes mobilemed dos parâmetros
+    if (parametros && parametros.length > 0) {
+      parametros.forEach(p => {
+        if (p.nome_mobilemed) {
+          nomeVariants.add(p.nome_mobilemed);
+          nomeVariants.add(p.nome_mobilemed.replace(/\s+/g, ''));
+        }
+      });
+    }
+
+    console.log(`🔍 Buscando volumetria para ${cliente.nome_fantasia} com variantes:`, Array.from(nomeVariants));
 
     // Buscar por cada variante do nome
-    for (const nomeVariant of nomeVariants) {
+    for (const nomeVariant of Array.from(nomeVariants)) {
       const { data: volEmpresa } = await supabase
         .from('volumetria_mobilemed')
         .select(`
@@ -121,6 +139,8 @@ serve(async (req: Request) => {
         volumetriaMap.set(key, item);
       });
     }
+
+    console.log(`📊 Total de exames encontrados na volumetria: ${volumetriaMap.size}`);
 
     // Pattern-based search apenas para clientes que precisam (se aplicável)
     const nomeFantasia = cliente.nome_fantasia || cliente.nome;
