@@ -548,78 +548,73 @@ serve(async (req) => {
         .eq('cliente_id', cliente.id)
         .eq('ativo', true);
 
-      // Criar cache de preços para lookup rápido
-      const precosCache = new Map<string, any>();
+      // Criar cache de preços para lookup rápido (incluindo categoria e prioridade)
+      const precosCache = new Map<string, number>();
       (precosCliente || []).forEach((preco: any) => {
-        const key = `${preco.modalidade}|${preco.especialidade}`;
+        const key = `${preco.modalidade}|${preco.especialidade}|${preco.categoria || 'N/A'}|${preco.prioridade || 'ROTINA'}`;
+        // Usar o primeiro preço encontrado para esta combinação (preços já ordenados por volume)
         if (!precosCache.has(key)) {
-          precosCache.set(key, []);
+          precosCache.set(key, Number(preco.valor_base) || 0);
         }
-        precosCache.get(key)!.push(preco);
       });
 
-      // Processar exames em batches menores para evitar sobrecarga
-      const BATCH_SIZE = 50;
+      // Processar exames sequencialmente para evitar timeout na RPC
       const examesCalculados: any[] = [];
       
-      for (let i = 0; i < volumetria.length; i += BATCH_SIZE) {
-        const batch = volumetria.slice(i, i + BATCH_SIZE);
+      for (const v of volumetria) {
+        if (v.tipo_faturamento === 'NC-NF' || v.tipo_faturamento === 'EXCLUSAO') {
+          continue;
+        }
         
-        const batchResults = await Promise.all(
-          batch.map(async (v) => {
-            if (v.tipo_faturamento === 'NC-NF' || v.tipo_faturamento === 'EXCLUSAO') {
-              return null;
+        try {
+          // Criar chave completa para cache (MOD+ESP+CAT+PRIOR)
+          const key = `${v.MODALIDADE || ''}|${v.ESPECIALIDADE || ''}|${v.CATEGORIA || 'N/A'}|${v.PRIORIDADE || 'ROTINA'}`;
+          
+          // Buscar preço do cache primeiro
+          let valorUnitario = precosCache.get(key);
+          
+          // Se não encontrou no cache, chamar RPC (UMA VEZ por combinação única)
+          if (valorUnitario === undefined) {
+            const { data: precoData, error: precoError } = await supabase
+              .rpc('calcular_preco_exame', {
+                p_cliente_id: cliente.id,
+                p_modalidade: v.MODALIDADE || '',
+                p_especialidade: v.ESPECIALIDADE || '',
+                p_categoria: v.CATEGORIA || 'N/A',
+                p_prioridade: v.PRIORIDADE || 'ROTINA',
+                p_volume_total: 0,
+                p_cond_volume: 'MOD/ESP/CAT',
+                p_periodo: periodo
+              });
+            
+            if (precoError) {
+              console.error(`❌ RPC erro ${nomeFantasia} (${key}):`, precoError);
+              valorUnitario = 0;
+            } else {
+              valorUnitario = Number(precoData) || 0;
             }
             
-            try {
-              // Buscar preço do cache
-              const key = `${v.MODALIDADE || ''}|${v.ESPECIALIDADE || ''}`;
-              const precosDisponiveis = precosCache.get(key) || [];
-              
-              // Se tiver preços no cache, usar diretamente
-              let valorUnitario = 0;
-              if (precosDisponiveis.length > 0) {
-                // Pegar o primeiro preço (ou aplicar lógica de volume se necessário)
-                const preco = precosDisponiveis[0];
-                valorUnitario = Number(preco.valor) || 0;
-              } else {
-                // Fallback: chamar RPC para casos específicos
-                const { data: precoData } = await supabase
-                  .rpc('calcular_preco_exame', {
-                    p_cliente_id: cliente.id,
-                    p_modalidade: v.MODALIDADE || '',
-                    p_especialidade: v.ESPECIALIDADE || '',
-                    p_categoria: v.CATEGORIA || 'N/A',
-                    p_prioridade: v.PRIORIDADE || 'ROTINA',
-                    p_volume_total: 0,
-                    p_cond_volume: 'MOD/ESP/CAT',
-                    p_periodo: periodo
-                  });
-                valorUnitario = Number(precoData) || 0;
-              }
-              
-              const quantidade = Number(v.VALORES) || 1;
-              
-              return {
-                modalidade: v.MODALIDADE || '',
-                especialidade: v.ESPECIALIDADE || '',
-                categoria: v.CATEGORIA || '',
-                prioridade: v.PRIORIDADE || '',
-                quantidade: quantidade,
-                valor_unitario: valorUnitario,
-                valor_total: valorUnitario * quantidade
-              };
-            } catch (e) {
-              console.error(`❌ Erro ao calcular preço do exame:`, e);
-              return null;
-            }
-          })
-        );
-        
-        examesCalculados.push(...batchResults);
+            // Salvar no cache para reutilizar
+            precosCache.set(key, valorUnitario);
+          }
+          
+          const quantidade = Number(v.VALORES) || 1;
+          
+          examesCalculados.push({
+            modalidade: v.MODALIDADE || '',
+            especialidade: v.ESPECIALIDADE || '',
+            categoria: v.CATEGORIA || '',
+            prioridade: v.PRIORIDADE || '',
+            quantidade: quantidade,
+            valor_unitario: valorUnitario,
+            valor_total: valorUnitario * quantidade
+          });
+        } catch (e) {
+          console.error(`❌ Erro ao processar exame ${nomeFantasia}:`, e);
+        }
       }
       
-      const examesCalculadosValidos = examesCalculados.filter(e => e !== null);
+      const examesCalculadosValidos = examesCalculados;
 
       // Calcular valor total dos exames
       valorExamesCalculado = examesCalculadosValidos.reduce((sum, e: any) => sum + e.valor_total, 0);
