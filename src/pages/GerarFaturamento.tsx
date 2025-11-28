@@ -337,7 +337,13 @@ export default function GerarFaturamento() {
       };
 
       // Preparar dados para inserção/atualização no banco
-      const dadosParaDB = novosResultados.map(resultado => ({
+      // ✅ CORREÇÃO: Dedupli car por cliente_nome ANTES de salvar no DB
+      // Clientes com múltiplos cliente_ids (PRN, CEDIDIAG, RMPADUA) devem ter apenas 1 registro
+      const resultadosDeduplicados = Array.from(
+        new Map(novosResultados.map(r => [r.clienteNome, r])).values()
+      );
+
+      const dadosParaDB = resultadosDeduplicados.map(resultado => ({
         cliente_id: resultado.clienteId,
         cliente_nome: resultado.clienteNome,
         periodo: periodoSelecionado,
@@ -350,15 +356,22 @@ export default function GerarFaturamento() {
         data_processamento: converterDataSegura(resultado.dataProcessamento),
         data_geracao_relatorio: resultado.relatorioGerado ? new Date().toISOString() : null,
         data_envio_email: resultado.emailEnviado ? new Date().toISOString() : null,
-        detalhes_relatorio: resultado.relatorioData ? JSON.stringify(resultado.relatorioData) : null
+        detalhes_relatorio: resultado.relatorioData ? JSON.stringify(resultado.relatorioData) : null,
+        omie_nf_gerada: resultado.omieNFGerada || false,
+        omie_codigo_pedido: resultado.omieCodigoPedido || null,
+        omie_numero_pedido: resultado.omieNumeroPedido || null,
+        data_geracao_nf_omie: resultado.dataGeracaoNFOmie ? converterDataSegura(resultado.dataGeracaoNFOmie) : null
       }));
 
-      // Usar upsert para inserir ou atualizar registros
+      console.log(`💾 Salvando ${dadosParaDB.length} registros únicos (deduplicados de ${novosResultados.length} resultados)`);
+
+      // ✅ CORREÇÃO CRÍTICA: Usar cliente_nome (agrupado) como chave única, não cliente_id
+      // Isso evita duplicatas para clientes com múltiplos IDs (PRN, CEDIDIAG, RMPADUA, etc)
       for (const dados of dadosParaDB) {
         await supabase
           .from('relatorios_faturamento_status')
           .upsert(dados, { 
-            onConflict: 'cliente_id,periodo',
+            onConflict: 'cliente_nome,periodo', // ✅ Agrupado por nome, não por ID
             ignoreDuplicates: false 
           });
       }
