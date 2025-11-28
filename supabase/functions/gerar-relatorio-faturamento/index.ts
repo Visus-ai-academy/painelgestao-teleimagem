@@ -62,55 +62,65 @@ serve(async (req: Request) => {
     // Use the same Map approach as demonstrativo generation to avoid duplicates
     const volumetriaMap = new Map();
     
-    // Initial search by EMPRESA and nome_fantasia
-    const { data: volumetriaEmpresa, error: volError1 } = await supabase
-      .from('volumetria_mobilemed')
-      .select(`
-        id,
-        "DATA_REALIZACAO",
-        "DATA_LAUDO",
-        "NOME_PACIENTE",
-        "MEDICO",
-        "ESTUDO_DESCRICAO",
-        "MODALIDADE",
-        "ESPECIALIDADE",
-        "CATEGORIA",
-        "PRIORIDADE",
-        "ACCESSION_NUMBER",
-        "EMPRESA",
-        "Cliente_Nome_Fantasia",
-        "VALORES",
-        tipo_faturamento
-      `)
-      .eq('periodo_referencia', periodo)
-      .eq('EMPRESA', cliente.nome);
+    // Buscar usando ILIKE para lidar com variações de nome (ex: "CLINICADIA" vs "CLINICA DIA")
+    const nomeVariants = [
+      cliente.nome,
+      cliente.nome_fantasia,
+      cliente.nome?.replace(/\s+/g, ''), // Remove espaços
+      cliente.nome_fantasia?.replace(/\s+/g, ''), // Remove espaços
+    ].filter(Boolean);
 
-    const { data: volumetriaFantasia, error: volError2 } = await supabase
-      .from('volumetria_mobilemed')
-      .select(`
-        id,
-        "DATA_REALIZACAO",
-        "DATA_LAUDO",
-        "NOME_PACIENTE",
-        "MEDICO",
-        "ESTUDO_DESCRICAO",
-        "MODALIDADE",
-        "ESPECIALIDADE",
-        "CATEGORIA",
-        "PRIORIDADE",
-        "ACCESSION_NUMBER",
-        "EMPRESA",
-        "Cliente_Nome_Fantasia",
-        "VALORES",
-        tipo_faturamento
-      `)
-      .eq('periodo_referencia', periodo)
-      .eq('Cliente_Nome_Fantasia', cliente.nome_fantasia);
+    // Buscar por cada variante do nome
+    for (const nomeVariant of nomeVariants) {
+      const { data: volEmpresa } = await supabase
+        .from('volumetria_mobilemed')
+        .select(`
+          id,
+          "DATA_REALIZACAO",
+          "DATA_LAUDO",
+          "NOME_PACIENTE",
+          "MEDICO",
+          "ESTUDO_DESCRICAO",
+          "MODALIDADE",
+          "ESPECIALIDADE",
+          "CATEGORIA",
+          "PRIORIDADE",
+          "ACCESSION_NUMBER",
+          "EMPRESA",
+          "Cliente_Nome_Fantasia",
+          "VALORES",
+          tipo_faturamento
+        `)
+        .eq('periodo_referencia', periodo)
+        .ilike('EMPRESA', `%${nomeVariant}%`);
 
-    [...(volumetriaEmpresa || []), ...(volumetriaFantasia || [])].forEach(item => {
-      const key = item.id ? item.id.toString() : `fallback_${item.EMPRESA}_${item.VALORES}_${Math.random()}`;
-      volumetriaMap.set(key, item);
-    });
+      const { data: volFantasia } = await supabase
+        .from('volumetria_mobilemed')
+        .select(`
+          id,
+          "DATA_REALIZACAO",
+          "DATA_LAUDO",
+          "NOME_PACIENTE",
+          "MEDICO",
+          "ESTUDO_DESCRICAO",
+          "MODALIDADE",
+          "ESPECIALIDADE",
+          "CATEGORIA",
+          "PRIORIDADE",
+          "ACCESSION_NUMBER",
+          "EMPRESA",
+          "Cliente_Nome_Fantasia",
+          "VALORES",
+          tipo_faturamento
+        `)
+        .eq('periodo_referencia', periodo)
+        .ilike('Cliente_Nome_Fantasia', `%${nomeVariant}%`);
+
+      [...(volEmpresa || []), ...(volFantasia || [])].forEach(item => {
+        const key = item.id ? item.id.toString() : `fallback_${item.EMPRESA}_${item.VALORES}_${Math.random()}`;
+        volumetriaMap.set(key, item);
+      });
+    }
 
     // Pattern-based search apenas para clientes que precisam (se aplicável)
     const nomeFantasia = cliente.nome_fantasia || cliente.nome;
