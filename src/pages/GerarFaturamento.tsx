@@ -1090,7 +1090,8 @@ export default function GerarFaturamento() {
 
   // Função auxiliar para limpar dados do período antes de gerar
   const limparDadosPeriodo = async (periodo: string) => {
-    console.log('🗑️ [LIMPEZA] Iniciando limpeza de dados do período:', periodo);
+    console.log('🗑️ [LIMPEZA] ===== INICIANDO LIMPEZA =====');
+    console.log('🗑️ [LIMPEZA] Período:', periodo);
     
     try {
       // 1. Limpar demonstrativos do banco
@@ -1179,13 +1180,19 @@ export default function GerarFaturamento() {
       });
       
     } catch (error) {
-      console.error('❌ [LIMPEZA] Erro durante limpeza:', error);
+      console.error('❌ [LIMPEZA] ERRO CRÍTICO na limpeza:', error);
+      console.error('❌ [LIMPEZA] Stack trace:', error instanceof Error ? error.stack : 'sem stack');
+      
+      // Disparar evento mesmo em caso de erro parcial para tentar atualizar UI
+      console.log('🔄 [LIMPEZA] Disparando evento apesar do erro...');
+      window.dispatchEvent(new CustomEvent('resumo-geral-reload', { detail: { periodo } }));
+      
       toast({
         title: "Erro na limpeza",
-        description: error instanceof Error ? error.message : "Erro ao limpar dados anteriores",
+        description: error instanceof Error ? error.message : "Erro ao limpar dados anteriores. Continuando com a geração...",
         variant: "destructive",
       });
-      throw error; // Re-throw para parar o processamento
+      // NÃO fazer throw - deixar a geração continuar
     }
   };
 
@@ -1213,7 +1220,14 @@ export default function GerarFaturamento() {
     });
 
     // 🗑️ PASSO 1: Limpar dados anteriores do período
-    await limparDadosPeriodo(periodoSelecionado);
+    console.log('🔧 [DEBUG] Prestes a chamar limparDadosPeriodo com período:', periodoSelecionado);
+    try {
+      await limparDadosPeriodo(periodoSelecionado);
+      console.log('✅ [DEBUG] limparDadosPeriodo concluído com sucesso');
+    } catch (limparError) {
+      console.error('❌ [DEBUG] Erro ao executar limparDadosPeriodo:', limparError);
+      // Continuar mesmo se a limpeza falhar
+    }
     
     setStatusProcessamento({
       processando: true,
@@ -2684,13 +2698,20 @@ export default function GerarFaturamento() {
                   
                   // ✅ Escutar evento de limpeza/recarga para recarregar automaticamente
                   const handleReload = (event: any) => {
-                    console.log('🔔 [RESUMO GERAL ABA GERAR] Evento resumo-geral-reload recebido:', event.detail);
+                    console.log('🔔🔔🔔 [RESUMO GERAL ABA GERAR] ===== EVENTO RECEBIDO =====');
+                    console.log('🔔 [RESUMO GERAL ABA GERAR] Event detail:', event.detail);
+                    console.log('🔔 [RESUMO GERAL ABA GERAR] Periodo do evento:', event.detail?.periodo);
+                    console.log('🔔 [RESUMO GERAL ABA GERAR] Periodo selecionado:', periodoSelecionado);
+                    
                     if (!event.detail?.periodo || event.detail.periodo === periodoSelecionado) {
-                      console.log('🔄 [RESUMO GERAL ABA GERAR] Recarregando após evento...');
+                      console.log('🔄 [RESUMO GERAL ABA GERAR] ✅ RECARREGANDO DADOS...');
                       carregarDemonstrativosDB();
+                    } else {
+                      console.log('⏭️ [RESUMO GERAL ABA GERAR] Período diferente, ignorando');
                     }
                   };
                   
+                  console.log('👂 [RESUMO GERAL ABA GERAR] Registrando listener para resumo-geral-reload');
                   window.addEventListener('resumo-geral-reload', handleReload);
                   
                   return () => {
