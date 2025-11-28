@@ -748,7 +748,13 @@ serve(async (req) => {
                 regra = 'continua_sim_volume_nao';
               }
             } else {
-              if (frequenciaPorVolume) {
+              // REGRA CRÍTICA: Se frequencia_continua = NÃO e volume zerado, NÃO cobrar franquia
+              if (totalExames === 0) {
+                valorCalculado = 0;
+                regra = 'continua_nao_volume_zerado_sem_cobranca';
+                console.log(`✅ ${nomeFantasia}: Frequência Contínua = NÃO + Volume ZERADO → Franquia NÃO cobrada`);
+              } else if (frequenciaPorVolume) {
+                // Com volume: aplica regra de frequência por volume
                 if (totalExames < volumeFranquia) {
                   valorCalculado = valorFranquiaBase;
                   regra = 'continua_nao_volume_sim_abaixo';
@@ -757,6 +763,7 @@ serve(async (req) => {
                   regra = 'continua_nao_volume_sim_acima';
                 }
               } else {
+                // Sem frequência por volume: cobra apenas se atingiu volume mínimo
                 if (totalExames < volumeFranquia) {
                   valorCalculado = valorFranquiaBase;
                   regra = 'continua_nao_volume_nao_abaixo';
