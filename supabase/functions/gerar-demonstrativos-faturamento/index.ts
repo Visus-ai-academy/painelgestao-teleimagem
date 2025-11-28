@@ -98,6 +98,7 @@ serve(async (req) => {
 
     const demonstrativos: DemonstrativoCliente[] = [];
     const clientesProcessados = new Set<string>(); // Track by nome_fantasia to avoid duplicates
+    const clientesComErro: Array<{nome: string, erro: string, stack?: string}> = []; // Track errors
 
     // Batch processing configuration - process 30 clients per batch to avoid timeout
     const BATCH_SIZE = 30;
@@ -925,21 +926,39 @@ serve(async (req) => {
         valor_total: demonstrativo.valor_total
       });
 
-      // ✅ CORREÇÃO CRÍTICA: Incluir cliente se tem valor bruto > 0 OU valor líquido > 0
-      // Clientes com franquia mas sem volumetria devem ser incluídos!
-      const deveIncluir = valorBruto > 0 || valorLiquido > 0 || totalExames > 0;
+      // ✅ CORRIGIDO: Incluir apenas clientes com volumetria OU franquia (conforme regra do usuário)
+      // Cliente SEM volumetria só deve ser incluído se tem franquia aplicável
+      const temVolumetria = totalExames > 0;
+      const temFranquiaAplicavel = valorFranquia > 0;
+      const temOutrosValores = valorPortalLaudos > 0 || valorIntegracao > 0;
+      
+      const deveIncluir = temVolumetria || temFranquiaAplicavel || temOutrosValores;
       
       if (deveIncluir) {
         demonstrativos.push(demonstrativo);
-        console.log(`✅ ${nomeFantasia} incluído: exames=${totalExames}, bruto=${valorBruto.toFixed(2)}, líquido=${valorLiquido.toFixed(2)}`);
+        console.log(`✅ ${nomeFantasia} incluído: exames=${totalExames}, franquia=${valorFranquia.toFixed(2)}, bruto=${valorBruto.toFixed(2)}, líquido=${valorLiquido.toFixed(2)}`);
       } else {
-        console.log(`⏭️ ${nomeFantasia} pulado (sem valores): exames=${totalExames}, bruto=${valorBruto.toFixed(2)}, líquido=${valorLiquido.toFixed(2)}`);
+        console.log(`⏭️ ${nomeFantasia} pulado (sem volumetria e sem franquia): exames=${totalExames}, franquia=${valorFranquia}, bruto=${valorBruto.toFixed(2)}`);
       }
       
     } catch (clienteError: any) {
       const clienteNome = cliente?.nome_fantasia || cliente?.nome || 'Cliente desconhecido';
-      console.error(`❌ ERRO ao processar cliente ${clienteNome}:`, clienteError);
-      console.error(`📋 Stack trace:`, clienteError.stack);
+      const erroMsg = clienteError?.message || String(clienteError);
+      
+      console.error(`\n❌❌❌ ERRO CRÍTICO ao processar cliente ${clienteNome}`);
+      console.error(`📋 Erro:`, erroMsg);
+      console.error(`📋 Stack:`, clienteError?.stack);
+      console.error(`📋 Cliente ID:`, cliente?.id);
+      console.error(`📋 Tipo Faturamento:`, tipoFaturamento);
+      console.error(`❌❌❌\n`);
+      
+      // ✅ RASTREAR ERRO PARA RELATÓRIO FINAL
+      clientesComErro.push({
+        nome: clienteNome,
+        erro: erroMsg,
+        stack: clienteError?.stack
+      });
+      
       // Continue processing other clients instead of failing the entire batch
     }
   }
@@ -954,8 +973,43 @@ serve(async (req) => {
     console.log(`\n🎉 PROCESSAMENTO COMPLETO`);
     console.log(`   📊 Total de demonstrativos gerados: ${demonstrativos.length}`);
     console.log(`   👥 Clientes processados: ${clientesProcessadosCount} | Pulados: ${clientesPuladosCount}`);
+    console.log(`   ❌ Clientes com erro: ${clientesComErro.length}`);
     console.log(`   📦 Total de lotes processados: ${Math.ceil(totalClientes / BATCH_SIZE)}`);
+    
+    // ✅ RELATÓRIO DETALHADO DE ERROS
+    if (clientesComErro.length > 0) {
+      console.error(`\n⚠️⚠️⚠️ RELATÓRIO DE ERROS (${clientesComErro.length} clientes falharam):`);
+      clientesComErro.forEach((item, index) => {
+        console.error(`\n${index + 1}. Cliente: ${item.nome}`);
+        console.error(`   Erro: ${item.erro}`);
+        if (item.stack) {
+          console.error(`   Stack: ${item.stack.substring(0, 200)}...`);
+        }
+      });
+      console.error(`⚠️⚠️⚠️\n`);
+    }
+    
+    // ✅ RELATÓRIO DETALHADO DE ERROS
+    if (clientesComErro.length > 0) {
+      console.error(`\n⚠️⚠️⚠️ RELATÓRIO DE ERROS (${clientesComErro.length} clientes falharam):`);
+      clientesComErro.forEach((item, index) => {
+        console.error(`\n${index + 1}. Cliente: ${item.nome}`);
+        console.error(`   Erro: ${item.erro}`);
+        if (item.stack) {
+          console.error(`   Stack: ${item.stack.substring(0, 200)}...`);
+        }
+      });
+      console.error(`⚠️⚠️⚠️\n`);
+    }
 
+
+    // ✅ RELATÓRIO FINAL COM MÉTRICAS DETALHADAS
+    console.log(`\n📊 RESUMO FINAL:`);
+    console.log(`   Total de clientes ativos: ${totalClientes}`);
+    console.log(`   ✅ Demonstrativos gerados: ${demonstrativos.length}`);
+    console.log(`   ⏭️  Clientes pulados (NC-NF, duplicados): ${clientesPuladosCount}`);
+    console.log(`   ❌ Clientes com erro: ${clientesComErro.length}`);
+    console.log(`   ❓ Clientes não processados: ${totalClientes - demonstrativos.length - clientesPuladosCount - clientesComErro.length}`);
 
     // ✅ FIX 4: Calculate summary correctly
     const resumo = {
@@ -1034,7 +1088,10 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         demonstrativos,
-        resumo
+        resumo,
+        clientes_com_erro: clientesComErro.length,
+        clientes_pulados: clientesPuladosCount,
+        erros: clientesComErro.map(e => ({ cliente: e.nome, erro: e.erro }))
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
