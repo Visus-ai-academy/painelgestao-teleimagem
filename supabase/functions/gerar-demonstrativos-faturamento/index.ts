@@ -925,11 +925,15 @@ serve(async (req) => {
         valor_total: demonstrativo.valor_total
       });
 
-      // Include if has exams OR net value > 0
-      if (totalExames > 0 && valorLiquido > 0) {
+      // ✅ CORREÇÃO CRÍTICA: Incluir cliente se tem valor bruto > 0 OU valor líquido > 0
+      // Clientes com franquia mas sem volumetria devem ser incluídos!
+      const deveIncluir = valorBruto > 0 || valorLiquido > 0 || totalExames > 0;
+      
+      if (deveIncluir) {
         demonstrativos.push(demonstrativo);
+        console.log(`✅ ${nomeFantasia} incluído: exames=${totalExames}, bruto=${valorBruto.toFixed(2)}, líquido=${valorLiquido.toFixed(2)}`);
       } else {
-        console.log(`⏭️ ${nomeFantasia} pulado (valores zerados): exames=${totalExames}, líquido=${valorLiquido}`);
+        console.log(`⏭️ ${nomeFantasia} pulado (sem valores): exames=${totalExames}, bruto=${valorBruto.toFixed(2)}, líquido=${valorLiquido.toFixed(2)}`);
       }
       
     } catch (clienteError: any) {
