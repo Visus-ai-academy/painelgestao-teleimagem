@@ -1999,37 +1999,50 @@ export default function GerarFaturamento() {
     // ✅ Garantir que estamos usando o período correto do localStorage
     const periodoAtual = localStorage.getItem('periodoFaturamentoSelecionado') || periodoSelecionado;
     
-    // ✅ USAR CLIENTES DOS DEMONSTRATIVOS SALVOS
-    let clientesParaProcessar = clientesCarregados;
+    // ✅ CORREÇÃO CRÍTICA: Buscar clientes DIRETAMENTE do banco (demonstrativos_faturamento_calculados)
+    // Em vez de depender do localStorage que pode estar incompleto ou desatualizado
+    console.log(`🔍 Buscando demonstrativos para período ${periodoAtual} diretamente do banco...`);
     
-    // Tentar carregar clientes dos demonstrativos salvos primeiro
-    const demonstrativosCompletos = localStorage.getItem(`demonstrativos_completos_${periodoAtual}`);
-    if (demonstrativosCompletos) {
-      try {
-        const dados = JSON.parse(demonstrativosCompletos);
-        if (dados.demonstrativos && Array.isArray(dados.demonstrativos) && dados.demonstrativos.length > 0) {
-          clientesParaProcessar = dados.demonstrativos
-            .filter((demo: any) => {
-              const total = Number(demo.total_exames ?? demo.total_laudos ?? demo.volume_total ?? 0);
-              return total > 0; // ✅ Somente clientes com volumetria
-            })
-            .map((demo: any) => ({
-              id: demo.cliente_id || `temp-${demo.cliente_nome}`,
-              nome: demo.cliente_nome || demo.nome_cliente,
-              email: demo.cliente_email || demo.email_cliente || `${(demo.cliente_nome || '').toLowerCase().replace(/[^a-z0-9]/g, '')}@cliente.com`,
-              demonstrativo: demo // ✅ Incluir dados do demonstrativo para usar no relatório
-            }));
-          console.log(`✅ Usando ${clientesParaProcessar.length} clientes dos demonstrativos para gerar relatórios`);
-        }
-      } catch (error) {
-        console.error('Erro ao processar demonstrativos:', error);
-      }
+    const { data: demonstrativosDB, error: erroDemonstrativos } = await supabase
+      .from('demonstrativos_faturamento_calculados')
+      .select('cliente_id, cliente_nome, total_exames, valor_total_faturamento')
+      .eq('periodo_referencia', periodoAtual)
+      .eq('status', 'calculado');
+    
+    if (erroDemonstrativos) {
+      console.error('Erro ao buscar demonstrativos:', erroDemonstrativos);
+      toast({
+        title: "Erro ao buscar demonstrativos",
+        description: erroDemonstrativos.message,
+        variant: "destructive",
+      });
+      return;
     }
+    
+    if (!demonstrativosDB || demonstrativosDB.length === 0) {
+      toast({
+        title: "Nenhum demonstrativo encontrado",
+        description: `Gere os demonstrativos primeiro para o período ${periodoAtual}`,
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // ✅ CORREÇÃO: Processar TODOS os clientes com demonstrativos, independente de terem exames ou não
+    // Isso permite gerar relatórios mesmo para clientes com 0 exames (mostrando que não houve volumetria)
+    const clientesParaProcessar = demonstrativosDB.map((demo: any) => ({
+      id: demo.cliente_id,
+      nome: demo.cliente_nome,
+      email: `${(demo.cliente_nome || '').toLowerCase().replace(/[^a-z0-9]/g, '')}@cliente.com`,
+      demonstrativo: demo
+    }));
+    
+    console.log(`✅ Encontrados ${clientesParaProcessar.length} clientes com demonstrativos para gerar relatórios`);
     
     if (clientesParaProcessar.length === 0) {
       toast({
         title: "Nenhum cliente encontrado",
-        description: "Certifique-se de que há clientes com demonstrativo gerado no período selecionado",
+        description: "Nenhum cliente com demonstrativo gerado no período selecionado",
         variant: "destructive",
       });
       return;
