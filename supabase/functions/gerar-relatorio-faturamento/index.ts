@@ -62,7 +62,7 @@ serve(async (req: Request) => {
     // Use the same Map approach as demonstrativo generation to avoid duplicates
     const volumetriaMap = new Map();
     
-    // Buscar nome_mobilemed dos parâmetros (fonte de verdade para correlação)
+    // ✅ CORREÇÃO CRÍTICA: Buscar nome_mobilemed dos parâmetros (fonte de verdade para correlação nome fantasia x nome mobilemed)
     const { data: parametros } = await supabase
       .from('parametros_faturamento')
       .select('nome_mobilemed')
@@ -76,17 +76,20 @@ serve(async (req: Request) => {
       cliente.nome_fantasia?.replace(/\s+/g, ''),
     ].filter(Boolean));
 
-    // Adicionar todos os nomes mobilemed dos parâmetros
+    // ✅ CRÍTICO: Adicionar TODOS os nomes mobilemed dos parâmetros (ex: CLINICA_RADI tem "MEDIMAGEMPLUS")
     if (parametros && parametros.length > 0) {
       parametros.forEach(p => {
         if (p.nome_mobilemed) {
           nomeVariants.add(p.nome_mobilemed);
           nomeVariants.add(p.nome_mobilemed.replace(/\s+/g, ''));
+          // Adicionar também variações com underscores e espaços
+          nomeVariants.add(p.nome_mobilemed.replace(/_/g, ' '));
+          nomeVariants.add(p.nome_mobilemed.replace(/\s+/g, '_'));
         }
       });
     }
 
-    console.log(`🔍 Buscando volumetria para ${cliente.nome_fantasia} com variantes:`, Array.from(nomeVariants));
+    console.log(`🔍 Buscando volumetria para ${cliente.nome_fantasia} usando ${nomeVariants.size} variantes:`, Array.from(nomeVariants));
 
     // Buscar por cada variante do nome
     for (const nomeVariant of Array.from(nomeVariants)) {
@@ -140,7 +143,7 @@ serve(async (req: Request) => {
       });
     }
 
-    console.log(`📊 Total de exames encontrados na volumetria: ${volumetriaMap.size}`);
+    console.log(`📊 Total de exames encontrados na volumetria para ${cliente.nome_fantasia}: ${volumetriaMap.size}`);
 
     // Pattern-based search apenas para clientes que precisam (se aplicável)
     const nomeFantasia = cliente.nome_fantasia || cliente.nome;
