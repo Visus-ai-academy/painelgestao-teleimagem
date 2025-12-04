@@ -110,31 +110,33 @@ serve(async (req) => {
           consideraPlantao: findIndex('CONSIDERA PLANTAO', 'CONSIDERA PLANTAO?', 'PLANTAO', 'PLANTÃO')
         }
 
-        // Funções auxiliares
+        // Buscar mapeamentos de nome_mobilemed → nome_fantasia de parametros_faturamento (fonte de verdade)
+        const { data: parametrosData } = await supabaseClient
+          .from('parametros_faturamento')
+          .select('nome_mobilemed, nome_fantasia')
+          .not('nome_mobilemed', 'is', null)
+          .not('nome_fantasia', 'is', null)
+
+        // Criar mapa de nome_mobilemed → nome_fantasia
+        const nomeMobiledMedMap = new Map<string, string>()
+        parametrosData?.forEach((p: any) => {
+          if (p.nome_mobilemed && p.nome_fantasia) {
+            const key = String(p.nome_mobilemed).toUpperCase().trim()
+            const value = String(p.nome_fantasia).toUpperCase().trim()
+            nomeMobiledMedMap.set(key, value)
+          }
+        })
+        
+        console.log(`📋 Mapeamentos nome_mobilemed carregados: ${nomeMobiledMedMap.size}`)
+
+        // Função para normalizar nome de cliente usando parametros_faturamento como fonte
         const normalizeClientName = (input: any): string => {
           let s = String(input ?? '').toUpperCase().trim()
           s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
           
-          // Mapeamentos conhecidos para normalização de nomes de arquivo
-          const mappings: Record<string, string> = {
-            'INTERCOR2': 'INTERCOR',
-            'P-HADVENTISTA': 'HADVENTISTA',
-            'P-UNIMED_CARUARU': 'UNIMED_CARUARU',
-            'PRN - MEDIMAGEM CAMBORIU': 'MEDIMAGEM_CAMBORIU',
-            'PRN': 'MEDIMAGEM_CAMBORIU',
-            'UNIMAGEM_CENTRO': 'UNIMAGEM_ATIBAIA',
-            'VIVERCLIN 2': 'VIVERCLIN',
-            // Mapeamentos específicos para CEDIDIAG (apenas variações exatas, não todos os CEDI*)
-            'CEDIDIAG': 'CEDIDIAG',
-            'CEDI_RO': 'CEDIDIAG',
-            'CEDI_RJ': 'CEDIDIAG',
-            'CEDI RO': 'CEDIDIAG',
-            'CEDI RJ': 'CEDIDIAG',
-          }
-          
-          if (mappings[s]) s = mappings[s]
-          
-          // NÃO normalizar todos os CEDI* para CEDIDIAG - isso causa colisões com CEDI_RX, CEDI_UNIMED_PL, etc.
+          // Usar mapeamento de parametros_faturamento (nome_mobilemed → nome_fantasia)
+          const mapeado = nomeMobiledMedMap.get(s)
+          if (mapeado) s = mapeado
           
           return s.replace(/\./g, ' ').replace(/\s+/g, ' ').trim()
         }
