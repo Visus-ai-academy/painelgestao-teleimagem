@@ -194,6 +194,16 @@ Deno.serve(async (req) => {
         .eq('ESPECIALIDADE', 'ONCO MEDICINA INTERNA')
       regrasAplicadasArquivo.add('v007')
 
+      // REGRA v044: Correção MAMA → MAMO para modalidade MG
+      // MAMA é reservado para RM MAMAS (modalidade MR), mamografias devem ter MAMO
+      console.log('  ⚡ Aplicando v044 - Correção MAMA → MAMO (modalidade MG)')
+      await supabase.from('volumetria_mobilemed')
+        .update({ ESPECIALIDADE: 'MAMO' })
+        .eq('arquivo_fonte', arquivoAtual)
+        .eq('MODALIDADE', 'MG')
+        .eq('ESPECIALIDADE', 'MAMA')
+      regrasAplicadasArquivo.add('v044')
+
       // REGRA v008: De-Para Prioridades
       console.log('  ⚡ Aplicando v008 - De-Para Prioridades')
       
