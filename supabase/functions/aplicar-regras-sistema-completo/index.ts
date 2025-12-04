@@ -97,7 +97,7 @@ serve(async (req) => {
 
       console.log(`📊 ${registros?.length || 0} registros`);
 
-      let stats = { modalidades: 0, especialidades: 0, categorias: 0, prioridades: 0, valores: 0 };
+      let stats = { modalidades: 0, especialidades: 0, categorias: 0, prioridades: 0, valores: 0, mamaMamo: 0 };
 
       const loteSize = 50;
       for (let i = 0; i < (registros?.length || 0); i += loteSize) {
@@ -114,9 +114,20 @@ serve(async (req) => {
             stats.modalidades++;
           } else if (reg.MODALIDADE === 'CR' || reg.MODALIDADE === 'DX') {
             const desc = reg.ESTUDO_DESCRICAO?.toLowerCase() || '';
-            upd.MODALIDADE = (desc.includes('mamografia') || desc.includes('mamogra')) ? 'MG' : 'RX';
+            upd.MODALIDADE = (desc.includes('mamografia') || desc.includes('mamogra') || desc.includes('tomo')) ? 'MG' : 'RX';
             changed = true;
             stats.modalidades++;
+          }
+
+          // REGRA CRÍTICA: MAMA → MAMO para modalidade MG (mamografia/tomossíntese)
+          // MG (mamografia) SEMPRE deve ter especialidade MAMO, não MAMA
+          // MAMA é reservado para modalidade MR (RM MAMAS)
+          const modalidadeAtual = upd.MODALIDADE || reg.MODALIDADE;
+          if (modalidadeAtual === 'MG' && reg.ESPECIALIDADE === 'MAMA') {
+            upd.ESPECIALIDADE = 'MAMO';
+            changed = true;
+            stats.mamaMamo++;
+            console.log(`🔄 MAMA → MAMO: ${reg.ESTUDO_DESCRICAO} (MG)`);
           }
 
           // Especialidades diretas
@@ -125,7 +136,7 @@ serve(async (req) => {
             'CT': 'MEDICINA INTERNA',
             'Colunas': 'MUSCULO ESQUELETICO'
           };
-          if (reg.ESPECIALIDADE && espMap[reg.ESPECIALIDADE]) {
+          if (reg.ESPECIALIDADE && espMap[reg.ESPECIALIDADE] && !upd.ESPECIALIDADE) {
             upd.ESPECIALIDADE = espMap[reg.ESPECIALIDADE];
             changed = true;
             stats.especialidades++;
@@ -201,7 +212,7 @@ serve(async (req) => {
         detalhes: { registros_processados: registros?.length || 0, ...stats, total_correções: totalCorrecoes }
       });
 
-      console.log(`✅ ${totalCorrecoes} correções: M:${stats.modalidades} E:${stats.especialidades} C:${stats.categorias} P:${stats.prioridades} V:${stats.valores}`);
+      console.log(`✅ ${totalCorrecoes} correções: M:${stats.modalidades} E:${stats.especialidades} C:${stats.categorias} P:${stats.prioridades} V:${stats.valores} MAMA→MAMO:${stats.mamaMamo}`);
       totalProcessados += registros?.length || 0;
     }
 
