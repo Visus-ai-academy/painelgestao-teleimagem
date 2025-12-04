@@ -55,6 +55,8 @@ serve(async (req) => {
           ativo,
           tipo_cliente,
           tipo_faturamento,
+          nome_fantasia,
+          nome_mobilemed,
           aplicar_franquia,
           valor_franquia,
           volume_franquia,
@@ -152,13 +154,18 @@ serve(async (req) => {
       clientesProcessadosCount++;
 
       // Buscar volumetria usando multiple search strategies - OTIMIZADO
+      // CRITICAL: Include nome_fantasia and nome_mobilemed from PARAMETROS (source of truth)
       const aliasSet = new Set<string>([
         cliente.nome?.trim(),
-        cliente.nome_fantasia?.trim() || cliente.nome?.trim(),
-        cliente.nome_mobilemed?.trim() || cliente.nome?.trim()
+        cliente.nome_fantasia?.trim(),
+        cliente.nome_mobilemed?.trim(),
+        // Incluir nome_fantasia e nome_mobilemed dos PARÂMETROS (source of truth para correlação)
+        parametros?.nome_fantasia?.trim(),
+        parametros?.nome_mobilemed?.trim()
       ].filter(Boolean));
 
-      // Skip sibling search to reduce queries - optimization for performance
+      // Log aliases for debugging
+      console.log(`🔍 ${cliente.nome}: Aliases para busca volumetria: [${Array.from(aliasSet).join(', ')}]`);
 
       const nomesBusca = Array.from(aliasSet);
 
