@@ -115,7 +115,7 @@ serve(async (req) => {
           let s = String(input ?? '').toUpperCase().trim()
           s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
           
-          // Mapeamentos conhecidos
+          // Mapeamentos conhecidos para normalização de nomes de arquivo
           const mappings: Record<string, string> = {
             'INTERCOR2': 'INTERCOR',
             'P-HADVENTISTA': 'HADVENTISTA',
@@ -124,12 +124,17 @@ serve(async (req) => {
             'PRN': 'MEDIMAGEM_CAMBORIU',
             'UNIMAGEM_CENTRO': 'UNIMAGEM_ATIBAIA',
             'VIVERCLIN 2': 'VIVERCLIN',
+            // Mapeamentos específicos para CEDIDIAG (apenas variações exatas, não todos os CEDI*)
+            'CEDIDIAG': 'CEDIDIAG',
+            'CEDI_RO': 'CEDIDIAG',
+            'CEDI_RJ': 'CEDIDIAG',
+            'CEDI RO': 'CEDIDIAG',
+            'CEDI RJ': 'CEDIDIAG',
           }
           
           if (mappings[s]) s = mappings[s]
           
-          // Normalizar CEDI
-          if (s.startsWith('CEDI')) s = 'CEDIDIAG'
+          // NÃO normalizar todos os CEDI* para CEDIDIAG - isso causa colisões com CEDI_RX, CEDI_UNIMED_PL, etc.
           
           return s.replace(/\./g, ' ').replace(/\s+/g, ' ').trim()
         }
