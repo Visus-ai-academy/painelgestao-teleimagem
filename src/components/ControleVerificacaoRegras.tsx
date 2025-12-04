@@ -70,6 +70,13 @@ export function ControleVerificacaoRegras() {
       edgeFunction: 'aplicar-substituicao-especialidade-categoria',
       categoria: 'especialidade'
     },
+    {
+      id: 'v044',
+      nome: 'Correção MAMA → MAMO (Modalidade MG)',
+      descricao: 'Corrige especialidade MAMA para MAMO quando modalidade é MG (mamografia). MAMA é reservado para MR (RM MAMAS).',
+      edgeFunction: 'corrigir-mama-mamo-retroativo',
+      categoria: 'especialidade'
+    },
     
     // === REGRAS DE QUEBRA ===
     {
@@ -440,6 +447,22 @@ export function ControleVerificacaoRegras() {
         encontrado: semTipificacao?.[0]?.count || 0,
         status: (semTipificacao?.[0]?.count || 0) === 0 ? 'ok' : 'falha',
         detalhes: semTipificacao?.[0]?.count > 0 ? 'Registros sem tipificação de faturamento' : 'Todos os registros tipificados'
+      });
+
+      // 6. Verificar especialidade MAMA com modalidade MG (deveria ser MAMO)
+      const { data: mamaMG } = await supabase
+        .from('volumetria_mobilemed')
+        .select('count')
+        .eq('MODALIDADE', 'MG')
+        .eq('ESPECIALIDADE', 'MAMA');
+
+      verificacoes.push({
+        regra: 'Especialidade MAMA/MG → MAMO',
+        condicao: 'Modalidade MG não pode ter especialidade MAMA (deve ser MAMO)',
+        esperado: 0,
+        encontrado: mamaMG?.[0]?.count || 0,
+        status: (mamaMG?.[0]?.count || 0) === 0 ? 'ok' : 'falha',
+        detalhes: mamaMG?.[0]?.count > 0 ? `${mamaMG?.[0]?.count} registros com MAMA/MG precisam correção para MAMO` : 'Todas as especialidades de mamografia estão corretas'
       });
 
       setVerificacoesEspecificas(verificacoes);

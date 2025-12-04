@@ -241,3 +241,6 @@ verify_jwt = true
 
 [functions.resetar-tipificacao-clientes]
 verify_jwt = false
+
+[functions.corrigir-mama-mamo-retroativo]
+verify_jwt = false

@@ -297,6 +297,25 @@ serve(async (req) => {
         throw new Error(`Falha crítica: Regras não puderam ser aplicadas automaticamente em ${arquivo_fonte}. Dados rejeitados por inconsistência.`);
       }
 
+      // ✅ PASSO 2.5: Correção específica MAMA → MAMO para modalidade MG
+      console.log('\n🎯 === CORREÇÃO MAMA → MAMO (Modalidade MG) ===');
+      try {
+        const { data: mamaMamoResult, error: mamaMamoError } = await supabaseClient.functions.invoke(
+          'corrigir-mama-mamo-retroativo',
+          {
+            body: { arquivo_fonte }
+          }
+        );
+
+        if (mamaMamoError) {
+          console.warn('⚠️ Aviso na correção MAMA → MAMO:', mamaMamoError);
+        } else {
+          console.log(`✅ Correção MAMA → MAMO aplicada: ${mamaMamoResult?.total_corrigidos || 0} registros corrigidos`);
+        }
+      } catch (mamaMamoError) {
+        console.warn('⚠️ Aviso na correção MAMA → MAMO (não crítico):', mamaMamoError);
+      }
+
       // ✅ PASSO 3: Aplicar tipificação de faturamento
       console.log('\n🎯 === APLICANDO TIPIFICAÇÃO DE FATURAMENTO ===');
       let tipificacaoSucesso = true;
