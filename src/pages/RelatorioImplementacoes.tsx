@@ -144,7 +144,7 @@ const RelatorioImplementacoes = () => {
       ]
     },
     {
-      titulo: "Sistema de Regras de Negócio Completo (27 Regras)",
+      titulo: "Sistema de Regras de Negócio Completo (28 Regras)",
       icon: <Target className="h-6 w-6" />,
       cor: "destructive",
       data: "Jul 2025 - Set 2025",
@@ -162,10 +162,11 @@ const RelatorioImplementacoes = () => {
         "Tipificação Faturamento: Classifica como oncologia, urgencia, alta_complexidade ou padrao",
         "Sistema de Exclusões: Regras configuráveis por cliente/modalidade/especialidade/categoria/prioridade",
         "Sistema de Quebras: Divide exames complexos em múltiplos registros com valor 1",
+        "Regra v044: Correção MAMA → MAMO para modalidade MG",
         "Triggers Automáticos: Aplicação em cascade durante insert"
       ],
       edgeFunctions: [
-        "aplicar-27-regras-completas: Executa todas as 27 regras em sequência",
+        "aplicar-27-regras-completas: Executa todas as 28 regras em sequência",
         "aplicar-regras-sistema-completo: Sistema master de aplicação",
         "aplicar-regras-v002-v003-manual: Correções retroativas manuais",
         "aplicar-correcao-modalidade-rx: Correção CR/DX → RX",

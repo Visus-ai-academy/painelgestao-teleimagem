@@ -13,7 +13,7 @@ interface StatusRegras {
   sistema_ativo: boolean;
 }
 
-// Lista das 25 regras aplicadas automaticamente - SISTEMA COMPLETO
+// Lista das 28 regras aplicadas automaticamente - SISTEMA COMPLETO
 const REGRAS_SISTEMA = [
   {
     id: 'v001',
@@ -208,7 +208,7 @@ const REGRAS_SISTEMA = [
     id: 'v026',
     nome: 'Aplicação Automática pós-Upload',
     categoria: 'Sistema',
-    criterio: 'Sistema monitora uploads concluídos e aplica automaticamente todas as 25 regras anteriores via trigger otimizado.',
+    criterio: 'Sistema monitora uploads concluídos e aplica automaticamente todas as 28 regras anteriores via trigger otimizado.',
     implementacao: 'Trigger: trigger_aplicar_regras_pos_upload + sistema de tasks'
   },
   {
@@ -217,6 +217,13 @@ const REGRAS_SISTEMA = [
     categoria: 'Sistema',
     criterio: 'Executa validação final dos dados processados e registra todas as aplicações de regras no audit_logs para rastreabilidade completa.',
     implementacao: 'Sistema de auditoria + logs detalhados'
+  },
+  {
+    id: 'v044',
+    nome: 'Correção MAMA → MAMO (Modalidade MG)',
+    categoria: 'Especialidade',
+    criterio: 'Corrige ESPECIALIDADE de "MAMA" para "MAMO" quando MODALIDADE é "MG". MAMA é reservado para RM MAMAS (modalidade MR), mamografias devem usar MAMO.',
+    implementacao: 'Edge function: aplicar-27-regras-completas'
   }
 ];
 
@@ -288,7 +295,7 @@ export function AutoRegrasMaster() {
     try {
       console.log(`⚡ APLICAÇÃO AUTOMÁTICA iniciada para ${tipo_arquivo}`);
       
-      // Aplicar TODAS as 25 regras automaticamente usando a função unificada
+      // Aplicar TODAS as 28 regras automaticamente usando a função unificada
       const { data, error } = await supabase.functions.invoke('aplicar-regras-sistema-completo', {
         body: {
           arquivo_fonte: tipo_arquivo,
@@ -376,7 +383,7 @@ export function AutoRegrasMaster() {
           Sistema Automático de Regras
         </CardTitle>
         <CardDescription>
-          Aplicação automática garantida das 25 regras de negócio sempre que dados são inseridos
+          Aplicação automática garantida das 28 regras de negócio sempre que dados são inseridos
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -393,14 +400,14 @@ export function AutoRegrasMaster() {
           <div className="p-3 bg-muted rounded-lg">
             <p className="text-sm text-muted-foreground">
               <strong>Funcionamento:</strong> O sistema monitora automaticamente todos os uploads de volumetria 
-              e aplica instantaneamente as 27 regras de negócio. Não requer intervenção manual.
+              e aplica instantaneamente as 28 regras de negócio. Não requer intervenção manual.
             </p>
           </div>
 
           <Collapsible open={mostrarRegras} onOpenChange={setMostrarRegras}>
             <CollapsibleTrigger className="flex items-center gap-2 w-full p-3 bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors">
               <ChevronDown className={`h-4 w-4 transition-transform ${mostrarRegras ? 'rotate-180' : ''}`} />
-              <span className="font-semibold">Ver Lista das 25 Regras Aplicadas Automaticamente</span>
+              <span className="font-semibold">Ver Lista das 28 Regras Aplicadas Automaticamente</span>
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-2">
               <div className="grid gap-4 p-4 bg-muted/30 rounded-lg">

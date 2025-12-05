@@ -50,7 +50,7 @@ export function TesteRegras27() {
     setResultado(null);
 
     try {
-      toast('🧪 Iniciando aplicação das 27 regras completas...');
+      toast('🧪 Iniciando aplicação das 28 regras completas...');
 
       const { data, error } = await supabase.functions.invoke('aplicar-27-regras-completas', {
         body: {
@@ -65,15 +65,15 @@ export function TesteRegras27() {
 
       setResultado(data);
       
-      toast.success('✅ As 27 regras foram aplicadas com sucesso!');
+      toast.success('✅ As 28 regras foram aplicadas com sucesso!');
 
     } catch (error: any) {
       const errorMessage = error?.message || 'Erro desconhecido';
       setErro(errorMessage);
       
-      toast.error(`❌ Erro na aplicação das 27 regras: ${errorMessage}`);
+      toast.error(`❌ Erro na aplicação das 28 regras: ${errorMessage}`);
       
-      console.error('Erro no teste das 27 regras:', error);
+      console.error('Erro no teste das 28 regras:', error);
     } finally {
       setIsTestando(false);
     }
@@ -143,7 +143,7 @@ export function TesteRegras27() {
           Sistema de Aplicação de Regras
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          Execute as 27 regras completas ou apenas regras específicas nos dados de volumetria
+          Execute as 28 regras completas ou apenas regras específicas nos dados de volumetria
         </p>
       </CardHeader>
       
@@ -152,7 +152,7 @@ export function TesteRegras27() {
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="todas-regras" className="flex items-center gap-2">
               <Database className="h-4 w-4" />
-              27 Regras Completas
+              28 Regras Completas
             </TabsTrigger>
             <TabsTrigger value="regra-v007" className="flex items-center gap-2">
               <Settings className="h-4 w-4" />
@@ -161,7 +161,7 @@ export function TesteRegras27() {
           </TabsList>
           
           <TabsContent value="todas-regras" className="space-y-6">
-            {/* Botão das 27 Regras */}
+            {/* Botão das 28 Regras */}
             <div className="flex items-center gap-4">
               <Button
                 onClick={executarTeste}
@@ -172,12 +172,12 @@ export function TesteRegras27() {
                 {isTestando ? (
                   <>
                     <RefreshCw className="h-4 w-4 animate-spin" />
-                    Executando 27 Regras...
+                    Executando 28 Regras...
                   </>
                 ) : (
                   <>
                     <Play className="h-4 w-4" />
-                    Executar 27 Regras Completas
+                    Executar 28 Regras Completas
                   </>
                 )}
               </Button>
@@ -195,18 +195,18 @@ export function TesteRegras27() {
               <div className="border border-red-200 bg-red-50 rounded-lg p-4">
                 <div className="flex items-center gap-2 text-red-700 mb-2">
                   <AlertTriangle className="h-4 w-4" />
-                  <span className="font-semibold">Erro na Aplicação das 27 Regras</span>
+                  <span className="font-semibold">Erro na Aplicação das 28 Regras</span>
                 </div>
                 <p className="text-red-600 text-sm">{erro}</p>
               </div>
             )}
 
-            {/* Exibir Resultados das 27 Regras */}
+            {/* Exibir Resultados das 28 Regras */}
             {resultado?.resultados && (
               <div className="space-y-4 border rounded-lg p-4 bg-green-50">
                 <div className="flex items-center gap-2 text-green-700 mb-4">
                   <CheckCircle className="h-5 w-5" />
-                  <span className="font-semibold text-lg">Resultados das 27 Regras</span>
+                  <span className="font-semibold text-lg">Resultados das 28 Regras</span>
                 </div>
 
             {/* Resumo Geral */}

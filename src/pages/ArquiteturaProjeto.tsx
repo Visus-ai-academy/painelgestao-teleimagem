@@ -58,7 +58,7 @@ const ArquiteturaProjeto = () => {
       id: 'regras-volumetria',
       type: 'default',
       position: { x: 50, y: 160 },
-      data: { label: '⚙️ 27 REGRAS\nVOLUMETRIA\n(Triggers Automáticos)' },
+      data: { label: '⚙️ 28 REGRAS\nVOLUMETRIA\n(Triggers Automáticos)' },
       style: { backgroundColor: '#059669', color: 'white', borderColor: '#047857', width: 150, height: 80 }
     },
     {
@@ -1030,13 +1030,13 @@ const ArquiteturaProjeto = () => {
               <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
                 <h4 className="font-medium text-green-800 mb-2">📊 ANÁLISE DETALHADA: REGRAS DO SISTEMA</h4>
                 <p className="text-sm text-green-700 mb-3">
-                  <strong>RESPOSTA ESPECÍFICA:</strong> O sistema possui <strong>25 regras de volumetria</strong> e 
-                  <strong>6 regras de faturamento</strong> (não 27 e 5 como mencionado). Status da aplicação:
+                  <strong>RESPOSTA ESPECÍFICA:</strong> O sistema possui <strong>28 regras de volumetria</strong> e 
+                  <strong>6 regras de faturamento</strong>. Status da aplicação:
                 </p>
                 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 text-sm">
                   <div className="bg-white p-3 rounded border border-green-200">
-                    <h5 className="font-medium text-green-700 mb-2">✅ REGRAS DE VOLUMETRIA (25) - APLICAÇÃO:</h5>
+                    <h5 className="font-medium text-green-700 mb-2">✅ REGRAS DE VOLUMETRIA (28) - APLICAÇÃO:</h5>
                     <div className="space-y-1 text-xs text-green-600">
                       <div><strong>• 8 regras:</strong> AUTOMÁTICAS via trigger_aplicar_regras_completas()</div>
                       <div><strong>• 3 regras:</strong> AUTOMÁTICAS via triggers específicos (data_referência)</div>
