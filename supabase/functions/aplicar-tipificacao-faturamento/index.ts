@@ -325,9 +325,9 @@ serve(async (req) => {
         return { tipo_faturamento: `${tipo_cliente}-NF` as TipoFaturamento, tipo_cliente };
       }
 
-      // CEMVALENCA: FT = Plantão OU MI OU Equipe2 OU Cardio OU Neurobrain OU MAMA
+      // CEMVALENCA: FT = MI OU Cardio OU Neurobrain OU Equipe2 (Plantão vai para CEMVALENCA_PL, MAMA não fatura)
       if (nomeUpper.includes('CEMVALENCA') && !nomeUpper.includes('CEMVALENCA_RX') && !nomeUpper.includes('CEMVALENCA_PL')) {
-        if (isPlantao || isMedicinaInterna || isCardio || isMamas || isNeurobrain || temMedicoEquipe2) {
+        if (isMedicinaInterna || isCardio || isNeurobrain || temMedicoEquipe2) {
           return { tipo_faturamento: `${tipo_cliente}-FT` as TipoFaturamento, tipo_cliente };
         }
         return { tipo_faturamento: `${tipo_cliente}-NF` as TipoFaturamento, tipo_cliente };
