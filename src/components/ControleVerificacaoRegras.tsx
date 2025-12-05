@@ -578,7 +578,7 @@ export function ControleVerificacaoRegras() {
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <Search className="h-5 w-5 text-primary" />
-              Verificação de 27 Regras de Processamento
+              Verificação de 28 Regras de Processamento
             </CardTitle>
             <div className="flex gap-2">
               <Button 
