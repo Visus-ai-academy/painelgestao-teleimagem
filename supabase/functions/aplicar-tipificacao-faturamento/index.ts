@@ -292,18 +292,12 @@ serve(async (req) => {
         return { tipo_faturamento: `${tipo_cliente}-NF` as TipoFaturamento, tipo_cliente };
       }
 
-      // RADMED: FT = Plantão OU ((CT/MR) E (MI/MUSCULO/NEURO)) (exceto Rodrigo Vaz)
+      // RADMED: FT = Plantão OU MI OU Cardio OU Neurobrain OU Equipe2 (exceto Rodrigo Vaz)
       if (nomeUpper.includes('RADMED')) {
         if (isRodrigoVaz) {
           return { tipo_faturamento: `${tipo_cliente}-NF` as TipoFaturamento, tipo_cliente };
         }
-        if (isPlantao) {
-          return { tipo_faturamento: `${tipo_cliente}-FT` as TipoFaturamento, tipo_cliente };
-        }
-        const isCTouMR = modalidadeUpper === 'CT' || modalidadeUpper === 'MR' || modalidadeUpper === 'RM';
-        const isMusculoEsqueletico = especialidadeUpper.includes('MUSCULO ESQUELETICO');
-        const isNeuro = especialidadeUpper.includes('NEURO');
-        if (isCTouMR && (isMedicinaInterna || isMusculoEsqueletico || isNeuro)) {
+        if (isPlantao || isMedicinaInterna || isCardio || isNeurobrain || temMedicoEquipe2) {
           return { tipo_faturamento: `${tipo_cliente}-FT` as TipoFaturamento, tipo_cliente };
         }
         return { tipo_faturamento: `${tipo_cliente}-NF` as TipoFaturamento, tipo_cliente };
