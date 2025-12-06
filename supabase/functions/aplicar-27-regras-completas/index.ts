@@ -295,10 +295,15 @@ Deno.serve(async (req) => {
       
       regrasAplicadasArquivo.add('v010c')
 
-      // REGRA v011: Aplicação categoria padrão
-      console.log('  ⚡ Aplicando v011 - Categoria padrão')
+      // REGRA v011: Processamento de Categorias de Exames
+      // Critério: Processa e categoriza exames com base na tabela cadastro_exames
+      // NÃO usar fallback "GERAL" - categoria deve vir do cadastro ou ficar SC (Sem Contraste) como padrão válido
+      console.log('  ⚡ Aplicando v011 - Processamento de Categorias de Exames')
+      
+      // Aplicar SC (Sem Contraste) como categoria padrão válida para exames sem categoria
+      // SC é uma categoria válida que existe na tabela categorias_exame
       await supabase.from('volumetria_mobilemed')
-        .update({ CATEGORIA: 'GERAL' })
+        .update({ CATEGORIA: 'SC' })
         .eq('arquivo_fonte', arquivoAtual)
         .or('CATEGORIA.is.null,CATEGORIA.eq.')
       regrasAplicadasArquivo.add('v011')
