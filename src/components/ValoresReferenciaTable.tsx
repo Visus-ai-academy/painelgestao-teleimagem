@@ -10,12 +10,16 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Pencil, Trash2, FileText, Link2, Link2Off, Search, CheckCircle2 } from "lucide-react";
+import { Plus, Pencil, Trash2, FileText, Link2, Link2Off, Search, CheckCircle2, Wand2, Loader2 } from "lucide-react";
 import { useValoresReferencia } from '@/hooks/useValoresReferencia';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 export function ValoresReferenciaTable() {
+  const { toast } = useToast();
   const { 
-    data, 
+    data,
+    refetch,
     loading, 
     error, 
     addValor, 
@@ -30,10 +34,41 @@ export function ValoresReferenciaTable() {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
   const [vinculandoItem, setVinculandoItem] = useState<any>(null);
+  const [vinculandoAutomatico, setVinculandoAutomatico] = useState(false);
   const [formData, setFormData] = useState({
     estudo_descricao: '',
     valores: ''
   });
+
+  const handleVinculacaoAutomatica = async () => {
+    try {
+      setVinculandoAutomatico(true);
+      
+      const { data: resultado, error } = await supabase.functions.invoke('vincular-exames-automatico', {
+        body: { limiar: 85 } // 85% de similaridade
+      });
+
+      if (error) throw error;
+
+      if (resultado?.sucesso) {
+        toast({
+          title: "Vinculação Automática Concluída",
+          description: `${resultado.vinculados} exames vinculados automaticamente. ${resultado.nao_vinculados} precisam de vinculação manual.`,
+        });
+        await refetch();
+      } else {
+        throw new Error(resultado?.erro || 'Erro desconhecido');
+      }
+    } catch (err: any) {
+      toast({
+        title: "Erro na Vinculação",
+        description: err.message,
+        variant: "destructive",
+      });
+    } finally {
+      setVinculandoAutomatico(false);
+    }
+  };
 
   const resetForm = () => {
     setFormData({ estudo_descricao: '', valores: '' });
@@ -128,13 +163,28 @@ export function ValoresReferenciaTable() {
             </Badge>
           </div>
         </div>
-        <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-          <DialogTrigger asChild>
-            <Button onClick={resetForm}>
-              <Plus className="h-4 w-4 mr-2" />
-              Adicionar Valor
+        <div className="flex gap-2">
+          {totalNaoVinculados > 0 && (
+            <Button 
+              variant="outline" 
+              onClick={handleVinculacaoAutomatica}
+              disabled={vinculandoAutomatico}
+            >
+              {vinculandoAutomatico ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Wand2 className="h-4 w-4 mr-2" />
+              )}
+              Vincular Automático
             </Button>
-          </DialogTrigger>
+          )}
+          <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+            <DialogTrigger asChild>
+              <Button onClick={resetForm}>
+                <Plus className="h-4 w-4 mr-2" />
+                Adicionar Valor
+              </Button>
+            </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Adicionar Novo Valor de Referência</DialogTitle>
@@ -174,7 +224,8 @@ export function ValoresReferenciaTable() {
               </Button>
             </DialogFooter>
           </DialogContent>
-        </Dialog>
+          </Dialog>
+        </div>
       </CardHeader>
       <CardContent>
         {data.length === 0 ? (
