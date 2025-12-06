@@ -163,11 +163,12 @@ Deno.serve(async (req) => {
         .eq('arquivo_fonte', arquivoAtual)
         .eq('ESPECIALIDADE', 'CORPO')
       
-      // D.O → MUSCULO ESQUELETICO
+      // MODALIDADE DO → ESPECIALIDADE D.O (Densitometria Óssea)
+      // Exames de modalidade DO devem ter especialidade D.O, não MUSCULO ESQUELETICO
       await supabase.from('volumetria_mobilemed')
-        .update({ ESPECIALIDADE: 'MUSCULO ESQUELETICO' })
+        .update({ ESPECIALIDADE: 'D.O' })
         .eq('arquivo_fonte', arquivoAtual)
-        .eq('ESPECIALIDADE', 'D.O')
+        .eq('MODALIDADE', 'DO')
       
       // TOMOGRAFIA → MEDICINA INTERNA
       await supabase.from('volumetria_mobilemed')
