@@ -149,11 +149,13 @@ export default function GerarFaturamento() {
   // 🚨 Estado para alertas de preços não cadastrados
   const [precosFaltantes, setPrecosFaltantes] = useState<PrecoFaltante[]>([]);
   const [mostrarAlertasPrecos, setMostrarAlertasPrecos] = useState(false);
+  const [isLoadingAlertas, setIsLoadingAlertas] = useState(false);
   
   // Função para carregar alertas de preços faltantes do banco de dados
   const carregarAlertasPrecosDoBanco = useCallback(async () => {
     if (!periodoSelecionado) return;
     
+    setIsLoadingAlertas(true);
     try {
       console.log('🔍 Carregando alertas de preços faltantes do banco para período:', periodoSelecionado);
       
@@ -221,6 +223,8 @@ export default function GerarFaturamento() {
       
     } catch (e) {
       console.error('Erro ao carregar alertas do banco:', e);
+    } finally {
+      setIsLoadingAlertas(false);
     }
   }, [periodoSelecionado]);
   
@@ -2670,6 +2674,8 @@ export default function GerarFaturamento() {
           <AlertasPrecosFaltantes 
             alertas={precosFaltantes}
             onClose={() => setPrecosFaltantes([])}
+            onRefresh={carregarAlertasPrecosDoBanco}
+            isLoading={isLoadingAlertas}
           />
 
           {/* Seletor de Período */}
