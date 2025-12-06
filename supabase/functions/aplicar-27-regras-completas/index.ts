@@ -403,6 +403,87 @@ Deno.serve(async (req) => {
 
       console.log(`  ✅ Aplicadas ${regrasAplicadasArquivo.size} regras para ${arquivoAtual}`)
 
+      // ========================================================
+      // REGRA v031 (CRÍTICA): Aplicação de MODALIDADE/ESPECIALIDADE/CATEGORIA baseada no cadastro_exames
+      // Esta é a ÚLTIMA regra antes da quebra, garantindo que os dados do cadastro sobrescrevam qualquer valor incorreto
+      // ========================================================
+      console.log('  ⚡ Aplicando v031 - Dados do cadastro_exames (MODALIDADE/ESPECIALIDADE/CATEGORIA)')
+      
+      try {
+        // Buscar cadastro de exames com todas as informações
+        const { data: cadastroExames, error: cadastroError } = await supabase
+          .from('cadastro_exames')
+          .select('nome, modalidade, especialidade, categoria')
+          .eq('ativo', true)
+
+        if (cadastroError) {
+          console.error('❌ Erro ao buscar cadastro de exames:', cadastroError)
+        } else if (cadastroExames && cadastroExames.length > 0) {
+          console.log(`  📚 Carregados ${cadastroExames.length} exames no cadastro`)
+
+          // Criar mapa de exames para busca eficiente (nome do exame como chave)
+          const mapaExames = new Map()
+          cadastroExames.forEach(exame => {
+            const key = exame.nome.toUpperCase().trim()
+            mapaExames.set(key, {
+              modalidade: exame.modalidade,
+              especialidade: exame.especialidade,
+              categoria: exame.categoria
+            })
+          })
+
+          // Buscar TODOS os registros do arquivo para verificar
+          const { data: registros, error: selectError } = await supabase
+            .from('volumetria_mobilemed')
+            .select('id, "ESTUDO_DESCRICAO", "MODALIDADE", "ESPECIALIDADE", "CATEGORIA"')
+            .eq('arquivo_fonte', arquivoAtual)
+
+          if (selectError) {
+            console.error('❌ Erro ao buscar registros para v031:', selectError)
+          } else if (registros && registros.length > 0) {
+            let totalAtualizadosCadastro = 0
+            
+            // Processar em lotes de 50
+            const batchSize = 50
+            for (let i = 0; i < registros.length; i += batchSize) {
+              const lote = registros.slice(i, i + batchSize)
+              
+              for (const registro of lote) {
+                const nomeExame = registro.ESTUDO_DESCRICAO?.toUpperCase().trim()
+                const dadosCadastro = mapaExames.get(nomeExame)
+                
+                if (dadosCadastro) {
+                  // Verificar se precisa atualizar
+                  const precisaAtualizar = 
+                    registro.MODALIDADE !== dadosCadastro.modalidade ||
+                    registro.ESPECIALIDADE !== dadosCadastro.especialidade ||
+                    registro.CATEGORIA !== dadosCadastro.categoria
+
+                  if (precisaAtualizar) {
+                    await supabase
+                      .from('volumetria_mobilemed')
+                      .update({
+                        'MODALIDADE': dadosCadastro.modalidade,
+                        'ESPECIALIDADE': dadosCadastro.especialidade,
+                        'CATEGORIA': dadosCadastro.categoria,
+                        updated_at: new Date().toISOString()
+                      })
+                      .eq('id', registro.id)
+                    
+                    totalAtualizadosCadastro++
+                  }
+                }
+              }
+            }
+            
+            console.log(`  ✅ v031: ${totalAtualizadosCadastro} registros atualizados com dados do cadastro`)
+          }
+        }
+        regrasAplicadasArquivo.add('v031')
+      } catch (v031Err) {
+        console.error('❌ Erro ao aplicar v031 (cadastro_exames):', v031Err)
+      }
+
       // APLICAR QUEBRA DE EXAMES AUTOMATICAMENTE
       console.log('  ⚡ Aplicando quebra de exames automática')
       try {
