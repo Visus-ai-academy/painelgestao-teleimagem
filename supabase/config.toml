@@ -244,3 +244,6 @@ verify_jwt = false
 
 [functions.corrigir-mama-mamo-retroativo]
 verify_jwt = false
+
+[functions.vincular-exames-automatico]
+verify_jwt = true
