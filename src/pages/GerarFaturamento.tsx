@@ -146,15 +146,26 @@ export default function GerarFaturamento() {
   const [tempoInicioProcessamento, setTempoInicioProcessamento] = useState(0);
   const [mostrarMonitoramento, setMostrarMonitoramento] = useState(false);
   
-  // 🚨 Estado para alertas de preços não cadastrados - carregar do localStorage
-  const [precosFaltantes, setPrecosFaltantes] = useState<PrecoFaltante[]>(() => {
-    const saved = localStorage.getItem('precosFaltantes_2025-10');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [mostrarAlertasPrecos, setMostrarAlertasPrecos] = useState(() => {
-    const saved = localStorage.getItem('precosFaltantes_2025-10');
-    return saved ? JSON.parse(saved).length > 0 : false;
-  });
+  // 🚨 Estado para alertas de preços não cadastrados
+  const [precosFaltantes, setPrecosFaltantes] = useState<PrecoFaltante[]>([]);
+  const [mostrarAlertasPrecos, setMostrarAlertasPrecos] = useState(false);
+  
+  // Carregar alertas do localStorage quando período muda
+  useEffect(() => {
+    const saved = localStorage.getItem(`precosFaltantes_${periodoSelecionado}`);
+    if (saved) {
+      try {
+        const alertas = JSON.parse(saved);
+        setPrecosFaltantes(alertas);
+        setMostrarAlertasPrecos(alertas.length > 0);
+      } catch (e) {
+        console.error('Erro ao carregar alertas do localStorage:', e);
+      }
+    } else {
+      setPrecosFaltantes([]);
+      setMostrarAlertasPrecos(false);
+    }
+  }, [periodoSelecionado]);
 
   // Quando todos os lotes terminarem (concluído ou erro), finalizar processamento e ocultar painel
   useEffect(() => {
