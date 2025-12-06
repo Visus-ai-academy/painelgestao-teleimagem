@@ -150,22 +150,84 @@ export default function GerarFaturamento() {
   const [precosFaltantes, setPrecosFaltantes] = useState<PrecoFaltante[]>([]);
   const [mostrarAlertasPrecos, setMostrarAlertasPrecos] = useState(false);
   
-  // Carregar alertas do localStorage quando período muda
-  useEffect(() => {
-    const saved = localStorage.getItem(`precosFaltantes_${periodoSelecionado}`);
-    if (saved) {
-      try {
-        const alertas = JSON.parse(saved);
-        setPrecosFaltantes(alertas);
-        setMostrarAlertasPrecos(alertas.length > 0);
-      } catch (e) {
-        console.error('Erro ao carregar alertas do localStorage:', e);
+  // Função para carregar alertas de preços faltantes do banco de dados
+  const carregarAlertasPrecosDoBanco = useCallback(async () => {
+    if (!periodoSelecionado) return;
+    
+    try {
+      console.log('🔍 Carregando alertas de preços faltantes do banco para período:', periodoSelecionado);
+      
+      // Buscar demonstrativos com detalhes_exames
+      const { data: demonstrativos, error } = await supabase
+        .from('demonstrativos_faturamento_calculados')
+        .select('cliente_nome, detalhes_exames')
+        .eq('periodo_referencia', periodoSelecionado)
+        .not('detalhes_exames', 'is', null);
+      
+      if (error) {
+        console.error('Erro ao buscar demonstrativos:', error);
+        return;
       }
-    } else {
-      setPrecosFaltantes([]);
-      setMostrarAlertasPrecos(false);
+      
+      if (!demonstrativos || demonstrativos.length === 0) {
+        console.log('📋 Nenhum demonstrativo encontrado para o período');
+        setPrecosFaltantes([]);
+        setMostrarAlertasPrecos(false);
+        return;
+      }
+      
+      // Extrair alertas de exames com status 'sem_preco' ou valor_unitario = 0
+      const alertasExtraidos: PrecoFaltante[] = [];
+      
+      for (const demo of demonstrativos) {
+        if (demo.detalhes_exames && Array.isArray(demo.detalhes_exames)) {
+          for (const exame of demo.detalhes_exames as any[]) {
+            if (exame.status === 'sem_preco' || (exame.valor_unitario !== undefined && exame.valor_unitario === 0)) {
+              // Verificar se já existe para evitar duplicatas
+              const jaExiste = alertasExtraidos.some(a =>
+                a.cliente_nome === demo.cliente_nome &&
+                a.modalidade === exame.modalidade &&
+                a.especialidade === exame.especialidade &&
+                a.categoria === exame.categoria &&
+                a.prioridade === exame.prioridade
+              );
+              
+              if (!jaExiste) {
+                alertasExtraidos.push({
+                  cliente_nome: demo.cliente_nome,
+                  modalidade: exame.modalidade || '',
+                  especialidade: exame.especialidade || '',
+                  categoria: exame.categoria || '',
+                  prioridade: exame.prioridade || '',
+                  quantidade: exame.quantidade || 0
+                });
+              }
+            }
+          }
+        }
+      }
+      
+      console.log(`🚨 [ALERTAS BANCO] Total de alertas encontrados: ${alertasExtraidos.length}`);
+      
+      setPrecosFaltantes(alertasExtraidos);
+      setMostrarAlertasPrecos(alertasExtraidos.length > 0);
+      
+      // Salvar no localStorage para persistência
+      if (alertasExtraidos.length > 0) {
+        localStorage.setItem(`precosFaltantes_${periodoSelecionado}`, JSON.stringify(alertasExtraidos));
+      } else {
+        localStorage.removeItem(`precosFaltantes_${periodoSelecionado}`);
+      }
+      
+    } catch (e) {
+      console.error('Erro ao carregar alertas do banco:', e);
     }
   }, [periodoSelecionado]);
+  
+  // Carregar alertas quando período muda
+  useEffect(() => {
+    carregarAlertasPrecosDoBanco();
+  }, [carregarAlertasPrecosDoBanco]);
 
   // Quando todos os lotes terminarem (concluído ou erro), finalizar processamento e ocultar painel
   useEffect(() => {
@@ -1377,18 +1439,14 @@ export default function GerarFaturamento() {
         }
         
         // 🚨 ALERTAS DE PREÇOS NÃO CADASTRADOS
-        const alertasPrecos = Array.isArray(data?.precos_nao_cadastrados) ? data.precos_nao_cadastrados : [];
-        console.log(`🚨 [ALERTAS] Preços não cadastrados recebidos: ${alertasPrecos.length}`);
-        console.log(`🚨 [ALERTAS] Dados:`, JSON.stringify(alertasPrecos, null, 2));
-        setPrecosFaltantes(alertasPrecos);
-        setMostrarAlertasPrecos(alertasPrecos.length > 0);
+        // Combinar alertas da edge function com alertas do banco
+        const alertasEdge = Array.isArray(data?.precos_nao_cadastrados) ? data.precos_nao_cadastrados : [];
+        console.log(`🚨 [ALERTAS] Preços não cadastrados da edge function: ${alertasEdge.length}`);
         
-        // Também salvar no localStorage para persistir entre reloads
-        if (alertasPrecos.length > 0) {
-          localStorage.setItem(`precosFaltantes_${periodoSelecionado}`, JSON.stringify(alertasPrecos));
-        } else {
-          localStorage.removeItem(`precosFaltantes_${periodoSelecionado}`);
-        }
+        // Aguardar um momento para os dados serem persistidos e então recarregar do banco
+        setTimeout(async () => {
+          await carregarAlertasPrecosDoBanco();
+        }, 1000);
         
         if (Array.isArray(data?.alertas)) todosAlertas.push(...data.alertas);
 
