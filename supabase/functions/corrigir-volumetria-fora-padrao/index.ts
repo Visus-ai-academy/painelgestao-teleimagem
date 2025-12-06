@@ -23,7 +23,7 @@ serve(async (req) => {
 
     console.log(`🔧 INICIANDO CORREÇÃO - Arquivo: ${arquivo_fonte || 'TODOS'}`);
 
-    // 1. Buscar registros sem categoria/especialidade/modalidade ou com valores incorretos
+    // 1. Buscar registros da volumetria
     let query = supabase
       .from('volumetria_mobilemed')
       .select('id, "ESTUDO_DESCRICAO", "CATEGORIA", "ESPECIALIDADE", "MODALIDADE", arquivo_fonte');
@@ -52,7 +52,7 @@ serve(async (req) => {
       });
     }
 
-    // 2. Buscar mapeamentos no cadastro de exames (incluindo modalidade)
+    // 2. Buscar mapeamentos do cadastro de exames (direto)
     const { data: cadastroExames } = await supabase
       .from('cadastro_exames')
       .select('nome, categoria, especialidade, modalidade')
@@ -60,56 +60,114 @@ serve(async (req) => {
 
     const mapeamentoCadastro = new Map();
     cadastroExames?.forEach(exame => {
-      mapeamentoCadastro.set(exame.nome.toUpperCase(), {
+      mapeamentoCadastro.set(exame.nome.toUpperCase().trim(), {
         categoria: exame.categoria || 'SC',
-        especialidade: exame.especialidade || null, // Não usar GERAL como fallback
+        especialidade: exame.especialidade || null,
         modalidade: exame.modalidade || null
       });
     });
 
-    console.log(`📋 Carregados ${cadastroExames?.length || 0} mapeamentos do cadastro`);
+    console.log(`📋 Carregados ${cadastroExames?.length || 0} mapeamentos do cadastro_exames (direto)`);
 
-    // 3. Processar registros em lotes
+    // 3. Buscar mapeamentos da tabela valores_referencia_de_para COM vinculação ao cadastro_exames
+    const { data: valoresReferencia } = await supabase
+      .from('valores_referencia_de_para')
+      .select('estudo_descricao, cadastro_exame_id')
+      .eq('ativo', true)
+      .not('cadastro_exame_id', 'is', null);
+
+    // Para cada valor de referência vinculado, buscar dados do cadastro_exames
+    const mapeamentoForaPadrao = new Map();
+    
+    if (valoresReferencia && valoresReferencia.length > 0) {
+      // Buscar os cadastro_exames vinculados
+      const cadastroExameIds = [...new Set(valoresReferencia.map(v => v.cadastro_exame_id).filter(Boolean))];
+      
+      const { data: examesVinculados } = await supabase
+        .from('cadastro_exames')
+        .select('id, categoria, especialidade, modalidade')
+        .in('id', cadastroExameIds);
+
+      const exameMap = new Map();
+      examesVinculados?.forEach(e => exameMap.set(e.id, e));
+
+      // Criar mapeamento de nome fora do padrão -> dados do cadastro vinculado
+      valoresReferencia.forEach(valor => {
+        const exame = exameMap.get(valor.cadastro_exame_id);
+        if (exame) {
+          mapeamentoForaPadrao.set(valor.estudo_descricao.toUpperCase().trim(), {
+            categoria: exame.categoria || 'SC',
+            especialidade: exame.especialidade || null,
+            modalidade: exame.modalidade || null
+          });
+        }
+      });
+
+      console.log(`🔗 Carregados ${mapeamentoForaPadrao.size} mapeamentos de exames fora do padrão VINCULADOS`);
+    }
+
+    // 4. Processar registros em lotes
     let registrosCorrigidos = 0;
+    let registrosSemMapeamento = 0;
     const tamanhoLote = 10;
 
     for (let i = 0; i < registrosSemCategoria.length; i += tamanhoLote) {
       const lote = registrosSemCategoria.slice(i, i + tamanhoLote);
       
       for (const registro of lote) {
-        // Buscar mapeamento no cadastro de exames
-        const mapeamento = mapeamentoCadastro.get(registro.ESTUDO_DESCRICAO?.toUpperCase());
+        const estudoDescricaoNormalizado = registro.ESTUDO_DESCRICAO?.toUpperCase().trim() || '';
+        
+        // Prioridade 1: Buscar no mapeamento de exames fora do padrão (vinculados)
+        let mapeamento = mapeamentoForaPadrao.get(estudoDescricaoNormalizado);
+        
+        // Prioridade 2: Buscar diretamente no cadastro de exames
+        if (!mapeamento) {
+          mapeamento = mapeamentoCadastro.get(estudoDescricaoNormalizado);
+        }
         
         if (mapeamento) {
-          // Sempre aplicar os valores do cadastro (sobrescrever se necessário)
+          // Aplicar os valores do mapeamento
           const updateData: any = {
-            "CATEGORIA": mapeamento.categoria,
-            "ESPECIALIDADE": mapeamento.especialidade,
             updated_at: new Date().toISOString()
           };
 
-          // Adicionar modalidade se disponível no cadastro
+          // Só atualizar se tiver valor no mapeamento
+          if (mapeamento.categoria) {
+            updateData["CATEGORIA"] = mapeamento.categoria;
+          }
+          if (mapeamento.especialidade) {
+            updateData["ESPECIALIDADE"] = mapeamento.especialidade;
+          }
           if (mapeamento.modalidade) {
             updateData["MODALIDADE"] = mapeamento.modalidade;
           }
 
-          // Atualizar registro
-          const { error: errorUpdate } = await supabase
-            .from('volumetria_mobilemed')
-            .update(updateData)
-            .eq('id', registro.id);
+          // Só atualiza se tiver algo para atualizar
+          if (Object.keys(updateData).length > 1) {
+            const { error: errorUpdate } = await supabase
+              .from('volumetria_mobilemed')
+              .update(updateData)
+              .eq('id', registro.id);
 
-          if (!errorUpdate) {
-            registrosCorrigidos++;
-            const modalidadeLog = mapeamento.modalidade ? `, Mod: ${mapeamento.modalidade}` : '';
-            console.log(`✅ Corrigido: ${registro.ESTUDO_DESCRICAO} -> Cat: ${mapeamento.categoria}, Esp: ${mapeamento.especialidade}${modalidadeLog}`);
-          } else {
-            console.error(`❌ Erro ao corrigir ${registro.id}:`, errorUpdate);
+            if (!errorUpdate) {
+              registrosCorrigidos++;
+              const modalidadeLog = mapeamento.modalidade ? `, Mod: ${mapeamento.modalidade}` : '';
+              console.log(`✅ Corrigido: ${registro.ESTUDO_DESCRICAO} -> Cat: ${mapeamento.categoria}, Esp: ${mapeamento.especialidade}${modalidadeLog}`);
+            } else {
+              console.error(`❌ Erro ao corrigir ${registro.id}:`, errorUpdate);
+            }
           }
         } else {
-          console.log(`⚠️ Sem mapeamento para: ${registro.ESTUDO_DESCRICAO}`);
+          registrosSemMapeamento++;
+          if (registrosSemMapeamento <= 10) {
+            console.log(`⚠️ Sem mapeamento para: ${registro.ESTUDO_DESCRICAO}`);
+          }
         }
       }
+    }
+
+    if (registrosSemMapeamento > 10) {
+      console.log(`⚠️ ... e mais ${registrosSemMapeamento - 10} registros sem mapeamento`);
     }
 
     const resultado = {
@@ -117,10 +175,12 @@ serve(async (req) => {
       arquivo_fonte: arquivo_fonte || 'TODOS',
       registros_encontrados: registrosSemCategoria.length,
       registros_corrigidos: registrosCorrigidos,
-      mapeamentos_utilizados: cadastroExames?.length || 0,
+      registros_sem_mapeamento: registrosSemMapeamento,
+      mapeamentos_cadastro_direto: cadastroExames?.length || 0,
+      mapeamentos_fora_padrao_vinculados: mapeamentoForaPadrao.size,
       data_processamento: new Date().toISOString(),
       detalhes: {
-        observacao: 'Correções aplicadas consultando cadastro_exames',
+        observacao: 'Correções aplicadas usando vinculação valores_referencia_de_para → cadastro_exames',
         campos_corrigidos: 'MODALIDADE, ESPECIALIDADE, CATEGORIA'
       }
     };

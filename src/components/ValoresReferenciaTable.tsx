@@ -9,13 +9,27 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Pencil, Trash2, FileText } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Plus, Pencil, Trash2, FileText, Link2, Link2Off, Search, CheckCircle2 } from "lucide-react";
 import { useValoresReferencia } from '@/hooks/useValoresReferencia';
 
 export function ValoresReferenciaTable() {
-  const { data, loading, error, addValor, updateValor, deleteValor, toggleAtivo } = useValoresReferencia();
+  const { 
+    data, 
+    loading, 
+    error, 
+    addValor, 
+    updateValor, 
+    deleteValor, 
+    toggleAtivo,
+    buscarSugestoes,
+    vincularExame,
+    desvincularExame
+  } = useValoresReferencia();
+  
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
+  const [vinculandoItem, setVinculandoItem] = useState<any>(null);
   const [formData, setFormData] = useState({
     estudo_descricao: '',
     valores: ''
@@ -49,6 +63,16 @@ export function ValoresReferenciaTable() {
       valores: item.valores.toString()
     });
   };
+
+  const handleVincular = async (cadastroExameId: string) => {
+    if (!vinculandoItem) return;
+    await vincularExame(vinculandoItem.id, cadastroExameId);
+    setVinculandoItem(null);
+  };
+
+  // Calcular estatísticas
+  const totalVinculados = data.filter(d => d.cadastro_exame_id).length;
+  const totalNaoVinculados = data.filter(d => !d.cadastro_exame_id).length;
 
   if (loading) {
     return (
@@ -93,6 +117,16 @@ export function ValoresReferenciaTable() {
           <p className="text-sm text-muted-foreground mt-1">
             Tabela de referência para aplicação automática de valores em exames fora de padrão
           </p>
+          <div className="flex gap-4 mt-2 text-sm">
+            <Badge variant="default" className="gap-1">
+              <CheckCircle2 className="h-3 w-3" />
+              {totalVinculados} Vinculados
+            </Badge>
+            <Badge variant="secondary" className="gap-1">
+              <Link2Off className="h-3 w-3" />
+              {totalNaoVinculados} Não Vinculados
+            </Badge>
+          </div>
         </div>
         <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
           <DialogTrigger asChild>
@@ -154,19 +188,46 @@ export function ValoresReferenciaTable() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Nome do Exame</TableHead>
+                  <TableHead>Nome do Exame (Fora Padrão)</TableHead>
                   <TableHead className="w-24">Valor</TableHead>
+                  <TableHead>Vinculado a (Cadastro)</TableHead>
                   <TableHead className="w-20">Status</TableHead>
-                  <TableHead className="w-32">Ações</TableHead>
+                  <TableHead className="w-40">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {data.map((item) => (
-                  <TableRow key={item.id}>
+                  <TableRow key={item.id} className={!item.cadastro_exame_id ? 'bg-amber-50/50 dark:bg-amber-950/10' : ''}>
                     <TableCell className="font-medium">
                       {item.estudo_descricao}
                     </TableCell>
                     <TableCell>{item.valores}</TableCell>
+                    <TableCell>
+                      {item.cadastro_exame ? (
+                        <div className="space-y-1">
+                          <div className="font-medium text-green-700 dark:text-green-400">
+                            {item.cadastro_exame.nome}
+                          </div>
+                          <div className="flex gap-1 flex-wrap">
+                            <Badge variant="outline" className="text-xs">
+                              {item.cadastro_exame.modalidade}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs">
+                              {item.cadastro_exame.especialidade}
+                            </Badge>
+                            {item.cadastro_exame.categoria && (
+                              <Badge variant="outline" className="text-xs">
+                                {item.cadastro_exame.categoria}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-amber-600 dark:text-amber-400 text-sm">
+                          Não vinculado - clique em "Vincular"
+                        </span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center space-x-2">
                         <Switch
@@ -179,7 +240,98 @@ export function ValoresReferenciaTable() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
+                        {/* Botão Vincular */}
+                        <Dialog open={vinculandoItem?.id === item.id} onOpenChange={(open) => !open && setVinculandoItem(null)}>
+                          <DialogTrigger asChild>
+                            <Button
+                              variant={item.cadastro_exame_id ? "ghost" : "default"}
+                              size="sm"
+                              onClick={() => setVinculandoItem(item)}
+                              title={item.cadastro_exame_id ? "Alterar vinculação" : "Vincular a exame do cadastro"}
+                            >
+                              <Link2 className="h-3 w-3" />
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-2xl">
+                            <DialogHeader>
+                              <DialogTitle className="flex items-center gap-2">
+                                <Search className="h-5 w-5" />
+                                Vincular Exame ao Cadastro
+                              </DialogTitle>
+                              <DialogDescription>
+                                Selecione o exame do cadastro que corresponde a "{item.estudo_descricao}"
+                              </DialogDescription>
+                            </DialogHeader>
+                            
+                            <div className="py-4">
+                              <Label className="text-sm font-medium">Sugestões (ordenadas por similaridade):</Label>
+                              <ScrollArea className="h-[300px] mt-2 border rounded-lg">
+                                <div className="p-2 space-y-2">
+                                  {buscarSugestoes(item.estudo_descricao, 10).map((sugestao, idx) => (
+                                    <div 
+                                      key={sugestao.exame.id}
+                                      className={`p-3 border rounded-lg cursor-pointer transition-colors hover:bg-primary/5 ${
+                                        idx === 0 ? 'border-green-500 bg-green-50/50 dark:bg-green-950/20' : ''
+                                      }`}
+                                      onClick={() => handleVincular(sugestao.exame.id)}
+                                    >
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex-1">
+                                          <div className="font-medium">{sugestao.exame.nome}</div>
+                                          <div className="flex gap-1 mt-1 flex-wrap">
+                                            <Badge variant="outline" className="text-xs">
+                                              {sugestao.exame.modalidade}
+                                            </Badge>
+                                            <Badge variant="outline" className="text-xs">
+                                              {sugestao.exame.especialidade}
+                                            </Badge>
+                                            {sugestao.exame.categoria && (
+                                              <Badge variant="outline" className="text-xs">
+                                                {sugestao.exame.categoria}
+                                              </Badge>
+                                            )}
+                                          </div>
+                                        </div>
+                                        <Badge 
+                                          variant={sugestao.similaridade >= 80 ? "default" : sugestao.similaridade >= 50 ? "secondary" : "outline"}
+                                          className="ml-2"
+                                        >
+                                          {sugestao.similaridade}%
+                                        </Badge>
+                                      </div>
+                                    </div>
+                                  ))}
+                                  {buscarSugestoes(item.estudo_descricao, 10).length === 0 && (
+                                    <div className="text-center py-8 text-muted-foreground">
+                                      Nenhuma sugestão encontrada com similaridade ≥ 30%
+                                    </div>
+                                  )}
+                                </div>
+                              </ScrollArea>
+                            </div>
+
+                            <DialogFooter>
+                              <Button variant="outline" onClick={() => setVinculandoItem(null)}>
+                                Cancelar
+                              </Button>
+                            </DialogFooter>
+                          </DialogContent>
+                        </Dialog>
+
+                        {/* Botão Desvincular */}
+                        {item.cadastro_exame_id && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => desvincularExame(item.id)}
+                            title="Remover vinculação"
+                          >
+                            <Link2Off className="h-3 w-3 text-red-500" />
+                          </Button>
+                        )}
+
+                        {/* Botão Editar */}
                         <Dialog>
                           <DialogTrigger asChild>
                             <Button
@@ -229,6 +381,7 @@ export function ValoresReferenciaTable() {
                           </DialogContent>
                         </Dialog>
 
+                        {/* Botão Excluir */}
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <Button variant="outline" size="sm">
