@@ -52,9 +52,9 @@ function calcularSimilaridade(str1: string, str2: string): number {
     if (proporcao >= 0.3) return Math.round(85 + (proporcao * 15));
   }
 
-  // Tokenizar
-  const tokens1 = new Set(s1.split(/\s+/).filter(t => t.length > 2));
-  const tokens2 = new Set(s2.split(/\s+/).filter(t => t.length > 2));
+  // Tokenizar (mínimo 2 chars para incluir TC, RX, MR, etc.)
+  const tokens1 = new Set(s1.split(/\s+/).filter(t => t.length >= 2));
+  const tokens2 = new Set(s2.split(/\s+/).filter(t => t.length >= 2));
 
   if (tokens1.size === 0 || tokens2.size === 0) return 0;
 
