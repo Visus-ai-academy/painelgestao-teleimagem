@@ -26,11 +26,33 @@ function calcularSimilaridade(str1: string, str2: string): number {
   // Se são iguais após normalização
   if (s1 === s2) return 100;
 
+  // Verificar contenção: se um está contido no outro
+  if (s1.includes(s2) || s2.includes(s1)) {
+    // O menor está contido no maior - alta similaridade
+    const menor = s1.length < s2.length ? s1 : s2;
+    const maior = s1.length < s2.length ? s2 : s1;
+    // Quanto mais o menor representa do maior, maior a similaridade
+    const proporcao = menor.length / maior.length;
+    // Se menor tem pelo menos 50% do tamanho, considerar 90%+
+    if (proporcao >= 0.3) return Math.round(85 + (proporcao * 15));
+  }
+
   // Tokenizar
   const tokens1 = new Set(s1.split(/\s+/).filter(t => t.length > 1));
   const tokens2 = new Set(s2.split(/\s+/).filter(t => t.length > 1));
 
   if (tokens1.size === 0 || tokens2.size === 0) return 0;
+
+  // Verificar se todos os tokens do menor estão no maior (contenção de tokens)
+  const menorTokens = tokens1.size < tokens2.size ? tokens1 : tokens2;
+  const maiorTokens = tokens1.size < tokens2.size ? tokens2 : tokens1;
+  const todosContidos = [...menorTokens].every(t => maiorTokens.has(t));
+  
+  if (todosContidos && menorTokens.size >= 2) {
+    // Todos os tokens do cadastro estão no fora do padrão
+    const proporcao = menorTokens.size / maiorTokens.size;
+    return Math.round(85 + (proporcao * 15));
+  }
 
   // Calcular interseção
   const intersecao = [...tokens1].filter(t => tokens2.has(t)).length;
