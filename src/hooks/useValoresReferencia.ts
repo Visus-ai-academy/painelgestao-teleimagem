@@ -27,13 +27,15 @@ interface SugestaoExame {
   similaridade: number;
 }
 
-// Função para calcular similaridade entre duas strings (Jaccard + tokens)
+// Função para calcular similaridade entre duas strings (Jaccard + tokens + contenção)
 function calcularSimilaridade(str1: string, str2: string): number {
   const normalizar = (s: string) => 
     s.toUpperCase()
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\b(DE|DA|DO|DAS|DOS|COM|SEM|PARA|POR|EM|NO|NA|NOS|NAS|E|OU)\b/gi, ' ')
       .replace(/[^A-Z0-9\s]/g, '')
+      .replace(/\s+/g, ' ')
       .trim();
 
   const s1 = normalizar(str1);
@@ -42,11 +44,29 @@ function calcularSimilaridade(str1: string, str2: string): number {
   // Se são iguais (case-insensitive)
   if (s1 === s2) return 100;
 
+  // Verificar contenção: se um está contido no outro
+  if (s1.includes(s2) || s2.includes(s1)) {
+    const menor = s1.length < s2.length ? s1 : s2;
+    const maior = s1.length < s2.length ? s2 : s1;
+    const proporcao = menor.length / maior.length;
+    if (proporcao >= 0.3) return Math.round(85 + (proporcao * 15));
+  }
+
   // Tokenizar
-  const tokens1 = new Set(s1.split(/\s+/).filter(t => t.length > 1));
-  const tokens2 = new Set(s2.split(/\s+/).filter(t => t.length > 1));
+  const tokens1 = new Set(s1.split(/\s+/).filter(t => t.length > 2));
+  const tokens2 = new Set(s2.split(/\s+/).filter(t => t.length > 2));
 
   if (tokens1.size === 0 || tokens2.size === 0) return 0;
+
+  // Verificar se todos os tokens do menor estão no maior
+  const menorTokens = tokens1.size < tokens2.size ? tokens1 : tokens2;
+  const maiorTokens = tokens1.size < tokens2.size ? tokens2 : tokens1;
+  const todosContidos = [...menorTokens].every(t => maiorTokens.has(t));
+  
+  if (todosContidos && menorTokens.size >= 1) {
+    const proporcao = menorTokens.size / maiorTokens.size;
+    return Math.round(80 + (proporcao * 20));
+  }
 
   // Calcular interseção
   const intersecao = [...tokens1].filter(t => tokens2.has(t)).length;
@@ -55,10 +75,16 @@ function calcularSimilaridade(str1: string, str2: string): number {
   // Jaccard similarity * 100
   const jaccard = (intersecao / uniao) * 100;
 
+  // Bonus para tokens significativos em comum (>4 chars)
+  const tokensSignificativos1 = [...tokens1].filter(t => t.length > 4);
+  const tokensSignificativos2 = [...tokens2].filter(t => t.length > 4);
+  const matchSignificativo = tokensSignificativos1.some(t => tokensSignificativos2.includes(t));
+  const bonusSignificativo = matchSignificativo ? 25 : 0;
+
   // Bonus para correspondência de início
   const bonus = s1.startsWith(s2.substring(0, 3)) || s2.startsWith(s1.substring(0, 3)) ? 10 : 0;
 
-  return Math.min(100, Math.round(jaccard + bonus));
+  return Math.min(100, Math.round(jaccard + bonus + bonusSignificativo));
 }
 
 export function useValoresReferencia() {
