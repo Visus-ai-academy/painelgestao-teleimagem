@@ -297,15 +297,78 @@ Deno.serve(async (req) => {
 
       // REGRA v011: Processamento de Categorias de Exames
       // Critério: Processa e categoriza exames com base na tabela cadastro_exames
-      // NÃO usar fallback "GERAL" - categoria deve vir do cadastro ou ficar SC (Sem Contraste) como padrão válido
       console.log('  ⚡ Aplicando v011 - Processamento de Categorias de Exames')
       
-      // Aplicar SC (Sem Contraste) como categoria padrão válida para exames sem categoria
-      // SC é uma categoria válida que existe na tabela categorias_exame
-      await supabase.from('volumetria_mobilemed')
-        .update({ CATEGORIA: 'SC' })
-        .eq('arquivo_fonte', arquivoAtual)
-        .or('CATEGORIA.is.null,CATEGORIA.eq.')
+      // Buscar categorias do cadastro de exames
+      const { data: examesComCategoria } = await supabase
+        .from('cadastro_exames')
+        .select('nome, categoria')
+        .eq('ativo', true)
+        .not('categoria', 'is', null)
+      
+      if (examesComCategoria && examesComCategoria.length > 0) {
+        // Buscar registros sem categoria para este arquivo
+        const { data: registrosSemCategoria } = await supabase
+          .from('volumetria_mobilemed')
+          .select('id, ESTUDO_DESCRICAO')
+          .eq('arquivo_fonte', arquivoAtual)
+          .or('CATEGORIA.is.null,CATEGORIA.eq.')
+        
+        if (registrosSemCategoria && registrosSemCategoria.length > 0) {
+          // Criar mapa de nome -> categoria
+          const mapaCategorias = new Map<string, string>()
+          for (const exame of examesComCategoria) {
+            if (exame.categoria) {
+              mapaCategorias.set(exame.nome.toUpperCase().trim(), exame.categoria)
+            }
+          }
+          
+          // Agrupar por categoria para updates em batch
+          const updatesPorCategoria = new Map<string, string[]>()
+          const idsParaSC: string[] = []
+          
+          for (const registro of registrosSemCategoria) {
+            const nomeExame = registro.ESTUDO_DESCRICAO?.toUpperCase().trim() || ''
+            const categoria = mapaCategorias.get(nomeExame)
+            
+            if (categoria) {
+              if (!updatesPorCategoria.has(categoria)) {
+                updatesPorCategoria.set(categoria, [])
+              }
+              updatesPorCategoria.get(categoria)!.push(registro.id)
+            } else {
+              // Exame não encontrado no cadastro -> SC (Sem Categoria)
+              idsParaSC.push(registro.id)
+            }
+          }
+          
+          // Aplicar updates por categoria
+          for (const [categoria, ids] of updatesPorCategoria) {
+            if (ids.length > 0) {
+              // Processar em batches de 500
+              for (let i = 0; i < ids.length; i += 500) {
+                const batch = ids.slice(i, i + 500)
+                await supabase.from('volumetria_mobilemed')
+                  .update({ CATEGORIA: categoria, updated_at: new Date().toISOString() })
+                  .in('id', batch)
+              }
+            }
+          }
+          
+          // Aplicar SC para exames sem categoria no cadastro
+          if (idsParaSC.length > 0) {
+            for (let i = 0; i < idsParaSC.length; i += 500) {
+              const batch = idsParaSC.slice(i, i + 500)
+              await supabase.from('volumetria_mobilemed')
+                .update({ CATEGORIA: 'SC', updated_at: new Date().toISOString() })
+                .in('id', batch)
+            }
+          }
+          
+          console.log(`    v011: Categorias aplicadas do cadastro: ${updatesPorCategoria.size} categorias distintas`)
+          console.log(`    v011: Registros com SC (sem cadastro): ${idsParaSC.length}`)
+        }
+      }
       regrasAplicadasArquivo.add('v011')
 
       // REGRA v012: Aplicação especialidade automática por modalidade
