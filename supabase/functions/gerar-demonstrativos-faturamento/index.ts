@@ -559,11 +559,34 @@ serve(async (req) => {
       let valorExamesCalculado = 0;
 
       // Buscar todos os preços do cliente de uma vez
-      const { data: precosCliente } = await supabase
+      // CORREÇÃO: Buscar por cliente_nome (nome_fantasia) ao invés de cliente_id
+      // Isso permite que múltiplos clientes com mesmo nome_fantasia compartilhem os mesmos preços
+      // Ex: PRN tem 38 unidades, todas com nome_fantasia = 'PRN', mas IDs diferentes
+      let precosCliente: any[] = [];
+      
+      // Primeiro tenta por cliente_id (preços específicos por unidade)
+      const { data: precosPorId } = await supabase
         .from('precos_servicos')
         .select('*')
         .eq('cliente_id', cliente.id)
         .eq('ativo', true);
+      
+      if (precosPorId && precosPorId.length > 0) {
+        precosCliente = precosPorId;
+      } else {
+        // Se não encontrou por ID, busca por nome_fantasia (preços compartilhados)
+        const { data: precosPorNome } = await supabase
+          .from('precos_servicos')
+          .select('*')
+          .eq('cliente_nome', nomeFantasia)
+          .eq('ativo', true);
+        
+        precosCliente = precosPorNome || [];
+        
+        if (precosCliente.length > 0) {
+          console.log(`📋 ${nomeFantasia}: Preços encontrados por nome_fantasia (${precosCliente.length} preços)`);
+        }
+      }
 
       // Criar cache de preços para lookup rápido (incluindo categoria e prioridade)
       // BUSCA EXATA - chave inclui MOD+ESP+CAT+PRIOR
