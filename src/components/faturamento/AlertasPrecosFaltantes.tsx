@@ -1,4 +1,4 @@
-import { AlertTriangle, X, Download } from "lucide-react";
+import { AlertTriangle, X, Download, CheckCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -28,24 +28,27 @@ interface AlertasPrecosFaltantesProps {
 }
 
 export function AlertasPrecosFaltantes({ alertas, onClose }: AlertasPrecosFaltantesProps) {
-  if (!alertas || alertas.length === 0) {
-    return null;
-  }
+  // Componente sempre visível - se não houver alertas, mostra mensagem de sucesso
+  const temAlertas = alertas && alertas.length > 0;
 
-  // Agrupar por cliente
-  const porCliente = alertas.reduce((acc, alerta) => {
-    if (!acc[alerta.cliente_nome]) {
-      acc[alerta.cliente_nome] = [];
-    }
-    acc[alerta.cliente_nome].push(alerta);
-    return acc;
-  }, {} as Record<string, PrecoFaltante[]>);
+  // Agrupar por cliente (só se houver alertas)
+  const porCliente = temAlertas 
+    ? alertas.reduce((acc, alerta) => {
+        if (!acc[alerta.cliente_nome]) {
+          acc[alerta.cliente_nome] = [];
+        }
+        acc[alerta.cliente_nome].push(alerta);
+        return acc;
+      }, {} as Record<string, PrecoFaltante[]>)
+    : {};
 
   const clientesAfetados = Object.keys(porCliente).length;
-  const totalArranjos = alertas.length;
-  const totalExamesSemPreco = alertas.reduce((sum, a) => sum + (a.quantidade || 0), 0);
+  const totalArranjos = alertas?.length || 0;
+  const totalExamesSemPreco = alertas?.reduce((sum, a) => sum + (a.quantidade || 0), 0) || 0;
 
   const exportarParaExcel = () => {
+    if (!temAlertas) return;
+    
     const dados = alertas.map(a => ({
       'Cliente': a.cliente_nome,
       'Modalidade': a.modalidade,
@@ -61,6 +64,35 @@ export function AlertasPrecosFaltantes({ alertas, onClose }: AlertasPrecosFaltan
     XLSX.writeFile(wb, `precos_faltantes_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
+  // Estado: SEM ALERTAS - tudo OK
+  if (!temAlertas) {
+    return (
+      <Card className="border-green-500/50 bg-green-500/5">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-green-600" />
+              <CardTitle className="text-lg text-green-600">
+                Preços - Status
+              </CardTitle>
+            </div>
+          </div>
+          <div className="flex gap-4 mt-2">
+            <Badge variant="outline" className="text-sm border-green-500/50 text-green-600">
+              Todos os preços cadastrados
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            Nenhum preço faltante identificado. Todos os arranjos de exames possuem preços cadastrados.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Estado: COM ALERTAS - preços faltantes
   return (
     <Card className="border-destructive/50 bg-destructive/5">
       <CardHeader className="pb-3">
