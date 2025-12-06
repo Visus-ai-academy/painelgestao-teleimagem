@@ -1231,6 +1231,10 @@ export default function GerarFaturamento() {
 
     console.log('📊 [STATUS] Iniciando processamento...');
     setProcessandoTodos(true);
+    
+    // 🚨 Limpar alertas de preços anteriores antes de nova geração
+    setPrecosFaltantes([]);
+    
     setStatusProcessamento({
       processando: true,
       mensagem: 'Limpando dados anteriores...',
@@ -2583,13 +2587,11 @@ export default function GerarFaturamento() {
 
         <TabsContent value="gerar" className="space-y-6 mt-6">
 
-          {/* 🚨 ALERTAS DE PREÇOS NÃO CADASTRADOS */}
-          {mostrarAlertasPrecos && precosFaltantes.length > 0 && (
-            <AlertasPrecosFaltantes 
-              alertas={precosFaltantes}
-              onClose={() => setMostrarAlertasPrecos(false)}
-            />
-          )}
+          {/* 🚨 ALERTAS DE PREÇOS NÃO CADASTRADOS - Sempre visível */}
+          <AlertasPrecosFaltantes 
+            alertas={precosFaltantes}
+            onClose={() => setPrecosFaltantes([])}
+          />
 
           {/* Seletor de Período */}
           <Card>
