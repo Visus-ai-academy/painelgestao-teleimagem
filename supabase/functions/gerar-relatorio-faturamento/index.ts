@@ -332,92 +332,99 @@ serve(async (req: Request) => {
     // Calcular volume total do período para seleção de faixas de preço
     const volumeTotal = (volumetriaFiltrada || []).reduce((sum, v) => sum + (v.VALORES || 0), 0) || dadosFinais.total_exames || 0;
 
-    // Função para buscar preço do exame com base em Modalidade + Especialidade + Categoria (+ Prioridade opcional) e faixas de volume
-    const buscarPreco = (exame: any) => {
+    // ✅ CORREÇÃO CRÍTICA: Função de busca de preço EXATA - SEM FALLBACKS
+    // O relatório DEVE usar os mesmos valores do demonstrativo
+    const buscarPrecoExato = (exame: any) => {
       if (!precos || precos.length === 0) return 0;
 
       const norm = (s: any) => (s ?? '').toString().trim().toUpperCase();
 
       const modalidadeN = norm(exame.MODALIDADE);
       const especialidadeN = norm(exame.ESPECIALIDADE);
-      const categoriaN = norm(exame.CATEGORIA || 'SC');
-      const prioridadeN = norm(exame.PRIORIDADE || '');
+      const categoriaN = norm(exame.CATEGORIA || 'N/A');
+      const prioridadeN = norm(exame.PRIORIDADE || 'ROTINA');
 
-      let pool: any[] = [];
-
-      // 1) Match EXATO com categoria
-      let candidatos = (precos || []).filter((p: any) =>
+      // BUSCA EXATA: Modalidade + Especialidade + Categoria + Prioridade
+      // SEM FALLBACKS - Se não encontrar, retorna 0
+      const candidatos = (precos || []).filter((p: any) =>
         (p.ativo ?? true) === true &&
         norm(p.modalidade) === modalidadeN &&
         norm(p.especialidade) === especialidadeN &&
-        norm(p.categoria || 'SC') === categoriaN
+        norm(p.categoria || 'N/A') === categoriaN &&
+        norm(p.prioridade || 'ROTINA') === prioridadeN
       );
 
       if (candidatos.length === 0) {
-        // 2) Fallback: ignorar categoria (modalidade+especialidade)
-        candidatos = (precos || []).filter((p: any) =>
-          (p.ativo ?? true) === true &&
-          norm(p.modalidade) === modalidadeN &&
-          norm(p.especialidade) === especialidadeN
-        );
+        console.log(`⚠️ PREÇO NÃO ENCONTRADO (EXATO): ${modalidadeN} | ${especialidadeN} | ${categoriaN} | ${prioridadeN}`);
+        return 0;
       }
 
-      if (candidatos.length === 0) {
-        // 3) Fallback: somente modalidade
-        candidatos = (precos || []).filter((p: any) =>
-          (p.ativo ?? true) === true &&
-          norm(p.modalidade) === modalidadeN
-        );
-      }
-
-      if (candidatos.length === 0) return 0;
-
-      // Preferência por cliente
+      // Filtrar por cliente específico
       let candidatosCliente = candidatos.filter((p: any) => p.cliente_id === cliente_id);
-      if (candidatosCliente.length === 0) candidatosCliente = candidatos.filter((p: any) => !p.cliente_id);
-
-      // Filtro por prioridade (preferência), com fallback
-      const priMatch = candidatosCliente.filter((p: any) => norm(p.prioridade || '') === prioridadeN);
-      pool = priMatch.length > 0 ? priMatch : candidatosCliente;
+      if (candidatosCliente.length === 0) candidatosCliente = candidatos;
 
       // Selecionar faixa por volume do período
-      const porFaixa = pool
+      const porFaixa = candidatosCliente
         .filter((p: any) =>
           (p.volume_inicial == null || volumeTotal >= p.volume_inicial) &&
           (p.volume_final == null || volumeTotal <= p.volume_final)
         )
         .sort((a: any, b: any) => (b.volume_inicial || 0) - (a.volume_inicial || 0));
 
-      const selecionado = porFaixa[0] || pool[0];
+      const selecionado = porFaixa[0] || candidatosCliente[0];
       if (!selecionado) return 0;
 
-      const prioridadeUrgencia = prioridadeN.includes('URG') || prioridadeN.includes('PLANT');
-      const usarUrgencia = exame.tipo_faturamento === 'urgencia' || prioridadeUrgencia || !!selecionado.considera_prioridade_plantao;
-
-      const valor = usarUrgencia ? (selecionado.valor_urgencia ?? 0) : (selecionado.valor_base ?? 0);
-      return valor > 0 ? valor : (selecionado.valor_base ?? 0) || 0;
+      return Number(selecionado.valor_base) || 0;
     };
 
-    // Estruturar exames detalhados para o PDF
-    const examesDetalhados = (volumetriaFiltrada || []).map(v => {
-      const valorUnitario = buscarPreco(v);
-      const quantidade = v.VALORES || 1;
-      
-      return {
-        data_exame: v.DATA_REALIZACAO || v.DATA_LAUDO || '',
-        paciente: v.NOME_PACIENTE || '',
-        medico: v.MEDICO || '',
-        exame: v.ESTUDO_DESCRICAO || '',
-        modalidade: v.MODALIDADE || '',
-        especialidade: v.ESPECIALIDADE || '',
-        categoria: v.CATEGORIA || '',
-        prioridade: v.PRIORIDADE || '',
-        accession_number: v.ACCESSION_NUMBER || '',
-        origem: v.Cliente_Nome_Fantasia || v.EMPRESA || '',
-        quantidade: quantidade,
-        valor_total: valorUnitario * quantidade
-      };
-    });
+    // ✅ PRIORIDADE: Usar detalhes_exames do demonstrativo quando disponível
+    // Isso garante que relatório = demonstrativo (mesmos valores)
+    let examesDetalhados: any[] = [];
+    
+    if (dadosFinais?.detalhes_exames && Array.isArray(dadosFinais.detalhes_exames) && dadosFinais.detalhes_exames.length > 0) {
+      // Usar dados já calculados do demonstrativo
+      console.log(`✅ Usando ${dadosFinais.detalhes_exames.length} exames do demonstrativo calculado`);
+      examesDetalhados = dadosFinais.detalhes_exames.map((e: any) => ({
+        data_exame: '',
+        paciente: '',
+        medico: '',
+        exame: '',
+        modalidade: e.modalidade || '',
+        especialidade: e.especialidade || '',
+        categoria: e.categoria || '',
+        prioridade: e.prioridade || '',
+        accession_number: '',
+        origem: '',
+        quantidade: e.quantidade || 0,
+        valor_unitario: e.valor_unitario || 0,
+        valor_total: e.valor_total || 0,
+        status: e.status || 'com_preco'
+      }));
+    } else {
+      // Fallback: calcular a partir da volumetria usando busca EXATA
+      console.log(`⚠️ Sem detalhes_exames no demonstrativo - calculando a partir da volumetria`);
+      examesDetalhados = (volumetriaFiltrada || []).map(v => {
+        const valorUnitario = buscarPrecoExato(v);
+        const quantidade = v.VALORES || 1;
+        
+        return {
+          data_exame: v.DATA_REALIZACAO || v.DATA_LAUDO || '',
+          paciente: v.NOME_PACIENTE || '',
+          medico: v.MEDICO || '',
+          exame: v.ESTUDO_DESCRICAO || '',
+          modalidade: v.MODALIDADE || '',
+          especialidade: v.ESPECIALIDADE || '',
+          categoria: v.CATEGORIA || '',
+          prioridade: v.PRIORIDADE || '',
+          accession_number: v.ACCESSION_NUMBER || '',
+          origem: v.Cliente_Nome_Fantasia || v.EMPRESA || '',
+          quantidade: quantidade,
+          valor_unitario: valorUnitario,
+          valor_total: valorUnitario * quantidade,
+          status: valorUnitario > 0 ? 'com_preco' : 'sem_preco'
+        };
+      });
+    }
 
     // Valores padrão para o relatório
     const totalLaudos = volumetriaFiltrada?.reduce((sum, v) => sum + (v.VALORES || 0), 0) || dadosFinais.total_exames || 0;
