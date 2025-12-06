@@ -101,6 +101,16 @@ serve(async (req) => {
     const demonstrativos: DemonstrativoCliente[] = [];
     const clientesProcessados = new Set<string>(); // Track by nome_fantasia to avoid duplicates
     const clientesComErro: Array<{nome: string, erro: string, stack?: string}> = []; // Track errors
+    
+    // 🚨 ALERTAS DE PREÇOS NÃO CADASTRADOS
+    const precosNaoCadastrados: Array<{
+      cliente_nome: string;
+      modalidade: string;
+      especialidade: string;
+      categoria: string;
+      prioridade: string;
+      quantidade: number;
+    }> = [];
 
     // Batch processing configuration - process 30 clients per batch to avoid timeout
     const BATCH_SIZE = 30;
@@ -556,16 +566,22 @@ serve(async (req) => {
         .eq('ativo', true);
 
       // Criar cache de preços para lookup rápido (incluindo categoria e prioridade)
+      // BUSCA EXATA - chave inclui MOD+ESP+CAT+PRIOR
       const precosCache = new Map<string, number>();
+      const precosFaltantesCliente = new Set<string>(); // Track de arranjos sem preço
+      
       (precosCliente || []).forEach((preco: any) => {
-        const key = `${preco.modalidade}|${preco.especialidade}|${preco.categoria || 'N/A'}|${preco.prioridade || 'ROTINA'}`;
-        // Usar o primeiro preço encontrado para esta combinação (preços já ordenados por volume)
+        const mod = (preco.modalidade || '').toString().toUpperCase().trim();
+        const esp = (preco.especialidade || '').toString().toUpperCase().trim();
+        const cat = (preco.categoria || 'N/A').toString().toUpperCase().trim();
+        const pri = (preco.prioridade || 'ROTINA').toString().toUpperCase().trim();
+        const key = `${mod}|${esp}|${cat}|${pri}`;
         if (!precosCache.has(key)) {
           precosCache.set(key, Number(preco.valor_base) || 0);
         }
       });
 
-      // Processar exames sequencialmente para evitar timeout na RPC
+      // Processar exames - BUSCA EXATA SEM FALLBACK
       const examesCalculados: any[] = [];
       
       for (const v of volumetria) {
@@ -574,21 +590,25 @@ serve(async (req) => {
         }
         
         try {
-          // Criar chave completa para cache (MOD+ESP+CAT+PRIOR)
-          const key = `${v.MODALIDADE || ''}|${v.ESPECIALIDADE || ''}|${v.CATEGORIA || 'N/A'}|${v.PRIORIDADE || 'ROTINA'}`;
+          // Criar chave EXATA para cache (MOD+ESP+CAT+PRIOR)
+          const mod = (v.MODALIDADE || '').toString().toUpperCase().trim();
+          const esp = (v.ESPECIALIDADE || '').toString().toUpperCase().trim();
+          const cat = (v.CATEGORIA || 'N/A').toString().toUpperCase().trim();
+          const pri = (v.PRIORIDADE || 'ROTINA').toString().toUpperCase().trim();
+          const key = `${mod}|${esp}|${cat}|${pri}`;
           
-          // Buscar preço do cache primeiro
+          // Buscar preço EXATO do cache
           let valorUnitario = precosCache.get(key);
           
-          // Se não encontrou no cache, chamar RPC (UMA VEZ por combinação única)
+          // Se não encontrou no cache, tentar RPC (que agora também é EXATO)
           if (valorUnitario === undefined) {
             const { data: precoData, error: precoError } = await supabase
               .rpc('calcular_preco_exame', {
                 p_cliente_id: cliente.id,
-                p_modalidade: v.MODALIDADE || '',
-                p_especialidade: v.ESPECIALIDADE || '',
-                p_categoria: v.CATEGORIA || 'N/A',
-                p_prioridade: v.PRIORIDADE || 'ROTINA',
+                p_modalidade: mod,
+                p_especialidade: esp,
+                p_categoria: cat,
+                p_prioridade: pri,
                 p_volume_total: 0,
                 p_cond_volume: 'MOD/ESP/CAT',
                 p_periodo: periodo
@@ -607,17 +627,55 @@ serve(async (req) => {
           
           const quantidade = Number(v.VALORES) || 1;
           
+          // 🚨 Se valor = 0, registrar como preço faltante (apenas UMA VEZ por arranjo)
+          if (valorUnitario === 0 && !precosFaltantesCliente.has(key)) {
+            precosFaltantesCliente.add(key);
+            precosNaoCadastrados.push({
+              cliente_nome: nomeFantasia,
+              modalidade: mod,
+              especialidade: esp,
+              categoria: cat,
+              prioridade: pri,
+              quantidade: quantidade
+            });
+            console.warn(`⚠️ PREÇO NÃO CADASTRADO: ${nomeFantasia} | ${mod} | ${esp} | ${cat} | ${pri}`);
+          }
+          
           examesCalculados.push({
-            modalidade: v.MODALIDADE || '',
-            especialidade: v.ESPECIALIDADE || '',
-            categoria: v.CATEGORIA || '',
-            prioridade: v.PRIORIDADE || '',
+            modalidade: mod,
+            especialidade: esp,
+            categoria: cat,
+            prioridade: pri,
             quantidade: quantidade,
             valor_unitario: valorUnitario,
             valor_total: valorUnitario * quantidade
           });
         } catch (e) {
           console.error(`❌ Erro ao processar exame ${nomeFantasia}:`, e);
+        }
+      }
+      
+      // Somar quantidades para arranjos já registrados como faltantes
+      const faltantesAgrupados = new Map<string, number>();
+      for (const v of volumetria) {
+        if (v.tipo_faturamento === 'NC-NF' || v.tipo_faturamento === 'EXCLUSAO') continue;
+        const mod = (v.MODALIDADE || '').toString().toUpperCase().trim();
+        const esp = (v.ESPECIALIDADE || '').toString().toUpperCase().trim();
+        const cat = (v.CATEGORIA || 'N/A').toString().toUpperCase().trim();
+        const pri = (v.PRIORIDADE || 'ROTINA').toString().toUpperCase().trim();
+        const key = `${mod}|${esp}|${cat}|${pri}`;
+        if (precosFaltantesCliente.has(key)) {
+          const qtdAtual = faltantesAgrupados.get(key) || 0;
+          faltantesAgrupados.set(key, qtdAtual + (Number(v.VALORES) || 1));
+        }
+      }
+      // Atualizar quantidade total nos alertas
+      for (const alerta of precosNaoCadastrados) {
+        if (alerta.cliente_nome === nomeFantasia) {
+          const key = `${alerta.modalidade}|${alerta.especialidade}|${alerta.categoria}|${alerta.prioridade}`;
+          if (faltantesAgrupados.has(key)) {
+            alerta.quantidade = faltantesAgrupados.get(key) || alerta.quantidade;
+          }
         }
       }
       
@@ -1175,6 +1233,12 @@ serve(async (req) => {
     // Isso elimina o timeout da edge function e torna o processo muito mais rápido
     console.log(`✅ Demonstrativos salvos. PDFs serão gerados separadamente pelo usuário.`);
 
+    // Resumo de preços não cadastrados
+    const totalPrecosFaltantes = precosNaoCadastrados.length;
+    if (totalPrecosFaltantes > 0) {
+      console.warn(`🚨 ALERTAS: ${totalPrecosFaltantes} arranjos de preço não cadastrados encontrados`);
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -1182,7 +1246,10 @@ serve(async (req) => {
         resumo,
         clientes_com_erro: clientesComErro.length,
         clientes_pulados: clientesPuladosCount,
-        erros: clientesComErro.map(e => ({ cliente: e.nome, erro: e.erro }))
+        erros: clientesComErro.map(e => ({ cliente: e.nome, erro: e.erro })),
+        // 🚨 ALERTAS DE PREÇOS NÃO CADASTRADOS
+        precos_nao_cadastrados: precosNaoCadastrados,
+        total_alertas_precos: totalPrecosFaltantes
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

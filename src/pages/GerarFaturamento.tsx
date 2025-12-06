@@ -52,6 +52,7 @@ import { ExamesValoresZerados } from "@/components/ExamesValorezrados";
 import { DiagnosticoPrecosFaturamento } from "@/components/DiagnosticoPrecosFaturamento";
 import FaturamentoComparativo from "@/components/faturamento/FaturamentoComparativo";
 import { MonitoramentoLotes, type LoteStatus } from "@/components/faturamento/MonitoramentoLotes";
+import { AlertasPrecosFaltantes, type PrecoFaltante } from "@/components/faturamento/AlertasPrecosFaltantes";
 
 
 import { generatePDF, downloadPDF, type FaturamentoData } from "@/lib/pdfUtils";
@@ -144,6 +145,10 @@ export default function GerarFaturamento() {
   const [lotesMonitoramento, setLotesMonitoramento] = useState<LoteStatus[]>([]);
   const [tempoInicioProcessamento, setTempoInicioProcessamento] = useState(0);
   const [mostrarMonitoramento, setMostrarMonitoramento] = useState(false);
+  
+  // 🚨 Estado para alertas de preços não cadastrados
+  const [precosFaltantes, setPrecosFaltantes] = useState<PrecoFaltante[]>([]);
+  const [mostrarAlertasPrecos, setMostrarAlertasPrecos] = useState(false);
 
   // Quando todos os lotes terminarem (concluído ou erro), finalizar processamento e ocultar painel
   useEffect(() => {
@@ -1348,6 +1353,16 @@ export default function GerarFaturamento() {
           localStorage.setItem(`demonstrativosGerados_${periodoSelecionado}`, JSON.stringify(clientesFinalizados));
           
           console.log(`✅ Processamento finalizado: ${clientesFinalizados.length} demonstrativos gerados`);
+        }
+        
+        // 🚨 ALERTAS DE PREÇOS NÃO CADASTRADOS
+        if (Array.isArray(data?.precos_nao_cadastrados) && data.precos_nao_cadastrados.length > 0) {
+          console.warn(`🚨 ${data.precos_nao_cadastrados.length} arranjos de preço não cadastrados!`);
+          setPrecosFaltantes(data.precos_nao_cadastrados);
+          setMostrarAlertasPrecos(true);
+        } else {
+          setPrecosFaltantes([]);
+          setMostrarAlertasPrecos(false);
         }
         
         if (Array.isArray(data?.alertas)) todosAlertas.push(...data.alertas);
@@ -2567,6 +2582,14 @@ export default function GerarFaturamento() {
 
 
         <TabsContent value="gerar" className="space-y-6 mt-6">
+
+          {/* 🚨 ALERTAS DE PREÇOS NÃO CADASTRADOS */}
+          {mostrarAlertasPrecos && precosFaltantes.length > 0 && (
+            <AlertasPrecosFaltantes 
+              alertas={precosFaltantes}
+              onClose={() => setMostrarAlertasPrecos(false)}
+            />
+          )}
 
           {/* Seletor de Período */}
           <Card>
