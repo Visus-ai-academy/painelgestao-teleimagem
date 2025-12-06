@@ -1,0 +1,8 @@
+-- Corrigir exame ANGIOTC VENOSA TORAX CARDIOLOGIA: CARDIO → MEDICINA INTERNA
+-- Conforme cadastro_exames, este exame é CT + MEDICINA INTERNA + ANGIO
+UPDATE volumetria_mobilemed
+SET "ESPECIALIDADE" = 'MEDICINA INTERNA',
+    updated_at = NOW()
+WHERE "ESTUDO_DESCRICAO" = 'ANGIOTC VENOSA TORAX CARDIOLOGIA'
+AND "ESPECIALIDADE" = 'CARDIO'
+AND periodo_referencia = '2025-10';
