@@ -316,6 +316,36 @@ serve(async (req) => {
         console.warn('⚠️ Aviso na correção MAMA → MAMO (não crítico):', mamaMamoError);
       }
 
+      // ✅ PASSO 2.6: Aplicar quebras automáticas de exames
+      console.log('\n🎯 === APLICANDO QUEBRAS AUTOMÁTICAS DE EXAMES ===');
+      let quebrasSucesso = true;
+      let totalQuebrados = 0;
+      try {
+        const { data: quebrasResult, error: quebrasError } = await supabaseClient.functions.invoke(
+          'aplicar-quebras-automatico',
+          {
+            body: { lote_upload: loteUpload }
+          }
+        );
+
+        if (quebrasError) {
+          console.error('❌ ERRO ao aplicar quebras:', quebrasError);
+          quebrasSucesso = false;
+        } else if (quebrasResult && quebrasResult.sucesso) {
+          totalQuebrados = quebrasResult.registros_quebrados || 0;
+          console.log(`✅ Quebras aplicadas: ${quebrasResult.registros_processados || 0} exames processados, ${totalQuebrados} exames quebrados criados`);
+        } else {
+          console.log(`ℹ️ Nenhuma quebra necessária ou aplicável`);
+        }
+      } catch (quebrasError) {
+        console.error(`❌ ERRO na aplicação de quebras (não crítico):`, quebrasError);
+        quebrasSucesso = false;
+      }
+
+      if (!quebrasSucesso) {
+        console.warn(`⚠️ Quebras falharam, mas processamento continua`);
+      }
+
       // ✅ PASSO 3: Aplicar tipificação de faturamento
       console.log('\n🎯 === APLICANDO TIPIFICAÇÃO DE FATURAMENTO ===');
       let tipificacaoSucesso = true;
@@ -364,6 +394,7 @@ serve(async (req) => {
             total_erros: totalErros,
             regras_aplicadas: regrasAplicadas,
             regras_exclusao_aplicadas: regrasExclusao,
+            quebras_aplicadas: totalQuebrados,
             arquivo_retroativo: arquivo_fonte.includes('retroativo'),
             debug_info: {
               arquivo_fonte,
