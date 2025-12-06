@@ -555,13 +555,12 @@ serve(async (req) => {
         console.log('⚠️ Erro ao ajustar categorias:', e?.message || e);
       }
 
-      // ✅ OTIMIZADO: Buscar preços e calcular em batches
+      // ✅ CORRIGIDO: Aplicar faixas de volume SEMPRE via RPC para clientes com faixas
       let valorExamesCalculado = 0;
 
       // Buscar todos os preços do cliente de uma vez
       // CORREÇÃO: Buscar por cliente_nome (nome_fantasia) ao invés de cliente_id
       // Isso permite que múltiplos clientes com mesmo nome_fantasia compartilhem os mesmos preços
-      // Ex: PRN tem 38 unidades, todas com nome_fantasia = 'PRN', mas IDs diferentes
       let precosCliente: any[] = [];
       
       // Primeiro tenta por cliente_id (preços específicos por unidade)
@@ -588,24 +587,44 @@ serve(async (req) => {
         }
       }
 
+      // ✅ VERIFICAR se cliente tem faixas de volume - se SIM, SEMPRE usar RPC
+      const clienteTemFaixasVolume = (precosCliente || []).some((p: any) => 
+        p.volume_inicial !== null || p.volume_final !== null
+      );
+      
+      // Obter cond_volume do cliente (padrão MOD/ESP/CAT)
+      const condVolumeCliente = precosCliente?.[0]?.cond_volume || 'MOD/ESP/CAT';
+      const consideraPlantao = precosCliente?.[0]?.considera_prioridade_plantao !== false;
+      
+      if (clienteTemFaixasVolume) {
+        console.log(`📊 ${nomeFantasia}: Cliente com FAIXAS DE VOLUME - SEMPRE usar RPC`);
+        console.log(`   cond_volume: ${condVolumeCliente}, considera_plantao: ${consideraPlantao}`);
+      }
+
       // Criar cache de preços para lookup rápido (incluindo categoria e prioridade)
-      // BUSCA EXATA - chave inclui MOD+ESP+CAT+PRIOR
+      // ⚠️ Cache só é usado para clientes SEM faixas de volume
       const precosCache = new Map<string, number>();
       const precosFaltantesCliente = new Set<string>(); // Track de arranjos sem preço
       
-      (precosCliente || []).forEach((preco: any) => {
-        const mod = (preco.modalidade || '').toString().toUpperCase().trim();
-        const esp = (preco.especialidade || '').toString().toUpperCase().trim();
-        const cat = (preco.categoria || 'N/A').toString().toUpperCase().trim();
-        const pri = (preco.prioridade || 'ROTINA').toString().toUpperCase().trim();
-        const key = `${mod}|${esp}|${cat}|${pri}`;
-        if (!precosCache.has(key)) {
-          precosCache.set(key, Number(preco.valor_base) || 0);
-        }
-      });
+      if (!clienteTemFaixasVolume) {
+        // Só popula cache se cliente NÃO tem faixas de volume
+        (precosCliente || []).forEach((preco: any) => {
+          const mod = (preco.modalidade || '').toString().toUpperCase().trim();
+          const esp = (preco.especialidade || '').toString().toUpperCase().trim();
+          const cat = (preco.categoria || 'N/A').toString().toUpperCase().trim();
+          const pri = (preco.prioridade || 'ROTINA').toString().toUpperCase().trim();
+          const key = `${mod}|${esp}|${cat}|${pri}`;
+          if (!precosCache.has(key)) {
+            precosCache.set(key, Number(preco.valor_base) || 0);
+          }
+        });
+      }
 
       // Processar exames - BUSCA EXATA SEM FALLBACK
       const examesCalculados: any[] = [];
+      
+      // ✅ Cache de RPC para evitar chamadas repetidas com mesmos parâmetros
+      const rpcCache = new Map<string, number>();
       
       for (const v of volumetria) {
         if (v.tipo_faturamento === 'NC-NF' || v.tipo_faturamento === 'EXCLUSAO') {
@@ -620,32 +639,65 @@ serve(async (req) => {
           const pri = (v.PRIORIDADE || 'ROTINA').toString().toUpperCase().trim();
           const key = `${mod}|${esp}|${cat}|${pri}`;
           
-          // Buscar preço EXATO do cache
-          let valorUnitario = precosCache.get(key);
+          let valorUnitario: number | undefined;
           
-          // Se não encontrou no cache, tentar RPC (que agora também é EXATO)
-          if (valorUnitario === undefined) {
-            const { data: precoData, error: precoError } = await supabase
-              .rpc('calcular_preco_exame', {
-                p_cliente_id: cliente.id,
-                p_modalidade: mod,
-                p_especialidade: esp,
-                p_categoria: cat,
-                p_prioridade: pri,
-                p_volume_total: 0,
-                p_cond_volume: 'MOD/ESP/CAT',
-                p_periodo: periodo
-              });
-            
-            if (precoError) {
-              console.error(`❌ RPC erro ${nomeFantasia} (${key}):`, precoError);
-              valorUnitario = 0;
+          // ✅ PARA CLIENTES COM FAIXAS DE VOLUME: SEMPRE usar RPC
+          if (clienteTemFaixasVolume) {
+            // Verificar cache de RPC primeiro
+            if (rpcCache.has(key)) {
+              valorUnitario = rpcCache.get(key)!;
             } else {
-              valorUnitario = Number(precoData) || 0;
+              // Chamar RPC com parâmetros corretos (volume, cond_volume, periodo)
+              const { data: precoData, error: precoError } = await supabase
+                .rpc('calcular_preco_exame', {
+                  p_cliente_id: cliente.id,
+                  p_modalidade: mod,
+                  p_especialidade: esp,
+                  p_categoria: cat,
+                  p_prioridade: pri,
+                  p_volume_total: totalExames, // ✅ Volume total real
+                  p_cond_volume: condVolumeCliente, // ✅ Condição de volume do cliente
+                  p_periodo: periodo // ✅ Período para cálculo correto
+                });
+              
+              if (precoError) {
+                console.error(`❌ RPC erro ${nomeFantasia} (${key}):`, precoError);
+                valorUnitario = 0;
+              } else {
+                valorUnitario = Number(precoData) || 0;
+              }
+              
+              // Salvar no cache de RPC para reutilizar
+              rpcCache.set(key, valorUnitario);
             }
+          } else {
+            // Para clientes SEM faixas de volume: usar cache simples
+            valorUnitario = precosCache.get(key);
             
-            // Salvar no cache para reutilizar
-            precosCache.set(key, valorUnitario);
+            // Se não encontrou no cache, tentar RPC
+            if (valorUnitario === undefined) {
+              const { data: precoData, error: precoError } = await supabase
+                .rpc('calcular_preco_exame', {
+                  p_cliente_id: cliente.id,
+                  p_modalidade: mod,
+                  p_especialidade: esp,
+                  p_categoria: cat,
+                  p_prioridade: pri,
+                  p_volume_total: 0,
+                  p_cond_volume: 'MOD/ESP/CAT',
+                  p_periodo: periodo
+                });
+              
+              if (precoError) {
+                console.error(`❌ RPC erro ${nomeFantasia} (${key}):`, precoError);
+                valorUnitario = 0;
+              } else {
+                valorUnitario = Number(precoData) || 0;
+              }
+              
+              // Salvar no cache para reutilizar
+              precosCache.set(key, valorUnitario);
+            }
           }
           
           const quantidade = Number(v.VALORES) || 1;
