@@ -146,9 +146,15 @@ export default function GerarFaturamento() {
   const [tempoInicioProcessamento, setTempoInicioProcessamento] = useState(0);
   const [mostrarMonitoramento, setMostrarMonitoramento] = useState(false);
   
-  // 🚨 Estado para alertas de preços não cadastrados
-  const [precosFaltantes, setPrecosFaltantes] = useState<PrecoFaltante[]>([]);
-  const [mostrarAlertasPrecos, setMostrarAlertasPrecos] = useState(false);
+  // 🚨 Estado para alertas de preços não cadastrados - carregar do localStorage
+  const [precosFaltantes, setPrecosFaltantes] = useState<PrecoFaltante[]>(() => {
+    const saved = localStorage.getItem('precosFaltantes_2025-10');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [mostrarAlertasPrecos, setMostrarAlertasPrecos] = useState(() => {
+    const saved = localStorage.getItem('precosFaltantes_2025-10');
+    return saved ? JSON.parse(saved).length > 0 : false;
+  });
 
   // Quando todos os lotes terminarem (concluído ou erro), finalizar processamento e ocultar painel
   useEffect(() => {
@@ -1360,13 +1366,17 @@ export default function GerarFaturamento() {
         }
         
         // 🚨 ALERTAS DE PREÇOS NÃO CADASTRADOS
-        if (Array.isArray(data?.precos_nao_cadastrados) && data.precos_nao_cadastrados.length > 0) {
-          console.warn(`🚨 ${data.precos_nao_cadastrados.length} arranjos de preço não cadastrados!`);
-          setPrecosFaltantes(data.precos_nao_cadastrados);
-          setMostrarAlertasPrecos(true);
+        const alertasPrecos = Array.isArray(data?.precos_nao_cadastrados) ? data.precos_nao_cadastrados : [];
+        console.log(`🚨 [ALERTAS] Preços não cadastrados recebidos: ${alertasPrecos.length}`);
+        console.log(`🚨 [ALERTAS] Dados:`, JSON.stringify(alertasPrecos, null, 2));
+        setPrecosFaltantes(alertasPrecos);
+        setMostrarAlertasPrecos(alertasPrecos.length > 0);
+        
+        // Também salvar no localStorage para persistir entre reloads
+        if (alertasPrecos.length > 0) {
+          localStorage.setItem(`precosFaltantes_${periodoSelecionado}`, JSON.stringify(alertasPrecos));
         } else {
-          setPrecosFaltantes([]);
-          setMostrarAlertasPrecos(false);
+          localStorage.removeItem(`precosFaltantes_${periodoSelecionado}`);
         }
         
         if (Array.isArray(data?.alertas)) todosAlertas.push(...data.alertas);
