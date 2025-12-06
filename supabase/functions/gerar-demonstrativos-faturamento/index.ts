@@ -1262,6 +1262,15 @@ serve(async (req) => {
       }
     }
     
+    // 🚨 DEBUG: Log detalhado para debugging de alertas
+    console.log(`🔍 [DEBUG ALERTAS] precosNaoCadastrados inicial: ${precosNaoCadastrados.length}`);
+    console.log(`🔍 [DEBUG ALERTAS] alertasExtraidos: ${alertasExtraidos.length}`);
+    console.log(`🔍 [DEBUG ALERTAS] demonstrativos.length: ${demonstrativos.length}`);
+    
+    if (precosNaoCadastrados.length > 0) {
+      console.log(`🔍 [DEBUG ALERTAS] Primeiros 5 precos não cadastrados:`, JSON.stringify(precosNaoCadastrados.slice(0, 5), null, 2));
+    }
+    
     // Combinar alertas originais com alertas extraídos (remover duplicatas)
     const alertasFinais = [...precosNaoCadastrados];
     for (const alerta of alertasExtraidos) {
@@ -1279,10 +1288,12 @@ serve(async (req) => {
     
     // Resumo de preços não cadastrados
     const totalPrecosFaltantes = alertasFinais.length;
+    console.log(`🚨 [ALERTAS FINAL] Total de alertas a enviar: ${totalPrecosFaltantes}`);
+    
     if (totalPrecosFaltantes > 0) {
       console.warn(`🚨 ALERTAS FINAIS: ${totalPrecosFaltantes} arranjos de preço não cadastrados encontrados`);
     } else {
-      console.log(`✅ Todos os preços cadastrados - nenhum alerta`);
+      console.log(`✅ Todos os preços cadastrados - nenhum alerta (precosNaoCadastrados=${precosNaoCadastrados.length}, alertasExtraidos=${alertasExtraidos.length})`);
     }
 
     return new Response(
