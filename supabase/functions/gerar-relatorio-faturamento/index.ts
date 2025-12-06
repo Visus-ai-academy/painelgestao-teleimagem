@@ -377,14 +377,52 @@ serve(async (req: Request) => {
       return Number(selecionado.valor_base) || 0;
     };
 
-    // ✅ PRIORIDADE: Usar detalhes_exames do demonstrativo quando disponível
-    // Isso garante que relatório = demonstrativo (mesmos valores)
+    // ✅ CORREÇÃO CRÍTICA: SEMPRE usar detalhes_exames do demonstrativo
+    // O relatório DEVE ser 100% idêntico ao demonstrativo - SEM RECÁLCULO
     let examesDetalhados: any[] = [];
     
-    if (dadosFinais?.detalhes_exames && Array.isArray(dadosFinais.detalhes_exames) && dadosFinais.detalhes_exames.length > 0) {
-      // Usar dados já calculados do demonstrativo
-      console.log(`✅ Usando ${dadosFinais.detalhes_exames.length} exames do demonstrativo calculado`);
-      examesDetalhados = dadosFinais.detalhes_exames.map((e: any) => ({
+    // Verificar se temos demonstrativo com detalhes_exames
+    const temDemoComDetalhes = dadosFinais?.detalhes_exames && 
+                               Array.isArray(dadosFinais.detalhes_exames) && 
+                               dadosFinais.detalhes_exames.length > 0;
+    
+    if (temDemoComDetalhes) {
+      // ✅ USAR EXATAMENTE os dados do demonstrativo - SEM FALLBACK, SEM RECÁLCULO
+      console.log(`✅ [RELATÓRIO = DEMONSTRATIVO] Usando ${dadosFinais.detalhes_exames.length} exames do demonstrativo calculado`);
+      
+      examesDetalhados = dadosFinais.detalhes_exames.map((e: any) => {
+        // Log para exames sem preço (para debug)
+        if (e.status === 'sem_preco' || e.valor_unitario === 0) {
+          console.log(`📋 Exame sem preço incluído: ${e.modalidade} | ${e.especialidade} | ${e.categoria} | ${e.prioridade} - Valor: ${e.valor_total}`);
+        }
+        
+        return {
+          data_exame: '',
+          paciente: '',
+          medico: '',
+          exame: '',
+          modalidade: e.modalidade || '',
+          especialidade: e.especialidade || '',
+          categoria: e.categoria || '',
+          prioridade: e.prioridade || '',
+          accession_number: '',
+          origem: '',
+          quantidade: e.quantidade || 0,
+          // ✅ CRÍTICO: Usar valores EXATOS do demonstrativo, mesmo se zero
+          valor_unitario: e.valor_unitario ?? 0,
+          valor_total: e.valor_total ?? 0,
+          status: e.status || 'com_preco'
+        };
+      });
+      
+      console.log(`📊 Total exames mapeados: ${examesDetalhados.length}`);
+      console.log(`📊 Exames sem preço: ${examesDetalhados.filter(e => e.status === 'sem_preco' || e.valor_unitario === 0).length}`);
+      
+    } else if (demo?.detalhes_exames && Array.isArray(demo.detalhes_exames) && demo.detalhes_exames.length > 0) {
+      // Fallback: tentar usar demo do banco se dadosFinais não tiver
+      console.log(`⚠️ Usando detalhes_exames do demo (banco) - ${demo.detalhes_exames.length} exames`);
+      
+      examesDetalhados = demo.detalhes_exames.map((e: any) => ({
         data_exame: '',
         paciente: '',
         medico: '',
@@ -396,13 +434,16 @@ serve(async (req: Request) => {
         accession_number: '',
         origem: '',
         quantidade: e.quantidade || 0,
-        valor_unitario: e.valor_unitario || 0,
-        valor_total: e.valor_total || 0,
+        valor_unitario: e.valor_unitario ?? 0,
+        valor_total: e.valor_total ?? 0,
         status: e.status || 'com_preco'
       }));
+      
     } else {
-      // Fallback: calcular a partir da volumetria usando busca EXATA
-      console.log(`⚠️ Sem detalhes_exames no demonstrativo - calculando a partir da volumetria`);
+      // ⚠️ ÚLTIMO RECURSO: Calcular a partir da volumetria usando busca EXATA
+      // Isso só deve acontecer se NÃO houver demonstrativo
+      console.warn(`⚠️ SEM detalhes_exames disponível - calculando a partir da volumetria (NÃO RECOMENDADO)`);
+      
       examesDetalhados = (volumetriaFiltrada || []).map(v => {
         const valorUnitario = buscarPrecoExato(v);
         const quantidade = v.VALORES || 1;
