@@ -1233,10 +1233,56 @@ serve(async (req) => {
     // Isso elimina o timeout da edge function e torna o processo muito mais rápido
     console.log(`✅ Demonstrativos salvos. PDFs serão gerados separadamente pelo usuário.`);
 
+    // 🚨 EXTRAIR ALERTAS DE PREÇOS FALTANTES DOS DEMONSTRATIVOS GERADOS
+    // Isso garante que todos os exames com status: 'sem_preco' sejam reportados
+    const alertasExtraidos: Array<{
+      cliente_nome: string;
+      modalidade: string;
+      especialidade: string;
+      categoria: string;
+      prioridade: string;
+      quantidade: number;
+    }> = [];
+    
+    for (const demo of demonstrativos) {
+      if (demo.detalhes_exames && Array.isArray(demo.detalhes_exames)) {
+        for (const exame of demo.detalhes_exames) {
+          if (exame.status === 'sem_preco' || exame.valor_unitario === 0) {
+            alertasExtraidos.push({
+              cliente_nome: demo.cliente_nome,
+              modalidade: exame.modalidade || '',
+              especialidade: exame.especialidade || '',
+              categoria: exame.categoria || '',
+              prioridade: exame.prioridade || '',
+              quantidade: exame.quantidade || 0
+            });
+            console.warn(`🚨 PREÇO FALTANTE EXTRAÍDO: ${demo.cliente_nome} | ${exame.modalidade} | ${exame.especialidade} | ${exame.categoria} | ${exame.prioridade} (${exame.quantidade} exames)`);
+          }
+        }
+      }
+    }
+    
+    // Combinar alertas originais com alertas extraídos (remover duplicatas)
+    const alertasFinais = [...precosNaoCadastrados];
+    for (const alerta of alertasExtraidos) {
+      const jaExiste = alertasFinais.some(a => 
+        a.cliente_nome === alerta.cliente_nome &&
+        a.modalidade === alerta.modalidade &&
+        a.especialidade === alerta.especialidade &&
+        a.categoria === alerta.categoria &&
+        a.prioridade === alerta.prioridade
+      );
+      if (!jaExiste) {
+        alertasFinais.push(alerta);
+      }
+    }
+    
     // Resumo de preços não cadastrados
-    const totalPrecosFaltantes = precosNaoCadastrados.length;
+    const totalPrecosFaltantes = alertasFinais.length;
     if (totalPrecosFaltantes > 0) {
-      console.warn(`🚨 ALERTAS: ${totalPrecosFaltantes} arranjos de preço não cadastrados encontrados`);
+      console.warn(`🚨 ALERTAS FINAIS: ${totalPrecosFaltantes} arranjos de preço não cadastrados encontrados`);
+    } else {
+      console.log(`✅ Todos os preços cadastrados - nenhum alerta`);
     }
 
     return new Response(
@@ -1248,7 +1294,7 @@ serve(async (req) => {
         clientes_pulados: clientesPuladosCount,
         erros: clientesComErro.map(e => ({ cliente: e.nome, erro: e.erro })),
         // 🚨 ALERTAS DE PREÇOS NÃO CADASTRADOS
-        precos_nao_cadastrados: precosNaoCadastrados,
+        precos_nao_cadastrados: alertasFinais,
         total_alertas_precos: totalPrecosFaltantes
       }),
       {
