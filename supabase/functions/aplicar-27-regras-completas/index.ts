@@ -297,6 +297,8 @@ Deno.serve(async (req) => {
 
       // REGRA v011: Processamento de Categorias de Exames
       // Critério: Processa e categoriza exames com base na tabela cadastro_exames
+      // TODOS os exames estão no cadastro e TODOS possuem categoria definida (incluindo "SC")
+      // NÃO há fallback - categoria vem exclusivamente do cadastro_exames
       console.log('  ⚡ Aplicando v011 - Processamento de Categorias de Exames')
       
       // Buscar categorias do cadastro de exames
@@ -325,7 +327,7 @@ Deno.serve(async (req) => {
           
           // Agrupar por categoria para updates em batch
           const updatesPorCategoria = new Map<string, string[]>()
-          const idsParaSC: string[] = []
+          let naoEncontradosNoCadastro = 0
           
           for (const registro of registrosSemCategoria) {
             const nomeExame = registro.ESTUDO_DESCRICAO?.toUpperCase().trim() || ''
@@ -337,12 +339,13 @@ Deno.serve(async (req) => {
               }
               updatesPorCategoria.get(categoria)!.push(registro.id)
             } else {
-              // Exame não encontrado no cadastro -> SC (Sem Categoria)
-              idsParaSC.push(registro.id)
+              // Exame não encontrado no cadastro - NÃO aplicar fallback
+              // Isso indica um exame "fora do padrão" que precisa ser cadastrado
+              naoEncontradosNoCadastro++
             }
           }
           
-          // Aplicar updates por categoria
+          // Aplicar updates por categoria (vindas do cadastro_exames)
           for (const [categoria, ids] of updatesPorCategoria) {
             if (ids.length > 0) {
               // Processar em batches de 500
@@ -355,18 +358,12 @@ Deno.serve(async (req) => {
             }
           }
           
-          // Aplicar SC para exames sem categoria no cadastro
-          if (idsParaSC.length > 0) {
-            for (let i = 0; i < idsParaSC.length; i += 500) {
-              const batch = idsParaSC.slice(i, i + 500)
-              await supabase.from('volumetria_mobilemed')
-                .update({ CATEGORIA: 'SC', updated_at: new Date().toISOString() })
-                .in('id', batch)
-            }
+          const totalCategorizados = Array.from(updatesPorCategoria.values()).reduce((sum, ids) => sum + ids.length, 0)
+          console.log(`    v011: Categorias aplicadas do cadastro: ${totalCategorizados} registros`)
+          console.log(`    v011: Categorias distintas: ${updatesPorCategoria.size}`)
+          if (naoEncontradosNoCadastro > 0) {
+            console.log(`    v011: AVISO - ${naoEncontradosNoCadastro} exames não encontrados no cadastro (fora do padrão)`)
           }
-          
-          console.log(`    v011: Categorias aplicadas do cadastro: ${updatesPorCategoria.size} categorias distintas`)
-          console.log(`    v011: Registros com SC (sem cadastro): ${idsParaSC.length}`)
         }
       }
       regrasAplicadasArquivo.add('v011')
