@@ -1,5 +1,5 @@
-import { AlertTriangle, X, Download, CheckCircle } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AlertTriangle, X, Download, CheckCircle, RefreshCw, Loader2 } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -25,9 +25,11 @@ export interface PrecoFaltante {
 interface AlertasPrecosFaltantesProps {
   alertas: PrecoFaltante[];
   onClose?: () => void;
+  onRefresh?: () => Promise<void>;
+  isLoading?: boolean;
 }
 
-export function AlertasPrecosFaltantes({ alertas, onClose }: AlertasPrecosFaltantesProps) {
+export function AlertasPrecosFaltantes({ alertas, onClose, onRefresh, isLoading }: AlertasPrecosFaltantesProps) {
   // Componente sempre visível - se não houver alertas, mostra mensagem de sucesso
   const temAlertas = alertas && alertas.length > 0;
 
@@ -76,17 +78,36 @@ export function AlertasPrecosFaltantes({ alertas, onClose }: AlertasPrecosFaltan
                 Preços - Status
               </CardTitle>
             </div>
+            {onRefresh && (
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={onRefresh}
+                disabled={isLoading}
+                className="gap-1"
+              >
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                Atualizar
+              </Button>
+            )}
           </div>
-          <div className="flex gap-4 mt-2">
-            <Badge variant="outline" className="text-sm border-green-500/50 text-green-600">
-              Todos os preços cadastrados
-            </Badge>
-          </div>
+          <CardDescription>
+            Verificação de preços cadastrados para o período selecionado
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Nenhum preço faltante identificado. Todos os arranjos de exames possuem preços cadastrados.
-          </p>
+          <div className="flex items-center gap-4">
+            <Badge variant="outline" className="text-sm border-green-500/50 text-green-600 px-3 py-1">
+              ✓ Todos os preços cadastrados
+            </Badge>
+            <span className="text-sm text-muted-foreground">
+              Nenhum arranjo de exame sem preço encontrado nos demonstrativos.
+            </span>
+          </div>
         </CardContent>
       </Card>
     );
@@ -104,6 +125,22 @@ export function AlertasPrecosFaltantes({ alertas, onClose }: AlertasPrecosFaltan
             </CardTitle>
           </div>
           <div className="flex items-center gap-2">
+            {onRefresh && (
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={onRefresh}
+                disabled={isLoading}
+                className="gap-1"
+              >
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                Atualizar
+              </Button>
+            )}
             <Button 
               variant="outline" 
               size="sm"
