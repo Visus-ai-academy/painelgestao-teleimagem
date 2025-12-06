@@ -3875,6 +3875,7 @@ export type Database = {
       valores_referencia_de_para: {
         Row: {
           ativo: boolean
+          cadastro_exame_id: string | null
           created_at: string
           created_by: string | null
           estudo_descricao: string
@@ -3884,6 +3885,7 @@ export type Database = {
         }
         Insert: {
           ativo?: boolean
+          cadastro_exame_id?: string | null
           created_at?: string
           created_by?: string | null
           estudo_descricao: string
@@ -3893,6 +3895,7 @@ export type Database = {
         }
         Update: {
           ativo?: boolean
+          cadastro_exame_id?: string | null
           created_at?: string
           created_by?: string | null
           estudo_descricao?: string
@@ -3900,7 +3903,15 @@ export type Database = {
           updated_at?: string
           valores?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "valores_referencia_de_para_cadastro_exame_id_fkey"
+            columns: ["cadastro_exame_id"]
+            isOneToOne: false
+            referencedRelation: "cadastro_exames"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       volumetria_erros: {
         Row: {
