@@ -40,7 +40,9 @@ serve(async (req) => {
     const TIPOS_VALIDOS_FATURAMENTO = ['CO-FT', 'CO-NF', 'NC-FT', 'NC-NF', 'NC1-NF'];
     
     // Clientes que precisam ser forçadamente retipificados (override)
-    const CLIENTES_FORCAR_RETIPIFICACAO = ['RADI-IMAGEM'];
+    // CEMVALENCA_RX e CEMVALENCA_PL são derivados de CEMVALENCA e precisam de retipificação forçada
+    // porque podem ter sido tipificados antes do agrupamento de clientes
+    const CLIENTES_FORCAR_RETIPIFICACAO = ['RADI-IMAGEM', 'CEMVALENCA_RX', 'CEMVALENCA_PL'];
     
     // 1. Primeiro: Limpar tipos inválidos se houver período especificado
     if (periodo_referencia) {
