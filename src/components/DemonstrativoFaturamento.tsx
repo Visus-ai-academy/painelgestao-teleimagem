@@ -1617,6 +1617,66 @@ export default function DemonstrativoFaturamento() {
               >
                 {ordemAlfabetica ? 'Z-A' : 'A-Z'}
               </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  // Exportar dados expandidos para Excel
+                  const dadosExport: any[] = [];
+                  
+                  clientesFiltrados.forEach(cliente => {
+                    if (cliente.detalhes_exames && cliente.detalhes_exames.length > 0) {
+                      // Adicionar cada detalhe como uma linha separada
+                      cliente.detalhes_exames.forEach(detalhe => {
+                        dadosExport.push({
+                          'Cliente': cliente.nome,
+                          'Tipo Faturamento': cliente.tipo_faturamento || '',
+                          'Status': cliente.status_pagamento,
+                          'Modalidade': detalhe.modalidade,
+                          'Especialidade': detalhe.especialidade,
+                          'Categoria': detalhe.categoria,
+                          'Prioridade': detalhe.prioridade,
+                          'Quantidade': detalhe.quantidade,
+                          'Valor Unitário': detalhe.valor_unitario,
+                          'Valor Total': detalhe.valor_total,
+                          'Total Exames Cliente': cliente.total_exames,
+                          'Valor Bruto Cliente': cliente.valor_bruto,
+                          'Valor Líquido Cliente': cliente.valor_liquido
+                        });
+                      });
+                    } else {
+                      // Cliente sem detalhes - adicionar linha resumo
+                      dadosExport.push({
+                        'Cliente': cliente.nome,
+                        'Tipo Faturamento': cliente.tipo_faturamento || '',
+                        'Status': cliente.status_pagamento,
+                        'Modalidade': '',
+                        'Especialidade': '',
+                        'Categoria': '',
+                        'Prioridade': '',
+                        'Quantidade': '',
+                        'Valor Unitário': '',
+                        'Valor Total': '',
+                        'Total Exames Cliente': cliente.total_exames,
+                        'Valor Bruto Cliente': cliente.valor_bruto,
+                        'Valor Líquido Cliente': cliente.valor_liquido
+                      });
+                    }
+                  });
+                  
+                  const ws = XLSX.utils.json_to_sheet(dadosExport);
+                  const wb = XLSX.utils.book_new();
+                  XLSX.utils.book_append_sheet(wb, ws, 'Faturamento Expandido');
+                  XLSX.writeFile(wb, `faturamento_expandido_${periodo}.xlsx`);
+                  toast({
+                    title: "Exportação concluída",
+                    description: `${dadosExport.length} registros exportados para Excel`,
+                  });
+                }}
+              >
+                <Download className="h-4 w-4 mr-1" />
+                Exportar Excel
+              </Button>
             </div>
           </div>
         </CardHeader>
