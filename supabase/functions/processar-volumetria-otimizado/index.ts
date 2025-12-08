@@ -346,6 +346,39 @@ serve(async (req) => {
         console.warn(`⚠️ Quebras falharam, mas processamento continua`);
       }
 
+      // ✅ PASSO 2.7: Aplicar agrupamento de clientes (CEMVALENCA → CEMVALENCA_RX/PL, DIAGNOSTICA, etc.)
+      // CRÍTICO: Deve executar ANTES da tipificação para que os clientes sejam agrupados corretamente
+      console.log('\n🎯 === APLICANDO AGRUPAMENTO DE CLIENTES ===');
+      let agrupamentoSucesso = true;
+      try {
+        const { data: agrupamentoResult, error: agrupamentoError } = await supabaseClient.functions.invoke(
+          'aplicar-agrupamento-clientes',
+          {
+            body: {}
+          }
+        );
+
+        if (agrupamentoError) {
+          console.error('❌ ERRO ao aplicar agrupamento:', agrupamentoError);
+          agrupamentoSucesso = false;
+        } else if (agrupamentoResult && agrupamentoResult.success) {
+          console.log(`✅ Agrupamento aplicado:`);
+          console.log(`   - Total mapeados: ${agrupamentoResult.total_mapeados || 0}`);
+          console.log(`   - DIAGNOSTICA agrupados: ${agrupamentoResult.diagnostica_agrupados || 0}`);
+          console.log(`   - CEMVALENCA_RX movidos: ${agrupamentoResult.cemvalenca_rx_movidos || 0}`);
+          console.log(`   - CEMVALENCA_PL movidos: ${agrupamentoResult.cemvalenca_pl_movidos || 0}`);
+        } else {
+          console.log(`ℹ️ Nenhum agrupamento necessário`);
+        }
+      } catch (agrupamentoError) {
+        console.error(`❌ ERRO na aplicação de agrupamento (não crítico):`, agrupamentoError);
+        agrupamentoSucesso = false;
+      }
+
+      if (!agrupamentoSucesso) {
+        console.warn(`⚠️ Agrupamento falhou, mas processamento continua`);
+      }
+
       // ✅ PASSO 3: Aplicar tipificação de faturamento
       console.log('\n🎯 === APLICANDO TIPIFICAÇÃO DE FATURAMENTO ===');
       let tipificacaoSucesso = true;
