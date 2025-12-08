@@ -592,13 +592,23 @@ serve(async (req) => {
         p.volume_inicial !== null || p.volume_final !== null
       );
       
-      // Obter cond_volume do cliente (padrão MOD/ESP/CAT)
-      const condVolumeCliente = precosCliente?.[0]?.cond_volume || 'MOD/ESP/CAT';
-      const consideraPlantao = precosCliente?.[0]?.considera_prioridade_plantao !== false;
+      // ✅ Criar mapa de cond_volume por arranjo (MOD+ESP+CAT+PRIOR)
+      // Cada arranjo pode ter sua própria condição de volume!
+      const condVolumeMap = new Map<string, string>();
+      (precosCliente || []).forEach((preco: any) => {
+        const mod = (preco.modalidade || '').toString().toUpperCase().trim();
+        const esp = (preco.especialidade || '').toString().toUpperCase().trim();
+        const cat = (preco.categoria || 'N/A').toString().toUpperCase().trim();
+        const pri = (preco.prioridade || 'ROTINA').toString().toUpperCase().trim();
+        const key = `${mod}|${esp}|${cat}|${pri}`;
+        if (preco.cond_volume && !condVolumeMap.has(key)) {
+          condVolumeMap.set(key, preco.cond_volume.toUpperCase().trim());
+        }
+      });
       
       if (clienteTemFaixasVolume) {
         console.log(`📊 ${nomeFantasia}: Cliente com FAIXAS DE VOLUME - SEMPRE usar RPC`);
-        console.log(`   cond_volume: ${condVolumeCliente}, considera_plantao: ${consideraPlantao}`);
+        console.log(`   Arranjos com cond_volume definido: ${condVolumeMap.size}`);
       }
 
       // Criar cache de preços para lookup rápido (incluindo categoria e prioridade)
@@ -647,7 +657,10 @@ serve(async (req) => {
             if (rpcCache.has(key)) {
               valorUnitario = rpcCache.get(key)!;
             } else {
-              // Chamar RPC com parâmetros corretos (volume, cond_volume, periodo)
+              // ✅ Obter cond_volume específico do arranjo (ou fallback para MOD/ESP/CAT)
+              const condVolumeArranjo = condVolumeMap.get(key) || 'MOD/ESP/CAT';
+              
+              // Chamar RPC com parâmetros corretos (cond_volume específico do arranjo)
               const { data: precoData, error: precoError } = await supabase
                 .rpc('calcular_preco_exame', {
                   p_cliente_id: cliente.id,
@@ -655,8 +668,8 @@ serve(async (req) => {
                   p_especialidade: esp,
                   p_categoria: cat,
                   p_prioridade: pri,
-                  p_volume_total: totalExames, // ✅ Volume total real
-                  p_cond_volume: condVolumeCliente, // ✅ Condição de volume do cliente
+                  p_volume_total: 0, // RPC calcula internamente baseado no cond_volume
+                  p_cond_volume: condVolumeArranjo, // ✅ Condição de volume ESPECÍFICA do arranjo
                   p_periodo: periodo // ✅ Período para cálculo correto
                 });
               
