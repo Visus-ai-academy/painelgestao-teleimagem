@@ -493,76 +493,133 @@ export default function GerarFaturamento() {
   const handleExportarRelatoriosFaturamentoExcel = async () => {
     try {
       toast({
-        title: "Exportando dados...",
-        description: "Aguarde enquanto preparamos o arquivo Excel",
+        title: "Exportando dados do Quadro 2...",
+        description: "Buscando dados de faturamento e calculando valores...",
       });
 
-      // Buscar todos os dados do quadro 2 (volumetria_mobilemed) para o período
+      // 1. Buscar demonstrativos com detalhes de exames para obter preços
+      const { data: demonstrativos, error: demoError } = await supabase
+        .from('demonstrativos_faturamento_calculados')
+        .select('cliente_nome, detalhes_exames')
+        .eq('periodo_referencia', periodoSelecionado);
+
+      if (demoError) throw demoError;
+
+      // Criar mapa de preços por cliente+modalidade+especialidade+categoria+prioridade
+      const precosMap = new Map<string, { valor_unitario: number; valor_total: number }>();
+      demonstrativos?.forEach((demo: any) => {
+        const clienteNome = demo.cliente_nome;
+        const detalhes = demo.detalhes_exames || [];
+        detalhes.forEach((d: any) => {
+          const key = `${clienteNome}|${d.modalidade}|${d.especialidade}|${d.categoria}|${d.prioridade}`;
+          precosMap.set(key, { 
+            valor_unitario: d.valor_unitario || 0, 
+            valor_total: d.valor_total || 0 
+          });
+        });
+      });
+
+      // 2. Buscar dados do Quadro 2 (volumetria faturada)
       const { data: dadosVolumetria, error } = await supabase
         .from('volumetria_mobilemed')
         .select('*')
         .eq('periodo_referencia', periodoSelecionado)
+        .in('tipo_faturamento', ['CO-FT', 'NC-FT', 'NC1-FT'])
+        .order('Cliente_Nome_Fantasia', { ascending: true })
         .order('DATA_REALIZACAO', { ascending: false });
 
       if (error) throw error;
 
       if (!dadosVolumetria || dadosVolumetria.length === 0) {
         toast({
-          title: "Nenhum dado encontrado",
-          description: `Não há dados de volumetria para o período ${periodoSelecionado}`,
+          title: "Nenhum dado faturado encontrado",
+          description: `Não há exames faturados (CO-FT, NC-FT, NC1-FT) para o período ${periodoSelecionado}`,
           variant: "destructive",
         });
         return;
       }
 
-      // Preparar dados para o Excel - Quadro 2
-      const dadosExcel = dadosVolumetria.map((item: any) => ({
-        'Data Realização': item.DATA_REALIZACAO || '',
-        'Data Laudo': item.DATA_LAUDO || '',
-        'Paciente': item.NOME_PACIENTE || '',
-        'Médico': item.MEDICO || '',
-        'Exame': item.ESTUDO_DESCRICAO || '',
-        'Modalidade': item.MODALIDADE || '',
-        'Especialidade': item.ESPECIALIDADE || '',
-        'Prioridade': item.PRIORIDADE || '',
-        'Accession': item.ACCESSION_NUMBER || '',
-        'Cliente': item.EMPRESA || '',
-        'Quantidade': item.VALORES || 1,
-        'Status': item.STATUS || ''
-      }));
+      // 3. Preparar dados para o Excel - Quadro 2 com valores
+      const dadosExcel = dadosVolumetria.map((item: any) => {
+        const clienteNome = item.Cliente_Nome_Fantasia || item.EMPRESA || '';
+        const chavePreco = `${clienteNome}|${item.MODALIDADE}|${item.ESPECIALIDADE}|${item.CATEGORIA}|${item.PRIORIDADE}`;
+        const preco = precosMap.get(chavePreco);
+        const quantidade = item.VALORES || 1;
+        const valorUnitario = preco?.valor_unitario || 0;
+        const valorTotal = valorUnitario * quantidade;
 
-      // Criar workbook e worksheet
+        return {
+          'Cliente': clienteNome,
+          'Data Realização': item.DATA_REALIZACAO || '',
+          'Data Laudo': item.DATA_LAUDO || '',
+          'Paciente': item.NOME_PACIENTE || '',
+          'Médico': item.MEDICO || '',
+          'Exame': item.ESTUDO_DESCRICAO || '',
+          'Modalidade': item.MODALIDADE || '',
+          'Especialidade': item.ESPECIALIDADE || '',
+          'Categoria': item.CATEGORIA || '',
+          'Prioridade': item.PRIORIDADE || '',
+          'Accession': item.ACCESSION_NUMBER || '',
+          'Tipo Faturamento': item.tipo_faturamento || '',
+          'Quantidade': quantidade,
+          'Valor Unitário': valorUnitario,
+          'Valor Total': valorTotal
+        };
+      });
+
+      // 4. Criar workbook e worksheet
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.json_to_sheet(dadosExcel);
 
       // Ajustar largura das colunas
       const colWidths = [
+        { wch: 25 }, // Cliente
         { wch: 14 }, // Data Realização
         { wch: 12 }, // Data Laudo
         { wch: 30 }, // Paciente
         { wch: 30 }, // Médico
         { wch: 40 }, // Exame
-        { wch: 12 }, // Modalidade
-        { wch: 18 }, // Especialidade
+        { wch: 10 }, // Modalidade
+        { wch: 20 }, // Especialidade
+        { wch: 15 }, // Categoria
         { wch: 12 }, // Prioridade
-        { wch: 15 }, // Accession
-        { wch: 25 }, // Cliente
+        { wch: 18 }, // Accession
+        { wch: 14 }, // Tipo Faturamento
         { wch: 10 }, // Quantidade
-        { wch: 12 }, // Status
+        { wch: 14 }, // Valor Unitário
+        { wch: 14 }, // Valor Total
       ];
       ws['!cols'] = colWidths;
 
-      XLSX.utils.book_append_sheet(wb, ws, 'Quadro 2 - Faturamento');
+      XLSX.utils.book_append_sheet(wb, ws, 'Quadro 2 - Detalhamento');
 
-      // Gerar nome do arquivo
-      const nomeArquivo = `Quadro_2_Faturamento_${periodoSelecionado}.xlsx`;
+      // 5. Criar aba de resumo por cliente
+      const resumoPorCliente = new Map<string, { quantidade: number; valorTotal: number }>();
+      dadosExcel.forEach((item: any) => {
+        const cliente = item['Cliente'];
+        const atual = resumoPorCliente.get(cliente) || { quantidade: 0, valorTotal: 0 };
+        atual.quantidade += item['Quantidade'];
+        atual.valorTotal += item['Valor Total'];
+        resumoPorCliente.set(cliente, atual);
+      });
 
-      // Fazer download
+      const dadosResumo = Array.from(resumoPorCliente.entries()).map(([cliente, dados]) => ({
+        'Cliente': cliente,
+        'Total Exames': dados.quantidade,
+        'Valor Total': dados.valorTotal
+      })).sort((a, b) => a['Cliente'].localeCompare(b['Cliente']));
+
+      const wsResumo = XLSX.utils.json_to_sheet(dadosResumo);
+      wsResumo['!cols'] = [{ wch: 30 }, { wch: 15 }, { wch: 18 }];
+      XLSX.utils.book_append_sheet(wb, wsResumo, 'Resumo por Cliente');
+
+      // 6. Gerar nome do arquivo e fazer download
+      const nomeArquivo = `Quadro_2_Faturamento_Detalhado_${periodoSelecionado}.xlsx`;
       XLSX.writeFile(wb, nomeArquivo);
 
       toast({
         title: "Exportação concluída!",
-        description: `Arquivo ${nomeArquivo} baixado com sucesso`,
+        description: `${dadosExcel.length} registros exportados em ${nomeArquivo}`,
       });
     } catch (error) {
       console.error('Erro ao exportar:', error);
