@@ -18,11 +18,6 @@ Deno.serve(async (req) => {
 
     console.log('🔄 Iniciando aplicação de agrupamento de clientes...')
 
-    // 0. Preservar nome original em unidade_origem antes de aplicar mapeamentos
-    // Observação: copiar valor de outra coluna direto no update não é suportado pelo supabase-js sem SQL bruto.
-    // Para evitar erro e manter o processo simples, vamos pular esta etapa aqui.
-    console.log('ℹ️ Pulando preservação automática de unidade_origem (sem SQL/raw). Prosseguindo com mapeamentos...')
-
     // Detectar dinamicamente a coluna de prioridade (PRIORIDADE vs prioridade)
     let prioridadeCol = 'PRIORIDADE'
     try {
@@ -94,108 +89,124 @@ Deno.serve(async (req) => {
 
     console.log(`✅ Agrupados ${diagnosticaData?.length || 0} registros de DIAGNOSTICA PLANTAO_* para DIAGNOSTICA`)
 
-    // 3. Garantir que CEMVALENCA RX com prioridade PLANTÃO vá para CEMVALENCA_RX
-    let cemvalencaRxData: any[] | null = null
-    let cemvalencaRxError: any = null
-      let rxResp = await supabase
-        .from('volumetria_mobilemed')
-        .update({ EMPRESA: 'CEMVALENCA_RX' })
-        .eq('EMPRESA', 'CEMVALENCA')
-        .eq('MODALIDADE', 'RX')
-        .select('id')
+    // ========================================
+    // REGRAS CEMVALENCA - ORDEM IMPORTANTE:
+    // 1. RX ou DX → CEMVALENCA_RX (independente de prioridade)
+    // 2. PLANTÃO (não RX/DX) → CEMVALENCA_PL
+    // 3. Demais → CEMVALENCA
+    // ========================================
 
-    cemvalencaRxData = rxResp.data
-    cemvalencaRxError = rxResp.error
+    // 3. Mover exames RX de CEMVALENCA para CEMVALENCA_RX
+    const { data: cemvalencaRxData, error: cemvalencaRxError } = await supabase
+      .from('volumetria_mobilemed')
+      .update({ EMPRESA: 'CEMVALENCA_RX' })
+      .eq('EMPRESA', 'CEMVALENCA')
+      .eq('MODALIDADE', 'RX')
+      .select('id')
 
     if (cemvalencaRxError) {
-      console.error('❌ Erro ao processar CEMVALENCA_RX:', cemvalencaRxError)
+      console.error('❌ Erro ao processar CEMVALENCA_RX (RX):', cemvalencaRxError)
       throw cemvalencaRxError
     }
 
-    console.log(`✅ Movidos ${cemvalencaRxData?.length || 0} registros RX PLANTÃO para CEMVALENCA_RX`)
+    console.log(`✅ Movidos ${cemvalencaRxData?.length || 0} registros RX para CEMVALENCA_RX`)
 
-    // 4. Garantir que CEMVALENCA não-RX com prioridade PLANTÃO vá para CEMVALENCA_PL
-    let cemvalencaPlData: any[] | null = null
-    let cemvalencaPlError: any = null
-      let plResp = await supabase
-        .from('volumetria_mobilemed')
-        .update({ EMPRESA: 'CEMVALENCA_PL' })
-        .eq('EMPRESA', 'CEMVALENCA')
-        .neq('MODALIDADE', 'RX')
-        .ilike(prioridadeCol, '%PLANT%')
-        .select('id')
+    // 4. Mover exames DX de CEMVALENCA para CEMVALENCA_RX
+    const { data: cemvalencaDxData, error: cemvalencaDxError } = await supabase
+      .from('volumetria_mobilemed')
+      .update({ EMPRESA: 'CEMVALENCA_RX' })
+      .eq('EMPRESA', 'CEMVALENCA')
+      .eq('MODALIDADE', 'DX')
+      .select('id')
 
-    cemvalencaPlData = plResp.data
-    cemvalencaPlError = plResp.error
+    if (cemvalencaDxError) {
+      console.error('❌ Erro ao processar CEMVALENCA_RX (DX):', cemvalencaDxError)
+      throw cemvalencaDxError
+    }
+
+    console.log(`✅ Movidos ${cemvalencaDxData?.length || 0} registros DX para CEMVALENCA_RX`)
+
+    // 5. Mover exames com prioridade PLANTÃO de CEMVALENCA para CEMVALENCA_PL
+    // (RX/DX já foram movidos, então aqui só pega outros exames com PLANTÃO)
+    const { data: cemvalencaPlData, error: cemvalencaPlError } = await supabase
+      .from('volumetria_mobilemed')
+      .update({ EMPRESA: 'CEMVALENCA_PL' })
+      .eq('EMPRESA', 'CEMVALENCA')
+      .ilike(prioridadeCol, '%PLANT%')
+      .select('id')
 
     if (cemvalencaPlError) {
       console.error('❌ Erro ao processar CEMVALENCA_PL:', cemvalencaPlError)
       throw cemvalencaPlError
     }
 
-    console.log(`✅ Movidos ${cemvalencaPlData?.length || 0} registros não-RX PLANTÃO para CEMVALENCA_PL`)
+    console.log(`✅ Movidos ${cemvalencaPlData?.length || 0} registros PLANTÃO para CEMVALENCA_PL`)
 
-    // 5. Retornar registros indevidos (sem PLANTÃO) de CEMVALENCA_PL para CEMVALENCA
-    let cemvalencaPlRetData: any[] | null = null
-    let cemvalencaPlRetError: any = null
-      let plRetResp = await supabase
-        .from('volumetria_mobilemed')
-        .update({ EMPRESA: 'CEMVALENCA' })
-        .eq('EMPRESA', 'CEMVALENCA_PL')
-        .not(prioridadeCol, 'ilike', '%PLANT%')
-        .select('id')
-
-    cemvalencaPlRetData = plRetResp.data
-    cemvalencaPlRetError = plRetResp.error
+    // 6. Correção: Retornar registros de CEMVALENCA_PL que não são PLANTÃO para CEMVALENCA
+    const { data: cemvalencaPlRetData, error: cemvalencaPlRetError } = await supabase
+      .from('volumetria_mobilemed')
+      .update({ EMPRESA: 'CEMVALENCA' })
+      .eq('EMPRESA', 'CEMVALENCA_PL')
+      .not(prioridadeCol, 'ilike', '%PLANT%')
+      .select('id')
 
     if (cemvalencaPlRetError) {
       console.error('❌ Erro ao retornar indevidos de CEMVALENCA_PL:', cemvalencaPlRetError)
       throw cemvalencaPlRetError
     }
 
-    console.log(`✅ Retornados ${cemvalencaPlRetData?.length || 0} registros de CEMVALENCA_PL → CEMVALENCA (sem PLANTÃO) `)
+    console.log(`✅ Retornados ${cemvalencaPlRetData?.length || 0} registros de CEMVALENCA_PL → CEMVALENCA (sem PLANTÃO)`)
 
-    // 6. Retornar registros indevidos (sem PLANTÃO) de CEMVALENCA_RX para CEMVALENCA
-    let cemvalencaRxRetData: any[] | null = null
-    let cemvalencaRxRetError: any = null
-      let rxRetResp = await supabase
-        .from('volumetria_mobilemed')
-        .update({ EMPRESA: 'CEMVALENCA' })
-        .eq('EMPRESA', 'CEMVALENCA_RX')
-        .neq('MODALIDADE', 'RX')
-        .select('id')
-
-    cemvalencaRxRetData = rxRetResp.data
-    cemvalencaRxRetError = rxRetResp.error
+    // 7. Correção: Retornar registros de CEMVALENCA_RX que não são RX nem DX para CEMVALENCA
+    const { data: cemvalencaRxRetData, error: cemvalencaRxRetError } = await supabase
+      .from('volumetria_mobilemed')
+      .update({ EMPRESA: 'CEMVALENCA' })
+      .eq('EMPRESA', 'CEMVALENCA_RX')
+      .neq('MODALIDADE', 'RX')
+      .neq('MODALIDADE', 'DX')
+      .select('id')
 
     if (cemvalencaRxRetError) {
       console.error('❌ Erro ao retornar indevidos de CEMVALENCA_RX:', cemvalencaRxRetError)
       throw cemvalencaRxRetError
     }
 
-    console.log(`✅ Retornados ${cemvalencaRxRetData?.length || 0} registros de CEMVALENCA_RX → CEMVALENCA (sem PLANTÃO) `)
+    console.log(`✅ Retornados ${cemvalencaRxRetData?.length || 0} registros de CEMVALENCA_RX → CEMVALENCA (sem RX/DX)`)
 
-    // 7. Verificar quantos registros CEMVALENCA restaram
-    const { count: cemvalencaCount, error: countError } = await supabase
+    // 8. Verificar contagem final
+    const { count: cemvalencaCount } = await supabase
       .from('volumetria_mobilemed')
       .select('id', { count: 'exact', head: true })
       .eq('EMPRESA', 'CEMVALENCA')
 
-    if (countError) {
-      console.error('❌ Erro ao contar CEMVALENCA:', countError)
-    } else {
-      console.log(`📊 Registros restantes em CEMVALENCA: ${cemvalencaCount || 0}`)
-    }
+    const { count: cemvalencaRxCount } = await supabase
+      .from('volumetria_mobilemed')
+      .select('id', { count: 'exact', head: true })
+      .eq('EMPRESA', 'CEMVALENCA_RX')
+
+    const { count: cemvalencaPlCount } = await supabase
+      .from('volumetria_mobilemed')
+      .select('id', { count: 'exact', head: true })
+      .eq('EMPRESA', 'CEMVALENCA_PL')
+
+    console.log(`📊 Contagem final:`)
+    console.log(`   - CEMVALENCA: ${cemvalencaCount || 0}`)
+    console.log(`   - CEMVALENCA_RX: ${cemvalencaRxCount || 0}`)
+    console.log(`   - CEMVALENCA_PL: ${cemvalencaPlCount || 0}`)
 
     const resultado = {
       success: true,
       total_mapeados: totalMapeados,
       diagnostica_agrupados: diagnosticaData?.length || 0,
-      cemvalenca_rx_movidos: cemvalencaRxData?.length || 0,
+      cemvalenca_rx_movidos: (cemvalencaRxData?.length || 0) + (cemvalencaDxData?.length || 0),
       cemvalenca_pl_movidos: cemvalencaPlData?.length || 0,
       cemvalenca_pl_retorno: cemvalencaPlRetData?.length || 0,
       cemvalenca_rx_retorno: cemvalencaRxRetData?.length || 0,
-      cemvalenca_restantes: cemvalencaCount || 0,
+      contagem_final: {
+        cemvalenca: cemvalencaCount || 0,
+        cemvalenca_rx: cemvalencaRxCount || 0,
+        cemvalenca_pl: cemvalencaPlCount || 0
+      },
       mensagem: 'Agrupamento de clientes aplicado com sucesso'
     }
 
