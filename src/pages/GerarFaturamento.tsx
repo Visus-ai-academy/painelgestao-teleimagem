@@ -340,9 +340,9 @@ export default function GerarFaturamento() {
 
   // Resultados filtrados e ordenados para aba Relatórios
   const resultadosFiltradosRelatorios = useMemo(() => {
-    // Primeiro, remover duplicatas por clienteId
+    // Primeiro, remover duplicatas por clienteNome (para clientes multi-unidade como CEDIDIAG, PRN, RMPADUA)
     const uniqueResults = resultados.filter((resultado, index, array) => 
-      array.findIndex(r => r.clienteId === resultado.clienteId) === index
+      array.findIndex(r => r.clienteNome === resultado.clienteNome) === index
     );
     
     let filtrados = [...uniqueResults];
