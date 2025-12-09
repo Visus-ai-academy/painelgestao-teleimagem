@@ -3,7 +3,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Upload,
-  BarChart3,
   Settings,
   Activity,
   FileBarChart
@@ -13,7 +12,7 @@ import { VolumetriaPeriodoSelector } from "@/components/volumetria/VolumetriaPer
 import { VolumetriaUploadStats } from '@/components/volumetria/VolumetriaUploadStats';
 import { VolumetriaExamesNaoIdentificados } from '@/components/volumetria/VolumetriaExamesNaoIdentificados';
 import { VolumetriaStatusPanel } from '@/components/VolumetriaStatusPanel';
-import { AnaliseRegistrosExcluidos } from '@/components/AnaliseRegistrosExcluidos';
+
 import { AutoRegrasMaster } from '@/components/AutoRegrasMaster';
 import { TesteRegras27 } from '@/components/TesteRegras27';
 import { AplicarAgrupamentoClientes } from '@/components/AplicarAgrupamentoClientes';
@@ -63,22 +62,21 @@ export default function DadosVolumetria() {
 
       <VolumetriaProvider>
         <Tabs defaultValue="upload" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="upload" className="flex items-center gap-2">
               <Upload className="h-4 w-4" />
               Upload de Dados
             </TabsTrigger>
-            <TabsTrigger value="demonstrativo" className="flex items-center gap-2">
-              <FileBarChart className="h-4 w-4" />
-              Demonstrativo
-            </TabsTrigger>
-            <TabsTrigger value="sistema-regras" className="flex items-center gap-2">
+            <TabsTrigger 
+              value="sistema-regras" 
+              className="flex items-center gap-2 data-[state=active]:bg-orange-500 data-[state=active]:text-white text-orange-600 font-semibold"
+            >
               <Settings className="h-4 w-4" />
               Sistema de Regras
             </TabsTrigger>
-            <TabsTrigger value="registros-excluidos" className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              Registros Excluídos
+            <TabsTrigger value="demonstrativo" className="flex items-center gap-2">
+              <FileBarChart className="h-4 w-4" />
+              Demonstrativo
             </TabsTrigger>
           </TabsList>
 
@@ -268,9 +266,6 @@ export default function DadosVolumetria() {
             <AutoRegrasMaster />
           </TabsContent>
           
-          <TabsContent value="registros-excluidos">
-            <AnaliseRegistrosExcluidos />
-          </TabsContent>
         </Tabs>
       </VolumetriaProvider>
     </div>
