@@ -62,62 +62,20 @@ serve(async (req: Request) => {
     // Use the same Map approach as demonstrativo generation to avoid duplicates
     const volumetriaMap = new Map();
     
-    // ✅ CORREÇÃO CRÍTICA: Buscar nome_mobilemed dos parâmetros (fonte de verdade para correlação nome fantasia x nome mobilemed)
-    const { data: parametros } = await supabase
-      .from('parametros_faturamento')
-      .select('nome_mobilemed, nome_fantasia')
-      .eq('cliente_id', cliente_id);
-
-    // Coletar todos os nomes mobilemed + variantes do cliente
-    const nomeVariants = new Set([
-      cliente.nome,
-      cliente.nome_fantasia,
-      cliente.nome?.replace(/\s+/g, ''),
-      cliente.nome_fantasia?.replace(/\s+/g, ''),
-      cliente.nome?.replace(/_/g, ' '),
-      cliente.nome_fantasia?.replace(/_/g, ' '),
-    ].filter(Boolean));
-
-    // ✅ CRÍTICO: Adicionar TODOS os nomes mobilemed dos parâmetros
-    // Exemplos de correlações:
-    // - CLINICA_RADI (nome_fantasia) → MEDIMAGEMPLUS (nome_mobilemed)
-    // - IMD_CS (nome_fantasia) → IMD_CS, IMDBATATAIS, IMDGUARAI (possíveis na volumetria)
-    // - MATRIZ_ESPLANADA (nome_fantasia) → UNIMED_UBERABA_MATRIZ (nome_mobilemed na volumetria)
-    // - PRN (nome_fantasia) → PRN, PRN TELE_... (múltiplos nome_mobilemed)
-    if (parametros && parametros.length > 0) {
-      parametros.forEach(p => {
-        if (p.nome_mobilemed) {
-          // Adicionar o nome exato
-          nomeVariants.add(p.nome_mobilemed);
-          // Variação sem espaços
-          nomeVariants.add(p.nome_mobilemed.replace(/\s+/g, ''));
-          // Variação com underscores substituídos por espaços
-          nomeVariants.add(p.nome_mobilemed.replace(/_/g, ' '));
-          // Variação com espaços substituídos por underscores
-          nomeVariants.add(p.nome_mobilemed.replace(/\s+/g, '_'));
-          
-          // ✅ NOVO: Para nomes compostos com TELE_ ou outros prefixos, adicionar também a parte base
-          // Ex: "PRN TELE_ARARAQUARA" → adicionar também "PRN"
-          if (p.nome_mobilemed.includes(' ')) {
-            const partes = p.nome_mobilemed.split(' ');
-            nomeVariants.add(partes[0]); // Primeira parte (ex: PRN)
-          }
-        }
-        
-        // Adicionar também nome_fantasia dos parâmetros como variante
-        if (p.nome_fantasia) {
-          nomeVariants.add(p.nome_fantasia);
-          nomeVariants.add(p.nome_fantasia.replace(/\s+/g, ''));
-          nomeVariants.add(p.nome_fantasia.replace(/_/g, ' '));
-        }
-      });
-    }
-
-    console.log(`🔍 [${cliente.nome_fantasia}] Buscando volumetria com ${nomeVariants.size} variantes:`, Array.from(nomeVariants).sort());
-
-    // Buscar por cada variante do nome
-    for (const nomeVariant of Array.from(nomeVariants)) {
-      const { data: volEmpresa } = await supabase
+    // ✅ CORREÇÃO CRÍTICA: Para clientes com variantes (CEMVALENCA, CEMVALENCA_PL, CEMVALENCA_RX),
+    // usar busca EXATA pelo nome do cliente, não ilike com wildcards
+    const nomeFantasia = cliente.nome_fantasia || cliente.nome;
+    const nomeClienteUpper = nomeFantasia?.toUpperCase() || '';
+    
+    // Lista de clientes com variantes que precisam de busca EXATA
+    const clientesComVariantes = ['CEMVALENCA', 'CEMVALENCA_PL', 'CEMVALENCA_RX'];
+    const usarBuscaExata = clientesComVariantes.includes(nomeClienteUpper);
+    
+    console.log(`🔍 [${nomeFantasia}] Modo de busca: ${usarBuscaExata ? 'EXATA' : 'VARIANTES'}`);
+    
+    if (usarBuscaExata) {
+      // ✅ BUSCA EXATA: Apenas o nome exato do cliente
+      const { data: volExata } = await supabase
         .from('volumetria_mobilemed')
         .select(`
           id,
@@ -137,34 +95,107 @@ serve(async (req: Request) => {
           tipo_faturamento
         `)
         .eq('periodo_referencia', periodo)
-        .ilike('EMPRESA', `%${nomeVariant}%`);
-
-      const { data: volFantasia } = await supabase
-        .from('volumetria_mobilemed')
-        .select(`
-          id,
-          "DATA_REALIZACAO",
-          "DATA_LAUDO",
-          "NOME_PACIENTE",
-          "MEDICO",
-          "ESTUDO_DESCRICAO",
-          "MODALIDADE",
-          "ESPECIALIDADE",
-          "CATEGORIA",
-          "PRIORIDADE",
-          "ACCESSION_NUMBER",
-          "EMPRESA",
-          "Cliente_Nome_Fantasia",
-          "VALORES",
-          tipo_faturamento
-        `)
-        .eq('periodo_referencia', periodo)
-        .ilike('Cliente_Nome_Fantasia', `%${nomeVariant}%`);
-
-      [...(volEmpresa || []), ...(volFantasia || [])].forEach(item => {
-        const key = item.id ? item.id.toString() : `fallback_${item.EMPRESA}_${item.VALORES}_${Math.random()}`;
+        .eq('EMPRESA', nomeClienteUpper);
+      
+      (volExata || []).forEach(item => {
+        const key = item.id ? item.id.toString() : `exact_${item.EMPRESA}_${item.VALORES}_${Math.random()}`;
         volumetriaMap.set(key, item);
       });
+      
+      console.log(`📊 [${nomeFantasia}] Busca EXATA: ${volumetriaMap.size} registros`);
+    } else {
+      // ✅ BUSCA POR VARIANTES: Para clientes sem variantes específicas
+      const { data: parametros } = await supabase
+        .from('parametros_faturamento')
+        .select('nome_mobilemed, nome_fantasia')
+        .eq('cliente_id', cliente_id);
+
+      // Coletar todos os nomes mobilemed + variantes do cliente
+      const nomeVariants = new Set([
+        cliente.nome,
+        cliente.nome_fantasia,
+        cliente.nome?.replace(/\s+/g, ''),
+        cliente.nome_fantasia?.replace(/\s+/g, ''),
+        cliente.nome?.replace(/_/g, ' '),
+        cliente.nome_fantasia?.replace(/_/g, ' '),
+      ].filter(Boolean));
+
+      // Adicionar TODOS os nomes mobilemed dos parâmetros
+      if (parametros && parametros.length > 0) {
+        parametros.forEach(p => {
+          if (p.nome_mobilemed) {
+            nomeVariants.add(p.nome_mobilemed);
+            nomeVariants.add(p.nome_mobilemed.replace(/\s+/g, ''));
+            nomeVariants.add(p.nome_mobilemed.replace(/_/g, ' '));
+            nomeVariants.add(p.nome_mobilemed.replace(/\s+/g, '_'));
+            
+            if (p.nome_mobilemed.includes(' ')) {
+              const partes = p.nome_mobilemed.split(' ');
+              nomeVariants.add(partes[0]);
+            }
+          }
+          
+          if (p.nome_fantasia) {
+            nomeVariants.add(p.nome_fantasia);
+            nomeVariants.add(p.nome_fantasia.replace(/\s+/g, ''));
+            nomeVariants.add(p.nome_fantasia.replace(/_/g, ' '));
+          }
+        });
+      }
+
+      console.log(`🔍 [${nomeFantasia}] Buscando volumetria com ${nomeVariants.size} variantes:`, Array.from(nomeVariants).sort());
+
+      // Buscar por cada variante do nome
+      for (const nomeVariant of Array.from(nomeVariants)) {
+        const { data: volEmpresa } = await supabase
+          .from('volumetria_mobilemed')
+          .select(`
+            id,
+            "DATA_REALIZACAO",
+            "DATA_LAUDO",
+            "NOME_PACIENTE",
+            "MEDICO",
+            "ESTUDO_DESCRICAO",
+            "MODALIDADE",
+            "ESPECIALIDADE",
+            "CATEGORIA",
+            "PRIORIDADE",
+            "ACCESSION_NUMBER",
+            "EMPRESA",
+            "Cliente_Nome_Fantasia",
+            "VALORES",
+            tipo_faturamento
+          `)
+          .eq('periodo_referencia', periodo)
+          .ilike('EMPRESA', `%${nomeVariant}%`);
+
+        const { data: volFantasia } = await supabase
+          .from('volumetria_mobilemed')
+          .select(`
+            id,
+            "DATA_REALIZACAO",
+            "DATA_LAUDO",
+            "NOME_PACIENTE",
+            "MEDICO",
+            "ESTUDO_DESCRICAO",
+            "MODALIDADE",
+            "ESPECIALIDADE",
+            "CATEGORIA",
+            "PRIORIDADE",
+            "ACCESSION_NUMBER",
+            "EMPRESA",
+            "Cliente_Nome_Fantasia",
+            "VALORES",
+            tipo_faturamento
+          `)
+          .eq('periodo_referencia', periodo)
+          .ilike('Cliente_Nome_Fantasia', `%${nomeVariant}%`);
+
+        [...(volEmpresa || []), ...(volFantasia || [])].forEach(item => {
+          const key = item.id ? item.id.toString() : `fallback_${item.EMPRESA}_${item.VALORES}_${Math.random()}`;
+          volumetriaMap.set(key, item);
+        });
+      }
     }
 
     console.log(`📊 Total de exames encontrados na volumetria para ${cliente.nome_fantasia}: ${volumetriaMap.size}`);
