@@ -18,7 +18,7 @@ import { AutoRegrasMaster } from '@/components/AutoRegrasMaster';
 import { TesteRegras27 } from '@/components/TesteRegras27';
 import { AplicarAgrupamentoClientes } from '@/components/AplicarAgrupamentoClientes';
 import { CorrigirExamesForaPadrao } from '@/components/CorrigirExamesForaPadrao';
-import { RemoverExamesUS } from '@/components/RemoverExamesUS';
+
 import { SystemDateTime } from '@/components/SystemDateTime';
 import { LimparUploadTravado } from '@/components/LimparUploadTravado';
 import { FinalizarUploadsTravados } from '@/components/FinalizarUploadsTravados';
@@ -229,29 +229,28 @@ export default function DadosVolumetria() {
                     Para garantir o processamento correto dos dados, execute as regras na seguinte ordem:
                   </p>
                   <ol className="list-decimal list-inside text-amber-700 text-sm space-y-1">
-                    <li><strong>Remover Exames US</strong> - Exclui modalidade US (não aplicável)</li>
                     <li><strong>Corrigir Exames Fora do Padrão</strong> - Vincula exames não identificados ao cadastro</li>
                     <li><strong>Executar 28 Regras Completas</strong> - Aplica normalização, categorias, especialidades e modalidades</li>
                     <li><strong>Aplicar Agrupamento de Clientes</strong> - Distribui exames para clientes derivados (ex: CEMVALENCA_RX)</li>
                     <li><strong>Aplicar Tipificação Geral</strong> - Define tipo de faturamento (CO-FT, NC-FT, etc.) - <span className="font-bold">SEMPRE POR ÚLTIMO</span></li>
                   </ol>
+                  <p className="text-amber-600 text-xs mt-2 italic">
+                    Nota: Exames com modalidade "US" são excluídos automaticamente durante o upload.
+                  </p>
                 </div>
               </div>
             </div>
             
-            {/* 1. Remover Exames US */}
-            <RemoverExamesUS />
-            
-            {/* 2. Corrigir Exames Fora do Padrão */}
+            {/* 1. Corrigir Exames Fora do Padrão */}
             <CorrigirExamesForaPadrao />
             
-            {/* 3. Executar 28 Regras Completas */}
+            {/* 2. Executar 28 Regras Completas */}
             <TesteRegras27 />
             
-            {/* 4. Aplicar Agrupamento aos Dados Existentes */}
+            {/* 3. Aplicar Agrupamento aos Dados Existentes */}
             <AplicarAgrupamentoClientes />
             
-            {/* 5. Tipificação Geral - SEMPRE POR ÚLTIMO */}
+            {/* 4. Tipificação Geral - SEMPRE POR ÚLTIMO */}
             <AplicarTipificacaoGeral
               onCorrecaoConcluida={() => setRefreshTipificacao(prev => prev + 1)}
             />
