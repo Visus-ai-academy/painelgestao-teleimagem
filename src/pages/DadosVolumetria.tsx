@@ -219,7 +219,39 @@ export default function DadosVolumetria() {
           </TabsContent>
 
           <TabsContent value="sistema-regras" className="space-y-6">
-            {/* Tipificação Geral - TODOS os clientes (CO, NC e NC1) */}
+            {/* Alerta de Sequência de Processamento */}
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <Activity className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                <div>
+                  <h3 className="font-semibold text-amber-800 mb-2">Sequência de Aplicação das Regras</h3>
+                  <p className="text-amber-700 text-sm mb-3">
+                    Para garantir o processamento correto dos dados, execute as regras na seguinte ordem:
+                  </p>
+                  <ol className="list-decimal list-inside text-amber-700 text-sm space-y-1">
+                    <li><strong>Remover Exames US</strong> - Exclui modalidade US (não aplicável)</li>
+                    <li><strong>Corrigir Exames Fora do Padrão</strong> - Vincula exames não identificados ao cadastro</li>
+                    <li><strong>Executar 28 Regras Completas</strong> - Aplica normalização, categorias, especialidades e modalidades</li>
+                    <li><strong>Aplicar Agrupamento de Clientes</strong> - Distribui exames para clientes derivados (ex: CEMVALENCA_RX)</li>
+                    <li><strong>Aplicar Tipificação Geral</strong> - Define tipo de faturamento (CO-FT, NC-FT, etc.) - <span className="font-bold">SEMPRE POR ÚLTIMO</span></li>
+                  </ol>
+                </div>
+              </div>
+            </div>
+            
+            {/* 1. Remover Exames US */}
+            <RemoverExamesUS />
+            
+            {/* 2. Corrigir Exames Fora do Padrão */}
+            <CorrigirExamesForaPadrao />
+            
+            {/* 3. Executar 28 Regras Completas */}
+            <TesteRegras27 />
+            
+            {/* 4. Aplicar Agrupamento aos Dados Existentes */}
+            <AplicarAgrupamentoClientes />
+            
+            {/* 5. Tipificação Geral - SEMPRE POR ÚLTIMO */}
             <AplicarTipificacaoGeral
               onCorrecaoConcluida={() => setRefreshTipificacao(prev => prev + 1)}
             />
@@ -233,19 +265,7 @@ export default function DadosVolumetria() {
               }
             />
             
-            {/* Corrigir Exames Fora do Padrão */}
-            <CorrigirExamesForaPadrao />
-            
-            {/* Remover Exames US */}
-            <RemoverExamesUS />
-            
-            {/* Aplicar Agrupamento aos Dados Existentes */}
-            <AplicarAgrupamentoClientes />
-            
-            {/* Teste das 27 Regras Completas */}
-            <TesteRegras27 />
-            
-            {/* Sistema de Regras Original */}
+            {/* Sistema de Regras Original (Legacy) */}
             <AutoRegrasMaster />
           </TabsContent>
           
