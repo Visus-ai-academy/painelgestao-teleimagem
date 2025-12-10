@@ -62,20 +62,23 @@ serve(async (req: Request) => {
     // Use the same Map approach as demonstrativo generation to avoid duplicates
     const volumetriaMap = new Map();
     
-    // ✅ CORREÇÃO CRÍTICA: Para clientes com variantes (CEMVALENCA, CEMVALENCA_PL, CEMVALENCA_RX),
-    // usar busca EXATA pelo nome do cliente, não ilike com wildcards
-    const nomeFantasia = cliente.nome_fantasia || cliente.nome;
-    const nomeClienteUpper = nomeFantasia?.toUpperCase() || '';
+    // ✅ CORREÇÃO CRÍTICA: Para clientes com variantes, usar busca EXATA pelo nome
+    const clienteNomeFantasia = cliente.nome_fantasia || cliente.nome;
+    const clienteNomeUpper = (clienteNomeFantasia || '').toUpperCase().trim();
     
     // Lista de clientes com variantes que precisam de busca EXATA
-    const clientesComVariantes = ['CEMVALENCA', 'CEMVALENCA_PL', 'CEMVALENCA_RX'];
-    const usarBuscaExata = clientesComVariantes.includes(nomeClienteUpper);
+    const clientesComVariantes = [
+      'CEMVALENCA', 'CEMVALENCA_PL', 'CEMVALENCA_RX',
+      'RMPADUA', 'RMPADUA_MR', 'RMPADUA_CT',
+      'GOLD', 'GOLD_RMX'
+    ];
+    const usarBuscaExata = clientesComVariantes.includes(clienteNomeUpper);
     
-    console.log(`🔍 [${nomeFantasia}] Modo de busca: ${usarBuscaExata ? 'EXATA' : 'VARIANTES'}`);
+    console.log(`🔍 [${clienteNomeFantasia}] Modo de busca: ${usarBuscaExata ? 'EXATA' : 'VARIANTES'}, nome_upper: ${clienteNomeUpper}`);
     
     if (usarBuscaExata) {
-      // ✅ BUSCA EXATA: Apenas o nome exato do cliente
-      const { data: volExata } = await supabase
+      // ✅ BUSCA EXATA: Apenas o nome exato do cliente na coluna EMPRESA
+      const { data: volExata, error: volError } = await supabase
         .from('volumetria_mobilemed')
         .select(`
           id,
@@ -95,14 +98,18 @@ serve(async (req: Request) => {
           tipo_faturamento
         `)
         .eq('periodo_referencia', periodo)
-        .eq('EMPRESA', nomeClienteUpper);
+        .eq('EMPRESA', clienteNomeUpper);
+      
+      if (volError) {
+        console.error(`❌ Erro na busca exata: ${volError.message}`);
+      }
       
       (volExata || []).forEach(item => {
         const key = item.id ? item.id.toString() : `exact_${item.EMPRESA}_${item.VALORES}_${Math.random()}`;
         volumetriaMap.set(key, item);
       });
       
-      console.log(`📊 [${nomeFantasia}] Busca EXATA: ${volumetriaMap.size} registros`);
+      console.log(`📊 [${clienteNomeFantasia}] Busca EXATA por EMPRESA='${clienteNomeUpper}': ${volumetriaMap.size} registros`);
     } else {
       // ✅ BUSCA POR VARIANTES: Para clientes sem variantes específicas
       const { data: parametros } = await supabase
@@ -143,7 +150,7 @@ serve(async (req: Request) => {
         });
       }
 
-      console.log(`🔍 [${nomeFantasia}] Buscando volumetria com ${nomeVariants.size} variantes:`, Array.from(nomeVariants).sort());
+      console.log(`🔍 [${clienteNomeFantasia}] Buscando volumetria com ${nomeVariants.size} variantes`);
 
       // Buscar por cada variante do nome
       for (const nomeVariant of Array.from(nomeVariants)) {
@@ -198,19 +205,20 @@ serve(async (req: Request) => {
       }
     }
 
-    console.log(`📊 Total de exames encontrados na volumetria para ${cliente.nome_fantasia}: ${volumetriaMap.size}`);
+    console.log(`📊 Total de exames encontrados na volumetria para ${clienteNomeFantasia}: ${volumetriaMap.size}`);
 
     // Pattern-based search apenas para clientes que precisam (se aplicável)
-    const nomeFantasia = cliente.nome_fantasia || cliente.nome;
+    // Não usar para clientes com variantes (já tratados acima)
     let padroesBusca: string[] = [];
     
     // PRN pode precisar de pattern search se não estiver agrupado na volumetria
-    if (nomeFantasia === 'PRN') {
-      padroesBusca = ['PRN%'];
-    } else if (nomeFantasia.includes('AKCPALMAS') || nomeFantasia.includes('AKC')) {
-      padroesBusca = ['AKC%', 'AKCPALMAS%'];
+    if (!usarBuscaExata) {
+      if (clienteNomeFantasia === 'PRN') {
+        padroesBusca = ['PRN%'];
+      } else if (clienteNomeFantasia.includes('AKCPALMAS') || clienteNomeFantasia.includes('AKC')) {
+        padroesBusca = ['AKC%', 'AKCPALMAS%'];
+      }
     }
-    // CEDIDIAG removido - agrupamento já feito na volumetria (CEDI-RJ e CEDI-RO já vêm como CEDIDIAG)
     
     if (padroesBusca.length > 0) {
       for (const padrao of padroesBusca) {
@@ -263,7 +271,7 @@ serve(async (req: Request) => {
           volumetriaMap.set(key, item);
         });
       }
-      console.log(`📊 ${nomeFantasia}: Pattern search completado com ${volumetriaMap.size} registros únicos`);
+      console.log(`📊 ${clienteNomeFantasia}: Pattern search completado com ${volumetriaMap.size} registros únicos`);
     }
 
     let volumetria = Array.from(volumetriaMap.values());
