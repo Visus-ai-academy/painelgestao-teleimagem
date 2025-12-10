@@ -418,29 +418,32 @@ serve(async (req) => {
         console.log(`🔍 CEMVALENCA_PL: ${antesFiltro} → ${volumetria.length} registros (removidos ${antesFiltro - volumetria.length})`);
       }
       
-      // CEMVALENCA: Plantão OU Medicina Interna OU Equipe 2 OU Cardio OU Neurobrain OU MAMA
-      if (nomeUpper.includes('CEMVALENCA') && !nomeUpper.includes('CEMVALENCA_RX') && !nomeUpper.includes('CEMVALENCA_PL') && volumetria.length > 0) {
+      // CEMVALENCA: Medicina Interna OU Equipe 2 OU Cardio OU Neurobrain OU MAMO
+      // ✅ CORREÇÃO: PLANTÃO já foi para CEMVALENCA_PL, RX/DX já foi para CEMVALENCA_RX pelo agrupamento
+      // Então aqui só filtramos as especialidades faturáveis: MI, CARDIO, NEUROBRAIN, MAMO, Equipe 2
+      if (nomeUpper === 'CEMVALENCA' && volumetria.length > 0) {
         const MEDICOS_EQUIPE_2 = ['Dr. Antonio Gualberto Chianca Filho', 'Dr. Daniel Chrispim', 'Dr. Efraim Da Silva Ferreira', 'Dr. Felipe Falcão de Sá', 'Dr. Guilherme N. Schincariol', 'Dr. Gustavo Andreis', 'Dr. João Carlos Dantas do Amaral', 'Dr. João Fernando Miranda Pompermayer', 'Dr. Leonardo de Paula Ribeiro Figueiredo', 'Dr. Raphael Sanfelice João', 'Dr. Thiago P. Martins', 'Dr. Virgílio Oliveira Barreto', 'Dra. Adriana Giubilei Pimenta', 'Dra. Aline Andrade Dorea', 'Dra. Camila Amaral Campos', 'Dra. Cynthia Mendes Vieira de Morais', 'Dra. Fernanda Gama Barbosa', 'Dra. Kenia Menezes Fernandes', 'Dra. Lara M. Durante Bacelar', 'Dr. Aguinaldo Cunha Zuppani', 'Dr. Alex Gueiros de Barros', 'Dr. Eduardo Caminha Nunes', 'Dr. Márcio D\'Andréa Rossi', 'Dr. Rubens Pereira Moura Filho', 'Dr. Wesley Walber da Silva', 'Dra. Luna Azambuja Satte Alam', 'Dra. Roberta Bertoldo Sabatini Treml', 'Dra. Thais Nogueira D. Gastaldi', 'Dra. Vanessa da Costa Maldonado'];
         const antesFiltro = volumetria.length;
+        const examesTotaisAntes = volumetria.reduce((acc, vol) => acc + (Number(vol.VALORES) || 0), 0);
         
         volumetria = volumetria.filter(vol => {
-          const prioridade = (vol.PRIORIDADE || '').toString().toUpperCase();
           const especialidade = (vol.ESPECIALIDADE || '').toString().toUpperCase();
           const categoria = (vol.CATEGORIA || '').toString().toUpperCase();
           const medico = (vol.MEDICO || '').toString();
           
           // Aplicar OR lógico: qualquer uma das condições abaixo inclui o exame
-          const isPlantao = prioridade === 'PLANTÃO' || prioridade === 'PLANTAO';
           const isMedicinaInterna = especialidade.includes('MEDICINA INTERNA');
           const isCardio = especialidade.includes('CARDIO');
-          const isMamas = especialidade.includes('MAMA');
+          // ✅ CORREÇÃO: Incluir MAMO (não apenas MAMA) para mamografia
+          const isMamo = especialidade.includes('MAMO') || especialidade.includes('MAMA');
           const isNeurobrain = categoria.includes('NEUROBRAIN');
           const temMedicoEquipe2 = MEDICOS_EQUIPE_2.some(med => medico.includes(med));
           
           // Retorna true se qualquer condição for verdadeira (OR lógico)
-          return isPlantao || isMedicinaInterna || isCardio || isMamas || isNeurobrain || temMedicoEquipe2;
+          return isMedicinaInterna || isCardio || isMamo || isNeurobrain || temMedicoEquipe2;
         });
-        console.log(`🔍 CEMVALENCA (Plantão OU MI OU Equipe2 OU Cardio OU Neurobrain OU MAMA): ${antesFiltro} → ${volumetria.length} registros (removidos ${antesFiltro - volumetria.length})`);
+        const examesTotaisDepois = volumetria.reduce((acc, vol) => acc + (Number(vol.VALORES) || 0), 0);
+        console.log(`🔍 CEMVALENCA (MI OU Cardio OU MAMO OU Neurobrain OU Equipe2): ${antesFiltro} → ${volumetria.length} registros | ${examesTotaisAntes} → ${examesTotaisDepois} exames`);
       }
       
       // Clientes com regra específica: apenas Cardio OU Plantão
