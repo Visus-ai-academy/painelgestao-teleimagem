@@ -392,34 +392,10 @@ serve(async (req) => {
         console.warn(`⚠️ Agrupamento falhou, mas processamento continua`);
       }
 
-      // ✅ PASSO 3: Aplicar tipificação de faturamento
-      console.log('\n🎯 === APLICANDO TIPIFICAÇÃO DE FATURAMENTO ===');
-      let tipificacaoSucesso = true;
-      try {
-        const { data: tipificacaoResult, error: tipificacaoError } = await supabaseClient.functions.invoke(
-          'aplicar-tipificacao-faturamento',
-          {
-            body: {
-              arquivo_fonte,
-              lote_upload: loteUpload
-            }
-          }
-        );
-
-        if (tipificacaoError) {
-          console.error('❌ ERRO ao aplicar tipificação:', tipificacaoError);
-          tipificacaoSucesso = false;
-        } else {
-          console.log(`✅ Tipificação aplicada:`, tipificacaoResult);
-        }
-      } catch (tipificacaoError) {
-        console.error(`❌ ERRO CRÍTICO na aplicação de tipificação:`, tipificacaoError);
-        tipificacaoSucesso = false;
-      }
-
-      if (!tipificacaoSucesso) {
-        console.warn(`⚠️ Tipificação falhou, mas processamento continua`);
-      }
+      // ℹ️ TIPIFICAÇÃO: Removida do pipeline automático
+      // A tipificação deve ser aplicada MANUALMENTE pelo usuário via "Aplicar Tipificação Geral"
+      // no menu Sistema de Regras após o upload ser concluído
+      console.log('\nℹ️ Tipificação NÃO aplicada automaticamente - usar "Aplicar Tipificação Geral" manualmente');
 
       // Variável para compatibilidade com código existente
       const regrasExclusao = sistemaSucesso ? totalCorrecoes : 0;
