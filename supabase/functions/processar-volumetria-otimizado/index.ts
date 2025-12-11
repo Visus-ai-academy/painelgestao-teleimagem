@@ -125,7 +125,20 @@ serve(async (req) => {
           const linhaOriginal = batchStart + i + 1;
           totalProcessados++;
           
-          // 🚫 EXCLUIR REGISTROS COM MODALIDADE "US" - Exames não realizados/não faturados
+          // 🚫 FILTRO 1: EXCLUIR REGISTROS COM STATUS DIFERENTE DE "Assinado" ou "Reassinado"
+          const statusRecord = (record.STATUS || '').toString().trim().toLowerCase();
+          if (statusRecord !== 'assinado' && statusRecord !== 'reassinado') {
+            registrosRejeitados.push({
+              linha_original: linhaOriginal,
+              dados_originais: record,
+              motivo_rejeicao: 'STATUS_INVALIDO',
+              detalhes_erro: `Status "${record.STATUS || 'VAZIO'}" não é válido. Apenas registros com status "Assinado" ou "Reassinado" são aceitos.`
+            });
+            totalErros++;
+            continue; // Pular este registro
+          }
+          
+          // 🚫 FILTRO 2: EXCLUIR REGISTROS COM MODALIDADE "US" - Exames não realizados/não faturados
           if (record.MODALIDADE === 'US') {
             registrosRejeitados.push({
               linha_original: linhaOriginal,
