@@ -116,6 +116,29 @@ Deno.serve(async (req) => {
         .in('EMPRESA', ['CEDI-RJ','CEDI-RO','CEDI-UNIMED','CEDI_RJ','CEDI_RO','CEDI_UNIMED'])
       regrasAplicadasArquivo.add('v001')
 
+      // REGRA v001b: Normalizar sufixo _TELE (ex: CLINICA_CRL_TELE -> CLINICA_CRL)
+      console.log('  ⚡ Aplicando v001b - Normalizar sufixo _TELE')
+      const { data: clientesTele } = await supabase
+        .from('volumetria_mobilemed')
+        .select('"EMPRESA"')
+        .eq('arquivo_fonte', arquivoAtual)
+        .like('EMPRESA', '%_TELE')
+      
+      if (clientesTele && clientesTele.length > 0) {
+        const empresasUnicas = [...new Set(clientesTele.map((c: any) => c.EMPRESA).filter(Boolean))]
+        for (const empresaTele of empresasUnicas) {
+          if (empresaTele && empresaTele.endsWith('_TELE')) {
+            const empresaNormalizada = empresaTele.replace(/_TELE$/, '')
+            await supabase.from('volumetria_mobilemed')
+              .update({ EMPRESA: empresaNormalizada })
+              .eq('arquivo_fonte', arquivoAtual)
+              .eq('EMPRESA', empresaTele)
+            console.log(`    📝 ${empresaTele} → ${empresaNormalizada}`)
+          }
+        }
+      }
+      regrasAplicadasArquivo.add('v001b')
+
       // REGRA v005: Correções modalidade RX/MG/DO
       console.log('  ⚡ Aplicando v005 - Correções modalidade')
       await supabase.from('volumetria_mobilemed')
