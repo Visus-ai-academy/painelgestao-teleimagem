@@ -310,6 +310,30 @@ serve(async (req) => {
         throw new Error(`Falha crítica: Regras não puderam ser aplicadas automaticamente em ${arquivo_fonte}. Dados rejeitados por inconsistência.`);
       }
 
+      // ✅ PASSO 2.2: Corrigir exames fora do padrão usando vinculações valores_referencia_de_para
+      console.log('\n🎯 === CORREÇÃO EXAMES FORA DO PADRÃO (vinculação) ===');
+      try {
+        const { data: foraPadraoResult, error: foraPadraoError } = await supabaseClient.functions.invoke(
+          'corrigir-volumetria-fora-padrao',
+          {
+            body: { arquivo_fonte }
+          }
+        );
+
+        if (foraPadraoError) {
+          console.warn('⚠️ Aviso na correção de exames fora do padrão:', foraPadraoError);
+        } else if (foraPadraoResult && foraPadraoResult.sucesso) {
+          console.log(`✅ Exames fora do padrão corrigidos:`);
+          console.log(`   - Registros encontrados: ${foraPadraoResult.registros_encontrados || 0}`);
+          console.log(`   - Registros corrigidos: ${foraPadraoResult.registros_corrigidos || 0}`);
+          console.log(`   - Sem mapeamento: ${foraPadraoResult.registros_sem_mapeamento || 0}`);
+        } else {
+          console.log(`ℹ️ Nenhuma correção de exames fora do padrão necessária`);
+        }
+      } catch (foraPadraoError) {
+        console.warn('⚠️ Aviso na correção de exames fora do padrão (não crítico):', foraPadraoError);
+      }
+
       // ✅ PASSO 2.5: Correção específica MAMA → MAMO para modalidade MG
       console.log('\n🎯 === CORREÇÃO MAMA → MAMO (Modalidade MG) ===');
       try {
