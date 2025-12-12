@@ -85,6 +85,31 @@ serve(async (req) => {
     for (const arquivo of arquivosParaProcessar) {
       console.log(`\n🔄 ${arquivo}`);
       
+      // === LIMPEZA DE NOMES DE CLIENTES (antes do processamento) ===
+      console.log('  ⚡ Limpeza de nomes de clientes...');
+      
+      // Normalizar sufixo _TELE (ex: CLINICA_CRL_TELE -> CLINICA_CRL)
+      const { data: clientesTele } = await supabase
+        .from('volumetria_mobilemed')
+        .select('"EMPRESA"')
+        .eq('arquivo_fonte', arquivo)
+        .like('EMPRESA', '%_TELE');
+      
+      if (clientesTele && clientesTele.length > 0) {
+        const empresasUnicas = [...new Set(clientesTele.map((c: any) => c.EMPRESA).filter(Boolean))];
+        for (const empresaTele of empresasUnicas) {
+          if (empresaTele && empresaTele.endsWith('_TELE')) {
+            const empresaNormalizada = empresaTele.replace(/_TELE$/, '');
+            await supabase.from('volumetria_mobilemed')
+              .update({ EMPRESA: empresaNormalizada })
+              .eq('arquivo_fonte', arquivo)
+              .eq('EMPRESA', empresaTele);
+            console.log(`    📝 ${empresaTele} → ${empresaNormalizada}`);
+          }
+        }
+      }
+      
+      // === BUSCAR REGISTROS PARA PROCESSAMENTO ===
       const { data: registros, error: errorFetch } = await supabase
         .from('volumetria_mobilemed')
         .select('id, "ESTUDO_DESCRICAO", "CATEGORIA", "ESPECIALIDADE", "PRIORIDADE", "VALORES", "MODALIDADE"')
