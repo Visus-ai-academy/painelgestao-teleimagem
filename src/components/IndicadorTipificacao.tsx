@@ -6,10 +6,17 @@ import { AlertCircle, CheckCircle, Clock, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
+interface ClienteSemCadastro {
+  empresa: string;
+  qtd_registros: number;
+  total_exames: number;
+}
+
 interface TipificacaoStats {
   total_registros: number;
   sem_tipificacao: number;
   percentual_sem_tipificacao: number;
+  clientes_sem_cadastro: ClienteSemCadastro[];
   por_tipo: {
     tipo_faturamento: string;
     total: number;
@@ -36,7 +43,7 @@ export const IndicadorTipificacao = ({ periodoReferencia, onStatusChange }: Indi
       // Buscar estatísticas de tipificação (com VALORES para contar exames)
       const { data: registros, error } = await supabase
         .from('volumetria_mobilemed')
-        .select('tipo_faturamento, "VALORES"')
+        .select('tipo_faturamento, "VALORES", "EMPRESA"')
         .eq('periodo_referencia', periodoReferencia);
 
       if (error) throw error;
@@ -64,10 +71,33 @@ export const IndicadorTipificacao = ({ periodoReferencia, onStatusChange }: Indi
         }))
         .sort((a, b) => b.total - a.total);
 
+      // Identificar clientes sem cadastro (sem tipificação)
+      const clientesSemTipificacaoMap = new Map<string, { registros: number; exames: number }>();
+      registros
+        .filter(r => !r.tipo_faturamento)
+        .forEach(r => {
+          const empresa = r.EMPRESA || 'DESCONHECIDO';
+          const valores = Number(r.VALORES) || 0;
+          const atual = clientesSemTipificacaoMap.get(empresa) || { registros: 0, exames: 0 };
+          clientesSemTipificacaoMap.set(empresa, {
+            registros: atual.registros + 1,
+            exames: atual.exames + valores
+          });
+        });
+
+      const clientesSemCadastro: ClienteSemCadastro[] = Array.from(clientesSemTipificacaoMap.entries())
+        .map(([empresa, dados]) => ({
+          empresa,
+          qtd_registros: dados.registros,
+          total_exames: dados.exames
+        }))
+        .sort((a, b) => b.total_exames - a.total_exames);
+
       setStats({
         total_registros: totalExames,
         sem_tipificacao: examesSemTipificacao,
         percentual_sem_tipificacao: percentualSemTipificacao,
+        clientes_sem_cadastro: clientesSemCadastro,
         por_tipo: porTipo
       });
 
@@ -158,9 +188,27 @@ export const IndicadorTipificacao = ({ periodoReferencia, onStatusChange }: Indi
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              <strong>{stats.sem_tipificacao.toLocaleString('pt-BR')} registros sem tipificação!</strong>
+              <strong>{stats.sem_tipificacao.toLocaleString('pt-BR')} exames sem tipificação!</strong>
               <br />
-              É necessário executar a correção de tipificação antes de gerar demonstrativos.
+              <span className="text-sm">
+                {stats.clientes_sem_cadastro.length > 0 ? (
+                  <>
+                    <strong>Clientes sem cadastro nos parâmetros:</strong>
+                    <ul className="mt-1 ml-4 list-disc">
+                      {stats.clientes_sem_cadastro.map((cliente) => (
+                        <li key={cliente.empresa}>
+                          <strong>{cliente.empresa}</strong>: {cliente.total_exames.toLocaleString('pt-BR')} exames ({cliente.qtd_registros} registros)
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="mt-2 text-xs">
+                      É necessário cadastrar estes clientes em "Parâmetros de Faturamento" antes de executar a tipificação.
+                    </p>
+                  </>
+                ) : (
+                  'É necessário executar "Aplicar Tipificação Geral" para tipificar os registros.'
+                )}
+              </span>
             </AlertDescription>
           </Alert>
         )}
