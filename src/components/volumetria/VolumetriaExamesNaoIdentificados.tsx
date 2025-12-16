@@ -36,11 +36,11 @@ export function VolumetriaExamesNaoIdentificados() {
     try {
       console.log('🚀 INICIANDO loadExamesNaoIdentificados');
       
-      // BUSCAR APENAS REGISTROS FORA DO PADRÃO, SEM QUANTIDADE E SEM MODALIDADE US
+      // BUSCAR TODOS OS REGISTROS SEM QUANTIDADE (ZERADOS) E SEM MODALIDADE US
+      // Inclui tanto arquivos "fora_padrao" quanto "padrao" que tenham VALORES zerados
       const { data: volumetriaData, error: volumetriaError } = await supabase
         .from('volumetria_mobilemed')
         .select('ESTUDO_DESCRICAO, MODALIDADE, ESPECIALIDADE, arquivo_fonte, VALORES')
-        .like('arquivo_fonte', '%fora_padrao%')
         .or('VALORES.eq.0,VALORES.is.null')
         .neq('MODALIDADE', 'US')
         .limit(50000);
@@ -50,12 +50,12 @@ export function VolumetriaExamesNaoIdentificados() {
         throw volumetriaError;
       }
       
-      console.log('📊 REGISTROS FORA DO PADRÃO (SEM QUANTIDADE, EXCETO US):', volumetriaData?.length || 0);
+      console.log('📊 REGISTROS ZERADOS (TODOS OS ARQUIVOS, EXCETO US):', volumetriaData?.length || 0);
       console.log('📊 EXEMPLO DE REGISTROS:', volumetriaData?.slice(0, 5));
       
       
       if (!volumetriaData || volumetriaData.length === 0) {
-        console.log('📊 Nenhum registro fora do padrão (sem quantidade, exceto US) encontrado');
+        console.log('📊 Nenhum registro zerado (exceto US) encontrado');
         setLoading(false);
         return;
       }
