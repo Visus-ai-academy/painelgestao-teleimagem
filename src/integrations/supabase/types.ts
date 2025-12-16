@@ -4618,6 +4618,14 @@ export type Database = {
             Returns: Json
           }
         | { Args: { p_escala_id: string; p_medico_id: string }; Returns: Json }
+        | {
+            Args: {
+              p_dispositivo_info?: Json
+              p_escala_id: string
+              p_medico_id: string
+            }
+            Returns: Json
+          }
       fazer_checkout_ativacao:
         | { Args: { p_ativacao_id: string }; Returns: Json }
         | {
@@ -4904,13 +4912,15 @@ export type Database = {
         }[]
       }
       has_metrics_access: { Args: never; Returns: boolean }
-      has_role: {
-        Args: {
-          _role: Database["public"]["Enums"]["app_role"]
-          _user_id: string
-        }
-        Returns: boolean
-      }
+      has_role:
+        | {
+            Args: {
+              _role: Database["public"]["Enums"]["app_role"]
+              _user_id: string
+            }
+            Returns: boolean
+          }
+        | { Args: { required_role: string }; Returns: boolean }
       has_volumetria_access: { Args: never; Returns: boolean }
       hash_personal_data: { Args: { data: string }; Returns: string }
       identificar_duplicados_precos_servicos: {
@@ -5007,21 +5017,23 @@ export type Database = {
       normalizar_clientes_cedi: { Args: never; Returns: Json }
       normalizar_medico: { Args: { medico_nome: string }; Returns: string }
       normalizar_nome_medico: { Args: { nome: string }; Returns: string }
-      obter_status_ativacao_atual: {
-        Args: { p_medico_id?: string }
-        Returns: {
-          alerta_ativo: boolean
-          ativacao_id: string
-          data_ativacao: string
-          escala_id: string
-          horario_checkin: string
-          horario_checkout: string
-          medico_id: string
-          medico_nome: string
-          status_ativacao: string
-          tempo_online: unknown
-        }[]
-      }
+      obter_status_ativacao_atual:
+        | {
+            Args: { p_medico_id?: string }
+            Returns: {
+              alerta_ativo: boolean
+              ativacao_id: string
+              data_ativacao: string
+              escala_id: string
+              horario_checkin: string
+              horario_checkout: string
+              medico_id: string
+              medico_nome: string
+              status_ativacao: string
+              tempo_online: unknown
+            }[]
+          }
+        | { Args: { p_data?: string; p_medico_id: string }; Returns: Json }
       oferecer_escala_cobertura: {
         Args: {
           p_data_fim: string
@@ -5045,7 +5057,9 @@ export type Database = {
       }
       processar_checkout_automatico: { Args: never; Returns: number }
       processar_tasks_sistema: { Args: never; Returns: Json }
-      promote_user_to_admin: { Args: { user_email: string }; Returns: boolean }
+      promote_user_to_admin:
+        | { Args: { target_user_id: string }; Returns: undefined }
+        | { Args: { user_email: string }; Returns: boolean }
       reabrir_periodo_faturamento: {
         Args: { p_periodo_referencia: string }
         Returns: Json
