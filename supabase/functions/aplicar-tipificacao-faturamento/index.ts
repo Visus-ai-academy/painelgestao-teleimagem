@@ -92,7 +92,87 @@ serve(async (req) => {
       }
     }
 
-    // 2. Buscar registros que precisam de tipificação
+    // 2. Buscar parâmetros de todos os clientes para verificar quem tem cadastro
+    console.log('🔍 Buscando parâmetros de clientes para verificar cadastros...');
+    const { data: parametrosCheck, error: parametrosCheckError } = await supabaseClient
+      .from('parametros_faturamento')
+      .select('nome_fantasia');
+
+    if (parametrosCheckError) {
+      console.error('❌ Erro ao buscar parâmetros para verificação:', parametrosCheckError);
+    }
+
+    // Criar set de clientes com cadastro (normalizado)
+    const clientesComCadastro = new Set<string>();
+    if (parametrosCheck) {
+      parametrosCheck.forEach(p => {
+        if (p.nome_fantasia) {
+          clientesComCadastro.add(p.nome_fantasia.toUpperCase().trim());
+        }
+      });
+      console.log(`✅ ${clientesComCadastro.size} clientes com cadastro em parametros_faturamento`);
+    }
+
+    // 2.1 Identificar clientes na volumetria que NÃO têm cadastro mas têm tipo_faturamento definido
+    if (periodo_referencia && clientesComCadastro.size > 0) {
+      console.log('🔍 Buscando clientes sem cadastro que já foram tipificados incorretamente...');
+      
+      const { data: clientesVolumetria, error: clientesVolError } = await supabaseClient
+        .from('volumetria_mobilemed')
+        .select('"EMPRESA"')
+        .eq('periodo_referencia', periodo_referencia)
+        .not('tipo_faturamento', 'is', null);
+
+      if (!clientesVolError && clientesVolumetria) {
+        // Identificar clientes únicos na volumetria com tipo definido
+        const clientesComTipo = new Set<string>();
+        clientesVolumetria.forEach(r => {
+          if (r.EMPRESA) {
+            clientesComTipo.add(r.EMPRESA.toUpperCase().trim());
+          }
+        });
+
+        // Encontrar clientes sem cadastro (têm tipo definido mas não estão em parametros_faturamento)
+        const clientesSemCadastroComTipo: string[] = [];
+        for (const cliente of clientesComTipo) {
+          // Verificar se cliente existe no cadastro (busca exata e parcial)
+          let encontrado = clientesComCadastro.has(cliente);
+          if (!encontrado) {
+            for (const cadastrado of clientesComCadastro) {
+              if (cliente.includes(cadastrado) || cadastrado.includes(cliente)) {
+                encontrado = true;
+                break;
+              }
+            }
+          }
+          if (!encontrado) {
+            clientesSemCadastroComTipo.push(cliente);
+          }
+        }
+
+        if (clientesSemCadastroComTipo.length > 0) {
+          console.warn(`⚠️ Encontrados ${clientesSemCadastroComTipo.length} clientes SEM CADASTRO mas com tipo_faturamento definido:`);
+          clientesSemCadastroComTipo.forEach(c => console.warn(`   - ${c}`));
+
+          // Limpar tipo_faturamento desses clientes para que sejam reprocessados
+          for (const cliente of clientesSemCadastroComTipo) {
+            const { error: clearError, count } = await supabaseClient
+              .from('volumetria_mobilemed')
+              .update({ tipo_faturamento: null, tipo_cliente: null })
+              .eq('periodo_referencia', periodo_referencia)
+              .ilike('"EMPRESA"', cliente);
+
+            if (clearError) {
+              console.error(`❌ Erro ao limpar tipo de ${cliente}:`, clearError);
+            } else {
+              console.log(`✅ Limpo tipo_faturamento de ${count || 0} registros de ${cliente}`);
+            }
+          }
+        }
+      }
+    }
+
+    // 2.2 Buscar registros que precisam de tipificação
     let query = supabaseClient
       .from('volumetria_mobilemed')
       .select('id, "EMPRESA", "MODALIDADE", "ESPECIALIDADE", "CATEGORIA", "PRIORIDADE", "MEDICO"');
