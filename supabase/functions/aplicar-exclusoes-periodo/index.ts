@@ -66,28 +66,48 @@ serve(async (req) => {
       });
     }
 
-    // Calcular datas para jun/25
+    // Calcular datas baseadas no período de referência
     let dataLimiteRealizacao: Date;
     let dataInicioJanelaLaudo: Date;
     let dataFimJanelaLaudo: Date;
     
-    if (periodo_referencia === '2025-06') {
-      dataLimiteRealizacao = new Date('2025-06-01'); // v003: excluir >= esta data
-      dataInicioJanelaLaudo = new Date('2025-06-08'); // v002: janela válida início
-      dataFimJanelaLaudo = new Date('2025-07-07');   // v002: janela válida fim
-    } else {
+    let anoCompleto: number;
+    let mesNumero: number;
+    
+    // Detectar formato do período: YYYY-MM ou mes/ano
+    if (periodo_referencia.includes('-')) {
+      // Formato YYYY-MM (ex: "2025-10")
+      const [ano, mes] = periodo_referencia.split('-');
+      anoCompleto = parseInt(ano);
+      mesNumero = parseInt(mes);
+      console.log(`📅 Período detectado (YYYY-MM): ano=${anoCompleto}, mês=${mesNumero}`);
+    } else if (periodo_referencia.includes('/')) {
+      // Formato mes/ano (ex: "out/25")
       const [mes, ano] = periodo_referencia.split('/');
       const meses: { [key: string]: number } = {
         'jan': 1, 'fev': 2, 'mar': 3, 'abr': 4, 'mai': 5, 'jun': 6,
         'jul': 7, 'ago': 8, 'set': 9, 'out': 10, 'nov': 11, 'dez': 12
       };
-      const anoCompleto = 2000 + parseInt(ano);
-      const mesNumero = meses[mes];
-      
-      dataLimiteRealizacao = new Date(anoCompleto, mesNumero - 1, 1);
-      dataInicioJanelaLaudo = new Date(anoCompleto, mesNumero - 1, 8);
-      dataFimJanelaLaudo = new Date(anoCompleto, mesNumero, 7);
+      anoCompleto = 2000 + parseInt(ano);
+      mesNumero = meses[mes.toLowerCase()];
+      console.log(`📅 Período detectado (mes/ano): ano=${anoCompleto}, mês=${mesNumero}`);
+    } else {
+      console.error(`❌ Formato de período não reconhecido: ${periodo_referencia}`);
+      return new Response(JSON.stringify({
+        sucesso: false,
+        erro: `Formato de período inválido: ${periodo_referencia}. Use YYYY-MM ou mes/ano`
+      }), { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400 
+      });
     }
+
+    // v003: Excluir exames realizados NO mês de referência ou DEPOIS (>= primeiro dia do mês)
+    dataLimiteRealizacao = new Date(anoCompleto, mesNumero - 1, 1);
+    
+    // v002: Manter DATA_LAUDO entre dia 8 do mês de referência e dia 7 do mês seguinte
+    dataInicioJanelaLaudo = new Date(anoCompleto, mesNumero - 1, 8);
+    dataFimJanelaLaudo = new Date(anoCompleto, mesNumero, 7);
 
     const dataLimiteRealizacaoStr = dataLimiteRealizacao.toISOString().split('T')[0];
     const dataInicioJanelaLaudoStr = dataInicioJanelaLaudo.toISOString().split('T')[0];
