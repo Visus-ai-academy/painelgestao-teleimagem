@@ -151,8 +151,14 @@ serve(async (req) => {
           }
           
           // ✅ ACEITAR DEMAIS REGISTROS - Gravar com periodo_referencia correto
+          // CRÍTICO: Remover tipo_faturamento e tipo_cliente do record para evitar tipificação automática
+          // Esses campos devem ser aplicados APENAS via "Aplicar Tipificação Geral" manualmente
+          const { tipo_faturamento, tipo_cliente, ...recordSemTipificacao } = record as any;
+          
           const recordToInsert = {
-            ...record,
+            ...recordSemTipificacao,
+            tipo_faturamento: null, // Forçar NULL - tipificação é manual
+            tipo_cliente: null, // Forçar NULL - tipificação é manual
             periodo_referencia: periodoReferenciaDb,
             arquivo_fonte: arquivo_fonte,
             lote_upload: loteUpload,
