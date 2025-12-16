@@ -416,13 +416,45 @@ serve(async (req) => {
         console.warn(`⚠️ Agrupamento falhou, mas processamento continua`);
       }
 
+      // ✅ PASSO 2.8: Aplicar regras v002/v003 para arquivos RETROATIVOS
+      // Estas regras excluem registros por DATA_REALIZACAO e DATA_LAUDO fora do período válido
+      let regrasExclusao = 0;
+      if (arquivo_fonte.includes('retroativo')) {
+        console.log('\n🎯 === APLICANDO REGRAS v002/v003 (ARQUIVOS RETROATIVOS) ===');
+        try {
+          const { data: exclusoesResult, error: exclusoesError } = await supabaseClient.functions.invoke(
+            'aplicar-exclusoes-periodo',
+            {
+              body: { 
+                arquivo_fonte: arquivo_fonte,
+                periodo_referencia: periodoReferenciaDb // Formato YYYY-MM
+              }
+            }
+          );
+
+          if (exclusoesError) {
+            console.error('❌ ERRO ao aplicar regras v002/v003:', exclusoesError);
+          } else if (exclusoesResult && exclusoesResult.sucesso) {
+            regrasExclusao = exclusoesResult.registros_excluidos || 0;
+            console.log(`✅ Regras v002/v003 aplicadas:`);
+            console.log(`   - v003 (DATA_REALIZACAO): ${exclusoesResult.detalhes?.v003_excluidos || 0} excluídos`);
+            console.log(`   - v002 (DATA_LAUDO): ${exclusoesResult.detalhes?.v002_excluidos || 0} excluídos`);
+            console.log(`   - Total excluídos: ${regrasExclusao}`);
+            console.log(`   - Registros restantes: ${exclusoesResult.registros_restantes || 0}`);
+          } else {
+            console.log(`ℹ️ Nenhuma exclusão v002/v003 aplicada`);
+          }
+        } catch (exclusoesError) {
+          console.error(`❌ ERRO na aplicação de regras v002/v003:`, exclusoesError);
+        }
+      } else {
+        console.log('\nℹ️ Regras v002/v003 não aplicáveis (arquivo não é retroativo)');
+      }
+
       // ℹ️ TIPIFICAÇÃO: Removida do pipeline automático
       // A tipificação deve ser aplicada MANUALMENTE pelo usuário via "Aplicar Tipificação Geral"
       // no menu Sistema de Regras após o upload ser concluído
       console.log('\nℹ️ Tipificação NÃO aplicada automaticamente - usar "Aplicar Tipificação Geral" manualmente');
-
-      // Variável para compatibilidade com código existente
-      const regrasExclusao = sistemaSucesso ? totalCorrecoes : 0;
 
       // Atualizar status final
       await supabaseClient
