@@ -38,150 +38,31 @@ serve(async (req) => {
 
     // TIPOS VÁLIDOS DE FATURAMENTO (para validação)
     const TIPOS_VALIDOS_FATURAMENTO = ['CO-FT', 'CO-NF', 'NC-FT', 'NC-NF', 'NC1-NF'];
-    
-    // Clientes que precisam ser forçadamente retipificados (override)
-    // CEMVALENCA_RX e CEMVALENCA_PL são derivados de CEMVALENCA e precisam de retipificação forçada
-    // porque podem ter sido tipificados antes do agrupamento de clientes
-    const CLIENTES_FORCAR_RETIPIFICACAO = ['RADI-IMAGEM', 'CEMVALENCA_RX', 'CEMVALENCA_PL'];
-    
-    // 1. Primeiro: Limpar tipos inválidos se houver período especificado
+
+    // 1. LIMPAR TODA A TIPIFICAÇÃO DO PERÍODO para retipificar do zero
     if (periodo_referencia) {
-      console.log('🧹 Verificando e limpando tipos de faturamento inválidos...');
-      
-      // Contar registros com tipos inválidos
-      const { count: countInvalidos, error: checkError } = await supabaseClient
+      console.log(`🧹 LIMPANDO TODA tipificação do período ${periodo_referencia} para retipificar do zero...`);
+      const { error: clearAllError, count: clearCount } = await supabaseClient
         .from('volumetria_mobilemed')
-        .select('*', { count: 'exact', head: true })
-        .eq('periodo_referencia', periodo_referencia)
-        .not('tipo_faturamento', 'is', null)
-        .not('tipo_faturamento', 'in', `(${TIPOS_VALIDOS_FATURAMENTO.join(',')})`);
+        .update({ tipo_faturamento: null, tipo_cliente: null })
+        .eq('periodo_referencia', periodo_referencia);
 
-      if (checkError) {
-        console.error('❌ Erro ao verificar tipos inválidos:', checkError);
-      } else if (countInvalidos && countInvalidos > 0) {
-        console.log(`⚠️ Encontrados ${countInvalidos} registros com tipos inválidos que serão limpos`);
-        
-        // Limpar tipos inválidos (definir como NULL)
-        const { error: cleanError } = await supabaseClient
-          .from('volumetria_mobilemed')
-          .update({ tipo_faturamento: null, tipo_cliente: null })
-          .eq('periodo_referencia', periodo_referencia)
-          .not('tipo_faturamento', 'in', `(${TIPOS_VALIDOS_FATURAMENTO.join(',')})`);
-
-        if (cleanError) {
-          console.error('❌ Erro ao limpar tipos inválidos:', cleanError);
-        } else {
-          console.log('✅ Tipos inválidos limpos com sucesso');
-        }
-      }
-      
-      // Forçar retipificação de clientes específicos que foram tipificados incorretamente
-      for (const cliente of CLIENTES_FORCAR_RETIPIFICACAO) {
-        console.log(`🔄 Forçando retipificação de ${cliente}...`);
-        const { error: forceError, count } = await supabaseClient
-          .from('volumetria_mobilemed')
-          .update({ tipo_faturamento: null, tipo_cliente: null })
-          .eq('periodo_referencia', periodo_referencia)
-          .eq('EMPRESA', cliente);
-        
-        if (forceError) {
-          console.error(`❌ Erro ao forçar retipificação de ${cliente}:`, forceError);
-        } else {
-          console.log(`✅ ${count || 0} registros de ${cliente} marcados para retipificação`);
-        }
+      if (clearAllError) {
+        console.error('❌ Erro ao limpar tipificação:', clearAllError);
+      } else {
+        console.log(`✅ Limpa tipificação de ${clearCount || 0} registros do período ${periodo_referencia}`);
       }
     }
 
-    // 2. Buscar parâmetros de todos os clientes para verificar quem tem cadastro
-    console.log('🔍 Buscando parâmetros de clientes para verificar cadastros...');
-    const { data: parametrosCheck, error: parametrosCheckError } = await supabaseClient
-      .from('parametros_faturamento')
-      .select('nome_fantasia');
-
-    if (parametrosCheckError) {
-      console.error('❌ Erro ao buscar parâmetros para verificação:', parametrosCheckError);
-    }
-
-    // Criar set de clientes com cadastro (normalizado)
-    const clientesComCadastro = new Set<string>();
-    if (parametrosCheck) {
-      parametrosCheck.forEach(p => {
-        if (p.nome_fantasia) {
-          clientesComCadastro.add(p.nome_fantasia.toUpperCase().trim());
-        }
-      });
-      console.log(`✅ ${clientesComCadastro.size} clientes com cadastro em parametros_faturamento`);
-    }
-
-    // 2.1 Identificar clientes na volumetria que NÃO têm cadastro mas têm tipo_faturamento definido
-    if (periodo_referencia && clientesComCadastro.size > 0) {
-      console.log('🔍 Buscando clientes sem cadastro que já foram tipificados incorretamente...');
-      
-      const { data: clientesVolumetria, error: clientesVolError } = await supabaseClient
-        .from('volumetria_mobilemed')
-        .select('"EMPRESA"')
-        .eq('periodo_referencia', periodo_referencia)
-        .not('tipo_faturamento', 'is', null);
-
-      if (!clientesVolError && clientesVolumetria) {
-        // Identificar clientes únicos na volumetria com tipo definido
-        const clientesComTipo = new Set<string>();
-        clientesVolumetria.forEach(r => {
-          if (r.EMPRESA) {
-            clientesComTipo.add(r.EMPRESA.toUpperCase().trim());
-          }
-        });
-
-        // Encontrar clientes sem cadastro (têm tipo definido mas não estão em parametros_faturamento)
-        const clientesSemCadastroComTipo: string[] = [];
-        for (const cliente of clientesComTipo) {
-          // Verificar se cliente existe no cadastro (busca exata e parcial)
-          let encontrado = clientesComCadastro.has(cliente);
-          if (!encontrado) {
-            for (const cadastrado of clientesComCadastro) {
-              if (cliente.includes(cadastrado) || cadastrado.includes(cliente)) {
-                encontrado = true;
-                break;
-              }
-            }
-          }
-          if (!encontrado) {
-            clientesSemCadastroComTipo.push(cliente);
-          }
-        }
-
-        if (clientesSemCadastroComTipo.length > 0) {
-          console.warn(`⚠️ Encontrados ${clientesSemCadastroComTipo.length} clientes SEM CADASTRO mas com tipo_faturamento definido:`);
-          clientesSemCadastroComTipo.forEach(c => console.warn(`   - ${c}`));
-
-          // Limpar tipo_faturamento desses clientes para que sejam reprocessados
-          for (const cliente of clientesSemCadastroComTipo) {
-            const { error: clearError, count } = await supabaseClient
-              .from('volumetria_mobilemed')
-              .update({ tipo_faturamento: null, tipo_cliente: null })
-              .eq('periodo_referencia', periodo_referencia)
-              .ilike('"EMPRESA"', cliente);
-
-            if (clearError) {
-              console.error(`❌ Erro ao limpar tipo de ${cliente}:`, clearError);
-            } else {
-              console.log(`✅ Limpo tipo_faturamento de ${count || 0} registros de ${cliente}`);
-            }
-          }
-        }
-      }
-    }
-
-    // 2.2 Buscar registros que precisam de tipificação
+    // 2. Buscar TODOS os registros do período (já foram limpos acima)
     let query = supabaseClient
       .from('volumetria_mobilemed')
       .select('id, "EMPRESA", "MODALIDADE", "ESPECIALIDADE", "CATEGORIA", "PRIORIDADE", "MEDICO"');
 
     // Aplicar filtros conforme parâmetros
     if (periodo_referencia) {
-      // Filtrar por período e apenas registros sem tipo de faturamento válido
-      query = query.eq('periodo_referencia', periodo_referencia)
-        .or(`tipo_faturamento.is.null,tipo_faturamento.not.in.(${TIPOS_VALIDOS_FATURAMENTO.join(',')})`);
+      // Todos registros do período (já limpos, então todos têm tipo_faturamento = NULL)
+      query = query.eq('periodo_referencia', periodo_referencia);
     } else if (arquivo_fonte && lote_upload) {
       query = query.eq('arquivo_fonte', arquivo_fonte).eq('lote_upload', lote_upload);
     } else if (arquivo_fonte) {
