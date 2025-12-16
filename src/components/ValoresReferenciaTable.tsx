@@ -19,6 +19,7 @@ export function ValoresReferenciaTable() {
   const { toast } = useToast();
   const { 
     data,
+    cadastroExames,
     refetch,
     loading, 
     error, 
@@ -35,6 +36,7 @@ export function ValoresReferenciaTable() {
   const [editingItem, setEditingItem] = useState<any>(null);
   const [vinculandoItem, setVinculandoItem] = useState<any>(null);
   const [vinculandoAutomatico, setVinculandoAutomatico] = useState(false);
+  const [buscaManual, setBuscaManual] = useState('');
   const [formData, setFormData] = useState({
     estudo_descricao: '',
     valores: ''
@@ -293,12 +295,12 @@ export function ValoresReferenciaTable() {
                     <TableCell>
                       <div className="flex items-center gap-1">
                         {/* Botão Vincular */}
-                        <Dialog open={vinculandoItem?.id === item.id} onOpenChange={(open) => !open && setVinculandoItem(null)}>
+                        <Dialog open={vinculandoItem?.id === item.id} onOpenChange={(open) => { if (!open) { setVinculandoItem(null); setBuscaManual(''); } }}>
                           <DialogTrigger asChild>
                             <Button
                               variant={item.cadastro_exame_id ? "ghost" : "default"}
                               size="sm"
-                              onClick={() => setVinculandoItem(item)}
+                              onClick={() => { setVinculandoItem(item); setBuscaManual(''); }}
                               title={item.cadastro_exame_id ? "Alterar vinculação" : "Vincular a exame do cadastro"}
                             >
                               <Link2 className="h-3 w-3" />
@@ -315,51 +317,124 @@ export function ValoresReferenciaTable() {
                               </DialogDescription>
                             </DialogHeader>
                             
-                            <div className="py-4">
-                              <Label className="text-sm font-medium">Sugestões (ordenadas por similaridade):</Label>
-                              <ScrollArea className="h-[300px] mt-2 border rounded-lg">
-                                <div className="p-2 space-y-2">
-                                  {buscarSugestoes(item.estudo_descricao, 10).map((sugestao, idx) => (
-                                    <div 
-                                      key={sugestao.exame.id}
-                                      className={`p-3 border rounded-lg cursor-pointer transition-colors hover:bg-primary/5 ${
-                                        idx === 0 ? 'border-green-500 bg-green-50/50 dark:bg-green-950/20' : ''
-                                      }`}
-                                      onClick={() => handleVincular(sugestao.exame.id)}
-                                    >
-                                      <div className="flex items-center justify-between">
-                                        <div className="flex-1">
-                                          <div className="font-medium">{sugestao.exame.nome}</div>
-                                          <div className="flex gap-1 mt-1 flex-wrap">
-                                            <Badge variant="outline" className="text-xs">
-                                              {sugestao.exame.modalidade}
-                                            </Badge>
-                                            <Badge variant="outline" className="text-xs">
-                                              {sugestao.exame.especialidade}
-                                            </Badge>
-                                            {sugestao.exame.categoria && (
-                                              <Badge variant="outline" className="text-xs">
-                                                {sugestao.exame.categoria}
+                            <div className="py-4 space-y-4">
+                              {/* Campo de busca manual */}
+                              <div>
+                                <Label className="text-sm font-medium">Buscar exame do cadastro:</Label>
+                                <Input
+                                  placeholder="Digite para buscar (ex: TC PESCOCO, RM CRANIO...)"
+                                  value={buscaManual}
+                                  onChange={(e) => setBuscaManual(e.target.value)}
+                                  className="mt-1"
+                                />
+                              </div>
+
+                              <div>
+                                <Label className="text-sm font-medium">
+                                  {buscaManual.length >= 2 ? 'Resultados da busca:' : 'Sugestões (ordenadas por similaridade):'}
+                                </Label>
+                                <ScrollArea className="h-[300px] mt-2 border rounded-lg">
+                                  <div className="p-2 space-y-2">
+                                    {/* Se há busca manual, filtrar pelo texto */}
+                                    {buscaManual.length >= 2 ? (
+                                      cadastroExames
+                                        .filter(exame => 
+                                          exame.nome.toUpperCase().includes(buscaManual.toUpperCase()) ||
+                                          exame.modalidade.toUpperCase().includes(buscaManual.toUpperCase()) ||
+                                          exame.especialidade.toUpperCase().includes(buscaManual.toUpperCase())
+                                        )
+                                        .slice(0, 20)
+                                        .map((exame, idx) => (
+                                          <div 
+                                            key={exame.id}
+                                            className={`p-3 border rounded-lg cursor-pointer transition-colors hover:bg-primary/5 ${
+                                              idx === 0 ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-950/20' : ''
+                                            }`}
+                                            onClick={() => {
+                                              handleVincular(exame.id);
+                                              setBuscaManual('');
+                                            }}
+                                          >
+                                            <div className="flex items-center justify-between">
+                                              <div className="flex-1">
+                                                <div className="font-medium">{exame.nome}</div>
+                                                <div className="flex gap-1 mt-1 flex-wrap">
+                                                  <Badge variant="outline" className="text-xs">
+                                                    {exame.modalidade}
+                                                  </Badge>
+                                                  <Badge variant="outline" className="text-xs">
+                                                    {exame.especialidade}
+                                                  </Badge>
+                                                  {exame.categoria && (
+                                                    <Badge variant="outline" className="text-xs">
+                                                      {exame.categoria}
+                                                    </Badge>
+                                                  )}
+                                                </div>
+                                              </div>
+                                              <Badge variant="secondary" className="ml-2">
+                                                Busca
                                               </Badge>
-                                            )}
+                                            </div>
+                                          </div>
+                                        ))
+                                    ) : (
+                                      /* Sugestões automáticas por similaridade */
+                                      buscarSugestoes(item.estudo_descricao, 10).map((sugestao, idx) => (
+                                        <div 
+                                          key={sugestao.exame.id}
+                                          className={`p-3 border rounded-lg cursor-pointer transition-colors hover:bg-primary/5 ${
+                                            idx === 0 ? 'border-green-500 bg-green-50/50 dark:bg-green-950/20' : ''
+                                          }`}
+                                          onClick={() => handleVincular(sugestao.exame.id)}
+                                        >
+                                          <div className="flex items-center justify-between">
+                                            <div className="flex-1">
+                                              <div className="font-medium">{sugestao.exame.nome}</div>
+                                              <div className="flex gap-1 mt-1 flex-wrap">
+                                                <Badge variant="outline" className="text-xs">
+                                                  {sugestao.exame.modalidade}
+                                                </Badge>
+                                                <Badge variant="outline" className="text-xs">
+                                                  {sugestao.exame.especialidade}
+                                                </Badge>
+                                                {sugestao.exame.categoria && (
+                                                  <Badge variant="outline" className="text-xs">
+                                                    {sugestao.exame.categoria}
+                                                  </Badge>
+                                                )}
+                                              </div>
+                                            </div>
+                                            <Badge 
+                                              variant={sugestao.similaridade >= 80 ? "default" : sugestao.similaridade >= 50 ? "secondary" : "outline"}
+                                              className="ml-2"
+                                            >
+                                              {sugestao.similaridade}%
+                                            </Badge>
                                           </div>
                                         </div>
-                                        <Badge 
-                                          variant={sugestao.similaridade >= 80 ? "default" : sugestao.similaridade >= 50 ? "secondary" : "outline"}
-                                          className="ml-2"
-                                        >
-                                          {sugestao.similaridade}%
-                                        </Badge>
+                                      ))
+                                    )}
+                                    
+                                    {/* Mensagens vazias */}
+                                    {buscaManual.length >= 2 && cadastroExames.filter(e => 
+                                      e.nome.toUpperCase().includes(buscaManual.toUpperCase()) ||
+                                      e.modalidade.toUpperCase().includes(buscaManual.toUpperCase()) ||
+                                      e.especialidade.toUpperCase().includes(buscaManual.toUpperCase())
+                                    ).length === 0 && (
+                                      <div className="text-center py-8 text-muted-foreground">
+                                        Nenhum exame encontrado para "{buscaManual}"
                                       </div>
-                                    </div>
-                                  ))}
-                                  {buscarSugestoes(item.estudo_descricao, 10).length === 0 && (
-                                    <div className="text-center py-8 text-muted-foreground">
-                                      Nenhuma sugestão encontrada com similaridade ≥ 30%
-                                    </div>
-                                  )}
-                                </div>
-                              </ScrollArea>
+                                    )}
+                                    {buscaManual.length < 2 && buscarSugestoes(item.estudo_descricao, 10).length === 0 && (
+                                      <div className="text-center py-8 text-muted-foreground">
+                                        <p>Nenhuma sugestão automática encontrada.</p>
+                                        <p className="text-sm mt-2">Use o campo de busca acima para encontrar o exame.</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </ScrollArea>
+                              </div>
                             </div>
 
                             <DialogFooter>
