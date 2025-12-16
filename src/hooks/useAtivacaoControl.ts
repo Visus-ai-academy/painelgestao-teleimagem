@@ -47,7 +47,9 @@ export const useAtivacaoControl = () => {
         return;
       }
 
-      setStatusGeral(data || []);
+      // A função RPC retorna jsonb, precisamos garantir que seja um array
+      const statusArray = Array.isArray(data) ? data as AtivacaoStatus[] : [];
+      setStatusGeral(statusArray);
       
       // Encontrar ativação do usuário atual
       const { data: { user } } = await supabase.auth.getUser();
@@ -58,8 +60,8 @@ export const useAtivacaoControl = () => {
           .eq('user_id', user.id)
           .single();
         
-        if (medicoData) {
-          const ativacaoUsuario = data?.find((a: AtivacaoStatus) => a.medico_id === medicoData.id);
+        if (medicoData && statusArray.length > 0) {
+          const ativacaoUsuario = statusArray.find((a) => a.medico_id === medicoData.id);
           setAtivacaoAtual(ativacaoUsuario || null);
         }
       }
