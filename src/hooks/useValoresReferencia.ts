@@ -33,6 +33,8 @@ function calcularSimilaridade(str1: string, str2: string): number {
     s.toUpperCase()
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
+      // Substituir barras e caracteres especiais por espaço ANTES de remover
+      .replace(/[\/\-\_\+\(\)\[\]\{\}\|\\]/g, ' ')
       .replace(/\b(DE|DA|DO|DAS|DOS|COM|SEM|PARA|POR|EM|NO|NA|NOS|NAS|E|OU)\b/gi, ' ')
       .replace(/[^A-Z0-9\s]/g, '')
       .replace(/\s+/g, ' ')
