@@ -507,8 +507,12 @@ export default function GerarFaturamento() {
 
       // Criar mapa de preços por cliente+modalidade+especialidade+categoria+prioridade
       const precosMap = new Map<string, { valor_unitario: number; valor_total: number }>();
+      // Criar set de clientes que têm demonstrativos gerados (fonte de verdade)
+      const clientesComDemonstrativo = new Set<string>();
+      
       demonstrativos?.forEach((demo: any) => {
         const clienteNome = demo.cliente_nome;
+        clientesComDemonstrativo.add(clienteNome.toUpperCase().trim());
         const detalhes = demo.detalhes_exames || [];
         detalhes.forEach((d: any) => {
           const key = `${clienteNome}|${d.modalidade}|${d.especialidade}|${d.categoria}|${d.prioridade}`;
@@ -518,6 +522,8 @@ export default function GerarFaturamento() {
           });
         });
       });
+
+      console.log(`📊 Quadro 2: ${clientesComDemonstrativo.size} clientes com demonstrativo gerado`);
 
       // 2. Buscar dados do Quadro 2 (volumetria faturada)
       const { data: dadosVolumetria, error } = await supabase
@@ -539,8 +545,39 @@ export default function GerarFaturamento() {
         return;
       }
 
-      // 3. Preparar dados para o Excel - Quadro 2 com valores
-      const dadosExcel = dadosVolumetria.map((item: any) => {
+      // 3. Filtrar volumetria para incluir APENAS clientes com demonstrativo gerado
+      const dadosVolumetriaFiltrados = dadosVolumetria.filter((item: any) => {
+        const clienteNome = item.Cliente_Nome_Fantasia || item.EMPRESA || '';
+        const clienteNomeUpper = clienteNome.toUpperCase().trim();
+        return clientesComDemonstrativo.has(clienteNomeUpper);
+      });
+
+      // Log de clientes excluídos por não ter demonstrativo
+      const clientesSemDemonstrativo = new Set<string>();
+      dadosVolumetria.forEach((item: any) => {
+        const clienteNome = item.Cliente_Nome_Fantasia || item.EMPRESA || '';
+        const clienteNomeUpper = clienteNome.toUpperCase().trim();
+        if (!clientesComDemonstrativo.has(clienteNomeUpper)) {
+          clientesSemDemonstrativo.add(clienteNome);
+        }
+      });
+      
+      if (clientesSemDemonstrativo.size > 0) {
+        console.warn(`⚠️ Quadro 2: ${clientesSemDemonstrativo.size} clientes excluídos por não ter demonstrativo:`, 
+          Array.from(clientesSemDemonstrativo));
+      }
+
+      if (dadosVolumetriaFiltrados.length === 0) {
+        toast({
+          title: "Nenhum dado faturado encontrado",
+          description: `Não há exames faturados com demonstrativo gerado para o período ${periodoSelecionado}`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // 4. Preparar dados para o Excel - Quadro 2 com valores
+      const dadosExcel = dadosVolumetriaFiltrados.map((item: any) => {
         const clienteNome = item.Cliente_Nome_Fantasia || item.EMPRESA || '';
         const chavePreco = `${clienteNome}|${item.MODALIDADE}|${item.ESPECIALIDADE}|${item.CATEGORIA}|${item.PRIORIDADE}`;
         const preco = precosMap.get(chavePreco);
