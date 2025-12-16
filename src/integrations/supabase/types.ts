@@ -4406,25 +4406,21 @@ export type Database = {
       }
       performance_dashboard: {
         Row: {
-          description: string | null
-          metric: string | null
-          value: number | null
+          duracao_max_ms: number | null
+          duracao_media_ms: number | null
+          hora: string | null
+          operation: string | null
+          table_name: string | null
+          total_operacoes: number | null
         }
         Relationships: []
       }
       security_metrics_view: {
         Row: {
-          active_consents: number | null
-          active_users_24h: number | null
-          admin_users: number | null
-          alerts_last_24h: number | null
-          encrypted_records: number | null
-          failed_logins_24h: number | null
-          manager_users: number | null
-          rls_enabled_tables: number | null
-          sensitive_access_24h: number | null
-          successful_backups_7d: number | null
-          total_policies: number | null
+          dia: string | null
+          logins_falha: number | null
+          logins_sucesso: number | null
+          usuarios_unicos: number | null
         }
         Relationships: []
       }
@@ -4454,67 +4450,69 @@ export type Database = {
         Args: { arquivo_fonte_param?: string }
         Returns: Json
       }
-      aplicar_regras_periodo_automatico: {
-        Args: {
-          record: Database["public"]["Tables"]["volumetria_mobilemed"]["Row"]
-        }
-        Returns: {
-          ACCESSION_NUMBER: string | null
-          arquivo_fonte: string
-          CATEGORIA: string | null
-          cliente_nome_fantasia: string | null
-          Cliente_Nome_Fantasia: string | null
-          CODIGO_INTERNO: number | null
-          CODIGO_PACIENTE: string | null
-          COMPLEMENTAR: string | null
-          controle_origem_id: string | null
-          created_at: string
-          created_by: string | null
-          DATA_LAUDO: string | null
-          DATA_PRAZO: string | null
-          DATA_REALIZACAO: string | null
-          DATA_REASSINATURA: string | null
-          data_referencia: string | null
-          DATA_TRANSFERENCIA: string | null
-          data_upload: string
-          DIGITADOR: string | null
-          DUPLICADO: string | null
-          EMPRESA: string
-          ESPECIALIDADE: string | null
-          ESTUDO_DESCRICAO: string | null
-          HORA_LAUDO: string | null
-          HORA_PRAZO: string | null
-          HORA_REALIZACAO: string | null
-          HORA_REASSINATURA: string | null
-          HORA_TRANSFERENCIA: string | null
-          id: string
-          IMAGENS_CAPTURADAS: number | null
-          IMAGENS_CHAVES: number | null
-          lote_upload: string | null
-          MEDICO: string | null
-          MEDICO_REASSINATURA: string | null
-          MODALIDADE: string | null
-          NOME_PACIENTE: string
-          periodo_referencia: string | null
-          POSSUI_IMAGENS_CHAVE: string | null
-          PRIORIDADE: string | null
-          processamento_pendente: boolean | null
-          SEGUNDA_ASSINATURA: string | null
-          STATUS: string | null
-          tipo_cliente: string | null
-          tipo_dados: string
-          tipo_faturamento: string | null
-          unidade_origem: string | null
-          updated_at: string
-          VALORES: number | null
-        }
-        SetofOptions: {
-          from: "volumetria_mobilemed"
-          to: "volumetria_mobilemed"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
+      aplicar_regras_periodo_automatico:
+        | { Args: { p_periodo: string }; Returns: Json }
+        | {
+            Args: {
+              record: Database["public"]["Tables"]["volumetria_mobilemed"]["Row"]
+            }
+            Returns: {
+              ACCESSION_NUMBER: string | null
+              arquivo_fonte: string
+              CATEGORIA: string | null
+              cliente_nome_fantasia: string | null
+              Cliente_Nome_Fantasia: string | null
+              CODIGO_INTERNO: number | null
+              CODIGO_PACIENTE: string | null
+              COMPLEMENTAR: string | null
+              controle_origem_id: string | null
+              created_at: string
+              created_by: string | null
+              DATA_LAUDO: string | null
+              DATA_PRAZO: string | null
+              DATA_REALIZACAO: string | null
+              DATA_REASSINATURA: string | null
+              data_referencia: string | null
+              DATA_TRANSFERENCIA: string | null
+              data_upload: string
+              DIGITADOR: string | null
+              DUPLICADO: string | null
+              EMPRESA: string
+              ESPECIALIDADE: string | null
+              ESTUDO_DESCRICAO: string | null
+              HORA_LAUDO: string | null
+              HORA_PRAZO: string | null
+              HORA_REALIZACAO: string | null
+              HORA_REASSINATURA: string | null
+              HORA_TRANSFERENCIA: string | null
+              id: string
+              IMAGENS_CAPTURADAS: number | null
+              IMAGENS_CHAVES: number | null
+              lote_upload: string | null
+              MEDICO: string | null
+              MEDICO_REASSINATURA: string | null
+              MODALIDADE: string | null
+              NOME_PACIENTE: string
+              periodo_referencia: string | null
+              POSSUI_IMAGENS_CHAVE: string | null
+              PRIORIDADE: string | null
+              processamento_pendente: boolean | null
+              SEGUNDA_ASSINATURA: string | null
+              STATUS: string | null
+              tipo_cliente: string | null
+              tipo_dados: string
+              tipo_faturamento: string | null
+              unidade_origem: string | null
+              updated_at: string
+              VALORES: number | null
+            }
+            SetofOptions: {
+              from: "volumetria_mobilemed"
+              to: "volumetria_mobilemed"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
       aplicar_regras_quebra_exames: {
         Args: { arquivo_fonte_param?: string }
         Returns: Json
@@ -4585,6 +4583,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      classificar_tipo_pessoa: { Args: { documento: string }; Returns: string }
       cleanup_old_audit_logs: { Args: never; Returns: number }
       cleanup_old_performance_logs: { Args: never; Returns: number }
       create_security_alert: {
@@ -4609,18 +4608,22 @@ export type Database = {
         Returns: Json
       }
       expirar_coberturas_automaticamente: { Args: never; Returns: undefined }
-      fazer_checkin_ativacao: {
-        Args: {
-          p_dispositivo_info?: Json
-          p_escala_id: string
-          p_ip_address?: unknown
-        }
-        Returns: Json
-      }
-      fazer_checkout_ativacao: {
-        Args: { p_ativacao_id: string; p_observacoes?: string }
-        Returns: Json
-      }
+      fazer_checkin_ativacao:
+        | {
+            Args: {
+              p_dispositivo_info?: Json
+              p_escala_id: string
+              p_ip_address?: unknown
+            }
+            Returns: Json
+          }
+        | { Args: { p_escala_id: string; p_medico_id: string }; Returns: Json }
+      fazer_checkout_ativacao:
+        | { Args: { p_ativacao_id: string }; Returns: Json }
+        | {
+            Args: { p_ativacao_id: string; p_observacoes?: string }
+            Returns: Json
+          }
       fechar_periodo_faturamento: {
         Args: { p_observacoes?: string; p_periodo_referencia: string }
         Returns: Json
@@ -4734,14 +4737,16 @@ export type Database = {
           ultima_aplicacao: string
         }[]
       }
-      get_regras_aplicadas_stats: {
-        Args: never
-        Returns: {
-          regra: string
-          total_aplicacoes: number
-          ultima_aplicacao: string
-        }[]
-      }
+      get_regras_aplicadas_stats:
+        | {
+            Args: never
+            Returns: {
+              regra: string
+              total_aplicacoes: number
+              ultima_aplicacao: string
+            }[]
+          }
+        | { Args: { p_periodo?: string }; Returns: Json }
       get_tempo_medio_atraso_clientes: {
         Args: never
         Returns: {
