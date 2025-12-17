@@ -739,10 +739,15 @@ export default function ContratosClientes() {
           console.error(`Erro ao buscar preços para cliente ${cliente.nome}:`, precosError);
         }
         
-        // 7. Calcular data de início e fim do contrato
-        const dataInicio = new Date().toISOString().split('T')[0];
-        const dataFim = new Date();
-        dataFim.setFullYear(dataFim.getFullYear() + 1); // 1 ano de contrato
+        // 7. Buscar datas dos parâmetros - se não existir, usar data atual
+        const hoje = new Date().toISOString().split('T')[0];
+        const umAnoDepois = new Date();
+        umAnoDepois.setFullYear(umAnoDepois.getFullYear() + 1);
+        
+        // Priorizar datas dos parâmetros, fallback para data atual
+        const dataInicio = parametroRepresentante.data_inicio_contrato || hoje;
+        const dataFimParametro = parametroRepresentante.data_termino_contrato || null;
+        const dataFim = dataFimParametro ? new Date(dataFimParametro) : umAnoDepois;
         
         // Preparar serviços contratados baseados nos preços (se houver)
         const servicosContratados = (precosCliente && precosCliente.length > 0) ? precosCliente.map(preco => ({
