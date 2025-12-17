@@ -215,24 +215,94 @@ Deno.serve(async (req) => {
       }
       regrasAplicadasArquivo.add('v001d')
 
-      // REGRA v005: Correções modalidade RX/MG/DO
-      console.log('  ⚡ Aplicando v005 - Correções modalidade')
-      await supabase.from('volumetria_mobilemed')
-        .update({ MODALIDADE: 'RX' })
+      // REGRA v005: Correções modalidade RX/MG/MR/DO baseadas no cadastro_exames
+      console.log('  ⚡ Aplicando v005 - Correções modalidade baseadas no cadastro_exames')
+      
+      // Buscar exames cadastrados com especialidades MAMO e MAMA
+      const { data: examesMAMO } = await supabase
+        .from('cadastro_exames')
+        .select('nome')
+        .eq('especialidade', 'MAMO')
+        .eq('ativo', true)
+      
+      const { data: examesMAMA } = await supabase
+        .from('cadastro_exames')
+        .select('nome')
+        .eq('especialidade', 'MAMA')
+        .eq('ativo', true)
+      
+      // Converter CR/DX para MG (exames de MAMO - Mamografia/Tomossíntese)
+      if (examesMAMO && examesMAMO.length > 0) {
+        let totalMG = 0
+        for (const exame of examesMAMO) {
+          if (exame.nome) {
+            const { count } = await supabase
+              .from('volumetria_mobilemed')
+              .update({ MODALIDADE: 'MG', updated_at: new Date().toISOString() })
+              .eq('arquivo_fonte', arquivoAtual)
+              .in('MODALIDADE', ['CR', 'DX'])
+              .ilike('ESTUDO_DESCRICAO', exame.nome)
+              .select('*', { count: 'exact', head: true })
+            
+            if (count && count > 0) {
+              totalMG += count
+              console.log(`    📝 CR/DX → MG (MAMO): ${exame.nome} (${count})`)
+            }
+          }
+        }
+        if (totalMG > 0) {
+          console.log(`  ✅ v005a: ${totalMG} registros CR/DX → MG (especialidade MAMO)`)
+        }
+      }
+      
+      // Converter CR/DX para MR (exames de MAMA - ex: RM MAMAS)
+      if (examesMAMA && examesMAMA.length > 0) {
+        let totalMR = 0
+        for (const exame of examesMAMA) {
+          if (exame.nome) {
+            const { count } = await supabase
+              .from('volumetria_mobilemed')
+              .update({ MODALIDADE: 'MR', updated_at: new Date().toISOString() })
+              .eq('arquivo_fonte', arquivoAtual)
+              .in('MODALIDADE', ['CR', 'DX'])
+              .ilike('ESTUDO_DESCRICAO', exame.nome)
+              .select('*', { count: 'exact', head: true })
+            
+            if (count && count > 0) {
+              totalMR += count
+              console.log(`    📝 CR/DX → MR (MAMA): ${exame.nome} (${count})`)
+            }
+          }
+        }
+        if (totalMR > 0) {
+          console.log(`  ✅ v005b: ${totalMR} registros CR/DX → MR (especialidade MAMA)`)
+        }
+      }
+      
+      // Converter CR/DX restantes para RX (exames que não são MAMO nem MAMA)
+      const { count: countRX } = await supabase
+        .from('volumetria_mobilemed')
+        .update({ MODALIDADE: 'RX', updated_at: new Date().toISOString() })
         .eq('arquivo_fonte', arquivoAtual)
         .in('MODALIDADE', ['CR', 'DX'])
-        .not('ESTUDO_DESCRICAO', 'like', '%mamogra%')
+        .select('*', { count: 'exact', head: true })
+      
+      if (countRX && countRX > 0) {
+        console.log(`  ✅ v005c: ${countRX} registros CR/DX → RX (outros exames)`)
+      }
 
+      // Converter OT para DO (Densitometria Óssea)
       await supabase.from('volumetria_mobilemed')
-        .update({ MODALIDADE: 'MG' })
-        .eq('arquivo_fonte', arquivoAtual)
-        .in('MODALIDADE', ['CR', 'DX'])
-        .like('ESTUDO_DESCRICAO', '%mamogra%')
-
-      await supabase.from('volumetria_mobilemed')
-        .update({ MODALIDADE: 'DO' })
+        .update({ MODALIDADE: 'DO', updated_at: new Date().toISOString() })
         .eq('arquivo_fonte', arquivoAtual)
         .eq('MODALIDADE', 'OT')
+      
+      // Converter BMD para DO (Densitometria Óssea)
+      await supabase.from('volumetria_mobilemed')
+        .update({ MODALIDADE: 'DO', updated_at: new Date().toISOString() })
+        .eq('arquivo_fonte', arquivoAtual)
+        .eq('MODALIDADE', 'BMD')
+      
       regrasAplicadasArquivo.add('v005')
 
       // REGRA v007: Correções de especialidades problemáticas
