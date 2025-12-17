@@ -30,8 +30,8 @@ import { useUploadStatus } from "@/hooks/useUploadStatus";
 import { useAutoRegras } from "@/hooks/useAutoRegras";
 
 
-// Período atual - onde estão os dados carregados (junho/2025)
-const PERIODO_ATUAL = "2025-06";
+// Período atual - onde estão os dados carregados (outubro/2025)
+const PERIODO_ATUAL = "2025-10";
 
 export default function DadosVolumetria() {
   const [refreshUploadStatus, setRefreshUploadStatus] = useState(0);
