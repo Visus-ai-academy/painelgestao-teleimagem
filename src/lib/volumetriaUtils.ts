@@ -720,30 +720,37 @@ export async function processVolumetriaOtimizado(
       
       if (arquivoFonte.includes('retroativo')) {
         // PRIORIDADE MÁXIMA: Aplicar regras v002/v003 PRIMEIRO para arquivos retroativos
-        console.log('🚀🚀🚀 APLICANDO REGRAS v002/v003 COMO PRIMEIRA PRIORIDADE...');
+        // v003: Exclui exames com DATA_REALIZACAO >= primeiro dia do mês de referência
+        // v002: Mantém apenas exames com DATA_LAUDO entre dia 8 do mês e dia 7 do mês seguinte
+        console.log('🚀🚀🚀 APLICANDO REGRAS v002/v003 COMO PRIMEIRA PRIORIDADE (ARQUIVOS RETROATIVOS)...');
+        
+        // Converter período para formato YYYY-MM que a função aplicar-exclusoes-periodo espera
+        const periodoDb = periodo ? `${periodo.ano}-${periodo.mes.toString().padStart(2, '0')}` : null;
         
         try {
           const { data: regrasV002V003, error: errorV002V003 } = await supabase.functions.invoke(
-            'aplicar-regras-v002-v003-automatico',
+            'aplicar-exclusoes-periodo',
             {
               body: {
                 arquivo_fonte: arquivoFonte,
-                upload_id: 'priority-process',
-                arquivo_nome: `priority-${arquivoFonte}`,
-                status: 'concluido',
-                total_registros: result.totalInserted,
-                periodo_referencia: periodoEdgeFormat
+                periodo_referencia: periodoDb || periodoEdgeFormat
               }
             }
           );
           
           if (errorV002V003) {
-            console.error('❌ ERRO CRÍTICO: Falha nas regras v002/v003 PRIORITÁRIAS:', errorV002V003);
+            console.error('❌ ERRO CRÍTICO: Falha nas regras v002/v003 (aplicar-exclusoes-periodo):', errorV002V003);
+          } else if (regrasV002V003?.sucesso) {
+            console.log('✅✅✅ REGRAS v002/v003 APLICADAS COM SUCESSO:');
+            console.log(`   - v003 (DATA_REALIZACAO >= início do mês): ${regrasV002V003.detalhes?.v003_excluidos || 0} excluídos`);
+            console.log(`   - v002 (DATA_LAUDO fora da janela dia 8-7): ${regrasV002V003.detalhes?.v002_excluidos || 0} excluídos`);
+            console.log(`   - Total excluídos: ${regrasV002V003.registros_excluidos || 0}`);
+            console.log(`   - Registros restantes: ${regrasV002V003.registros_restantes || 0}`);
           } else {
-            console.log('✅✅✅ REGRAS v002/v003 PRIORITÁRIAS APLICADAS COM SUCESSO:', regrasV002V003);
+            console.log('ℹ️ Nenhuma exclusão v002/v003 necessária:', regrasV002V003);
           }
         } catch (errorAutomatico) {
-          console.error('❌ ERRO CRÍTICO ao aplicar regras v002/v003 prioritárias:', errorAutomatico);
+          console.error('❌ ERRO CRÍTICO ao aplicar regras v002/v003:', errorAutomatico);
         }
         
       } else if (arquivoFonte.includes('volumetria_padrao') || arquivoFonte.includes('volumetria_fora_padrao')) {
