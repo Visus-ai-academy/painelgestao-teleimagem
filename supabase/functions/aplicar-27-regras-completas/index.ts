@@ -73,25 +73,91 @@ Deno.serve(async (req) => {
 
       // ===== REGRAS DE EXCLUSÃO (CRÍTICAS) =====
       
-      // REGRA v002: Exclusões por período (apenas para retroativos)
+      // REGRAS v002/v003: Exclusões por período (apenas para retroativos)
       if (arquivoAtual.includes('retroativo')) {
-        console.log('  ⚡ Aplicando v002 - Exclusões por período')
-        await supabase.from('volumetria_mobilemed')
+        console.log('  ⚡ Aplicando v002/v003 - Exclusões por período para retroativos')
+        
+        // Parsear período (formato YYYY-MM)
+        let ano: number, mes: number
+        if (periodo_referencia.includes('-')) {
+          const [anoStr, mesStr] = periodo_referencia.split('-')
+          ano = parseInt(anoStr)
+          mes = parseInt(mesStr)
+        } else if (periodo_referencia.includes('/')) {
+          const partes = periodo_referencia.split('/')
+          const mesNome = partes[0].toLowerCase()
+          const anoStr = partes[1]
+          const mesesMap: Record<string, number> = {
+            'jan': 1, 'fev': 2, 'mar': 3, 'abr': 4, 'mai': 5, 'jun': 6,
+            'jul': 7, 'ago': 8, 'set': 9, 'out': 10, 'nov': 11, 'dez': 12
+          }
+          mes = mesesMap[mesNome.substring(0, 3)] || 1
+          ano = anoStr.length === 2 ? 2000 + parseInt(anoStr) : parseInt(anoStr)
+        } else {
+          console.error('❌ Formato de período inválido:', periodo_referencia)
+          continue
+        }
+        
+        // Calcular datas limites
+        // v003: DATA_REALIZACAO deve ser ANTES do primeiro dia do mês de referência
+        const dataLimiteRealizacao = `${ano}-${String(mes).padStart(2, '0')}-01`
+        
+        // v002: DATA_LAUDO deve estar entre dia 8 do mês ref e dia 7 do mês seguinte
+        const dataInicioJanelaLaudo = `${ano}-${String(mes).padStart(2, '0')}-08`
+        const mesSeguinte = mes === 12 ? 1 : mes + 1
+        const anoSeguinte = mes === 12 ? ano + 1 : ano
+        const dataFimJanelaLaudo = `${anoSeguinte}-${String(mesSeguinte).padStart(2, '0')}-07`
+        
+        console.log(`    📅 Período: ${periodo_referencia} (${ano}-${mes})`)
+        console.log(`    📅 v003: DATA_REALIZACAO < ${dataLimiteRealizacao}`)
+        console.log(`    📅 v002: DATA_LAUDO entre ${dataInicioJanelaLaudo} e ${dataFimJanelaLaudo}`)
+        
+        // Contar registros antes
+        const { count: antesExclusao } = await supabase
+          .from('volumetria_mobilemed')
+          .select('*', { count: 'exact', head: true })
+          .eq('arquivo_fonte', arquivoAtual)
+        
+        // v003: Excluir registros com DATA_REALIZACAO >= primeiro dia do mês de referência
+        const { count: excluidosV003 } = await supabase
+          .from('volumetria_mobilemed')
           .delete()
           .eq('arquivo_fonte', arquivoAtual)
-          .neq('PERIODO_REFERENCIA', periodo_referencia.replace('/', '/20'))
-        regrasAplicadasArquivo.add('v002')
-      }
-
-      // REGRA v003: Exclusões por data laudo (apenas para retroativos)
-      if (arquivoAtual.includes('retroativo')) {
-        console.log('  ⚡ Aplicando v003 - Exclusões por data laudo')
-        const anoMes = periodo_referencia.replace('/', '/20')
-        await supabase.from('volumetria_mobilemed')
-          .delete()
-          .eq('arquivo_fonte', arquivoAtual)
-          .not('DATA_LAUDO', 'like', `${anoMes}%`)
+          .gte('DATA_REALIZACAO', dataLimiteRealizacao)
+          .select('*', { count: 'exact', head: true })
+        
+        console.log(`    🗑️ v003: ${excluidosV003 || 0} registros excluídos (DATA_REALIZACAO >= ${dataLimiteRealizacao})`)
         regrasAplicadasArquivo.add('v003')
+        
+        // v002: Excluir registros com DATA_LAUDO fora da janela permitida
+        // Excluir DATA_LAUDO < dataInicioJanelaLaudo
+        const { count: excluidosV002Antes } = await supabase
+          .from('volumetria_mobilemed')
+          .delete()
+          .eq('arquivo_fonte', arquivoAtual)
+          .lt('DATA_LAUDO', dataInicioJanelaLaudo)
+          .select('*', { count: 'exact', head: true })
+        
+        // Excluir DATA_LAUDO > dataFimJanelaLaudo
+        const { count: excluidosV002Depois } = await supabase
+          .from('volumetria_mobilemed')
+          .delete()
+          .eq('arquivo_fonte', arquivoAtual)
+          .gt('DATA_LAUDO', dataFimJanelaLaudo)
+          .select('*', { count: 'exact', head: true })
+        
+        const totalExcluidosV002 = (excluidosV002Antes || 0) + (excluidosV002Depois || 0)
+        console.log(`    🗑️ v002: ${totalExcluidosV002} registros excluídos (DATA_LAUDO fora da janela)`)
+        regrasAplicadasArquivo.add('v002')
+        
+        // Contar registros depois
+        const { count: depoisExclusao } = await supabase
+          .from('volumetria_mobilemed')
+          .select('*', { count: 'exact', head: true })
+          .eq('arquivo_fonte', arquivoAtual)
+        
+        const totalExcluidos = (antesExclusao || 0) - (depoisExclusao || 0)
+        console.log(`    📊 Total excluídos v002/v003: ${totalExcluidos} (${antesExclusao} → ${depoisExclusao})`)
       }
 
       // REGRA v004: Exclusões de clientes específicos
