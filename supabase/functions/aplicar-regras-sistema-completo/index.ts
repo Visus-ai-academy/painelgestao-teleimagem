@@ -24,14 +24,29 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    let body = {};
+    let body: any = {};
     try {
       body = await req.json();
     } catch (jsonError) {
-      console.log('Corpo da requisição vazio ou inválido, usando defaults:', jsonError);
+      console.log('Corpo da requisição vazio ou inválido:', jsonError);
     }
 
-    const { arquivo_fonte, periodo_referencia = '2025-06', aplicar_todos_arquivos = false } = body;
+    const { arquivo_fonte, periodo_referencia, aplicar_todos_arquivos = false } = body;
+    
+    // Validar período obrigatório
+    if (!periodo_referencia) {
+      console.error('❌ Período de referência não informado');
+      return new Response(
+        JSON.stringify({ 
+          success: false,
+          erro: 'Período de referência é obrigatório. Selecione o período antes de processar.'
+        }),
+        { 
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
     
     const arquivosParaProcessar = aplicar_todos_arquivos 
       ? ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo']
