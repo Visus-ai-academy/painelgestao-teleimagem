@@ -33,8 +33,7 @@ import { LimparUploads } from "@/components/LimparUploads";
 // Tipos para fontes de dados
 type FonteDados = 'upload' | 'mobilemed' | 'banco';
 
-// Período atual (julho/2025)
-const PERIODO_ATUAL = "2025-07";
+// Período é determinado pela seleção do usuário, não por constantes hardcoded
 
 export default function ConfiguracaoFaturamento() {
   const { toast } = useToast();
