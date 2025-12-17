@@ -15,10 +15,13 @@ serve(async (req) => {
     const requestBody = await req.json();
     const { arquivo_fonte, periodo_referencia } = requestBody;
     
-    console.log(`🎯 APLICAR EXCLUSÕES POR PERÍODO v002/v003`);
-    console.log(`📝 Request body completo:`, JSON.stringify(requestBody, null, 2));
+    console.log(`🎯 ===============================================`);
+    console.log(`🎯 APLICAR EXCLUSÕES POR PERÍODO v002/v003 - v2.1`);
+    console.log(`🎯 ===============================================`);
+    console.log(`📝 Request body RAW:`, JSON.stringify(requestBody));
     console.log(`📁 Arquivo: ${arquivo_fonte}`);
-    console.log(`📅 Período: ${periodo_referencia}`);
+    console.log(`📅 Período RECEBIDO (raw): "${periodo_referencia}"`);
+    console.log(`📅 Tipo do período: ${typeof periodo_referencia}`);
 
     // Validar arquivo_fonte
     const arquivosValidos = [
@@ -66,70 +69,164 @@ serve(async (req) => {
       });
     }
 
-    // Calcular datas baseadas no período de referência
-    let dataLimiteRealizacao: Date;
-    let dataInicioJanelaLaudo: Date;
-    let dataFimJanelaLaudo: Date;
-    
+    // PARSER ROBUSTO DE PERÍODO - Aceita QUALQUER formato e converte para ano/mês
     let anoCompleto: number;
     let mesNumero: number;
     
-    // Detectar formato do período: YYYY-MM ou mes/ano
-    if (periodo_referencia.includes('-')) {
-      // Formato YYYY-MM (ex: "2025-10")
-      const [ano, mes] = periodo_referencia.split('-');
+    const periodoStr = String(periodo_referencia || '').trim();
+    console.log(`🔍 Analisando período: "${periodoStr}"`);
+    
+    // Formato 1: YYYY-MM (ex: "2025-10") - FORMATO PREFERENCIAL
+    if (/^\d{4}-\d{2}$/.test(periodoStr)) {
+      const [ano, mes] = periodoStr.split('-');
       anoCompleto = parseInt(ano);
       mesNumero = parseInt(mes);
-      console.log(`📅 Período detectado (YYYY-MM): ano=${anoCompleto}, mês=${mesNumero}`);
-    } else if (periodo_referencia.includes('/')) {
-      // Formato mes/ano (ex: "out/25")
-      const [mes, ano] = periodo_referencia.split('/');
+      console.log(`📅 Formato detectado: YYYY-MM → ano=${anoCompleto}, mês=${mesNumero}`);
+    } 
+    // Formato 2: mes/ano (ex: "out/25")
+    else if (/^[a-zA-Z]{3}\/\d{2}$/.test(periodoStr)) {
+      const [mes, ano] = periodoStr.split('/');
       const meses: { [key: string]: number } = {
         'jan': 1, 'fev': 2, 'mar': 3, 'abr': 4, 'mai': 5, 'jun': 6,
         'jul': 7, 'ago': 8, 'set': 9, 'out': 10, 'nov': 11, 'dez': 12
       };
       anoCompleto = 2000 + parseInt(ano);
-      mesNumero = meses[mes.toLowerCase()];
-      console.log(`📅 Período detectado (mes/ano): ano=${anoCompleto}, mês=${mesNumero}`);
-    } else {
-      console.error(`❌ Formato de período não reconhecido: ${periodo_referencia}`);
+      mesNumero = meses[mes.toLowerCase()] || 0;
+      
+      if (mesNumero === 0) {
+        console.error(`❌ Mês inválido no período: "${mes}"`);
+        return new Response(JSON.stringify({
+          sucesso: false,
+          erro: `Mês inválido no período: ${mes}. Use: jan, fev, mar, abr, mai, jun, jul, ago, set, out, nov, dez`
+        }), { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400 
+        });
+      }
+      
+      console.log(`📅 Formato detectado: mes/YY → ano=${anoCompleto}, mês=${mesNumero}`);
+    }
+    // Formato 3: YYYY/MM (ex: "2025/10")
+    else if (/^\d{4}\/\d{2}$/.test(periodoStr)) {
+      const [ano, mes] = periodoStr.split('/');
+      anoCompleto = parseInt(ano);
+      mesNumero = parseInt(mes);
+      console.log(`📅 Formato detectado: YYYY/MM → ano=${anoCompleto}, mês=${mesNumero}`);
+    }
+    else {
+      console.error(`❌ Formato de período não reconhecido: "${periodoStr}"`);
       return new Response(JSON.stringify({
         sucesso: false,
-        erro: `Formato de período inválido: ${periodo_referencia}. Use YYYY-MM ou mes/ano`
+        erro: `Formato de período inválido: "${periodoStr}". Use YYYY-MM (ex: 2025-10) ou mes/ano (ex: out/25)`
       }), { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400 
       });
     }
 
+    // Validar valores
+    if (anoCompleto < 2020 || anoCompleto > 2100) {
+      console.error(`❌ Ano inválido: ${anoCompleto}`);
+      return new Response(JSON.stringify({
+        sucesso: false,
+        erro: `Ano inválido: ${anoCompleto}. Deve estar entre 2020 e 2100`
+      }), { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400 
+      });
+    }
+    
+    if (mesNumero < 1 || mesNumero > 12) {
+      console.error(`❌ Mês inválido: ${mesNumero}`);
+      return new Response(JSON.stringify({
+        sucesso: false,
+        erro: `Mês inválido: ${mesNumero}. Deve estar entre 1 e 12`
+      }), { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400 
+      });
+    }
+
+    console.log(`✅ PERÍODO PARSEADO COM SUCESSO: Ano=${anoCompleto}, Mês=${mesNumero}`);
+
+    // CALCULAR DATAS PARA REGRAS v002/v003
+    
     // v003: Excluir exames realizados NO mês de referência ou DEPOIS (>= primeiro dia do mês)
-    dataLimiteRealizacao = new Date(anoCompleto, mesNumero - 1, 1);
+    // Para outubro/2025, dataLimiteRealizacao = 2025-10-01
+    // Exames com DATA_REALIZACAO >= 2025-10-01 são EXCLUÍDOS
+    // Exames com DATA_REALIZACAO < 2025-10-01 são MANTIDOS (realizados ANTES do mês de referência)
+    const dataLimiteRealizacao = new Date(Date.UTC(anoCompleto, mesNumero - 1, 1));
     
     // v002: Manter DATA_LAUDO entre dia 8 do mês de referência e dia 7 do mês seguinte
-    dataInicioJanelaLaudo = new Date(anoCompleto, mesNumero - 1, 8);
-    dataFimJanelaLaudo = new Date(anoCompleto, mesNumero, 7);
+    // Para outubro/2025: manter laudos entre 2025-10-08 e 2025-11-07
+    const dataInicioJanelaLaudo = new Date(Date.UTC(anoCompleto, mesNumero - 1, 8));
+    const dataFimJanelaLaudo = new Date(Date.UTC(anoCompleto, mesNumero, 7));
 
     const dataLimiteRealizacaoStr = dataLimiteRealizacao.toISOString().split('T')[0];
     const dataInicioJanelaLaudoStr = dataInicioJanelaLaudo.toISOString().split('T')[0];
     const dataFimJanelaLaudoStr = dataFimJanelaLaudo.toISOString().split('T')[0];
 
-    console.log(`📊 REGRAS APLICADAS:`);
-    console.log(`   v003 - Excluir DATA_REALIZACAO >= ${dataLimiteRealizacaoStr}`);
-    console.log(`   v002 - Manter DATA_LAUDO apenas entre ${dataInicioJanelaLaudoStr} e ${dataFimJanelaLaudoStr}`);
+    console.log(`📊 ===============================================`);
+    console.log(`📊 REGRAS A SEREM APLICADAS:`);
+    console.log(`📊 ===============================================`);
+    console.log(`📊 v003 - EXCLUIR registros com DATA_REALIZACAO >= ${dataLimiteRealizacaoStr}`);
+    console.log(`📊        (exames realizados no mês ${mesNumero}/${anoCompleto} ou depois)`);
+    console.log(`📊 v002 - MANTER apenas DATA_LAUDO entre ${dataInicioJanelaLaudoStr} e ${dataFimJanelaLaudoStr}`);
+    console.log(`📊        (laudos assinados na janela válida do período)`);
+    console.log(`📊 ===============================================`);
 
     // Verificar registros totais antes da aplicação
-    const { count: totalRegistrosInicial } = await supabase
+    const { count: totalRegistrosInicial, error: countError } = await supabase
       .from('volumetria_mobilemed')
       .select('*', { count: 'exact', head: true })
       .eq('arquivo_fonte', arquivo_fonte);
 
-    console.log(`📊 Total de registros inicial: ${totalRegistrosInicial || 0}`);
+    if (countError) {
+      console.error('❌ Erro ao contar registros iniciais:', countError);
+      throw new Error(`Erro ao contar registros: ${countError.message}`);
+    }
+
+    console.log(`📊 Total de registros inicial para ${arquivo_fonte}: ${totalRegistrosInicial || 0}`);
+
+    if (!totalRegistrosInicial || totalRegistrosInicial === 0) {
+      console.log(`⚠️ Nenhum registro encontrado para ${arquivo_fonte} - nada a processar`);
+      return new Response(JSON.stringify({
+        sucesso: true,
+        arquivo_fonte,
+        periodo_referencia: periodoStr,
+        periodo_parseado: { ano: anoCompleto, mes: mesNumero },
+        registros_inicial: 0,
+        registros_encontrados: 0,
+        registros_excluidos: 0,
+        registros_restantes: 0,
+        detalhes: {
+          v003_excluidos: 0,
+          v002_excluidos: 0,
+          data_limite_realizacao: dataLimiteRealizacaoStr,
+          janela_laudo_inicio: dataInicioJanelaLaudoStr,
+          janela_laudo_fim: dataFimJanelaLaudoStr
+        },
+        mensagem: 'Nenhum registro para processar'
+      }), { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
+    }
+
+    // Buscar amostra de datas para debug
+    const { data: amostraDatas } = await supabase
+      .from('volumetria_mobilemed')
+      .select('"DATA_REALIZACAO", "DATA_LAUDO"')
+      .eq('arquivo_fonte', arquivo_fonte)
+      .limit(5);
+    
+    console.log(`📊 Amostra de datas no arquivo:`, JSON.stringify(amostraDatas, null, 2));
 
     let totalExcludosV003 = 0;
     let totalExcludosV002 = 0;
 
     // ===== APLICAR REGRA v003 PRIMEIRO =====
-    console.log(`🔧 Aplicando v003: Excluindo DATA_REALIZACAO >= ${dataLimiteRealizacaoStr}...`);
+    console.log(`\n🔧 ===== APLICANDO v003 =====`);
+    console.log(`🔧 Excluindo registros com DATA_REALIZACAO >= ${dataLimiteRealizacaoStr}...`);
     
     const { count: registrosV003, error: errorV003Count } = await supabase
       .from('volumetria_mobilemed')
@@ -139,19 +236,12 @@ serve(async (req) => {
 
     if (errorV003Count) {
       console.error('❌ Erro ao contar registros v003:', errorV003Count);
-      return new Response(JSON.stringify({ 
-        sucesso: false, 
-        erro: errorV003Count.message 
-      }), { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400 
-      });
+      throw new Error(`Erro ao contar v003: ${errorV003Count.message}`);
     }
 
-    console.log(`📊 v003: ${registrosV003 || 0} registros encontrados para exclusão`);
+    console.log(`📊 v003: ${registrosV003 || 0} registros encontrados para exclusão (DATA_REALIZACAO >= ${dataLimiteRealizacaoStr})`);
 
     if (registrosV003 && registrosV003 > 0) {
-      // Excluir em lotes
       const BATCH_SIZE = 100;
       let processedBatches = 0;
       
@@ -164,7 +254,12 @@ serve(async (req) => {
           .order('id')
           .limit(BATCH_SIZE);
 
-        if (selectError || !idsToDelete || idsToDelete.length === 0) {
+        if (selectError) {
+          console.error('❌ Erro ao selecionar IDs para v003:', selectError);
+          break;
+        }
+
+        if (!idsToDelete || idsToDelete.length === 0) {
           break;
         }
 
@@ -193,8 +288,10 @@ serve(async (req) => {
     console.log(`✅ v003 concluída: ${totalExcludosV003} registros excluídos`);
 
     // ===== APLICAR REGRA v002 NOS REGISTROS RESTANTES =====
-    console.log(`🔧 Aplicando v002: Excluindo DATA_LAUDO fora da janela ${dataInicioJanelaLaudoStr} - ${dataFimJanelaLaudoStr}...`);
+    console.log(`\n🔧 ===== APLICANDO v002 =====`);
+    console.log(`🔧 Excluindo registros com DATA_LAUDO fora da janela ${dataInicioJanelaLaudoStr} - ${dataFimJanelaLaudoStr}...`);
     
+    // v002: Excluir onde DATA_LAUDO < inicio OU DATA_LAUDO > fim
     const { count: registrosV002, error: errorV002Count } = await supabase
       .from('volumetria_mobilemed')
       .select('*', { count: 'exact', head: true })
@@ -204,10 +301,9 @@ serve(async (req) => {
     if (errorV002Count) {
       console.error('❌ Erro ao contar registros v002:', errorV002Count);
     } else {
-      console.log(`📊 v002: ${registrosV002 || 0} registros encontrados para exclusão`);
+      console.log(`📊 v002: ${registrosV002 || 0} registros encontrados para exclusão (DATA_LAUDO fora da janela)`);
 
       if (registrosV002 && registrosV002 > 0) {
-        // Excluir em lotes
         const BATCH_SIZE = 100;
         let processedBatches = 0;
         
@@ -220,7 +316,12 @@ serve(async (req) => {
             .order('id')
             .limit(BATCH_SIZE);
 
-          if (selectError || !idsToDelete || idsToDelete.length === 0) {
+          if (selectError) {
+            console.error('❌ Erro ao selecionar IDs para v002:', selectError);
+            break;
+          }
+
+          if (!idsToDelete || idsToDelete.length === 0) {
             break;
           }
 
@@ -262,17 +363,19 @@ serve(async (req) => {
       .from('audit_logs')
       .insert({
         table_name: 'volumetria_mobilemed',
-        operation: 'REGRAS_V002_V003_APLICADAS',
+        operation: 'REGRAS_V002_V003_APLICADAS_V2',
         record_id: arquivo_fonte,
         new_data: {
+          versao_funcao: '2.1',
           arquivo_fonte,
-          periodo_referencia,
+          periodo_referencia_original: periodoStr,
+          periodo_parseado: { ano: anoCompleto, mes: mesNumero },
           registros_inicial: totalRegistrosInicial || 0,
           registros_excluidos_v003: totalExcludosV003,
           registros_excluidos_v002: totalExcludosV002,
           total_excluidos: totalExcluidos,
           registros_finais: registrosFinais || 0,
-          regras: 'v002_v003',
+          regras: 'v002_v003_v2.1',
           data_limite_realizacao: dataLimiteRealizacaoStr,
           janela_laudo_inicio: dataInicioJanelaLaudoStr,
           janela_laudo_fim: dataFimJanelaLaudoStr
@@ -284,7 +387,8 @@ serve(async (req) => {
     const resultado = {
       sucesso: true,
       arquivo_fonte,
-      periodo_referencia,
+      periodo_referencia: periodoStr,
+      periodo_parseado: { ano: anoCompleto, mes: mesNumero },
       registros_inicial: totalRegistrosInicial || 0,
       registros_encontrados: (registrosV003 || 0) + (registrosV002 || 0),
       registros_excluidos: totalExcluidos,
@@ -296,12 +400,21 @@ serve(async (req) => {
         janela_laudo_inicio: dataInicioJanelaLaudoStr,
         janela_laudo_fim: dataFimJanelaLaudoStr
       },
-      regra_aplicada: 'v002/v003 - Exclusões por Período',
+      regra_aplicada: 'v002/v003 - Exclusões por Período (v2.1)',
       data_processamento: new Date().toISOString(),
-      observacao: `Aplicadas ambas as regras v002 e v003. Total excluído: ${totalExcluidos}. Restantes: ${registrosFinais || 0}.`
+      observacao: `Período ${mesNumero}/${anoCompleto}: Mantidos apenas exames realizados ANTES de ${dataLimiteRealizacaoStr} com laudos entre ${dataInicioJanelaLaudoStr} e ${dataFimJanelaLaudoStr}. Total excluído: ${totalExcluidos}. Restantes: ${registrosFinais || 0}.`
     };
 
-    console.log(`✅ RESULTADO FINAL:`, resultado);
+    console.log(`\n✅ ===============================================`);
+    console.log(`✅ RESULTADO FINAL - v002/v003 v2.1:`);
+    console.log(`✅ ===============================================`);
+    console.log(`✅ Período: ${mesNumero}/${anoCompleto}`);
+    console.log(`✅ Registros iniciais: ${totalRegistrosInicial}`);
+    console.log(`✅ v003 excluídos: ${totalExcludosV003}`);
+    console.log(`✅ v002 excluídos: ${totalExcludosV002}`);
+    console.log(`✅ Total excluídos: ${totalExcluidos}`);
+    console.log(`✅ Registros finais: ${registrosFinais}`);
+    console.log(`✅ ===============================================`);
 
     return new Response(JSON.stringify(resultado), { 
       headers: { ...corsHeaders, 'Content-Type': 'application/json' } 

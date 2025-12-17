@@ -1,5 +1,4 @@
 import { supabase } from '@/integrations/supabase/client';
-import { convertDbPeriodToEdgeFormat } from '@/lib/volumetriaUtils';
 
 /**
  * CORREÇÃO EMERGENCIAL: Aplicar regras v002/v003 em uploads existentes
@@ -32,9 +31,8 @@ export async function corrigirRegrasV002V003Existentes(): Promise<{ success: boo
     for (const upload of uploadsProblematicos || []) {
       console.log(`\n🔧 Processando upload: ${upload.arquivo_nome} (${upload.tipo_arquivo})`);
       
-      // Converter período de formato DB para Edge Function
-      const periodoEdgeFormat = convertDbPeriodToEdgeFormat(upload.periodo_referencia);
-      console.log(`📅 Período convertido: ${upload.periodo_referencia} → ${periodoEdgeFormat}`);
+      // Log do período - usar formato YYYY-MM do banco diretamente
+      console.log(`📅 Período do banco (YYYY-MM): ${upload.periodo_referencia}`);
       
       // Verificar se há registros para este arquivo
       const { count: registrosExistentes } = await supabase
@@ -50,7 +48,7 @@ export async function corrigirRegrasV002V003Existentes(): Promise<{ success: boo
           arquivo: upload.arquivo_nome,
           tipo: upload.tipo_arquivo,
           periodo_original: upload.periodo_referencia,
-          periodo_convertido: periodoEdgeFormat,
+          periodo_utilizado: upload.periodo_referencia,
           status: 'SEM_REGISTROS',
           registros_antes: 0,
           registros_depois: 0,
@@ -62,13 +60,16 @@ export async function corrigirRegrasV002V003Existentes(): Promise<{ success: boo
       // Aplicar regras v002/v003
       try {
         console.log(`🚀 Aplicando regras v002/v003 para ${upload.tipo_arquivo}...`);
+        console.log(`📅 Período DB: ${upload.periodo_referencia} (será enviado diretamente)`);
         
+        // CORREÇÃO CRÍTICA: Enviar período no formato YYYY-MM (formato do banco)
+        // Não usar periodoEdgeFormat que converte para mes/ano e causa erros de parsing
         const { data: resultadoRegras, error: errorRegras } = await supabase.functions.invoke(
           'aplicar-exclusoes-periodo',
           {
             body: {
               arquivo_fonte: upload.tipo_arquivo,
-              periodo_referencia: periodoEdgeFormat
+              periodo_referencia: upload.periodo_referencia // Formato YYYY-MM direto do banco
             }
           }
         );
@@ -79,7 +80,7 @@ export async function corrigirRegrasV002V003Existentes(): Promise<{ success: boo
             arquivo: upload.arquivo_nome,
             tipo: upload.tipo_arquivo,
             periodo_original: upload.periodo_referencia,
-            periodo_convertido: periodoEdgeFormat,
+            periodo_utilizado: upload.periodo_referencia,
             status: 'ERRO',
             erro: errorRegras.message,
             registros_antes: registrosExistentes,
@@ -104,7 +105,7 @@ export async function corrigirRegrasV002V003Existentes(): Promise<{ success: boo
             arquivo: upload.arquivo_nome,
             tipo: upload.tipo_arquivo,
             periodo_original: upload.periodo_referencia,
-            periodo_convertido: periodoEdgeFormat,
+            periodo_utilizado: upload.periodo_referencia,
             status: 'SUCESSO',
             registros_antes: registrosExistentes,
             registros_depois: registrosDepois,
@@ -119,7 +120,7 @@ export async function corrigirRegrasV002V003Existentes(): Promise<{ success: boo
           arquivo: upload.arquivo_nome,
           tipo: upload.tipo_arquivo,
           periodo_original: upload.periodo_referencia,
-          periodo_convertido: periodoEdgeFormat,
+          periodo_utilizado: upload.periodo_referencia,
           status: 'ERRO_CRITICO',
           erro: errorAplic instanceof Error ? errorAplic.message : 'Erro desconhecido',
           registros_antes: registrosExistentes,
