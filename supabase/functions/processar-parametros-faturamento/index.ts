@@ -266,7 +266,45 @@ serve(async (req) => {
         if (cliente_id) {
           console.log(`Cliente encontrado: ${nomeEmpresa} -> ID: ${cliente_id}`);
         } else {
-          console.log(`Cliente NÃO encontrado: ${nomeEmpresa} (normalizado: ${nomeEmpresaNormalizado})`);
+          // CRIAR CLIENTE AUTOMATICAMENTE quando não existe
+          console.log(`🆕 Cliente NÃO encontrado: ${nomeEmpresa} - Criando automaticamente...`);
+          
+          const nomeFantasiaArquivo = findColumnValue(row, COLUMN_MAPPING.nomeFantasia);
+          const cnpjArquivo = findColumnValue(row, COLUMN_MAPPING.cnpj);
+          const razaoSocialArquivo = findColumnValue(row, COLUMN_MAPPING.razaoSocial);
+          
+          // Criar novo cliente na tabela clientes
+          const novoClienteData = {
+            nome: nomeEmpresa.toString().trim(),
+            nome_mobilemed: nomeEmpresa.toString().trim(),
+            nome_fantasia: nomeFantasiaArquivo?.toString().trim() || nomeEmpresa.toString().trim(),
+            cnpj: formatarCNPJ(cnpjArquivo),
+            razao_social: razaoSocialArquivo?.toString().trim() || null,
+            ativo: true,
+            status: 'Ativo'
+          };
+          
+          const { data: novoCliente, error: erroCliente } = await supabase
+            .from('clientes')
+            .insert(novoClienteData)
+            .select('id')
+            .single();
+          
+          if (erroCliente) {
+            console.error(`❌ Erro ao criar cliente ${nomeEmpresa}:`, erroCliente);
+            throw new Error(`Erro ao criar cliente ${nomeEmpresa}: ${erroCliente.message}`);
+          }
+          
+          cliente_id = novoCliente.id;
+          console.log(`✅ Cliente criado com sucesso: ${nomeEmpresa} -> ID: ${cliente_id}`);
+          
+          // Adicionar ao mapa para futuras referências no mesmo arquivo
+          clienteMap.set(nomeEmpresa.toString().toLowerCase().trim(), cliente_id);
+          clienteMap.set(nomeEmpresaNormalizado, cliente_id);
+          if (nomeFantasiaArquivo) {
+            clienteMap.set(nomeFantasiaArquivo.toString().toLowerCase().trim(), cliente_id);
+            clienteMap.set(normalizarNome(nomeFantasiaArquivo.toString()), cliente_id);
+          }
         }
 
         // Debug: mostrar dados sendo extraídos do arquivo
