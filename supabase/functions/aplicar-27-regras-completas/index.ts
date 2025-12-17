@@ -205,11 +205,11 @@ Deno.serve(async (req) => {
         .eq('arquivo_fonte', arquivoAtual)
         .eq('ESPECIALIDADE', 'CARDIO COM SCORE')
       
-      // Colunas → MUSCULO ESQUELETICO  
+      // Colunas → MUSCULO ESQUELETICO (será refinado por v034 para neurologistas)
       await supabase.from('volumetria_mobilemed')
         .update({ ESPECIALIDADE: 'MUSCULO ESQUELETICO' })
         .eq('arquivo_fonte', arquivoAtual)
-        .eq('ESPECIALIDADE', 'Colunas')
+        .or('ESPECIALIDADE.eq.Colunas,ESPECIALIDADE.eq.COLUNAS,ESPECIALIDADE.ilike.colunas')
 
       // ONCO MEDICINA INTERNA → MEDICINA INTERNA
       await supabase.from('volumetria_mobilemed')
@@ -217,6 +217,25 @@ Deno.serve(async (req) => {
         .eq('arquivo_fonte', arquivoAtual)
         .eq('ESPECIALIDADE', 'ONCO MEDICINA INTERNA')
       regrasAplicadasArquivo.add('v007')
+
+      // ===== REGRA v034: Colunas x Músculo x Neuro (APÓS v007) =====
+      // Se o médico é neurologista, sobrescreve para NEURO + SC
+      console.log('  ⚡ Aplicando v034 - Colunas → NEURO para neurologistas')
+      try {
+        const { data: v034Result, error: v034Error } = await supabase.functions.invoke(
+          'aplicar-regra-colunas-musculo-neuro',
+          { body: { arquivo_fonte: arquivoAtual } }
+        )
+        
+        if (v034Error) {
+          console.error('❌ Erro ao aplicar v034:', v034Error)
+        } else if (v034Result) {
+          console.log(`✅ v034: ${v034Result.total_alterados_neuro} → NEURO+SC, ${v034Result.total_alterados_musculo} → MUSCULO ESQUELETICO`)
+          regrasAplicadasArquivo.add('v034')
+        }
+      } catch (v034Err) {
+        console.error('❌ Erro ao chamar v034:', v034Err)
+      }
 
       // REGRA v044: Correção MAMA → MAMO para modalidade MG
       // MAMA é reservado para RM MAMAS (modalidade MR), mamografias devem ter MAMO

@@ -2221,6 +2221,39 @@ export type Database = {
         }
         Relationships: []
       }
+      medicos_neurologistas: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          created_by: string | null
+          crm: string | null
+          id: string
+          nome: string
+          observacoes: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          created_by?: string | null
+          crm?: string | null
+          id?: string
+          nome: string
+          observacoes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          created_by?: string | null
+          crm?: string | null
+          id?: string
+          nome?: string
+          observacoes?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       medicos_valores_adicionais: {
         Row: {
           created_at: string

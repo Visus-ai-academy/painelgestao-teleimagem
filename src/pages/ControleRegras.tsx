@@ -1,5 +1,4 @@
 import { AutoRegrasMaster } from '@/components/AutoRegrasMaster';
-import { AplicarRegraV007 } from '@/components/AplicarRegraV007';
 
 export default function ControleRegras() {
   return (
@@ -13,8 +12,6 @@ export default function ControleRegras() {
       
       <AutoRegrasMaster />
       
-      <AplicarRegraV007 />
-      
       <div className="p-4 bg-muted/50 rounded-lg border-l-4 border-primary">
         <h3 className="font-semibold text-lg mb-2">Como funciona o Sistema Automático</h3>
         <ul className="space-y-2 text-sm text-muted-foreground">
@@ -26,12 +23,15 @@ export default function ControleRegras() {
         </ul>
       </div>
 
-      <div className="p-4 bg-orange-50 rounded-lg border-l-4 border-orange-400">
-        <h3 className="font-semibold text-lg mb-2 text-orange-800">Aplicação Manual para Dados Existentes</h3>
-        <p className="text-sm text-orange-700">
-          Use o componente acima para aplicar regras específicas (como a v007) nos dados que já foram carregados anteriormente.
-          Isso é útil quando uma nova regra é implementada e precisa ser aplicada retroativamente.
+      <div className="p-4 bg-blue-50 rounded-lg border-l-4 border-blue-400">
+        <h3 className="font-semibold text-lg mb-2 text-blue-800">Regras v007 + v034 Integradas</h3>
+        <p className="text-sm text-blue-700 mb-2">
+          As regras de especialidade "Colunas" agora estão integradas no pipeline automático:
         </p>
+        <ul className="text-sm text-blue-700 space-y-1">
+          <li>• <strong>v007:</strong> Colunas → MUSCULO ESQUELETICO (padrão)</li>
+          <li>• <strong>v034:</strong> Colunas → NEURO + SC (para neurologistas da tabela <code className="bg-blue-100 px-1 rounded">medicos_neurologistas</code>)</li>
+        </ul>
       </div>
     </div>
   );
