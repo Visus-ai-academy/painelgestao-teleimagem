@@ -3,23 +3,40 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Users } from "lucide-react";
+import { Loader2, Users, AlertTriangle, CheckCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
-export function AplicarAgrupamentoClientes() {
+interface AplicarAgrupamentoClientesProps {
+  periodoReferencia?: string;
+}
+
+export function AplicarAgrupamentoClientes({ periodoReferencia }: AplicarAgrupamentoClientesProps) {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
   const handleAplicar = async () => {
+    // CRÍTICO: Validar período antes de processar
+    if (!periodoReferencia) {
+      toast({
+        title: "Período não selecionado",
+        description: "Selecione um período de referência na aba 'Upload de Dados' antes de aplicar o agrupamento",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setLoading(true);
       
       toast({
         title: "Aplicando agrupamento...",
-        description: "Processando agrupamento de clientes nos dados existentes",
+        description: `Processando agrupamento de clientes para período ${periodoReferencia}`,
       });
 
       const { data, error } = await supabase.functions.invoke('aplicar-agrupamento-clientes', {
-        body: {}
+        body: {
+          periodo_referencia: periodoReferencia
+        }
       });
 
       if (error) throw error;
@@ -75,10 +92,30 @@ export function AplicarAgrupamentoClientes() {
           </ul>
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
+        {/* Alerta se período não selecionado */}
+        {!periodoReferencia && (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              <strong>Período não selecionado!</strong> Volte à aba "Upload de Dados" e selecione o período de faturamento antes de aplicar o agrupamento.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Período selecionado */}
+        {periodoReferencia && (
+          <Alert>
+            <CheckCircle className="h-4 w-4 text-green-600" />
+            <AlertDescription>
+              Período selecionado: <strong>{periodoReferencia}</strong>
+            </AlertDescription>
+          </Alert>
+        )}
+
         <Button 
           onClick={handleAplicar} 
-          disabled={loading}
+          disabled={loading || !periodoReferencia}
           className="w-full"
         >
           {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

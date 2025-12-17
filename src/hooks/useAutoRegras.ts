@@ -9,15 +9,7 @@ interface UploadStatus {
   status: string;
   registros_inseridos: number;
   created_at: string;
-  periodo_referencia?: string; // Período do upload
-}
-
-// Função para obter período atual dinamicamente
-function getPeriodoAtual(): string {
-  const hoje = new Date();
-  const ano = hoje.getFullYear();
-  const mes = hoje.getMonth() + 1;
-  return `${ano}-${mes.toString().padStart(2, '0')}`;
+  periodo_referencia?: string;
 }
 
 export function useAutoRegras() {
@@ -158,19 +150,22 @@ export function useAutoRegras() {
   };
 
   const aplicarRegrasManual = async (arquivoFonte: string, loteUpload?: string, periodoReferencia?: string) => {
+    // CRÍTICO: Período é obrigatório - não processar sem período definido
+    if (!periodoReferencia) {
+      toast.error('⚠️ Período de referência não especificado. Selecione um período antes de processar.');
+      console.error('❌ Tentativa de aplicar regras sem período definido');
+      return null;
+    }
+    
     setProcessandoRegras(true);
     
-    // Usar período passado ou calcular período atual dinamicamente
-    const periodo = periodoReferencia || getPeriodoAtual();
-    
     try {
-      console.log(`🚀 Aplicando TODAS as 27 regras manualmente para período ${periodo}...`);
+      console.log(`🚀 Aplicando TODAS as 27 regras manualmente para período ${periodoReferencia}...`);
       
-      // Usar a única função que funciona
       const { data, error } = await supabase.functions.invoke('aplicar-regras-sistema-completo', {
         body: {
           arquivo_fonte: arquivoFonte,
-          periodo_referencia: periodo,
+          periodo_referencia: periodoReferencia,
           aplicar_todos_arquivos: false
         }
       });
@@ -197,14 +192,17 @@ export function useAutoRegras() {
   };
 
   const validarRegras = async (arquivoFonte: string, periodoReferencia?: string) => {
-    // Usar período passado ou calcular período atual dinamicamente
-    const periodo = periodoReferencia || getPeriodoAtual();
+    // CRÍTICO: Período é obrigatório
+    if (!periodoReferencia) {
+      console.error('❌ Tentativa de validar regras sem período definido');
+      return null;
+    }
     
     try {
       const { data, error } = await supabase.functions.invoke('aplicar-regras-sistema-completo', {
         body: {
           arquivo_fonte: arquivoFonte,
-          periodo_referencia: periodo,
+          periodo_referencia: periodoReferencia,
           aplicar_todos_arquivos: false
         }
       });
@@ -226,20 +224,23 @@ export function useAutoRegras() {
   };
 
   const corrigirTodosDadosExistentes = async (periodoReferencia?: string) => {
+    // CRÍTICO: Período é obrigatório - não processar sem período definido
+    if (!periodoReferencia) {
+      toast.error('⚠️ Período de referência não especificado. Selecione um período antes de processar.');
+      console.error('❌ Tentativa de aplicar regras sem período definido');
+      return null;
+    }
+    
     setProcessandoRegras(true);
     
-    // Usar período passado ou calcular período atual dinamicamente
-    const periodo = periodoReferencia || getPeriodoAtual();
-    
     try {
-      toast.info(`🚀 Aplicando TODAS as 27 regras em TODOS os dados para período ${periodo}...`);
-      console.log(`🚀 Executando aplicação completa das 27 regras nos dados existentes (período: ${periodo})...`);
+      toast.info(`🚀 Aplicando TODAS as 27 regras em TODOS os dados para período ${periodoReferencia}...`);
+      console.log(`🚀 Executando aplicação completa das 27 regras nos dados existentes (período: ${periodoReferencia})...`);
       
-      // Usar a única função que funciona para todos os arquivos
       const { data, error } = await supabase.functions.invoke('aplicar-regras-sistema-completo', {
         body: {
           arquivo_fonte: null,
-          periodo_referencia: periodo,
+          periodo_referencia: periodoReferencia,
           aplicar_todos_arquivos: true
         }
       });
@@ -265,25 +266,6 @@ export function useAutoRegras() {
       setProcessandoRegras(false);
     }
   };
-
-  // Executar correção COMPLETA automática uma única vez ao inicializar o sistema
-  useEffect(() => {
-    const executarCorrecaoCompleta = async () => {
-      const jaExecutou = localStorage.getItem('correcao_completa_regras_executada');
-      if (!jaExecutou) {
-        console.log('🚀 Executando correção COMPLETA única dos dados existentes...');
-        try {
-          await corrigirTodosDadosExistentes();
-          localStorage.setItem('correcao_completa_regras_executada', 'true');
-        } catch (error) {
-          console.error('Erro na correção completa única:', error);
-        }
-      }
-    };
-
-    // Executar imediatamente ao carregar
-    executarCorrecaoCompleta();
-  }, []);
 
   return {
     autoAplicarAtivo,
