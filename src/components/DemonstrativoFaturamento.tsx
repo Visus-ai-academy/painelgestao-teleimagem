@@ -76,8 +76,7 @@ export default function DemonstrativoFaturamento() {
   const [filtroTipoFaturamento, setFiltroTipoFaturamento] = useState<string>("todos");
   // Persistir período selecionado - usar o mesmo localStorage que a página GerarFaturamento
   const [periodo, setPeriodo] = useState(() => {
-    const saved = localStorage.getItem('periodoFaturamentoSelecionado');
-    return saved || "2025-06"; // Fallback para jun/25
+    return localStorage.getItem('periodoFaturamentoSelecionado') || "";
   });
   const [periodosDisponiveis, setPeriodosDisponiveis] = useState<string[]>([]);
   const [ordemAlfabetica, setOrdemAlfabetica] = useState(true);
@@ -1364,7 +1363,7 @@ export default function DemonstrativoFaturamento() {
                   </SelectItem>
                 ))
               ) : (
-                <SelectItem value="2025-06" disabled>
+                <SelectItem value="" disabled>
                   Nenhum período disponível
                 </SelectItem>
               )}

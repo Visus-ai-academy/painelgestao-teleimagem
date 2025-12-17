@@ -26,7 +26,9 @@ interface ExameSemPreco {
 
 export function ExamesValoresZerados() {
   const [loading, setLoading] = useState(false);
-  const [periodo, setPeriodo] = useState("2025-06");
+  const [periodo, setPeriodo] = useState(() => {
+    return localStorage.getItem('periodoFaturamentoSelecionado') || "";
+  });
   const [examesSemPreco, setExamesSemPreco] = useState<ExameSemPreco[]>([]);
   const { toast } = useToast();
 
@@ -247,12 +249,18 @@ export function ExamesValoresZerados() {
                   <SelectValue placeholder="Selecione o período" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="2025-06">Junho/2025</SelectItem>
-                  <SelectItem value="2025-05">Maio/2025</SelectItem>
-                  <SelectItem value="2025-04">Abril/2025</SelectItem>
-                  <SelectItem value="2025-03">Março/2025</SelectItem>
-                  <SelectItem value="2025-02">Fevereiro/2025</SelectItem>
-                  <SelectItem value="2025-01">Janeiro/2025</SelectItem>
+                  {/* Gera últimos 12 meses dinamicamente */}
+                  {Array.from({ length: 12 }, (_, i) => {
+                    const date = new Date();
+                    date.setMonth(date.getMonth() - i);
+                    const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                    const label = date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+                    return (
+                      <SelectItem key={value} value={value}>
+                        {label.charAt(0).toUpperCase() + label.slice(1)}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
