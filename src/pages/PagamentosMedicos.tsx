@@ -31,8 +31,7 @@ export default function PagamentosMedicos() {
   
   // Controle de período
   const [periodoSelecionado, setPeriodoSelecionado] = useState(() => {
-    const saved = localStorage.getItem('periodoRepasseSelecionado');
-    return saved || "2025-06";
+    return localStorage.getItem('periodoRepasseSelecionado') || "";
   });
   const [mostrarApenasDisponiveis, setMostrarApenasDisponiveis] = useState(true);
   const [periodoBloqueado, setPeriodoBloqueado] = useState(false);

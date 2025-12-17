@@ -314,10 +314,18 @@ export function AutoRegrasMaster() {
       console.log(`⚡ APLICAÇÃO AUTOMÁTICA iniciada para ${tipo_arquivo}`);
 
       // Aplicar TODAS as 28 regras automaticamente usando a função unificada
+      // Obter período do localStorage (formato YYYY-MM)
+      const periodoSelecionado = localStorage.getItem('periodoVolumetriaSelecionado');
+      if (!periodoSelecionado) {
+        console.log('⚠️ Período não selecionado - aplicação de regras cancelada');
+        toast.warning('Selecione um período antes de processar os arquivos');
+        return;
+      }
+      
       const { data, error } = await supabase.functions.invoke("aplicar-regras-sistema-completo", {
         body: {
           arquivo_fonte: tipo_arquivo,
-          periodo_referencia: "2025-06", // Sempre usar período atual
+          periodo_referencia: periodoSelecionado,
           aplicar_todos_arquivos: false,
         },
       });

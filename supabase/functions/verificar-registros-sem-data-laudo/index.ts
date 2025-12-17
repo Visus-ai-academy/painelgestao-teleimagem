@@ -15,7 +15,14 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseKey)
 
-    const { periodo_referencia = '2025-06', acao = 'verificar' } = await req.json()
+    const { periodo_referencia, acao = 'verificar' } = await req.json()
+    
+    if (!periodo_referencia) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'periodo_referencia é obrigatório' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     console.log('🔍 VERIFICANDO REGISTROS SEM DATA_LAUDO')
     console.log(`📅 Período: ${periodo_referencia}`)
