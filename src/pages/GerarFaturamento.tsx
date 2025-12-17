@@ -57,8 +57,8 @@ import { AlertasPrecosFaltantes, type PrecoFaltante } from "@/components/faturam
 
 import { generatePDF, downloadPDF, type FaturamentoData } from "@/lib/pdfUtils";
 
-// Período atual - onde estão os dados carregados (junho/2025)
-const PERIODO_ATUAL = "2025-06";
+// Período atual - calculado dinamicamente
+const PERIODO_ATUAL = `${new Date().getFullYear()}-${(new Date().getMonth() + 1).toString().padStart(2, '0')}`;
 
 export default function GerarFaturamento() {
   const [activeTab, setActiveTab] = useState("gerar");
@@ -112,7 +112,8 @@ export default function GerarFaturamento() {
   // Controle de período para upload - persistir no localStorage
   const [periodoSelecionado, setPeriodoSelecionado] = useState(() => {
     const saved = localStorage.getItem('periodoFaturamentoSelecionado');
-    return saved || "2025-06"; // Fallback para jun/25
+    // Fallback para período atual dinamicamente calculado
+    return saved || `${new Date().getFullYear()}-${(new Date().getMonth() + 1).toString().padStart(2, '0')}`;
   });
   const [mostrarApenasEditaveis, setMostrarApenasEditaveis] = useState(true);
   
