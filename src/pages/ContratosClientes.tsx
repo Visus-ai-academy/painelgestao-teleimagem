@@ -739,22 +739,16 @@ export default function ContratosClientes() {
           console.error(`Erro ao buscar preços para cliente ${cliente.nome}:`, precosError);
         }
         
-        // 7. Buscar datas dos parâmetros - se não existir, usar data atual
-        const hoje = new Date().toISOString().split('T')[0];
-        const umAnoDepois = new Date();
-        umAnoDepois.setFullYear(umAnoDepois.getFullYear() + 1);
-        
-        // Priorizar datas dos parâmetros, fallback para data atual
-        const dataInicio = parametroRepresentante.data_inicio_contrato || hoje;
-        const dataFimParametro = parametroRepresentante.data_termino_contrato || null;
-        const dataFim = dataFimParametro ? new Date(dataFimParametro) : umAnoDepois;
+        // 7. Buscar TODOS os dados exclusivamente dos parâmetros - sem valores padrão
+        const dataInicio = parametroRepresentante.data_inicio_contrato || null;
+        const dataFim = parametroRepresentante.data_termino_contrato || null;
         
         // Preparar serviços contratados baseados nos preços (se houver)
         const servicosContratados = (precosCliente && precosCliente.length > 0) ? precosCliente.map(preco => ({
             modalidade: preco.modalidade,
             especialidade: preco.especialidade,
             categoria: preco.categoria,
-            prioridade: preco.prioridade || 'Rotina',
+            prioridade: preco.prioridade,
             valor_base: preco.valor_base,
             volume_inicial: preco.volume_inicial,
             volume_final: preco.volume_final
@@ -779,35 +773,28 @@ export default function ContratosClientes() {
           incluir_empresa_origem: parametroRepresentante.incluir_empresa_origem
         };
         
-        // 6. Criar contrato no banco
+        // 6. Criar contrato no banco - TODOS os campos vêm dos parâmetros
         console.log(`      📝 Inserindo contrato no banco para "${nomeFantasia}"...`);
         
         const { error: contratoError } = await supabase
           .from('contratos_clientes')
           .insert({
             cliente_id: cliente.id,
-            numero_contrato: contratoInfo.numeroContrato,
+            numero_contrato: contratoInfo.numeroContrato || null,
             data_inicio: dataInicio,
-            data_fim: dataFim.toISOString().split('T')[0],
-            status: 'ativo',
+            data_fim: dataFim,
+            status: parametroRepresentante.status || null,
             servicos_contratados: servicosContratados,
             modalidades: precosCliente && precosCliente.length > 0 ? [...new Set(precosCliente.map(p => p.modalidade))] : [],
             especialidades: precosCliente && precosCliente.length > 0 ? [...new Set(precosCliente.map(p => p.especialidade))] : [],
             tem_precos_configurados: precosCliente && precosCliente.length > 0,
             tem_parametros_configurados: true,
-            considera_plantao: false,
-            cond_volume: 'MOD/ESP/CAT',
-            dia_vencimento: parametroRepresentante.forma_cobranca === 'Mensal' ? 10 : 30,
-            desconto_percentual: 0,
-            acrescimo_percentual: 0,
-            faixas_volume: [],
             configuracoes_franquia: configuracoesFranquia,
             configuracoes_integracao: configuracoesIntegracao,
-            tipo_faturamento: parametroRepresentante.tipo_faturamento || 'CO-FT',
-            tipo_cliente: parametroRepresentante.tipo_cliente || 'CO',
-            forma_pagamento: parametroRepresentante.forma_cobranca || 'Mensal',
-            dia_fechamento: parametroRepresentante.dia_fechamento || 7,
-            observacoes_contratuais: `Gerado: ${nomeFantasia} | ${contratoInfo.parametros.length} parâmetro(s) | ${parametroRepresentante.tipo_faturamento || 'CO-FT'}`
+            tipo_faturamento: parametroRepresentante.tipo_faturamento || null,
+            tipo_cliente: parametroRepresentante.tipo_cliente || null,
+            forma_pagamento: parametroRepresentante.forma_cobranca || null,
+            dia_fechamento: parametroRepresentante.dia_fechamento || null
           });
         
          if (contratoError) {
