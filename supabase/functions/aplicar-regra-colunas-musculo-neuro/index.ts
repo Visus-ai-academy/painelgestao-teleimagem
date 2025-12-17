@@ -20,11 +20,11 @@ serve(async (req) => {
 
     const { arquivo_fonte, periodo_referencia } = await req.json();
     
-    console.log(`🔄 Iniciando aplicação da regra v034 (ColunasxMusculoxNeuro)`);
+    console.log(`🔄 Iniciando aplicação da regra v034 (ColunasxMusculoxNeuro) - OTIMIZADO`);
     console.log(`📁 Arquivo: ${arquivo_fonte || 'TODOS'}`);
     console.log(`📅 Período: ${periodo_referencia || 'TODOS'}`);
     
-    // BUSCAR NEUROLOGISTAS DA TABELA medicos_neurologistas (não mais hardcoded)
+    // BUSCAR NEUROLOGISTAS DA TABELA medicos_neurologistas
     const { data: neurologistasDb, error: neuroError } = await supabase
       .from('medicos_neurologistas')
       .select('nome')
@@ -35,7 +35,7 @@ serve(async (req) => {
       throw neuroError;
     }
     
-    const medicosNeuroLista = neurologistasDb?.map(n => n.nome) || [];
+    const medicosNeuroLista = neurologistasDb?.map(n => n.nome.toUpperCase().replace(/^DR[A]?\s+/i, '').trim()) || [];
     
     if (medicosNeuroLista.length === 0) {
       console.warn('⚠️ Nenhum neurologista encontrado na tabela medicos_neurologistas');
@@ -50,81 +50,18 @@ serve(async (req) => {
     
     console.log(`👨‍⚕️ Neurologistas carregados da tabela: ${medicosNeuroLista.length} médicos`);
     
-    // Função para normalizar nome do médico (remover Dr./Dra., espaços extras, etc.)
-    const normalizarNomeMedico = (nome: string): string => {
-      if (!nome) return '';
-      return nome
-        .replace(/^DR[A]?\s+/i, '') // Remove DR/DRA no início
-        .replace(/\s+/g, ' ') // Remove espaços extras
-        .trim()
-        .toUpperCase(); // Para comparação case-insensitive
-    };
-
-    // Função para verificar se nomes coincidem (incluindo abreviações)
-    const nomesCoicidem = (nomeCompleto: string, nomeBusca: string): boolean => {
-      const nomeCompletoNorm = normalizarNomeMedico(nomeCompleto);
-      const nomeBuscaNorm = normalizarNomeMedico(nomeBusca);
-      
-      // Verificação exata
-      if (nomeCompletoNorm === nomeBuscaNorm) return true;
-      
-      // Verificação de nome abreviado
-      // Ex: "Francisca R" deve coincidir com "Francisca Rocélia Silva de Freitas"
-      const partesCompleto = nomeCompletoNorm.split(' ');
-      const partesBusca = nomeBuscaNorm.split(' ');
-      
-      if (partesBusca.length <= partesCompleto.length) {
-        let match = true;
-        for (let i = 0; i < partesBusca.length; i++) {
-          const parteBusca = partesBusca[i];
-          const parteCompleta = partesCompleto[i];
-          
-          // Se a parte da busca tem apenas 1 caractere, verifica se é inicial
-          if (parteBusca.length === 1) {
-            if (!parteCompleta.startsWith(parteBusca)) {
-              match = false;
-              break;
-            }
-          } else {
-            // Nome completo deve coincidir exatamente
-            if (parteBusca !== parteCompleta) {
-              match = false;
-              break;
-            }
-          }
-        }
-        if (match) return true;
-      }
-      
-      return false;
-    };
-    
-    // Normalizar lista de médicos para comparação
-    const medicosNeuroNormalizados = medicosNeuroLista.map(nome => normalizarNomeMedico(nome));
-    
-    let totalProcessados = 0;
-    let totalAlteradosMusculo = 0;
-    let totalAlteradosNeuro = 0;
-    let totalErros = 0;
-    
-    // Construir query para buscar registros
-    // Buscar registros com especialidade "COLUNAS" ou "Colunas" (case-insensitive)
+    // Construir query para buscar registros com especialidade COLUNAS
     let query = supabase
       .from('volumetria_mobilemed')
-      .select('id, "ESTUDO_DESCRICAO", "ESPECIALIDADE", "CATEGORIA", "MEDICO"')
+      .select('id, "MEDICO"')
       .or('ESPECIALIDADE.eq.COLUNAS,ESPECIALIDADE.eq.Colunas,ESPECIALIDADE.ilike.colunas');
     
-    // Filtrar por arquivo_fonte se especificado
     if (arquivo_fonte) {
       query = query.eq('arquivo_fonte', arquivo_fonte);
     }
     
-    // Filtrar por periodo_referencia se especificado
     if (periodo_referencia) {
-      const periodoFormatado = periodo_referencia.includes('/20') 
-        ? periodo_referencia 
-        : periodo_referencia.replace('/', '/20');
-      query = query.eq('PERIODO_REFERENCIA', periodoFormatado);
+      query = query.eq('periodo_referencia', periodo_referencia);
     }
     
     const { data: registrosColunas, error: selectError } = await query;
@@ -142,7 +79,6 @@ serve(async (req) => {
           total_processados: 0,
           total_alterados_musculo: 0,
           total_alterados_neuro: 0,
-          total_erros: 0,
           arquivo_fonte: arquivo_fonte || 'TODOS',
           observacoes: 'Nenhum registro com especialidade "Colunas" encontrado'
         }),
@@ -152,99 +88,93 @@ serve(async (req) => {
     
     console.log(`📊 Encontrados ${registrosColunas.length} registros com especialidade "Colunas"`);
     
-    // Processar cada registro
+    // Separar registros em listas para NEURO e MUSCULO ESQUELETICO
+    const idsNeuro: string[] = [];
+    const idsMusculo: string[] = [];
+    
     for (const registro of registrosColunas) {
-      totalProcessados++;
+      const medico = (registro.MEDICO || '').toUpperCase().replace(/^DR[A]?\s+/i, '').trim();
       
-      try {
-        const medico = registro.MEDICO || '';
-        
-        // Determinar nova especialidade baseado no médico
-        let novaEspecialidade = 'MUSCULO ESQUELETICO'; // Padrão
-        let novaCategoria: string | null = null;
-        
-        // Verificar se o médico está na lista de neurologistas usando comparação inteligente
-        let ehNeurologista = false;
-        for (const medicoNeuro of medicosNeuroLista) {
-          if (nomesCoicidem(medicoNeuro, medico)) {
-            ehNeurologista = true;
-            break;
-          }
+      // Verificar se médico está na lista de neurologistas
+      let ehNeurologista = false;
+      for (const medicoNeuro of medicosNeuroLista) {
+        if (medico === medicoNeuro || medico.startsWith(medicoNeuro.split(' ')[0])) {
+          ehNeurologista = true;
+          break;
         }
-        
-        if (ehNeurologista) {
-          // NEUROLOGISTA: ESPECIALIDADE = 'NEURO' e CATEGORIA = 'SC'
-          novaEspecialidade = 'NEURO';
-          novaCategoria = 'SC'; // CRÍTICO: Forçar categoria SC para neurologistas
-          totalAlteradosNeuro++;
-        } else {
-          // NÃO NEUROLOGISTA: ESPECIALIDADE = 'MUSCULO ESQUELETICO'
-          novaEspecialidade = 'MUSCULO ESQUELETICO';
-          // Categoria permanece a mesma ou vem do cadastro_exames (aplicado por outras regras)
-          totalAlteradosMusculo++;
-        }
-        
-        // Preparar dados para atualização
-        const dadosAtualizacao: any = {
-          'ESPECIALIDADE': novaEspecialidade,
-          updated_at: new Date().toISOString()
-        };
-        
-        // Se for neurologista, OBRIGATORIAMENTE forçar CATEGORIA = 'SC'
-        if (novaCategoria) {
-          dadosAtualizacao['CATEGORIA'] = novaCategoria;
-        }
-        
-        // Atualizar registro
-        const { error: updateError } = await supabase
-          .from('volumetria_mobilemed')
-          .update(dadosAtualizacao)
-          .eq('id', registro.id);
-        
-        if (updateError) {
-          console.error(`❌ Erro ao atualizar registro ${registro.id}:`, updateError);
-          totalErros++;
-        } else {
-          if (novaEspecialidade === 'NEURO') {
-            console.log(`✅ NEURO + SC: ${registro.ESTUDO_DESCRICAO?.substring(0, 40)} - Médico: ${medico}`);
-          }
-        }
-        
-      } catch (error) {
-        console.error(`❌ Erro ao processar registro ${registro.id}:`, error);
-        totalErros++;
+      }
+      
+      if (ehNeurologista) {
+        idsNeuro.push(registro.id);
+      } else {
+        idsMusculo.push(registro.id);
       }
     }
     
-    // Log da operação no audit_logs
-    await supabase
-      .from('audit_logs')
-      .insert({
-        table_name: 'volumetria_mobilemed',
-        operation: 'REGRA_V034_COLUNAS_MUSCULO_NEURO',
-        record_id: arquivo_fonte || 'TODOS',
-        new_data: {
-          total_processados: totalProcessados,
-          total_alterados_musculo: totalAlteradosMusculo,
-          total_alterados_neuro: totalAlteradosNeuro,
-          total_erros: totalErros,
-          arquivo_fonte: arquivo_fonte || 'TODOS',
-          periodo_referencia: periodo_referencia || 'TODOS',
-          neurologistas_cadastrados: medicosNeuroLista.length
-        },
-        user_email: 'system',
-        severity: totalErros > 0 ? 'warning' : 'info'
-      });
+    console.log(`📋 Classificação: ${idsNeuro.length} NEURO, ${idsMusculo.length} MUSCULO ESQUELETICO`);
+    
+    let totalAlteradosNeuro = 0;
+    let totalAlteradosMusculo = 0;
+    
+    // BATCH UPDATE - NEURO (em lotes de 500)
+    const BATCH_SIZE = 500;
+    
+    if (idsNeuro.length > 0) {
+      console.log(`🧠 Atualizando ${idsNeuro.length} registros para NEURO + SC...`);
+      
+      for (let i = 0; i < idsNeuro.length; i += BATCH_SIZE) {
+        const batch = idsNeuro.slice(i, i + BATCH_SIZE);
+        
+        const { error: updateNeuroError } = await supabase
+          .from('volumetria_mobilemed')
+          .update({
+            'ESPECIALIDADE': 'NEURO',
+            'CATEGORIA': 'SC',
+            updated_at: new Date().toISOString()
+          })
+          .in('id', batch);
+        
+        if (updateNeuroError) {
+          console.error(`❌ Erro ao atualizar batch NEURO ${i}-${i + batch.length}:`, updateNeuroError);
+        } else {
+          totalAlteradosNeuro += batch.length;
+          console.log(`  ✅ Batch NEURO ${i + 1}-${i + batch.length} atualizado`);
+        }
+      }
+    }
+    
+    // BATCH UPDATE - MUSCULO ESQUELETICO (em lotes de 500)
+    if (idsMusculo.length > 0) {
+      console.log(`💪 Atualizando ${idsMusculo.length} registros para MUSCULO ESQUELETICO...`);
+      
+      for (let i = 0; i < idsMusculo.length; i += BATCH_SIZE) {
+        const batch = idsMusculo.slice(i, i + BATCH_SIZE);
+        
+        const { error: updateMusculoError } = await supabase
+          .from('volumetria_mobilemed')
+          .update({
+            'ESPECIALIDADE': 'MUSCULO ESQUELETICO',
+            updated_at: new Date().toISOString()
+          })
+          .in('id', batch);
+        
+        if (updateMusculoError) {
+          console.error(`❌ Erro ao atualizar batch MUSCULO ${i}-${i + batch.length}:`, updateMusculoError);
+        } else {
+          totalAlteradosMusculo += batch.length;
+          console.log(`  ✅ Batch MUSCULO ${i + 1}-${i + batch.length} atualizado`);
+        }
+      }
+    }
     
     const resultado = {
       sucesso: true,
-      total_processados: totalProcessados,
+      total_processados: registrosColunas.length,
       total_alterados_musculo: totalAlteradosMusculo,
       total_alterados_neuro: totalAlteradosNeuro,
-      total_erros: totalErros,
       arquivo_fonte: arquivo_fonte || 'TODOS',
       neurologistas_cadastrados: medicosNeuroLista.length,
-      observacoes: `Regra v034 aplicada. ${totalAlteradosMusculo} → MUSCULO ESQUELETICO, ${totalAlteradosNeuro} → NEURO + SC`
+      observacoes: `Regra v034 aplicada (BATCH). ${totalAlteradosMusculo} → MUSCULO ESQUELETICO, ${totalAlteradosNeuro} → NEURO + SC`
     };
     
     console.log('✅ Regra v034 (ColunasxMusculoxNeuro) aplicada com sucesso:', resultado);
