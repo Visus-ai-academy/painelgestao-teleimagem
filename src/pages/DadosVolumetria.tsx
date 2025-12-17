@@ -257,7 +257,11 @@ export default function DadosVolumetria() {
             } />
 
             {/* 3. Aplicar Agrupamento aos Dados Existentes */}
-            <AplicarAgrupamentoClientes />
+            <AplicarAgrupamentoClientes periodoReferencia={
+              periodoFaturamentoVolumetria
+                ? `${periodoFaturamentoVolumetria.ano}-${String(periodoFaturamentoVolumetria.mes).padStart(2, "0")}`
+                : undefined
+            } />
 
             {/* 4. Tipificação Geral - SEMPRE POR ÚLTIMO */}
             <AplicarTipificacaoGeral onCorrecaoConcluida={() => setRefreshTipificacao((prev) => prev + 1)} />
