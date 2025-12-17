@@ -9,6 +9,15 @@ interface UploadStatus {
   status: string;
   registros_inseridos: number;
   created_at: string;
+  periodo_referencia?: string; // Período do upload
+}
+
+// Função para obter período atual dinamicamente
+function getPeriodoAtual(): string {
+  const hoje = new Date();
+  const ano = hoje.getFullYear();
+  const mes = hoje.getMonth() + 1;
+  return `${ano}-${mes.toString().padStart(2, '0')}`;
 }
 
 export function useAutoRegras() {
@@ -148,17 +157,20 @@ export function useAutoRegras() {
     }
   };
 
-  const aplicarRegrasManual = async (arquivoFonte: string, loteUpload?: string) => {
+  const aplicarRegrasManual = async (arquivoFonte: string, loteUpload?: string, periodoReferencia?: string) => {
     setProcessandoRegras(true);
     
+    // Usar período passado ou calcular período atual dinamicamente
+    const periodo = periodoReferencia || getPeriodoAtual();
+    
     try {
-      console.log('🚀 Aplicando TODAS as 27 regras manualmente...');
+      console.log(`🚀 Aplicando TODAS as 27 regras manualmente para período ${periodo}...`);
       
       // Usar a única função que funciona
       const { data, error } = await supabase.functions.invoke('aplicar-regras-sistema-completo', {
         body: {
           arquivo_fonte: arquivoFonte,
-          periodo_referencia: '2025-06',
+          periodo_referencia: periodo,
           aplicar_todos_arquivos: false
         }
       });
@@ -184,12 +196,15 @@ export function useAutoRegras() {
     }
   };
 
-  const validarRegras = async (arquivoFonte: string) => {
+  const validarRegras = async (arquivoFonte: string, periodoReferencia?: string) => {
+    // Usar período passado ou calcular período atual dinamicamente
+    const periodo = periodoReferencia || getPeriodoAtual();
+    
     try {
       const { data, error } = await supabase.functions.invoke('aplicar-regras-sistema-completo', {
         body: {
           arquivo_fonte: arquivoFonte,
-          periodo_referencia: '2025-06',
+          periodo_referencia: periodo,
           aplicar_todos_arquivos: false
         }
       });
@@ -210,18 +225,21 @@ export function useAutoRegras() {
     }
   };
 
-  const corrigirTodosDadosExistentes = async () => {
+  const corrigirTodosDadosExistentes = async (periodoReferencia?: string) => {
     setProcessandoRegras(true);
     
+    // Usar período passado ou calcular período atual dinamicamente
+    const periodo = periodoReferencia || getPeriodoAtual();
+    
     try {
-      toast.info('🚀 Aplicando TODAS as 27 regras em TODOS os dados existentes...');
-      console.log('🚀 Executando aplicação completa das 27 regras nos dados existentes...');
+      toast.info(`🚀 Aplicando TODAS as 27 regras em TODOS os dados para período ${periodo}...`);
+      console.log(`🚀 Executando aplicação completa das 27 regras nos dados existentes (período: ${periodo})...`);
       
       // Usar a única função que funciona para todos os arquivos
       const { data, error } = await supabase.functions.invoke('aplicar-regras-sistema-completo', {
         body: {
           arquivo_fonte: null,
-          periodo_referencia: '2025-06',
+          periodo_referencia: periodo,
           aplicar_todos_arquivos: true
         }
       });
