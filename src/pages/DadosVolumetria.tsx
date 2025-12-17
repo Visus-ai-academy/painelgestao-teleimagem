@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Upload, Settings, Activity, FileBarChart } from "lucide-react";
@@ -27,11 +27,35 @@ import { useAutoRegras } from "@/hooks/useAutoRegras";
 // Período é SEMPRE o período selecionado pelo usuário no VolumetriaPeriodoSelector
 // NUNCA usar valores hardcoded - o período vem exclusivamente da seleção do usuário
 
+const PERIODO_STORAGE_KEY = 'volumetria_periodo_selecionado';
+
 export default function DadosVolumetria() {
   const [refreshUploadStatus, setRefreshUploadStatus] = useState(0);
-  const [periodoFaturamentoVolumetria, setPeriodoFaturamentoVolumetria] = useState<{ ano: number; mes: number } | null>(
-    null,
-  );
+  
+  // Inicializar do localStorage
+  const [periodoFaturamentoVolumetria, setPeriodoFaturamentoVolumetria] = useState<{ ano: number; mes: number } | null>(() => {
+    try {
+      const saved = localStorage.getItem(PERIODO_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed.ano === 'number' && typeof parsed.mes === 'number') {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.warn('Erro ao ler período do localStorage:', e);
+    }
+    return null;
+  });
+  
+  // Persistir período quando alterado
+  useEffect(() => {
+    if (periodoFaturamentoVolumetria) {
+      localStorage.setItem(PERIODO_STORAGE_KEY, JSON.stringify(periodoFaturamentoVolumetria));
+    } else {
+      localStorage.removeItem(PERIODO_STORAGE_KEY);
+    }
+  }, [periodoFaturamentoVolumetria]);
   const [refreshTipificacao, setRefreshTipificacao] = useState(0);
   const { toast } = useToast();
   const { status: uploadStatus, refresh: refreshUploadData } = useUploadStatus([
