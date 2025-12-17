@@ -33,7 +33,7 @@ export default function VerificarRegistrosSemDataLaudo() {
   const [verificando, setVerificando] = useState(false);
   const [excluindo, setExcluindo] = useState(false);
   const [resultado, setResultado] = useState<ResultadoVerificacao | null>(null);
-  const [periodoReferencia, setPeriodoReferencia] = useState('06/2025');
+  const [periodoReferencia, setPeriodoReferencia] = useState('');
   const { toast } = useToast();
 
   const verificarRegistros = async () => {
@@ -276,6 +276,13 @@ export default function VerificarRegistrosSemDataLaudo() {
               onChange={(e) => setPeriodoReferencia(e.target.value)}
               className="ml-2 border rounded px-2 py-1"
             >
+              <option value="">Selecione o período</option>
+              <option value="10/2025">Outubro/2025</option>
+              <option value="11/2025">Novembro/2025</option>
+              <option value="12/2025">Dezembro/2025</option>
+              <option value="09/2025">Setembro/2025</option>
+              <option value="08/2025">Agosto/2025</option>
+              <option value="07/2025">Julho/2025</option>
               <option value="06/2025">Junho/2025</option>
               <option value="05/2025">Maio/2025</option>
               <option value="04/2025">Abril/2025</option>

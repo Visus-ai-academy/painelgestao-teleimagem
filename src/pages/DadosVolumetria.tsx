@@ -24,8 +24,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useUploadStatus } from "@/hooks/useUploadStatus";
 import { useAutoRegras } from "@/hooks/useAutoRegras";
 
-// Período atual - onde estão os dados carregados (outubro/2025)
-const PERIODO_ATUAL = "2025-10";
+// Período é SEMPRE o período selecionado pelo usuário no VolumetriaPeriodoSelector
+// NUNCA usar valores hardcoded - o período vem exclusivamente da seleção do usuário
 
 export default function DadosVolumetria() {
   const [refreshUploadStatus, setRefreshUploadStatus] = useState(0);
@@ -259,14 +259,12 @@ export default function DadosVolumetria() {
             <AplicarTipificacaoGeral onCorrecaoConcluida={() => setRefreshTipificacao((prev) => prev + 1)} />
 
             {/* Status de Tipificação em Tempo Real */}
-            <IndicadorTipificacao
-              key={refreshTipificacao}
-              periodoReferencia={
-                periodoFaturamentoVolumetria
-                  ? `${periodoFaturamentoVolumetria.ano}-${String(periodoFaturamentoVolumetria.mes).padStart(2, "0")}`
-                  : "2025-10"
-              }
-            />
+            {periodoFaturamentoVolumetria && (
+              <IndicadorTipificacao
+                key={refreshTipificacao}
+                periodoReferencia={`${periodoFaturamentoVolumetria.ano}-${String(periodoFaturamentoVolumetria.mes).padStart(2, "0")}`}
+              />
+            )}
 
             {/* Sistema de Regras Original (Legacy) */}
             <AutoRegrasMaster />
