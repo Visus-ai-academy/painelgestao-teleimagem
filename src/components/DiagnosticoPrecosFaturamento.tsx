@@ -44,7 +44,11 @@ interface DiagnosticoResult {
   };
 }
 
-export const DiagnosticoPrecosFaturamento: React.FC = () => {
+interface DiagnosticoPrecosFaturamentoProps {
+  periodoReferencia?: string | null;
+}
+
+export const DiagnosticoPrecosFaturamento: React.FC<DiagnosticoPrecosFaturamentoProps> = ({ periodoReferencia }) => {
   const [clienteNome, setClienteNome] = useState('');
   const [loading, setLoading] = useState(false);
   const [resultado, setResultado] = useState<DiagnosticoResult | null>(null);
@@ -60,10 +64,19 @@ export const DiagnosticoPrecosFaturamento: React.FC = () => {
       return;
     }
 
+    if (!periodoReferencia) {
+      toast({
+        title: "Período não selecionado",
+        description: "Selecione o período de referência antes de diagnosticar",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('diagnosticar-precos-faturamento', {
-        body: { cliente_nome: clienteNome.trim(), periodo: '2025-06' }
+        body: { cliente_nome: clienteNome.trim(), periodo: periodoReferencia }
       });
 
       if (error) {
@@ -73,7 +86,7 @@ export const DiagnosticoPrecosFaturamento: React.FC = () => {
       setResultado(data);
       toast({
         title: "Diagnóstico concluído",
-        description: `Análise realizada para ${data.cliente.nome}`,
+        description: `Análise realizada para ${data.cliente.nome} - Período: ${periodoReferencia}`,
       });
     } catch (error: any) {
       console.error('Erro no diagnóstico:', error);
@@ -88,6 +101,14 @@ export const DiagnosticoPrecosFaturamento: React.FC = () => {
   };
 
   const testarClientes = (nome: string) => {
+    if (!periodoReferencia) {
+      toast({
+        title: "Período não selecionado",
+        description: "Selecione o período de referência antes de diagnosticar",
+        variant: "destructive"
+      });
+      return;
+    }
     setClienteNome(nome);
     setTimeout(() => executarDiagnostico(), 100);
   };

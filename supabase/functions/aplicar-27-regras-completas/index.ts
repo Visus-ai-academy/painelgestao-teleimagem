@@ -15,7 +15,19 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseKey)
 
-    const { periodo_referencia = '2025-06', aplicar_todos_arquivos = true, arquivo_fonte } = await req.json()
+    const { periodo_referencia, aplicar_todos_arquivos = true, arquivo_fonte } = await req.json()
+
+    // Validar período obrigatório
+    if (!periodo_referencia) {
+      console.error('❌ Período de referência não informado')
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Período de referência é obrigatório. Selecione o período antes de processar.' 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      )
+    }
 
     console.log('🚀 APLICANDO 27 REGRAS COMPLETAS - Sistema Otimizado v4')
     console.log(`📁 Arquivo: ${arquivo_fonte || 'TODOS OS ARQUIVOS'}`)

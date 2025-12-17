@@ -293,13 +293,28 @@ export function AutoRegrasMaster() {
     }
 
     try {
+      // Buscar período selecionado do localStorage
+      const periodoSalvo = localStorage.getItem('volumetria_periodo_selecionado');
+      if (!periodoSalvo) {
+        console.warn('⚠️ Nenhum período selecionado - aplicação automática ignorada');
+        toast.warning('Período não selecionado', {
+          description: 'Selecione o período de referência antes de processar'
+        });
+        return;
+      }
+      
+      // Converter formato {ano: number, mes: number} para YYYY-MM
+      const periodoObj = JSON.parse(periodoSalvo);
+      const periodoReferencia = `${periodoObj.ano}-${String(periodoObj.mes).padStart(2, '0')}`;
+      
       console.log(`⚡ APLICAÇÃO AUTOMÁTICA iniciada para ${tipo_arquivo}`);
+      console.log(`📅 Período de referência: ${periodoReferencia}`);
       
       // Aplicar TODAS as 28 regras automaticamente usando a função unificada
       const { data, error } = await supabase.functions.invoke('aplicar-regras-sistema-completo', {
         body: {
           arquivo_fonte: tipo_arquivo,
-          periodo_referencia: '2025-06', // Sempre usar período atual
+          periodo_referencia: periodoReferencia,
           aplicar_todos_arquivos: false
         }
       });

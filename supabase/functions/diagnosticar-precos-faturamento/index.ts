@@ -17,7 +17,19 @@ serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { cliente_nome, periodo = "2025-06" } = await req.json();
+    const { cliente_nome, periodo } = await req.json();
+    
+    // Validar período obrigatório
+    if (!periodo) {
+      console.error('❌ Período não informado');
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Período de referência é obrigatório. Selecione o período antes de diagnosticar.'
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
     
     console.log(`🔍 Diagnosticando preços para cliente: ${cliente_nome}, período: ${periodo}`);
 

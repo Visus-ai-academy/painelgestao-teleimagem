@@ -30,18 +30,29 @@ const ARQUIVOS_VOLUMETRIA = [
   { value: 'volumetria_onco_padrao', label: 'Oncológico' },
 ];
 
-export function SistemaRegrasUnificado() {
+interface SistemaRegrasUnificadoProps {
+  periodoReferencia?: string | null;
+}
+
+export function SistemaRegrasUnificado({ periodoReferencia }: SistemaRegrasUnificadoProps) {
   const [loading, setLoading] = useState(false);
   const [resultado, setResultado] = useState<ResultadoProcessamento | null>(null);
   const [arquivoSelecionado, setArquivoSelecionado] = useState('volumetria_padrao');
 
   const aplicarTodasRegras = async () => {
+    if (!periodoReferencia) {
+      toast.error('Período não selecionado', {
+        description: 'Selecione o período de referência antes de processar'
+      });
+      return;
+    }
+    
     setLoading(true);
     setResultado(null);
     
     try {
       toast.info('Iniciando aplicação completa de regras...', {
-        description: 'Processando TODOS os arquivos de volumetria'
+        description: `Processando TODOS os arquivos - Período: ${periodoReferencia}`
       });
 
       const inicioTempo = Date.now();
@@ -50,7 +61,7 @@ export function SistemaRegrasUnificado() {
       const { data, error } = await supabase.functions.invoke('aplicar-regras-sistema-completo', {
         body: { 
           aplicar_todos_arquivos: true,
-          periodo_referencia: '2025-06'
+          periodo_referencia: periodoReferencia
         }
       });
 
@@ -95,15 +106,22 @@ export function SistemaRegrasUnificado() {
   };
 
   const validarRegras = async () => {
+    if (!periodoReferencia) {
+      toast.error('Período não selecionado', {
+        description: 'Selecione o período de referência antes de validar'
+      });
+      return;
+    }
+    
     setLoading(true);
     
     try {
       toast.info('Validando regras aplicadas...', {
-        description: `Verificando arquivo: ${arquivoSelecionado}`
+        description: `Verificando arquivo: ${arquivoSelecionado} - Período: ${periodoReferencia}`
       });
 
       const { data, error } = await supabase.functions.invoke('validar-regras-aplicadas', {
-        body: { arquivo_fonte: arquivoSelecionado }
+        body: { arquivo_fonte: arquivoSelecionado, periodo_referencia: periodoReferencia }
       });
 
       if (error) throw error;
