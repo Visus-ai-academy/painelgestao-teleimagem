@@ -210,7 +210,12 @@ export default function VolumetriaDivergencias({ uploadedExams, periodoSeleciona
   }, []);
 
   // Obter período selecionado do prop ou usar o ativo do contexto
-  const periodoAtivo = periodoSelecionado || ctx.dashboardStats?.periodo_ativo || 'jun/25';
+  // CORREÇÃO: Usar período atual como fallback, NUNCA um valor hardcoded
+  const getCurrentPeriod = () => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  };
+  const periodoAtivo = periodoSelecionado || ctx.dashboardStats?.periodo_ativo || getCurrentPeriod();
   
   console.log('🎯 VolumetriaDivergencias - Período selecionado:', periodoAtivo);
   

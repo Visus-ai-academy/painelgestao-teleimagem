@@ -70,10 +70,10 @@ export function CorrecaoRegrasV002V003() {
             <div className="text-sm">
               <p className="font-medium text-orange-800">Problema Identificado:</p>
               <p className="text-orange-700">
-                Os uploads retroativos estão salvando período no formato "2025-06" (YYYY-MM), mas as edge functions esperam "jun/25" (mmm/YY).
+                Os uploads retroativos podem ter usado períodos incompatíveis. As edge functions agora aceitam formato YYYY-MM (ex: 2025-10).
               </p>
               <p className="text-orange-700 mt-1">
-                <strong>Esta correção:</strong> Converte os períodos e aplica as regras v002/v003 nos uploads existentes.
+                <strong>Esta correção:</strong> Reaplica as regras v002/v003 usando o período correto do banco de dados.
               </p>
             </div>
           </div>

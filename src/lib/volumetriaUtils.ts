@@ -724,8 +724,12 @@ export async function processVolumetriaOtimizado(
         // v002: Mantém apenas exames com DATA_LAUDO entre dia 8 do mês e dia 7 do mês seguinte
         console.log('🚀🚀🚀 APLICANDO REGRAS v002/v003 COMO PRIMEIRA PRIORIDADE (ARQUIVOS RETROATIVOS)...');
         
-        // Converter período para formato YYYY-MM que a função aplicar-exclusoes-periodo espera
-        const periodoDb = periodo ? `${periodo.ano}-${periodo.mes.toString().padStart(2, '0')}` : null;
+        // CORREÇÃO: Usar SEMPRE formato YYYY-MM, NUNCA formato mes/ano
+        const periodoDb = periodo 
+          ? `${periodo.ano}-${periodo.mes.toString().padStart(2, '0')}` 
+          : new Date().toISOString().substring(0, 7); // Fallback para mês atual em formato YYYY-MM
+        
+        console.log(`📅 Período para aplicar-exclusoes-periodo: ${periodoDb} (formato YYYY-MM)`);
         
         try {
           const { data: regrasV002V003, error: errorV002V003 } = await supabase.functions.invoke(
@@ -733,7 +737,7 @@ export async function processVolumetriaOtimizado(
             {
               body: {
                 arquivo_fonte: arquivoFonte,
-                periodo_referencia: periodoDb || periodoEdgeFormat
+                periodo_referencia: periodoDb // SEMPRE formato YYYY-MM
               }
             }
           );
