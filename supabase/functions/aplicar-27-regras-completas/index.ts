@@ -151,6 +151,70 @@ Deno.serve(async (req) => {
       }
       regrasAplicadasArquivo.add('v001b')
 
+      // REGRA v001c: Normalização de nomes de médicos (via mapeamento_nomes_medicos)
+      console.log('  ⚡ Aplicando v001c - Normalização nomes médicos')
+      const { data: mapeamentoMedicos } = await supabase
+        .from('mapeamento_nomes_medicos')
+        .select('nome_origem_normalizado, medico_nome')
+        .eq('ativo', true)
+      
+      if (mapeamentoMedicos && mapeamentoMedicos.length > 0) {
+        let totalMedicosNormalizados = 0
+        for (const mapeamento of mapeamentoMedicos) {
+          if (mapeamento.nome_origem_normalizado && mapeamento.medico_nome) {
+            const { count } = await supabase
+              .from('volumetria_mobilemed')
+              .update({ MEDICO: mapeamento.medico_nome, updated_at: new Date().toISOString() })
+              .eq('arquivo_fonte', arquivoAtual)
+              .ilike('MEDICO', mapeamento.nome_origem_normalizado)
+              .select('*', { count: 'exact', head: true })
+            
+            if (count && count > 0) {
+              totalMedicosNormalizados += count
+              console.log(`    📝 ${mapeamento.nome_origem_normalizado} → ${mapeamento.medico_nome} (${count})`)
+            }
+          }
+        }
+        if (totalMedicosNormalizados > 0) {
+          console.log(`  ✅ v001c: ${totalMedicosNormalizados} médicos normalizados`)
+        }
+      } else {
+        console.log('  ℹ️ v001c: Nenhum mapeamento de médicos configurado')
+      }
+      regrasAplicadasArquivo.add('v001c')
+
+      // REGRA v001d: De-Para valores zerados (via valores_referencia_de_para)
+      console.log('  ⚡ Aplicando v001d - De-Para valores zerados')
+      const { data: valoresReferencia } = await supabase
+        .from('valores_referencia_de_para')
+        .select('estudo_descricao, valores')
+        .eq('ativo', true)
+      
+      if (valoresReferencia && valoresReferencia.length > 0) {
+        let totalValoresAtualizados = 0
+        for (const ref of valoresReferencia) {
+          if (ref.estudo_descricao && ref.valores && ref.valores > 0) {
+            const { count } = await supabase
+              .from('volumetria_mobilemed')
+              .update({ VALOR: ref.valores, updated_at: new Date().toISOString() })
+              .eq('arquivo_fonte', arquivoAtual)
+              .ilike('ESTUDO_DESCRICAO', ref.estudo_descricao)
+              .or('VALOR.is.null,VALOR.eq.0')
+              .select('*', { count: 'exact', head: true })
+            
+            if (count && count > 0) {
+              totalValoresAtualizados += count
+            }
+          }
+        }
+        if (totalValoresAtualizados > 0) {
+          console.log(`  ✅ v001d: ${totalValoresAtualizados} valores atualizados via de-para`)
+        }
+      } else {
+        console.log('  ℹ️ v001d: Nenhum valor de-para configurado')
+      }
+      regrasAplicadasArquivo.add('v001d')
+
       // REGRA v005: Correções modalidade RX/MG/DO
       console.log('  ⚡ Aplicando v005 - Correções modalidade')
       await supabase.from('volumetria_mobilemed')
