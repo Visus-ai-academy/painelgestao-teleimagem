@@ -205,11 +205,8 @@ Deno.serve(async (req) => {
         .eq('arquivo_fonte', arquivoAtual)
         .eq('ESPECIALIDADE', 'CARDIO COM SCORE')
       
-      // Colunas → MUSCULO ESQUELETICO (será refinado por v034 para neurologistas)
-      await supabase.from('volumetria_mobilemed')
-        .update({ ESPECIALIDADE: 'MUSCULO ESQUELETICO' })
-        .eq('arquivo_fonte', arquivoAtual)
-        .or('ESPECIALIDADE.eq.Colunas,ESPECIALIDADE.eq.COLUNAS,ESPECIALIDADE.ilike.colunas')
+      // NOTA: Colunas NÃO é convertido aqui - v034 cuida de toda a lógica
+      // v034 aplica: Neurologista → NEURO+SC, Outros → MUSCULO ESQUELETICO
 
       // ONCO MEDICINA INTERNA → MEDICINA INTERNA
       await supabase.from('volumetria_mobilemed')
