@@ -1357,13 +1357,13 @@ export default function DemonstrativoFaturamento() {
             </SelectTrigger>
             <SelectContent>
               {periodosDisponiveis.length > 0 ? (
-                periodosDisponiveis.map((p) => (
+                periodosDisponiveis.filter(p => p && p.trim() !== '').map((p) => (
                   <SelectItem key={p} value={p}>
                     {p}
                   </SelectItem>
                 ))
               ) : (
-                <SelectItem value="" disabled>
+                <SelectItem value="__none__" disabled>
                   Nenhum período disponível
                 </SelectItem>
               )}
