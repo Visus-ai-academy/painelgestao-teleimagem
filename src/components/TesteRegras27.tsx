@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, CheckCircle, Play, RefreshCw, Database } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from 'sonner';
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface TesteResultado {
   resultados?: {
@@ -24,23 +25,33 @@ interface TesteResultado {
   };
 }
 
-export function TesteRegras27() {
+interface TesteRegras27Props {
+  periodoReferencia?: string;
+}
+
+export function TesteRegras27({ periodoReferencia }: TesteRegras27Props) {
   const [isTestando, setIsTestando] = useState(false);
   const [resultado, setResultado] = useState<TesteResultado | null>(null);
   const [erro, setErro] = useState<string | null>(null);
 
   const executarTeste = async () => {
+    // CRÍTICO: Validar período antes de processar
+    if (!periodoReferencia) {
+      toast.error('⚠️ Selecione um período de referência antes de executar as regras');
+      return;
+    }
+
     setIsTestando(true);
     setErro(null);
     setResultado(null);
 
     try {
-      toast('🧪 Iniciando aplicação das 28 regras completas...');
+      toast(`🧪 Iniciando aplicação das 28 regras completas para período ${periodoReferencia}...`);
 
       const { data, error } = await supabase.functions.invoke('aplicar-27-regras-completas', {
         body: {
           aplicar_todos_arquivos: true,
-          periodo_referencia: '2025-06'
+          periodo_referencia: periodoReferencia
         }
       });
 
@@ -77,11 +88,31 @@ export function TesteRegras27() {
       </CardHeader>
       
       <CardContent className="space-y-6">
+        {/* Alerta se período não selecionado */}
+        {!periodoReferencia && (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              <strong>Período não selecionado!</strong> Volte à aba "Upload de Dados" e selecione o período de faturamento antes de executar as regras.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Período selecionado */}
+        {periodoReferencia && (
+          <Alert>
+            <CheckCircle className="h-4 w-4 text-green-600" />
+            <AlertDescription>
+              Período selecionado: <strong>{periodoReferencia}</strong>
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Botão das 28 Regras */}
         <div className="flex items-center gap-4">
           <Button
             onClick={executarTeste}
-            disabled={isTestando}
+            disabled={isTestando || !periodoReferencia}
             className="flex items-center gap-2"
             size="lg"
           >

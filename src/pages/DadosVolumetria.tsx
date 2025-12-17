@@ -29,10 +29,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useUploadStatus } from "@/hooks/useUploadStatus";
 import { useAutoRegras } from "@/hooks/useAutoRegras";
 
-
-// Período atual - onde estão os dados carregados (outubro/2025)
-const PERIODO_ATUAL = "2025-10";
-
 export default function DadosVolumetria() {
   const [refreshUploadStatus, setRefreshUploadStatus] = useState(0);
   const [periodoFaturamentoVolumetria, setPeriodoFaturamentoVolumetria] = useState<{ ano: number; mes: number } | null>(null);
@@ -48,6 +44,11 @@ export default function DadosVolumetria() {
   
   // Hook para monitoramento automático de regras quando upload for concluído
   useAutoRegras();
+
+  // Período formatado para uso nos componentes (ex: "2025-10")
+  const periodoFormatado = periodoFaturamentoVolumetria 
+    ? `${periodoFaturamentoVolumetria.ano}-${String(periodoFaturamentoVolumetria.mes).padStart(2, '0')}` 
+    : undefined;
 
   return (
     <div className="space-y-6">
@@ -209,10 +210,7 @@ export default function DadosVolumetria() {
 
           <TabsContent value="demonstrativo" className="space-y-6">
             <DemonstrativoVolumetriaPorCliente 
-              periodo={periodoFaturamentoVolumetria 
-                ? `${periodoFaturamentoVolumetria.ano}-${String(periodoFaturamentoVolumetria.mes).padStart(2, '0')}` 
-                : ''
-              } 
+              periodo={periodoFormatado || ''} 
             />
           </TabsContent>
 
@@ -242,11 +240,11 @@ export default function DadosVolumetria() {
             {/* 1. Corrigir Exames Fora do Padrão */}
             <CorrigirExamesForaPadrao />
             
-            {/* 2. Executar 28 Regras Completas */}
-            <TesteRegras27 />
+            {/* 2. Executar 28 Regras Completas - PASSANDO PERÍODO */}
+            <TesteRegras27 periodoReferencia={periodoFormatado} />
             
-            {/* 3. Aplicar Agrupamento aos Dados Existentes */}
-            <AplicarAgrupamentoClientes />
+            {/* 3. Aplicar Agrupamento aos Dados Existentes - PASSANDO PERÍODO */}
+            <AplicarAgrupamentoClientes periodoReferencia={periodoFormatado} />
             
             {/* 4. Tipificação Geral - SEMPRE POR ÚLTIMO */}
             <AplicarTipificacaoGeral
@@ -256,10 +254,7 @@ export default function DadosVolumetria() {
             {/* Status de Tipificação em Tempo Real */}
             <IndicadorTipificacao
               key={refreshTipificacao}
-              periodoReferencia={periodoFaturamentoVolumetria 
-                ? `${periodoFaturamentoVolumetria.ano}-${String(periodoFaturamentoVolumetria.mes).padStart(2, '0')}` 
-                : '2025-10'
-              }
+              periodoReferencia={periodoFormatado || ''}
             />
             
             {/* Sistema de Regras Original (Legacy) */}
