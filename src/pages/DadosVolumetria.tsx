@@ -250,7 +250,11 @@ export default function DadosVolumetria() {
             <CorrigirExamesForaPadrao />
 
             {/* 2. Executar 28 Regras Completas */}
-            <TesteRegras27 />
+            <TesteRegras27 periodoReferencia={
+              periodoFaturamentoVolumetria
+                ? `${periodoFaturamentoVolumetria.ano}-${String(periodoFaturamentoVolumetria.mes).padStart(2, "0")}`
+                : undefined
+            } />
 
             {/* 3. Aplicar Agrupamento aos Dados Existentes */}
             <AplicarAgrupamentoClientes />
