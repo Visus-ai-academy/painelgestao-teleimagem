@@ -24,10 +24,21 @@ export function VolumetriaExamesNaoIdentificados() {
     loadExamesNaoIdentificados();
   }, []);
 
-  // Função para limpar termos X1-X9 e XE
-  const limparTermosX = (estudo: string): string => {
+  // Função para normalizar nome de exame: remove acentos, hífens, caracteres especiais
+  const normalizarNomeExame = (estudo: string): string => {
     if (!estudo) return estudo;
-    return estudo.replace(/\s*X[1-9E]\s*$/i, "").trim();
+    
+    return estudo
+      // Remove acentos (NFD decompõe caracteres, regex remove diacríticos)
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      // Remove hífens e traços
+      .replace(/[-–—]/g, " ")
+      // Remove termos X1-X9 e XE do final
+      .replace(/\s*X[1-9E]\s*$/i, "")
+      // Remove espaços múltiplos
+      .replace(/\s+/g, " ")
+      .trim();
   };
 
   const loadExamesNaoIdentificados = async () => {
@@ -47,7 +58,7 @@ export function VolumetriaExamesNaoIdentificados() {
       }
 
       const examesNoCadastro = new Set(
-        cadastroExamesData?.map((item) => limparTermosX(item.nome?.toUpperCase().trim() || "")).filter(Boolean) || [],
+        cadastroExamesData?.map((item) => normalizarNomeExame(item.nome?.toUpperCase().trim() || "")).filter(Boolean) || [],
       );
       console.log("📋 Exames no Cadastro de Exames:", examesNoCadastro.size);
 
@@ -65,7 +76,7 @@ export function VolumetriaExamesNaoIdentificados() {
       }
 
       const estudosForaPadrao = new Set(
-        foraPadraoData?.map((item) => limparTermosX(item.estudo_descricao?.toUpperCase().trim() || "")).filter(Boolean) || [],
+        foraPadraoData?.map((item) => normalizarNomeExame(item.estudo_descricao?.toUpperCase().trim() || "")).filter(Boolean) || [],
       );
       console.log("📋 Estudos no Fora do Padrão:", estudosForaPadrao.size);
 
@@ -100,7 +111,7 @@ export function VolumetriaExamesNaoIdentificados() {
           nomeEstudo = `[ERRO: Estudo sem descrição] - ${item.MODALIDADE || "?"} / ${item.ESPECIALIDADE || "?"}`;
         }
 
-        const estudoLimpo = limparTermosX(nomeEstudo.toUpperCase());
+        const estudoLimpo = normalizarNomeExame(nomeEstudo.toUpperCase());
         
         // Verificar se está mapeado no Cadastro de Exames ou no Fora do Padrão
         const temNoCadastro = examesNoCadastro.has(estudoLimpo);

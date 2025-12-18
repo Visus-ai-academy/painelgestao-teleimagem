@@ -5169,7 +5169,6 @@ export type Database = {
         Returns: boolean
       }
       validate_security_configuration: { Args: never; Returns: Json }
-      verificar_e_aplicar_regras_automaticas: { Args: never; Returns: Json }
     }
     Enums: {
       app_role: "admin" | "manager" | "user" | "medico"
