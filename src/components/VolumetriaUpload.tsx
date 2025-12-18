@@ -157,11 +157,27 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
 
   const config = VOLUMETRIA_UPLOAD_CONFIGS[arquivoFonte];
 
+  // Formatação do período para exibição
+  const periodoFormatado = periodoFaturamento 
+    ? `${['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][periodoFaturamento.mes - 1]}/${periodoFaturamento.ano}`
+    : 'Não definido';
+
   return (
     <div className={`space-y-4 ${disabled ? 'opacity-50 pointer-events-none' : ''}`}>
       <div className="p-4 bg-muted/50 rounded-lg">
-        <h3 className="font-semibold text-sm">{config.label}</h3>
-        <p className="text-xs text-muted-foreground mt-1">{config.description}</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-semibold text-sm">{config.label}</h3>
+            <p className="text-xs text-muted-foreground mt-1">{config.description}</p>
+          </div>
+          {periodoFaturamento && (
+            <div className="px-3 py-1.5 bg-green-100 border border-green-300 rounded-md">
+              <p className="text-xs font-bold text-green-700">
+                Período: {periodoFormatado}
+              </p>
+            </div>
+          )}
+        </div>
       </div>
       
       <div className="flex items-center justify-center w-full">
@@ -180,7 +196,7 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
               <>
                 <FileText className="w-8 h-8 mb-4 text-primary animate-pulse" />
                 <p className="mb-2 text-sm text-muted-foreground">
-                  <span>Processando arquivo...</span>
+                  <span>Processando para {periodoFormatado}...</span>
                 </p>
               </>
             ) : (
@@ -190,7 +206,7 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
                   <span className="font-semibold">Clique para fazer upload</span> ou arraste o arquivo
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Arquivos Excel (.xlsx, .xls)
+                  Arquivos Excel (.xlsx, .xls) • Período: <strong>{periodoFormatado}</strong>
                 </p>
               </>
             )}

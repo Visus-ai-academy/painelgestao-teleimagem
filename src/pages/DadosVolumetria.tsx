@@ -39,9 +39,12 @@ export default function DadosVolumetria() {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && typeof parsed.ano === 'number' && typeof parsed.mes === 'number') {
+          console.log('🗓️ PERÍODO CARREGADO DO LOCALSTORAGE:', parsed);
+          console.log(`📅 Formato: ${parsed.ano}-${parsed.mes.toString().padStart(2, '0')}`);
           return parsed;
         }
       }
+      console.log('🗓️ Nenhum período salvo no localStorage');
     } catch (e) {
       console.warn('Erro ao ler período do localStorage:', e);
     }
@@ -51,8 +54,12 @@ export default function DadosVolumetria() {
   // Persistir período quando alterado
   useEffect(() => {
     if (periodoFaturamentoVolumetria) {
-      localStorage.setItem(PERIODO_STORAGE_KEY, JSON.stringify(periodoFaturamentoVolumetria));
+      const periodoJson = JSON.stringify(periodoFaturamentoVolumetria);
+      console.log('💾 SALVANDO PERÍODO NO LOCALSTORAGE:', periodoFaturamentoVolumetria);
+      console.log(`📅 Formato DB: ${periodoFaturamentoVolumetria.ano}-${periodoFaturamentoVolumetria.mes.toString().padStart(2, '0')}`);
+      localStorage.setItem(PERIODO_STORAGE_KEY, periodoJson);
     } else {
+      console.log('🗑️ REMOVENDO PERÍODO DO LOCALSTORAGE');
       localStorage.removeItem(PERIODO_STORAGE_KEY);
     }
   }, [periodoFaturamentoVolumetria]);
