@@ -5,6 +5,7 @@ import { LimparDadosFicticios } from '@/components/LimparDadosFicticios';
 import { LimparCacheVolumetria } from '@/components/LimparCacheVolumetria';
 import { LimparVolumetriaTruncate } from '@/components/LimparVolumetriaTruncate';
 import { LimparRepasseReprocessar } from '@/components/LimparRepasseReprocessar';
+import { LimparPeriodoLocalStorage } from '@/components/LimparPeriodoLocalStorage';
 
 export default function LimparDados() {
   return (
@@ -17,6 +18,9 @@ export default function LimparDados() {
       </div>
       
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-1">
+        {/* PRIMEIRO: Limpar período do localStorage */}
+        <LimparPeriodoLocalStorage />
+        
         <LimparRepasseReprocessar />
         <LimparVolumetriaTruncate />
         <LimparCacheVolumetria />
