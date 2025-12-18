@@ -11,8 +11,6 @@ interface ExameNaoIdentificado {
   estudo_descricao: string;
   quantidade: number;
   arquivo_fonte: string;
-  temNoDePara?: boolean;
-  temNasRegras?: boolean;
 }
 
 export function VolumetriaExamesNaoIdentificados() {
@@ -53,20 +51,21 @@ export function VolumetriaExamesNaoIdentificados() {
       );
       console.log("📋 Exames no Cadastro de Exames:", examesNoCadastro.size);
 
-      // 2. Buscar estudos no Fora do Padrão (valores_referencia_de_para)
-      const { data: deParaData, error: deParaError } = await supabase
+      // 2. Buscar estudos no cadastro "Fora do Padrão" (valores_referencia_de_para)
+      // NOTA: Este cadastro mapeia variações de nomes de exames para exames do cadastro padrão
+      const { data: foraPadraoData, error: foraPadraoError } = await supabase
         .from("valores_referencia_de_para")
         .select("estudo_descricao")
         .eq("ativo", true)
         .limit(50000);
 
-      if (deParaError) {
-        console.error("❌ Erro ao buscar Fora do Padrão:", deParaError);
-        throw deParaError;
+      if (foraPadraoError) {
+        console.error("❌ Erro ao buscar Fora do Padrão:", foraPadraoError);
+        throw foraPadraoError;
       }
 
       const estudosForaPadrao = new Set(
-        deParaData?.map((item) => limparTermosX(item.estudo_descricao?.toUpperCase().trim() || "")).filter(Boolean) || [],
+        foraPadraoData?.map((item) => limparTermosX(item.estudo_descricao?.toUpperCase().trim() || "")).filter(Boolean) || [],
       );
       console.log("📋 Estudos no Fora do Padrão:", estudosForaPadrao.size);
 
@@ -91,10 +90,7 @@ export function VolumetriaExamesNaoIdentificados() {
       }
 
       // Agrupar exames NÃO IDENTIFICADOS (não estão no Cadastro NEM no Fora do Padrão)
-      const agrupados: Record<string, ExameNaoIdentificado & { 
-        temNoCadastro: boolean; 
-        temForaPadrao: boolean;
-      }> = {};
+      const agrupados: Record<string, ExameNaoIdentificado> = {};
 
       volumetriaData.forEach((item) => {
         let nomeEstudo = item.ESTUDO_DESCRICAO?.trim() || "";
@@ -106,7 +102,7 @@ export function VolumetriaExamesNaoIdentificados() {
 
         const estudoLimpo = limparTermosX(nomeEstudo.toUpperCase());
         
-        // Verificar se está mapeado
+        // Verificar se está mapeado no Cadastro de Exames ou no Fora do Padrão
         const temNoCadastro = examesNoCadastro.has(estudoLimpo);
         const temForaPadrao = estudosForaPadrao.has(estudoLimpo);
 
@@ -122,10 +118,6 @@ export function VolumetriaExamesNaoIdentificados() {
             estudo_descricao: nomeEstudo,
             arquivo_fonte: arquivoFonte,
             quantidade: 1,
-            temNoCadastro,
-            temForaPadrao,
-            temNoDePara: temForaPadrao,
-            temNasRegras: false,
           };
         }
       });
