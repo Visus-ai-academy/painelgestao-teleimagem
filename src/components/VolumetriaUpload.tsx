@@ -36,6 +36,29 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
     const file = event.target.files?.[0];
     if (!file) return;
 
+    // LOG CRÍTICO: Mostrar qual período está sendo usado
+    console.log('========================================');
+    console.log('🚨 UPLOAD INICIADO - VERIFICAÇÃO DE PERÍODO');
+    console.log('📁 Arquivo:', file.name);
+    console.log('📂 Tipo:', arquivoFonte);
+    console.log('📅 PERÍODO RECEBIDO NO COMPONENTE:', periodoFaturamento);
+    if (periodoFaturamento) {
+      console.log(`📅 PERÍODO FORMATADO: ${periodoFaturamento.ano}-${periodoFaturamento.mes.toString().padStart(2, '0')}`);
+    } else {
+      console.log('⚠️ ALERTA: periodoFaturamento está UNDEFINED ou NULL!');
+    }
+    console.log('========================================');
+
+    // VALIDAÇÃO CRÍTICA: Verificar se o período está definido
+    if (!periodoFaturamento || !periodoFaturamento.ano || !periodoFaturamento.mes) {
+      toast({
+        title: "Erro Crítico",
+        description: "Período de faturamento não está definido. Por favor, selecione o período antes de fazer upload.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     // Validação rigorosa do arquivo
     const allowedMimeTypes = [
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
@@ -85,6 +108,12 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
       });
       return;
     }
+
+    // Mostrar toast de confirmação com o período
+    toast({
+      title: "Upload Iniciado",
+      description: `Processando para período: ${['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][periodoFaturamento.mes - 1]}/${periodoFaturamento.ano}`,
+    });
 
     setIsProcessing(true);
     setProgress(0);

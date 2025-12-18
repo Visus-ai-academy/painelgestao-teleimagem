@@ -214,6 +214,17 @@ export async function processVolumetriaFile(
     
     while (tentativasLog < maxTentativasLog) {
       try {
+        // LOG CRÍTICO: Mostrar exatamente o que será gravado no banco
+        const periodoParaGravar = periodoFaturamento 
+          ? `${periodoFaturamento.ano}-${periodoFaturamento.mes.toString().padStart(2, '0')}` 
+          : null;
+        
+        console.log('========================================');
+        console.log('💾 GRAVANDO LOG DE UPLOAD NO BANCO');
+        console.log('📅 periodoFaturamento recebido:', periodoFaturamento);
+        console.log('📅 PERÍODO QUE SERÁ GRAVADO:', periodoParaGravar);
+        console.log('========================================');
+        
         const { data: logData, error: logError } = await supabase
           .from('processamento_uploads')
           .insert({
@@ -225,7 +236,7 @@ export async function processVolumetriaFile(
             registros_inseridos: 0,
             registros_atualizados: 0,
             registros_erro: 0,
-            periodo_referencia: periodoFaturamento ? `${periodoFaturamento.ano}-${periodoFaturamento.mes.toString().padStart(2, '0')}` : null,
+            periodo_referencia: periodoParaGravar,
             tamanho_arquivo: file.size
           })
           .select()
@@ -675,9 +686,16 @@ export async function processVolumetriaOtimizado(
   periodo?: { ano: number; mes: number },
   onProgress?: (progress: { progress: number; processed: number; total: number; status: string }) => void
 ): Promise<{ success: boolean; message: string; stats: any }> {
-  console.log('🚀 Iniciando processamento com DATABASE TRIGGERS AUTOMÁTICOS...');
+  console.log('========================================');
+  console.log('🚀 processVolumetriaOtimizado CHAMADO');
   console.log('📂 Arquivo fonte:', arquivoFonte);
-  console.log('📅 Período para processamento:', periodo);
+  console.log('📅 PERÍODO RECEBIDO NA FUNÇÃO:', periodo);
+  if (periodo) {
+    console.log(`📅 PERÍODO FORMATADO: ${periodo.ano}-${periodo.mes.toString().padStart(2, '0')}`);
+  } else {
+    console.error('❌ ERRO CRÍTICO: período é undefined ou null!');
+  }
+  console.log('========================================');
   
   try {
     // Primeiro, processar o arquivo normalmente
