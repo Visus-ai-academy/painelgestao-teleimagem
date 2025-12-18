@@ -239,29 +239,37 @@ serve(async (req) => {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
 
-      // Salvar rejeições se houver
+      // Salvar rejeições se houver - usando a tabela registros_rejeitados_processamento
       if (registrosRejeitados.length > 0) {
-        console.log(`💾 Salvando ${registrosRejeitados.length} registros rejeitados...`);
+        console.log(`💾 Salvando ${registrosRejeitados.length} registros rejeitados na tabela registros_rejeitados_processamento...`);
         try {
           const rejeicoes = registrosRejeitados.map(r => ({
-            empresa: r.dados_originais.EMPRESA || 'N/I',
-            nome_paciente: r.dados_originais.NOME_PACIENTE || 'N/I',
             arquivo_fonte: arquivo_fonte,
-            erro_detalhes: `${r.motivo_rejeicao}: ${r.detalhes_erro}`,
+            linha_original: r.linha_original,
             dados_originais: r.dados_originais,
-            status: 'rejeitado',
+            motivo_rejeicao: r.motivo_rejeicao,
+            detalhes_erro: r.detalhes_erro,
+            lote_upload: loteUpload,
             created_at: new Date().toISOString()
           }));
 
           // Inserir rejeições em batches pequenos
-          const BATCH_SIZE_REJEICOES = 20;
+          const BATCH_SIZE_REJEICOES = 50;
           for (let i = 0; i < rejeicoes.length; i += BATCH_SIZE_REJEICOES) {
             const batchRejeicoes = rejeicoes.slice(i, i + BATCH_SIZE_REJEICOES);
             
-            await supabaseClient
-              .from('volumetria_erros')
+            const { error: insertError } = await supabaseClient
+              .from('registros_rejeitados_processamento')
               .insert(batchRejeicoes);
+            
+            if (insertError) {
+              console.error(`❌ Erro ao salvar batch de rejeições:`, insertError);
+            } else {
+              console.log(`✅ Batch de ${batchRejeicoes.length} rejeições salvo com sucesso`);
+            }
           }
+          
+          console.log(`✅ Total de ${registrosRejeitados.length} registros rejeitados salvos`);
         } catch (saveError) {
           console.error(`❌ Erro ao salvar rejeições:`, saveError);
         }
