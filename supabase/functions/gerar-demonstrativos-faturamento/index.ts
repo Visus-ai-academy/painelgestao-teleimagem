@@ -601,7 +601,7 @@ serve(async (req) => {
       (precosCliente || []).forEach((preco: any) => {
         const mod = (preco.modalidade || '').toString().toUpperCase().trim();
         const esp = (preco.especialidade || '').toString().toUpperCase().trim();
-        const cat = (preco.categoria || 'N/A').toString().toUpperCase().trim();
+        const cat = (preco.categoria || '').toString().toUpperCase().trim();
         const pri = (preco.prioridade || 'ROTINA').toString().toUpperCase().trim();
         const key = `${mod}|${esp}|${cat}|${pri}`;
         if (preco.cond_volume && !condVolumeMap.has(key)) {
@@ -624,7 +624,7 @@ serve(async (req) => {
         (precosCliente || []).forEach((preco: any) => {
           const mod = (preco.modalidade || '').toString().toUpperCase().trim();
           const esp = (preco.especialidade || '').toString().toUpperCase().trim();
-          const cat = (preco.categoria || 'N/A').toString().toUpperCase().trim();
+          const cat = (preco.categoria || '').toString().toUpperCase().trim();
           const pri = (preco.prioridade || 'ROTINA').toString().toUpperCase().trim();
           const key = `${mod}|${esp}|${cat}|${pri}`;
           if (!precosCache.has(key)) {
@@ -648,7 +648,7 @@ serve(async (req) => {
           // Criar chave EXATA para cache (MOD+ESP+CAT+PRIOR)
           const mod = (v.MODALIDADE || '').toString().toUpperCase().trim();
           const esp = (v.ESPECIALIDADE || '').toString().toUpperCase().trim();
-          const cat = (v.CATEGORIA || 'N/A').toString().toUpperCase().trim();
+          const cat = (v.CATEGORIA || '').toString().toUpperCase().trim();
           const pri = (v.PRIORIDADE || 'ROTINA').toString().toUpperCase().trim();
           const key = `${mod}|${esp}|${cat}|${pri}`;
           
@@ -752,7 +752,7 @@ serve(async (req) => {
         if (v.tipo_faturamento === 'NC-NF' || v.tipo_faturamento === 'EXCLUSAO') continue;
         const mod = (v.MODALIDADE || '').toString().toUpperCase().trim();
         const esp = (v.ESPECIALIDADE || '').toString().toUpperCase().trim();
-        const cat = (v.CATEGORIA || 'N/A').toString().toUpperCase().trim();
+        const cat = (v.CATEGORIA || '').toString().toUpperCase().trim();
         const pri = (v.PRIORIDADE || 'ROTINA').toString().toUpperCase().trim();
         const key = `${mod}|${esp}|${cat}|${pri}`;
         if (precosFaltantesCliente.has(key)) {
