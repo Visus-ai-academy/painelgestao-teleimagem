@@ -1,11 +1,8 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { FileText, Calendar, BarChart3, AlertCircle } from "lucide-react";
 import { useVolumetria } from "@/contexts/VolumetriaContext";
-
-// FORÇA CACHE BUST
-const CACHE_BUSTER = Date.now();
 
 // Dados estruturados
 interface UploadStats {
@@ -19,27 +16,15 @@ interface UploadStats {
 
 export function VolumetriaUploadStats() {
   const { data, refreshData } = useVolumetria();
-
-  // FORÇAR EXECUÇÃO SEMPRE QUE COMPONENTE RENDERIZAR
-  console.log('🔥 RENDERIZAÇÃO VolumetriaUploadStats - CACHE BUSTER:', CACHE_BUSTER);
-  console.log('📊 Estado atual completo:', data);
-  console.log('📊 Loading:', data.loading);
-  console.log('📊 Stats keys:', Object.keys(data.stats));
+  const hasLoadedRef = useRef(false);
   
-  // Forçar uma atualização na primeira renderização para garantir que os dados sejam carregados
+  // Carregar dados APENAS uma vez na montagem do componente
   useEffect(() => {
-    console.log('🔄 VolumetriaUploadStats useEffect EXECUTADO - Cache buster:', CACHE_BUSTER);
-    console.log('📊 Data no useEffect:', data);
-    
-    // Forçar refresh imediato E com delay
-    console.log('🚀 Executando refresh IMEDIATO...');
-    refreshData();
-    
-    setTimeout(() => {
-      console.log('🚀 Executando refresh com DELAY...');
+    if (!hasLoadedRef.current) {
+      hasLoadedRef.current = true;
       refreshData();
-    }, 1000);
-  }, [CACHE_BUSTER]); // Dependência do cache buster força execução sempre
+    }
+  }, [refreshData]);
 
   // Converter dados do contexto para o formato de stats
   const stats: UploadStats[] = [
@@ -97,26 +82,12 @@ export function VolumetriaUploadStats() {
 
   const mainStats = stats.filter(s => s.fileName !== "Volumetria Onco Padrão");
 
-  const totalStats = mainStats.reduce((acc, stat) => {
-    console.log(`🔍 SOMA INDIVIDUAL - ${stat.fileName}:`);
-    console.log(`  - totalRecords: ${stat.totalRecords}`);
-    console.log(`  - recordsWithValue: ${stat.recordsWithValue}`);
-    console.log(`  - recordsZeroed: ${stat.recordsZeroed}`);
-    console.log(`  - totalValue: ${stat.totalValue}`);
-    
-    const newAcc = {
-      totalRecords: acc.totalRecords + stat.totalRecords,
-      recordsWithValue: acc.recordsWithValue + stat.recordsWithValue,
-      recordsZeroed: acc.recordsZeroed + stat.recordsZeroed,
-      totalValue: acc.totalValue + stat.totalValue,
-    };
-    
-    console.log(`  - Acumulado até agora: totalValue = ${newAcc.totalValue}, zerados = ${newAcc.recordsZeroed}`);
-    return newAcc;
-  }, { totalRecords: 0, recordsWithValue: 0, recordsZeroed: 0, totalValue: 0 });
-  
-  console.log(`🔍 RESULTADO FINAL DA SOMA: ${totalStats.totalValue} exames`);
-  console.log(`🔍 STATS ORIGINAIS DO CONTEXTO:`, data.stats);
+  const totalStats = mainStats.reduce((acc, stat) => ({
+    totalRecords: acc.totalRecords + stat.totalRecords,
+    recordsWithValue: acc.recordsWithValue + stat.recordsWithValue,
+    recordsZeroed: acc.recordsZeroed + stat.recordsZeroed,
+    totalValue: acc.totalValue + stat.totalValue,
+  }), { totalRecords: 0, recordsWithValue: 0, recordsZeroed: 0, totalValue: 0 });
 
 
   if (data.loading) {
