@@ -62,18 +62,34 @@ export function TesteRegras27({ periodoReferencia }: TesteRegras27Props) {
       try {
         console.log(`📁 Processando: ${arquivo}`);
         
-        // Timeout de 5 minutos para arquivos grandes
+        // Usar fetch direto com timeout de 5 minutos
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000);
         
-        const { data, error } = await supabase.functions.invoke('aplicar-regras-arquivo-unico', {
-          body: {
-            arquivo_fonte: arquivo,
-            periodo_referencia: periodoReferencia
+        const supabaseUrl = 'https://atbvikgxdcohnznkmaus.supabase.co';
+        const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF0YnZpa2d4ZGNvaG56bmttYXVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI2OTY1MzAsImV4cCI6MjA2ODI3MjUzMH0.P2eptjgahiMcUzE9b1eAVAW1HC9Ib52LYpRAO8S_9CE';
+        
+        const response = await fetch(
+          `${supabaseUrl}/functions/v1/aplicar-regras-arquivo-unico`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${supabaseAnonKey}`,
+              'apikey': supabaseAnonKey
+            },
+            body: JSON.stringify({
+              arquivo_fonte: arquivo,
+              periodo_referencia: periodoReferencia
+            }),
+            signal: controller.signal
           }
-        });
+        );
         
         clearTimeout(timeoutId);
+        
+        const data = await response.json();
+        const error = response.ok ? null : { message: data?.erro || 'Erro na requisição' };
 
         if (error) {
           console.error(`❌ Erro no arquivo ${arquivo}:`, error);
