@@ -8,6 +8,11 @@ import { toast } from 'sonner';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface TesteResultado {
+  background?: boolean;
+  job_id?: string;
+  message?: string;
+  arquivos?: string[];
+  instrucoes?: string;
   resultados?: {
     total_arquivos_processados?: number;
     total_registros_processados?: number;
@@ -33,6 +38,7 @@ export function TesteRegras27({ periodoReferencia }: TesteRegras27Props) {
   const [isTestando, setIsTestando] = useState(false);
   const [resultado, setResultado] = useState<TesteResultado | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+  const [jobId, setJobId] = useState<string | null>(null);
 
   const executarTeste = async () => {
     // CRÍTICO: Validar período antes de processar
@@ -44,6 +50,7 @@ export function TesteRegras27({ periodoReferencia }: TesteRegras27Props) {
     setIsTestando(true);
     setErro(null);
     setResultado(null);
+    setJobId(null);
 
     try {
       toast(`🧪 Iniciando aplicação das 28 regras completas para período ${periodoReferencia}...`);
@@ -61,7 +68,15 @@ export function TesteRegras27({ periodoReferencia }: TesteRegras27Props) {
 
       setResultado(data);
       
-      toast.success('✅ As 28 regras foram aplicadas com sucesso!');
+      // Verificar se é processamento em background
+      if (data?.background && data?.job_id) {
+        setJobId(data.job_id);
+        toast.success('✅ Processamento iniciado em segundo plano! Aguarde alguns segundos e os dados serão atualizados automaticamente.', {
+          duration: 8000
+        });
+      } else {
+        toast.success('✅ As 28 regras foram aplicadas com sucesso!');
+      }
 
     } catch (error: any) {
       const errorMessage = error?.message || 'Erro desconhecido';
@@ -129,7 +144,14 @@ export function TesteRegras27({ periodoReferencia }: TesteRegras27Props) {
             )}
           </Button>
           
-          {resultado && (
+          {resultado?.background && (
+            <Badge variant="outline" className="text-blue-600 border-blue-600">
+              <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+              Processando em Background
+            </Badge>
+          )}
+          
+          {resultado && !resultado.background && (
             <Badge variant="outline" className="text-green-600 border-green-600">
               <CheckCircle className="h-3 w-3 mr-1" />
               Regras Aplicadas
@@ -146,6 +168,23 @@ export function TesteRegras27({ periodoReferencia }: TesteRegras27Props) {
             <li>• <strong>+ 26 outras regras</strong> de normalização, exclusão e correção</li>
           </ul>
         </div>
+
+        {/* Mensagem de Background */}
+        {resultado?.background && (
+          <div className="border border-blue-200 bg-blue-50 rounded-lg p-4">
+            <div className="flex items-center gap-2 text-blue-700 mb-2">
+              <RefreshCw className="h-4 w-4 animate-spin" />
+              <span className="font-semibold">Processamento em Segundo Plano</span>
+            </div>
+            <p className="text-blue-600 text-sm mb-2">{resultado.message}</p>
+            {resultado.instrucoes && (
+              <p className="text-blue-500 text-xs">{resultado.instrucoes}</p>
+            )}
+            {jobId && (
+              <p className="text-blue-400 text-xs mt-2">Job ID: {jobId}</p>
+            )}
+          </div>
+        )}
 
         {/* Exibir Erro */}
         {erro && (
