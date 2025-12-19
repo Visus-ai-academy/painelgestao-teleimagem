@@ -737,43 +737,19 @@ export async function processVolumetriaOtimizado(
       // ========================================
       
       if (arquivoFonte.includes('retroativo')) {
-        // PRIORIDADE MÁXIMA: Aplicar regras v002/v003 PRIMEIRO para arquivos retroativos
-        // v003: Exclui exames com DATA_REALIZACAO >= primeiro dia do mês de referência
-        // v002: Mantém apenas exames com DATA_LAUDO entre dia 8 do mês e dia 7 do mês seguinte
-        console.log('🚀🚀🚀 APLICANDO REGRAS v002/v003 COMO PRIMEIRA PRIORIDADE (ARQUIVOS RETROATIVOS)...');
-        
-        // CORREÇÃO: Usar SEMPRE formato YYYY-MM, NUNCA formato mes/ano
-        const periodoDb = periodo 
-          ? `${periodo.ano}-${periodo.mes.toString().padStart(2, '0')}` 
-          : new Date().toISOString().substring(0, 7); // Fallback para mês atual em formato YYYY-MM
-        
-        console.log(`📅 Período para aplicar-exclusoes-periodo: ${periodoDb} (formato YYYY-MM)`);
-        
-        try {
-          const { data: regrasV002V003, error: errorV002V003 } = await supabase.functions.invoke(
-            'aplicar-exclusoes-periodo',
-            {
-              body: {
-                arquivo_fonte: arquivoFonte,
-                periodo_referencia: periodoDb // SEMPRE formato YYYY-MM
-              }
-            }
-          );
-          
-          if (errorV002V003) {
-            console.error('❌ ERRO CRÍTICO: Falha nas regras v002/v003 (aplicar-exclusoes-periodo):', errorV002V003);
-          } else if (regrasV002V003?.sucesso) {
-            console.log('✅✅✅ REGRAS v002/v003 APLICADAS COM SUCESSO:');
-            console.log(`   - v003 (DATA_REALIZACAO >= início do mês): ${regrasV002V003.detalhes?.v003_excluidos || 0} excluídos`);
-            console.log(`   - v002 (DATA_LAUDO fora da janela dia 8-7): ${regrasV002V003.detalhes?.v002_excluidos || 0} excluídos`);
-            console.log(`   - Total excluídos: ${regrasV002V003.registros_excluidos || 0}`);
-            console.log(`   - Registros restantes: ${regrasV002V003.registros_restantes || 0}`);
-          } else {
-            console.log('ℹ️ Nenhuma exclusão v002/v003 necessária:', regrasV002V003);
-          }
-        } catch (errorAutomatico) {
-          console.error('❌ ERRO CRÍTICO ao aplicar regras v002/v003:', errorAutomatico);
-        }
+        // ⚠️ REGRAS v002/v003 DESATIVADAS NO UPLOAD AUTOMÁTICO ⚠️
+        // As regras v002/v003 NÃO devem ser aplicadas automaticamente durante o upload
+        // Motivo: Excluem registros baseados no período selecionado, mas a lógica precisa 
+        // ser aplicada MANUALMENTE após análise correta do período de faturamento vs período dos dados
+        // 
+        // Para aplicar manualmente, o usuário deve usar:
+        // - Menu "Sistema de Regras" → "Correção v002/v003"
+        // - Ou chamar a edge function aplicar-exclusoes-periodo com o período CORRETO
+        console.log('⚠️ === REGRAS v002/v003 NÃO APLICADAS AUTOMATICAMENTE ===');
+        console.log(`   📝 Arquivo retroativo detectado: ${arquivoFonte}`);
+        console.log(`   📝 As regras v002/v003 devem ser aplicadas MANUALMENTE`);
+        console.log(`   📝 Use o menu "Sistema de Regras" → "Correção v002/v003"`);
+        console.log(`   📝 Período informado no upload: ${periodo?.ano}-${periodo?.mes?.toString().padStart(2, '0')}`);
         
       } else if (arquivoFonte.includes('volumetria_padrao') || arquivoFonte.includes('volumetria_fora_padrao')) {
         // PRIORIDADE MÁXIMA: Aplicar regra v031 PRIMEIRO para arquivos não-retroativos
