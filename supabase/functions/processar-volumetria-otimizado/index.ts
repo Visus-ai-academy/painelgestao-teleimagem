@@ -205,8 +205,16 @@ serve(async (req) => {
               });
               totalErros += batchValidRecords.length;
             } else {
-              totalInseridos += batchValidRecords.length;
-              console.log(`✅ Batch ${batchNumber} inserido com sucesso`);
+              // ✅ CORREÇÃO: Usar contagem REAL de registros inseridos (não o tamanho do batch enviado)
+              const realInsertCount = insertData?.length || 0;
+              totalInseridos += realInsertCount;
+              
+              // Se houve diferença, registrar como warning
+              if (realInsertCount !== batchValidRecords.length) {
+                console.warn(`⚠️ Batch ${batchNumber}: Enviados ${batchValidRecords.length}, inseridos ${realInsertCount} (diferença de ${batchValidRecords.length - realInsertCount})`);
+              }
+              
+              console.log(`✅ Batch ${batchNumber} inserido: ${realInsertCount} registros`);
             }
           } catch (batchError) {
             console.error(`❌ Timeout/erro no batch ${batchNumber}:`, batchError);
