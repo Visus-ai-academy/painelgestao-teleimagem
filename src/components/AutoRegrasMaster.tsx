@@ -314,18 +314,31 @@ export function AutoRegrasMaster() {
       console.log(`⚡ APLICAÇÃO AUTOMÁTICA iniciada para ${tipo_arquivo}`);
 
       // Aplicar TODAS as 28 regras automaticamente usando a função unificada
-      // Obter período do localStorage (formato YYYY-MM)
-      const periodoSelecionado = localStorage.getItem('periodoVolumetriaSelecionado');
-      if (!periodoSelecionado) {
+      // Obter período do localStorage - USANDO CHAVE CORRETA: volumetria_periodo_selecionado
+      const periodoRaw = localStorage.getItem('volumetria_periodo_selecionado');
+      if (!periodoRaw) {
         console.log('⚠️ Período não selecionado - aplicação de regras cancelada');
         toast.warning('Selecione um período antes de processar os arquivos');
         return;
       }
       
+      // Parsear o período que está no formato JSON {ano: number, mes: number}
+      let periodoReferencia: string;
+      try {
+        const periodoObj = JSON.parse(periodoRaw);
+        // Converter para formato YYYY-MM
+        periodoReferencia = `${periodoObj.ano}-${String(periodoObj.mes).padStart(2, '0')}`;
+        console.log(`📅 Período parseado do localStorage: ${periodoReferencia} (de ${periodoRaw})`);
+      } catch (parseError) {
+        // Se não for JSON, assume que já está no formato correto
+        periodoReferencia = periodoRaw;
+        console.log(`📅 Período usado diretamente: ${periodoReferencia}`);
+      }
+      
       const { data, error } = await supabase.functions.invoke("aplicar-regras-sistema-completo", {
         body: {
           arquivo_fonte: tipo_arquivo,
-          periodo_referencia: periodoSelecionado,
+          periodo_referencia: periodoReferencia,
           aplicar_todos_arquivos: false,
         },
       });
