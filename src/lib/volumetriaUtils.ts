@@ -346,48 +346,9 @@ export async function processVolumetriaFile(
             continue;
           }
 
-          // REGRA: Excluir laudos após data de corte dinâmica (parser robusto para datas BR)
-          const dataLaudo = row['DATA_LAUDO'];
-          if (dataLaudo) {
-            const parseBR = (val: any): Date | null => {
-              if (val instanceof Date) return val;
-              if (val == null || val === '') return null;
-              const str = String(val).trim();
-              const m = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
-              if (m) {
-                let [, d, mo, y] = m;
-                if (y.length === 2) y = String(2000 + parseInt(y));
-                const dt = new Date(parseInt(y), parseInt(mo) - 1, parseInt(d));
-                return isNaN(dt.getTime()) ? null : dt;
-              }
-              const dt = new Date(str);
-              return isNaN(dt.getTime()) ? null : dt;
-            };
-            const dataLaudoDate = parseBR(dataLaudo);
-            
-            // Calcular data de corte baseada no período de referência
-            let dataCorte: Date;
-            if (periodoFaturamento) {
-              // Data de corte = dia 7 do mês SEGUINTE ao período de referência
-              const mesCorte = periodoFaturamento.mes === 12 ? 1 : periodoFaturamento.mes + 1;
-              const anoCorte = periodoFaturamento.mes === 12 ? periodoFaturamento.ano + 1 : periodoFaturamento.ano;
-              dataCorte = new Date(anoCorte, mesCorte - 1, 7);
-            } else {
-              // Fallback: se não informar período, usar 60 dias no futuro
-              const hoje = new Date();
-              dataCorte = new Date(hoje.getFullYear(), hoje.getMonth() + 2, 7);
-            }
-            
-            if (dataLaudoDate && dataLaudoDate > dataCorte) {
-              if (nomeNorm === DEBUG_PACIENTE_NORM) {
-                dbgExcludedByLaudoCutoff++;
-                console.log(`⚠️ DEBUG PACIENTE - descartado por DATA_LAUDO > ${dataCorte.toISOString().split('T')[0]}: ${empresa} - ${String(dataLaudo)}`);
-              }
-              console.log(`Laudo após ${dataCorte.toISOString().split('T')[0]} excluído: ${empresa} - ${dataLaudo}`);
-              totalErrors++; // Contar como processado mas não inserido
-              continue;
-            }
-          }
+          // NOTA: Regras de exclusão por DATA_LAUDO (v002) e DATA_REALIZACAO (v003) 
+          // são aplicadas MANUALMENTE através do botão "Executar 28 Regras Completas"
+          // NÃO filtrar aqui durante a inserção inicial
 
           const safeString = (value: any): string | undefined => {
             if (value === null || value === undefined || value === '') return undefined;
