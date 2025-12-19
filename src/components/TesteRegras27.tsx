@@ -148,28 +148,8 @@ export function TesteRegras27({ periodoReferencia }: TesteRegras27Props) {
       </CardHeader>
       
       <CardContent className="space-y-6">
-        {/* Alerta se período não selecionado */}
-        {!periodoReferencia && (
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>
-              <strong>Período não selecionado!</strong> Volte à aba "Upload de Dados" e selecione o período de faturamento antes de executar as regras.
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {/* Período selecionado */}
-        {periodoReferencia && (
-          <Alert>
-            <CheckCircle className="h-4 w-4 text-green-600" />
-            <AlertDescription>
-              Período selecionado: <strong>{periodoReferencia}</strong>
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {/* Botão das 28 Regras */}
-        <div className="flex items-center gap-4">
+        {/* Botão das 28 Regras - Sempre visível primeiro */}
+        <div className="flex items-center gap-4 flex-wrap">
           <Button
             onClick={executarRegras}
             disabled={isProcessando || !periodoReferencia}
@@ -188,6 +168,21 @@ export function TesteRegras27({ periodoReferencia }: TesteRegras27Props) {
               </>
             )}
           </Button>
+          
+          {/* Período selecionado inline */}
+          {periodoReferencia && (
+            <Badge variant="outline" className="text-muted-foreground">
+              Período: <strong className="ml-1">{periodoReferencia}</strong>
+            </Badge>
+          )}
+          
+          {/* Alerta inline se período não selecionado */}
+          {!periodoReferencia && (
+            <span className="text-sm text-destructive flex items-center gap-1">
+              <AlertTriangle className="h-4 w-4" />
+              Selecione o período na aba "Upload de Dados"
+            </span>
+          )}
           
           {concluido && !isProcessando && (
             <Badge variant="outline" className="text-green-600 border-green-600">
