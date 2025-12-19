@@ -62,12 +62,18 @@ export function TesteRegras27({ periodoReferencia }: TesteRegras27Props) {
       try {
         console.log(`📁 Processando: ${arquivo}`);
         
+        // Timeout de 5 minutos para arquivos grandes
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000);
+        
         const { data, error } = await supabase.functions.invoke('aplicar-regras-arquivo-unico', {
           body: {
             arquivo_fonte: arquivo,
             periodo_referencia: periodoReferencia
           }
         });
+        
+        clearTimeout(timeoutId);
 
         if (error) {
           console.error(`❌ Erro no arquivo ${arquivo}:`, error);
