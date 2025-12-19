@@ -5089,7 +5089,6 @@ export type Database = {
         Returns: Json
       }
       processar_checkout_automatico: { Args: never; Returns: number }
-      processar_tasks_sistema: { Args: never; Returns: Json }
       promote_user_to_admin:
         | { Args: { target_user_id: string }; Returns: undefined }
         | { Args: { user_email: string }; Returns: boolean }
