@@ -740,63 +740,68 @@ export async function processVolumetriaOtimizado(
       // ========================================
       // SEGUNDA PRIORIDADE: Aplicar todas as outras regras através do lote
       // ========================================
-      console.log('🔧 Aplicando demais regras de negócio via aplicar-regras-lote...');
-      try {
-        console.log(`📂 Parâmetros: arquivo_fonte=${arquivoFonte}, periodo_referencia=${periodoReferencia}`);
-        
-        const { data: resultRegras, error: errorRegras } = await supabase.functions.invoke('aplicar-regras-lote', {
-          body: { 
-            arquivo_fonte: arquivoFonte,
-                periodo_referencia: periodoEdgeFormat
-          }
-        });
+      // ⚠️ DESATIVADO PARA ARQUIVOS RETROATIVOS - regras v002/v003 devem ser manuais
+      if (!arquivoFonte.includes('retroativo')) {
+        console.log('🔧 Aplicando demais regras de negócio via aplicar-regras-lote (apenas não-retroativos)...');
+        try {
+          console.log(`📂 Parâmetros: arquivo_fonte=${arquivoFonte}, periodo_referencia=${periodoReferencia}`);
+          
+          const { data: resultRegras, error: errorRegras } = await supabase.functions.invoke('aplicar-regras-lote', {
+            body: { 
+              arquivo_fonte: arquivoFonte,
+              periodo_referencia: periodoEdgeFormat
+            }
+          });
 
-        if (errorRegras) {
-          console.error('⚠️ Erro ao aplicar regras em lote:', errorRegras);
-          console.warn('⚠️ Dados inseridos mas regras podem não ter sido aplicadas corretamente');
-        } else {
-          console.log('✅ REGRAS EM LOTE APLICADAS COM SUCESSO!');
-          console.log('📊 Resultado completo:', resultRegras);
-          if (resultRegras?.resultados) {
-            console.log(`📋 Total de regras processadas: ${resultRegras.resultados.length}`);
-            const sucessos = resultRegras.resultados.filter((r: any) => r.sucesso).length;
-            const erros = resultRegras.resultados.filter((r: any) => !r.sucesso).length;
-            console.log(`✅ Sucessos: ${sucessos} | ❌ Erros: ${erros}`);
+          if (errorRegras) {
+            console.error('⚠️ Erro ao aplicar regras em lote:', errorRegras);
+          } else {
+            console.log('✅ REGRAS EM LOTE APLICADAS COM SUCESSO!');
           }
+        } catch (error) {
+          console.error('⚠️ Erro ao aplicar regras em lote:', error);
         }
-      } catch (error) {
-        console.error('⚠️ Erro ao aplicar regras em lote:', error);
-        console.warn('⚠️ Dados inseridos mas regras podem não ter sido aplicadas');
+      } else {
+        console.log('⚠️ Arquivos retroativos: regras em lote DESATIVADAS para preservar dados');
+        console.log('📝 As regras v002/v003 devem ser aplicadas MANUALMENTE após análise');
       }
       
       // ========================================
       // TERCEIRA PRIORIDADE: Aplicar regras automáticas complementares
       // ========================================
-      console.log('🚀 Aplicando regras automáticas complementares...');
-      
-      try {
-        const { data: regrasCompletas, error: errorRegrasCompletas } = await supabase.functions.invoke(
-          'auto-aplicar-regras-pos-upload',
-          {
-            body: {
-              arquivo_fonte: arquivoFonte,
-              upload_id: 'auto-process',
-              arquivo_nome: `auto-${arquivoFonte}`,
-              status: 'concluido',
-              total_registros: result.totalInserted,
-              auto_aplicar: true,
-            periodo_referencia: periodoEdgeFormat
-            }
-          }
-        );
+      // ⚠️ DESATIVADO PARA ARQUIVOS RETROATIVOS
+      // As regras v002/v003 DEVEM ser aplicadas MANUALMENTE através do botão "Executar 28 Regras"
+      // Não chamar auto-aplicar-regras-pos-upload para evitar exclusão automática de registros
+      if (!arquivoFonte.includes('retroativo')) {
+        console.log('🚀 Aplicando regras automáticas complementares (apenas para arquivos não-retroativos)...');
         
-        if (errorRegrasCompletas) {
-          console.warn('⚠️ Aviso: Falha nas regras automáticas completas:', errorRegrasCompletas);
-        } else {
-          console.log('✅ Regras automáticas complementares aplicadas:', regrasCompletas);
+        try {
+          const { data: regrasCompletas, error: errorRegrasCompletas } = await supabase.functions.invoke(
+            'auto-aplicar-regras-pos-upload',
+            {
+              body: {
+                arquivo_fonte: arquivoFonte,
+                upload_id: 'auto-process',
+                arquivo_nome: `auto-${arquivoFonte}`,
+                status: 'concluido',
+                total_registros: result.totalInserted,
+                auto_aplicar: true,
+                periodo_referencia: periodoEdgeFormat
+              }
+            }
+          );
+          
+          if (errorRegrasCompletas) {
+            console.warn('⚠️ Aviso: Falha nas regras automáticas completas:', errorRegrasCompletas);
+          } else {
+            console.log('✅ Regras automáticas complementares aplicadas:', regrasCompletas);
+          }
+        } catch (errorRegrasFull) {
+          console.warn('⚠️ Erro ao aplicar regras automáticas completas:', errorRegrasFull);
         }
-      } catch (errorRegrasFull) {
-        console.warn('⚠️ Erro ao aplicar regras automáticas completas:', errorRegrasFull);
+      } else {
+        console.log('⚠️ Arquivos retroativos: regras automáticas DESATIVADAS');
+        console.log('📝 Use o botão "Executar 28 Regras Completas" para aplicar manualmente');
       }
     }
     
