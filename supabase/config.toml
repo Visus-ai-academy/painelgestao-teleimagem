@@ -247,3 +247,9 @@ verify_jwt = false
 
 [functions.vincular-exames-automatico]
 verify_jwt = true
+
+[functions.aplicar-regras-arquivo-unico]
+verify_jwt = true
+
+[functions.aplicar-regra-colunas-musculo-neuro]
+verify_jwt = true

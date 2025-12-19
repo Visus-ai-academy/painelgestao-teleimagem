@@ -1,94 +1,133 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, CheckCircle, Play, RefreshCw, Database } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { AlertTriangle, CheckCircle, Play, RefreshCw, Database, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
-interface TesteResultado {
-  background?: boolean;
-  job_id?: string;
-  message?: string;
-  arquivos?: string[];
-  instrucoes?: string;
-  resultados?: {
-    total_arquivos_processados?: number;
-    total_registros_processados?: number;
-    total_registros_excluidos?: number;
-    total_registros_atualizados?: number;
-    total_registros_quebrados?: number;
-    regras_aplicadas?: string[];
-    detalhes_por_arquivo?: Array<{
-      arquivo: string;
-      registros_antes: number;
-      registros_depois: number;
-      registros_excluidos: number;
-      regras_aplicadas: string[];
-    }>;
-  };
+interface ArquivoResultado {
+  arquivo: string;
+  sucesso: boolean;
+  registros_antes?: number;
+  registros_depois?: number;
+  registros_excluidos?: number;
+  regras_aplicadas?: string[];
+  erro?: string;
+  mensagem?: string;
 }
 
 interface TesteRegras27Props {
   periodoReferencia?: string;
 }
 
-export function TesteRegras27({ periodoReferencia }: TesteRegras27Props) {
-  const [isTestando, setIsTestando] = useState(false);
-  const [resultado, setResultado] = useState<TesteResultado | null>(null);
-  const [erro, setErro] = useState<string | null>(null);
-  const [jobId, setJobId] = useState<string | null>(null);
+const ARQUIVOS_PROCESSAR = [
+  'volumetria_padrao',
+  'volumetria_padrao_retroativo', 
+  'volumetria_fora_padrao',
+  'volumetria_fora_padrao_retroativo'
+];
 
-  const executarTeste = async () => {
-    // CRÍTICO: Validar período antes de processar
+export function TesteRegras27({ periodoReferencia }: TesteRegras27Props) {
+  const [isProcessando, setIsProcessando] = useState(false);
+  const [arquivoAtual, setArquivoAtual] = useState<string | null>(null);
+  const [progresso, setProgresso] = useState(0);
+  const [resultados, setResultados] = useState<ArquivoResultado[]>([]);
+  const [erro, setErro] = useState<string | null>(null);
+  const [concluido, setConcluido] = useState(false);
+
+  const executarRegras = useCallback(async () => {
     if (!periodoReferencia) {
       toast.error('⚠️ Selecione um período de referência antes de executar as regras');
       return;
     }
 
-    setIsTestando(true);
+    setIsProcessando(true);
     setErro(null);
-    setResultado(null);
-    setJobId(null);
+    setResultados([]);
+    setProgresso(0);
+    setConcluido(false);
 
-    try {
-      toast(`🧪 Iniciando aplicação das 28 regras completas para período ${periodoReferencia}...`);
+    toast.info(`🚀 Iniciando aplicação das 28 regras para ${periodoReferencia}...`);
 
-      const { data, error } = await supabase.functions.invoke('aplicar-27-regras-completas', {
-        body: {
-          aplicar_todos_arquivos: true,
-          periodo_referencia: periodoReferencia
-        }
-      });
+    const resultadosProcessamento: ArquivoResultado[] = [];
 
-      if (error) {
-        throw new Error(`Erro na função: ${error.message}`);
-      }
+    for (let i = 0; i < ARQUIVOS_PROCESSAR.length; i++) {
+      const arquivo = ARQUIVOS_PROCESSAR[i];
+      setArquivoAtual(arquivo);
+      setProgresso(((i) / ARQUIVOS_PROCESSAR.length) * 100);
 
-      setResultado(data);
-      
-      // Verificar se é processamento em background
-      if (data?.background && data?.job_id) {
-        setJobId(data.job_id);
-        toast.success('✅ Processamento iniciado em segundo plano! Aguarde alguns segundos e os dados serão atualizados automaticamente.', {
-          duration: 8000
+      try {
+        console.log(`📁 Processando: ${arquivo}`);
+        
+        const { data, error } = await supabase.functions.invoke('aplicar-regras-arquivo-unico', {
+          body: {
+            arquivo_fonte: arquivo,
+            periodo_referencia: periodoReferencia
+          }
         });
-      } else {
-        toast.success('✅ As 28 regras foram aplicadas com sucesso!');
-      }
 
-    } catch (error: any) {
-      const errorMessage = error?.message || 'Erro desconhecido';
-      setErro(errorMessage);
-      
-      toast.error(`❌ Erro na aplicação das 28 regras: ${errorMessage}`);
-      
-      console.error('Erro no teste das 28 regras:', error);
-    } finally {
-      setIsTestando(false);
+        if (error) {
+          console.error(`❌ Erro no arquivo ${arquivo}:`, error);
+          resultadosProcessamento.push({
+            arquivo,
+            sucesso: false,
+            erro: error.message
+          });
+          toast.error(`❌ Erro em ${arquivo}: ${error.message}`);
+        } else {
+          resultadosProcessamento.push({
+            arquivo,
+            sucesso: data?.sucesso ?? true,
+            registros_antes: data?.registros_antes,
+            registros_depois: data?.registros_depois,
+            registros_excluidos: data?.registros_excluidos,
+            regras_aplicadas: data?.regras_aplicadas,
+            mensagem: data?.mensagem
+          });
+          
+          if (data?.registros_antes > 0) {
+            toast.success(`✅ ${arquivo}: ${data.registros_antes?.toLocaleString()} → ${data.registros_depois?.toLocaleString()} registros`);
+          } else {
+            toast.info(`ℹ️ ${arquivo}: sem registros`);
+          }
+        }
+
+        setResultados([...resultadosProcessamento]);
+
+      } catch (err: any) {
+        console.error(`❌ Erro ao processar ${arquivo}:`, err);
+        resultadosProcessamento.push({
+          arquivo,
+          sucesso: false,
+          erro: err.message || 'Erro desconhecido'
+        });
+        toast.error(`❌ Erro em ${arquivo}`);
+        setResultados([...resultadosProcessamento]);
+      }
     }
-  };
+
+    setProgresso(100);
+    setArquivoAtual(null);
+    setIsProcessando(false);
+    setConcluido(true);
+
+    const sucessos = resultadosProcessamento.filter(r => r.sucesso).length;
+    const falhas = resultadosProcessamento.filter(r => !r.sucesso).length;
+    
+    if (falhas === 0) {
+      toast.success(`🎉 Todas as 28 regras aplicadas com sucesso em ${sucessos} arquivos!`, { duration: 5000 });
+    } else {
+      toast.warning(`⚠️ Processamento concluído: ${sucessos} sucesso, ${falhas} falhas`);
+    }
+
+  }, [periodoReferencia]);
+
+  const totalRegistrosAntes = resultados.reduce((acc, r) => acc + (r.registros_antes || 0), 0);
+  const totalRegistrosDepois = resultados.reduce((acc, r) => acc + (r.registros_depois || 0), 0);
+  const totalExcluidos = resultados.reduce((acc, r) => acc + (r.registros_excluidos || 0), 0);
 
   return (
     <Card className="w-full">
@@ -126,15 +165,15 @@ export function TesteRegras27({ periodoReferencia }: TesteRegras27Props) {
         {/* Botão das 28 Regras */}
         <div className="flex items-center gap-4">
           <Button
-            onClick={executarTeste}
-            disabled={isTestando || !periodoReferencia}
+            onClick={executarRegras}
+            disabled={isProcessando || !periodoReferencia}
             className="flex items-center gap-2"
             size="lg"
           >
-            {isTestando ? (
+            {isProcessando ? (
               <>
-                <RefreshCw className="h-4 w-4 animate-spin" />
-                Executando 28 Regras...
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Processando...
               </>
             ) : (
               <>
@@ -144,152 +183,143 @@ export function TesteRegras27({ periodoReferencia }: TesteRegras27Props) {
             )}
           </Button>
           
-          {resultado?.background && (
-            <Badge variant="outline" className="text-blue-600 border-blue-600">
-              <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
-              Processando em Background
-            </Badge>
-          )}
-          
-          {resultado && !resultado.background && (
+          {concluido && !isProcessando && (
             <Badge variant="outline" className="text-green-600 border-green-600">
               <CheckCircle className="h-3 w-3 mr-1" />
-              Regras Aplicadas
+              Concluído
             </Badge>
           )}
         </div>
 
-        {/* Info sobre v034 */}
+        {/* Progresso */}
+        {isProcessando && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">
+                Processando: <strong>{arquivoAtual}</strong>
+              </span>
+              <span className="font-medium">{Math.round(progresso)}%</span>
+            </div>
+            <Progress value={progresso} className="h-2" />
+          </div>
+        )}
+
+        {/* Info sobre as regras */}
         <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
           <h4 className="font-semibold text-blue-800 mb-2">Regras incluídas:</h4>
           <ul className="text-sm text-blue-700 space-y-1">
             <li>• <strong>v007</strong>: Colunas → MUSCULO ESQUELETICO (padrão)</li>
-            <li>• <strong>v034</strong>: Colunas → NEURO + SC (para neurologistas cadastrados na tabela <code>medicos_neurologistas</code>)</li>
+            <li>• <strong>v034</strong>: Colunas → NEURO + SC (para neurologistas cadastrados)</li>
             <li>• <strong>+ 26 outras regras</strong> de normalização, exclusão e correção</li>
           </ul>
         </div>
 
-        {/* Mensagem de Background */}
-        {resultado?.background && (
-          <div className="border border-blue-200 bg-blue-50 rounded-lg p-4">
-            <div className="flex items-center gap-2 text-blue-700 mb-2">
-              <RefreshCw className="h-4 w-4 animate-spin" />
-              <span className="font-semibold">Processamento em Segundo Plano</span>
-            </div>
-            <p className="text-blue-600 text-sm mb-2">{resultado.message}</p>
-            {resultado.instrucoes && (
-              <p className="text-blue-500 text-xs">{resultado.instrucoes}</p>
-            )}
-            {jobId && (
-              <p className="text-blue-400 text-xs mt-2">Job ID: {jobId}</p>
-            )}
-          </div>
-        )}
-
-        {/* Exibir Erro */}
+        {/* Erro */}
         {erro && (
           <div className="border border-red-200 bg-red-50 rounded-lg p-4">
             <div className="flex items-center gap-2 text-red-700 mb-2">
               <AlertTriangle className="h-4 w-4" />
-              <span className="font-semibold">Erro na Aplicação das 28 Regras</span>
+              <span className="font-semibold">Erro</span>
             </div>
             <p className="text-red-600 text-sm">{erro}</p>
           </div>
         )}
 
-        {/* Exibir Resultados das 28 Regras */}
-        {resultado?.resultados && (
-          <div className="space-y-4 border rounded-lg p-4 bg-green-50">
-            <div className="flex items-center gap-2 text-green-700 mb-4">
-              <CheckCircle className="h-5 w-5" />
-              <span className="font-semibold text-lg">Resultados das 28 Regras</span>
+        {/* Resultados */}
+        {resultados.length > 0 && (
+          <div className="space-y-4 border rounded-lg p-4 bg-gray-50">
+            <div className="flex items-center gap-2 text-gray-700 mb-4">
+              {concluido ? (
+                <CheckCircle className="h-5 w-5 text-green-600" />
+              ) : (
+                <RefreshCw className="h-5 w-5 animate-spin text-blue-600" />
+              )}
+              <span className="font-semibold text-lg">
+                {concluido ? 'Resultados' : 'Processando...'}
+              </span>
             </div>
 
-            {/* Resumo Geral */}
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <div className="bg-white p-3 rounded border">
-                <div className="text-2xl font-bold text-blue-600">
-                  {resultado.resultados.total_arquivos_processados || 0}
+            {/* Resumo */}
+            {concluido && (
+              <div className="grid grid-cols-3 gap-4 mb-4">
+                <div className="bg-white p-3 rounded border">
+                  <div className="text-2xl font-bold text-blue-600">
+                    {totalRegistrosAntes.toLocaleString()}
+                  </div>
+                  <div className="text-sm text-gray-600">Total Antes</div>
                 </div>
-                <div className="text-sm text-gray-600">Arquivos Processados</div>
-              </div>
-
-              <div className="bg-white p-3 rounded border">
-                <div className="text-2xl font-bold text-green-600">
-                  {resultado.resultados.total_registros_processados?.toLocaleString() || 0}
+                <div className="bg-white p-3 rounded border">
+                  <div className="text-2xl font-bold text-green-600">
+                    {totalRegistrosDepois.toLocaleString()}
+                  </div>
+                  <div className="text-sm text-gray-600">Total Depois</div>
                 </div>
-                <div className="text-sm text-gray-600">Registros Processados</div>
-              </div>
-
-              <div className="bg-white p-3 rounded border">
-                <div className="text-2xl font-bold text-red-600">
-                  {resultado.resultados.total_registros_excluidos?.toLocaleString() || 0}
-                </div>
-                <div className="text-sm text-gray-600">Registros Excluídos</div>
-              </div>
-
-              <div className="bg-white p-3 rounded border">
-                <div className="text-2xl font-bold text-orange-600">
-                  {resultado.resultados.total_registros_atualizados?.toLocaleString() || 0}
-                </div>
-                <div className="text-sm text-gray-600">Registros Atualizados</div>
-              </div>
-
-              <div className="bg-white p-3 rounded border">
-                <div className="text-2xl font-bold text-purple-600">
-                  {resultado.resultados.total_registros_quebrados?.toLocaleString() || 0}
-                </div>
-                <div className="text-sm text-gray-600">Registros Quebrados</div>
-              </div>
-            </div>
-
-            {/* Regras Aplicadas */}
-            {resultado.resultados.regras_aplicadas && (
-              <div className="bg-white p-4 rounded border">
-                <h4 className="font-semibold mb-2">Regras Aplicadas:</h4>
-                <div className="flex flex-wrap gap-2">
-                  {resultado.resultados.regras_aplicadas.map((regra, index) => (
-                    <Badge 
-                      key={index} 
-                      variant="secondary"
-                      className={regra === 'v034' ? 'bg-purple-100 text-purple-800' : ''}
-                    >
-                      {regra}
-                    </Badge>
-                  ))}
+                <div className="bg-white p-3 rounded border">
+                  <div className="text-2xl font-bold text-red-600">
+                    {totalExcluidos.toLocaleString()}
+                  </div>
+                  <div className="text-sm text-gray-600">Excluídos</div>
                 </div>
               </div>
             )}
 
-            {/* Detalhes por Arquivo */}
-            {resultado.resultados.detalhes_por_arquivo && resultado.resultados.detalhes_por_arquivo.length > 0 && (
-              <div className="bg-white p-4 rounded border">
-                <h4 className="font-semibold mb-3">Detalhes por Arquivo:</h4>
-                <div className="space-y-3">
-                  {resultado.resultados.detalhes_por_arquivo.map((arquivo, index) => (
-                    <div key={index} className="border-l-4 border-blue-500 pl-4">
-                      <div className="font-medium text-gray-800">{arquivo.arquivo}</div>
-                      <div className="text-sm text-gray-600 mt-1">
-                        <span className="font-medium">{arquivo.registros_antes.toLocaleString()}</span> → 
-                        <span className="font-medium text-green-600 ml-1">{arquivo.registros_depois.toLocaleString()}</span>
-                        <span className="text-red-600 ml-2">({arquivo.registros_excluidos.toLocaleString()} excluídos)</span>
-                      </div>
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {arquivo.regras_aplicadas.map((regra, rIndex) => (
-                          <Badge 
-                            key={rIndex} 
-                            variant="outline" 
-                            className={`text-xs ${regra === 'v034' ? 'border-purple-500 text-purple-700' : ''}`}
-                          >
-                            {regra}
-                          </Badge>
-                        ))}
-                      </div>
+            {/* Detalhes por arquivo */}
+            <div className="space-y-3">
+              {resultados.map((resultado, index) => (
+                <div 
+                  key={index} 
+                  className={`border-l-4 pl-4 py-2 ${
+                    resultado.sucesso 
+                      ? 'border-green-500 bg-green-50' 
+                      : 'border-red-500 bg-red-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    {resultado.sucesso ? (
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <AlertTriangle className="h-4 w-4 text-red-600" />
+                    )}
+                    <span className="font-medium">{resultado.arquivo}</span>
+                  </div>
+                  
+                  {resultado.sucesso && resultado.registros_antes !== undefined && (
+                    <div className="text-sm text-gray-600 mt-1">
+                      <span className="font-medium">{resultado.registros_antes.toLocaleString()}</span> → 
+                      <span className="font-medium text-green-600 ml-1">{resultado.registros_depois?.toLocaleString()}</span>
+                      {resultado.registros_excluidos && resultado.registros_excluidos > 0 && (
+                        <span className="text-red-600 ml-2">
+                          ({resultado.registros_excluidos.toLocaleString()} excluídos)
+                        </span>
+                      )}
                     </div>
-                  ))}
+                  )}
+
+                  {resultado.regras_aplicadas && resultado.regras_aplicadas.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {resultado.regras_aplicadas.slice(0, 10).map((regra, rIndex) => (
+                        <Badge 
+                          key={rIndex} 
+                          variant="outline" 
+                          className={`text-xs ${regra.includes('v034') ? 'border-purple-500 text-purple-700' : ''}`}
+                        >
+                          {regra}
+                        </Badge>
+                      ))}
+                      {resultado.regras_aplicadas.length > 10 && (
+                        <Badge variant="outline" className="text-xs">
+                          +{resultado.regras_aplicadas.length - 10} mais
+                        </Badge>
+                      )}
+                    </div>
+                  )}
+
+                  {resultado.erro && (
+                    <p className="text-sm text-red-600 mt-1">{resultado.erro}</p>
+                  )}
                 </div>
-              </div>
-            )}
+              ))}
+            </div>
           </div>
         )}
       </CardContent>
