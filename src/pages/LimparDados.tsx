@@ -1,7 +1,6 @@
 import { LimparUploads } from '@/components/LimparUploads';
 import { LimparContratosPrecos } from '@/components/LimparContratosPrecos';
 import { LimparClientesContratosPrecos } from '@/components/LimparClientesContratosPrecos';
-import { LimparDadosFicticios } from '@/components/LimparDadosFicticios';
 import { LimparCacheVolumetria } from '@/components/LimparCacheVolumetria';
 import { LimparVolumetriaTruncate } from '@/components/LimparVolumetriaTruncate';
 import { LimparRepasseReprocessar } from '@/components/LimparRepasseReprocessar';
@@ -24,7 +23,6 @@ export default function LimparDados() {
         <LimparRepasseReprocessar />
         <LimparVolumetriaTruncate />
         <LimparCacheVolumetria />
-        <LimparDadosFicticios />
         <LimparClientesContratosPrecos />
         <LimparContratosPrecos />
         <LimparUploads />
