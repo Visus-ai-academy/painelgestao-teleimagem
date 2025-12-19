@@ -438,37 +438,20 @@ serve(async (req) => {
         console.warn(`⚠️ Agrupamento falhou, mas processamento continua`);
       }
 
-      // ✅ PASSO 2.8: Aplicar regras v002/v003 para arquivos RETROATIVOS
-      // Estas regras excluem registros por DATA_REALIZACAO e DATA_LAUDO fora do período válido
+      // ⚠️ PASSO 2.8: Regras v002/v003 DESATIVADAS NO UPLOAD AUTOMÁTICO
+      // As regras v002/v003 NÃO devem ser aplicadas automaticamente durante o upload
+      // Motivo: Excluem registros baseados no período selecionado, mas a lógica precisa 
+      // ser aplicada MANUALMENTE após análise correta do período de faturamento vs período dos dados
+      // 
+      // Para aplicar manualmente, o usuário deve usar o componente CorrecaoRegrasV002V003
+      // ou chamar a edge function aplicar-exclusoes-periodo com o período CORRETO
       let regrasExclusao = 0;
       if (arquivo_fonte.includes('retroativo')) {
-        console.log('\n🎯 === APLICANDO REGRAS v002/v003 (ARQUIVOS RETROATIVOS) ===');
-        try {
-          const { data: exclusoesResult, error: exclusoesError } = await supabaseClient.functions.invoke(
-            'aplicar-exclusoes-periodo',
-            {
-              body: { 
-                arquivo_fonte: arquivo_fonte,
-                periodo_referencia: periodoReferenciaDb // Formato YYYY-MM
-              }
-            }
-          );
-
-          if (exclusoesError) {
-            console.error('❌ ERRO ao aplicar regras v002/v003:', exclusoesError);
-          } else if (exclusoesResult && exclusoesResult.sucesso) {
-            regrasExclusao = exclusoesResult.registros_excluidos || 0;
-            console.log(`✅ Regras v002/v003 aplicadas:`);
-            console.log(`   - v003 (DATA_REALIZACAO): ${exclusoesResult.detalhes?.v003_excluidos || 0} excluídos`);
-            console.log(`   - v002 (DATA_LAUDO): ${exclusoesResult.detalhes?.v002_excluidos || 0} excluídos`);
-            console.log(`   - Total excluídos: ${regrasExclusao}`);
-            console.log(`   - Registros restantes: ${exclusoesResult.registros_restantes || 0}`);
-          } else {
-            console.log(`ℹ️ Nenhuma exclusão v002/v003 aplicada`);
-          }
-        } catch (exclusoesError) {
-          console.error(`❌ ERRO na aplicação de regras v002/v003:`, exclusoesError);
-        }
+        console.log('\n⚠️ === REGRAS v002/v003 NÃO APLICADAS AUTOMATICAMENTE ===');
+        console.log(`   📝 Arquivo retroativo detectado: ${arquivo_fonte}`);
+        console.log(`   📝 As regras v002/v003 devem ser aplicadas MANUALMENTE`);
+        console.log(`   📝 Use "Correção v002/v003" após definir o período de faturamento correto`);
+        console.log(`   📝 Período atual salvo nos registros: ${periodoReferenciaDb}`);
       } else {
         console.log('\nℹ️ Regras v002/v003 não aplicáveis (arquivo não é retroativo)');
       }
