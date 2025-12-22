@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -6,7 +6,6 @@ import { Progress } from "@/components/ui/progress";
 import { AlertTriangle, CheckCircle, Play, RefreshCw, Database, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from 'sonner';
-import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface ArquivoResultado {
   arquivo: string;
@@ -17,6 +16,8 @@ interface ArquivoResultado {
   regras_aplicadas?: string[];
   erro?: string;
   mensagem?: string;
+  job_id?: string;
+  status?: string;
 }
 
 interface TesteRegras27Props {
@@ -37,6 +38,88 @@ export function TesteRegras27({ periodoReferencia }: TesteRegras27Props) {
   const [resultados, setResultados] = useState<ArquivoResultado[]>([]);
   const [erro, setErro] = useState<string | null>(null);
   const [concluido, setConcluido] = useState(false);
+  const [jobIds, setJobIds] = useState<string[]>([]);
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Função para verificar status dos jobs
+  const verificarStatusJobs = useCallback(async (ids: string[]) => {
+    if (ids.length === 0) return;
+
+    try {
+      const { data: logs, error } = await supabase
+        .from('processamento_regras_log')
+        .select('*')
+        .in('id', ids);
+
+      if (error) {
+        console.error('Erro ao verificar status:', error);
+        return;
+      }
+
+      if (!logs || logs.length === 0) return;
+
+      const novosResultados: ArquivoResultado[] = logs.map(log => ({
+        arquivo: log.arquivo_fonte,
+        sucesso: log.status === 'concluido',
+        registros_antes: log.registros_antes || 0,
+        registros_depois: log.registros_depois || 0,
+        registros_excluidos: log.registros_excluidos || 0,
+        regras_aplicadas: log.regras_aplicadas || [],
+        erro: log.erro,
+        mensagem: log.mensagem,
+        job_id: log.id,
+        status: log.status
+      }));
+
+      setResultados(novosResultados);
+
+      // Atualizar progresso
+      const processados = logs.filter(l => l.status === 'concluido' || l.status === 'erro').length;
+      const total = ARQUIVOS_PROCESSAR.length;
+      setProgresso((processados / total) * 100);
+
+      // Verificar se todos terminaram
+      const todosProcessados = logs.every(l => l.status === 'concluido' || l.status === 'erro');
+      
+      if (todosProcessados && logs.length === ARQUIVOS_PROCESSAR.length) {
+        // Parar polling
+        if (pollingRef.current) {
+          clearInterval(pollingRef.current);
+          pollingRef.current = null;
+        }
+
+        setIsProcessando(false);
+        setConcluido(true);
+        setArquivoAtual(null);
+
+        const sucessos = logs.filter(l => l.status === 'concluido').length;
+        const falhas = logs.filter(l => l.status === 'erro').length;
+
+        if (falhas === 0) {
+          toast.success(`🎉 Todas as 28 regras aplicadas com sucesso em ${sucessos} arquivos!`, { duration: 5000 });
+        } else {
+          toast.warning(`⚠️ Processamento concluído: ${sucessos} sucesso, ${falhas} falhas`);
+        }
+      } else {
+        // Atualizar arquivo atual
+        const emProcessamento = logs.find(l => l.status === 'processando');
+        if (emProcessamento) {
+          setArquivoAtual(emProcessamento.arquivo_fonte);
+        }
+      }
+    } catch (err) {
+      console.error('Erro no polling:', err);
+    }
+  }, []);
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+      }
+    };
+  }, []);
 
   const executarRegras = useCallback(async () => {
     if (!periodoReferencia) {
@@ -49,21 +132,18 @@ export function TesteRegras27({ periodoReferencia }: TesteRegras27Props) {
     setResultados([]);
     setProgresso(0);
     setConcluido(false);
+    setJobIds([]);
 
     toast.info(`🚀 Iniciando aplicação das 28 regras para ${periodoReferencia}...`);
 
-    const resultadosProcessamento: ArquivoResultado[] = [];
+    const novosJobIds: string[] = [];
+    const resultadosIniciais: ArquivoResultado[] = [];
 
-    for (let i = 0; i < ARQUIVOS_PROCESSAR.length; i++) {
-      const arquivo = ARQUIVOS_PROCESSAR[i];
-      setArquivoAtual(arquivo);
-      setProgresso(((i) / ARQUIVOS_PROCESSAR.length) * 100);
-
+    // Disparar todos os processamentos em paralelo
+    for (const arquivo of ARQUIVOS_PROCESSAR) {
       try {
-        console.log(`📁 Processando: ${arquivo}`);
-        toast.info(`📁 Processando: ${arquivo}...`);
+        console.log(`📁 Iniciando processamento: ${arquivo}`);
         
-        // Usar supabase.functions.invoke que é mais estável
         const { data, error } = await supabase.functions.invoke('aplicar-regras-arquivo-unico', {
           body: {
             arquivo_fonte: arquivo,
@@ -72,81 +152,56 @@ export function TesteRegras27({ periodoReferencia }: TesteRegras27Props) {
         });
 
         if (error) {
-          console.error(`❌ Erro no arquivo ${arquivo}:`, error);
-          
-          // Verificar se é erro de timeout/rede vs erro real
-          const erroMsg = error.message || 'Erro na requisição';
-          const isNetworkError = erroMsg.includes('fetch') || erroMsg.includes('Failed') || erroMsg.includes('network');
-          
-          if (isNetworkError) {
-            // Pode ter processado mesmo com erro de rede - verificar logs do servidor
-            resultadosProcessamento.push({
-              arquivo,
-              sucesso: false,
-              erro: `Timeout de rede - verifique os logs. A função pode ter completado no servidor.`,
-              mensagem: 'Verifique os logs do Supabase Edge Functions'
-            });
-            toast.warning(`⚠️ ${arquivo}: Timeout - verifique logs do servidor`, { duration: 8000 });
-          } else {
-            resultadosProcessamento.push({
-              arquivo,
-              sucesso: false,
-              erro: erroMsg
-            });
-            toast.error(`❌ Erro em ${arquivo}: ${erroMsg}`);
-          }
-        } else {
-          resultadosProcessamento.push({
+          console.error(`❌ Erro ao iniciar ${arquivo}:`, error);
+          resultadosIniciais.push({
             arquivo,
-            sucesso: data?.sucesso ?? true,
-            registros_antes: data?.registros_antes,
-            registros_depois: data?.registros_depois,
-            registros_excluidos: data?.registros_excluidos,
-            regras_aplicadas: data?.regras_aplicadas,
-            mensagem: data?.mensagem
+            sucesso: false,
+            erro: error.message || 'Erro ao iniciar processamento',
+            status: 'erro'
           });
-          
-          if (data?.registros_antes > 0) {
-            toast.success(`✅ ${arquivo}: ${data.registros_antes?.toLocaleString()} → ${data.registros_depois?.toLocaleString()} registros`);
-          } else {
-            toast.info(`ℹ️ ${arquivo}: sem registros`);
-          }
+        } else if (data?.job_id) {
+          novosJobIds.push(data.job_id);
+          resultadosIniciais.push({
+            arquivo,
+            sucesso: false,
+            job_id: data.job_id,
+            status: 'processando',
+            mensagem: 'Processando em background...'
+          });
+          toast.info(`📁 ${arquivo}: processamento iniciado`, { duration: 2000 });
         }
-
-        setResultados([...resultadosProcessamento]);
-
       } catch (err: any) {
-        console.error(`❌ Erro ao processar ${arquivo}:`, err);
-        const erroMsg = err.name === 'AbortError' 
-          ? 'Timeout - a função pode estar processando no servidor' 
-          : (err.message || 'Erro desconhecido');
-        
-        resultadosProcessamento.push({
+        console.error(`❌ Erro ao iniciar ${arquivo}:`, err);
+        resultadosIniciais.push({
           arquivo,
           sucesso: false,
-          erro: erroMsg,
-          mensagem: 'Verifique os logs do Supabase'
+          erro: err.message || 'Erro desconhecido',
+          status: 'erro'
         });
-        toast.warning(`⚠️ ${arquivo}: ${erroMsg}`, { duration: 8000 });
-        setResultados([...resultadosProcessamento]);
       }
     }
 
-    setProgresso(100);
-    setArquivoAtual(null);
-    setIsProcessando(false);
-    setConcluido(true);
+    setResultados(resultadosIniciais);
+    setJobIds(novosJobIds);
 
-    const sucessos = resultadosProcessamento.filter(r => r.sucesso).length;
-    const falhas = resultadosProcessamento.filter(r => !r.sucesso).length;
-    
-    if (falhas === 0) {
-      toast.success(`🎉 Todas as 28 regras aplicadas com sucesso em ${sucessos} arquivos!`, { duration: 5000 });
+    // Iniciar polling para verificar status
+    if (novosJobIds.length > 0) {
+      setArquivoAtual('Aguardando processamento...');
+      
+      // Polling a cada 3 segundos
+      pollingRef.current = setInterval(() => {
+        verificarStatusJobs(novosJobIds);
+      }, 3000);
+
+      // Verificar imediatamente
+      setTimeout(() => verificarStatusJobs(novosJobIds), 1000);
     } else {
-      toast.warning(`⚠️ Processamento concluído: ${sucessos} sucesso, ${falhas} falhas`);
+      setIsProcessando(false);
+      setConcluido(true);
+      toast.error('Nenhum arquivo foi processado com sucesso');
     }
 
-  }, [periodoReferencia]);
+  }, [periodoReferencia, verificarStatusJobs]);
 
   const totalRegistrosAntes = resultados.reduce((acc, r) => acc + (r.registros_antes || 0), 0);
   const totalRegistrosDepois = resultados.reduce((acc, r) => acc + (r.registros_depois || 0), 0);
@@ -219,6 +274,9 @@ export function TesteRegras27({ periodoReferencia }: TesteRegras27Props) {
               <span className="font-medium">{Math.round(progresso)}%</span>
             </div>
             <Progress value={progresso} className="h-2" />
+            <p className="text-xs text-muted-foreground">
+              💡 O processamento ocorre em background. Atualizando status a cada 3s...
+            </p>
           </div>
         )}
 
@@ -253,7 +311,7 @@ export function TesteRegras27({ periodoReferencia }: TesteRegras27Props) {
                 <RefreshCw className="h-5 w-5 animate-spin text-blue-600" />
               )}
               <span className="font-semibold text-lg">
-                {concluido ? 'Resultados' : 'Processando...'}
+                {concluido ? 'Resultados' : 'Processando em background...'}
               </span>
             </div>
 
@@ -287,21 +345,30 @@ export function TesteRegras27({ periodoReferencia }: TesteRegras27Props) {
                 <div 
                   key={index} 
                   className={`border-l-4 pl-4 py-2 ${
-                    resultado.sucesso 
+                    resultado.status === 'concluido' || resultado.sucesso
                       ? 'border-green-500 bg-green-50' 
+                      : resultado.status === 'processando'
+                      ? 'border-blue-500 bg-blue-50'
                       : 'border-red-500 bg-red-50'
                   }`}
                 >
                   <div className="flex items-center gap-2">
-                    {resultado.sucesso ? (
+                    {resultado.status === 'concluido' || resultado.sucesso ? (
                       <CheckCircle className="h-4 w-4 text-green-600" />
+                    ) : resultado.status === 'processando' ? (
+                      <Loader2 className="h-4 w-4 text-blue-600 animate-spin" />
                     ) : (
                       <AlertTriangle className="h-4 w-4 text-red-600" />
                     )}
                     <span className="font-medium">{resultado.arquivo}</span>
+                    {resultado.status === 'processando' && (
+                      <Badge variant="outline" className="text-blue-600 text-xs">
+                        Em processamento...
+                      </Badge>
+                    )}
                   </div>
                   
-                  {resultado.sucesso && resultado.registros_antes !== undefined && (
+                  {(resultado.status === 'concluido' || resultado.sucesso) && resultado.registros_antes !== undefined && (
                     <div className="text-sm text-gray-600 mt-1">
                       <span className="font-medium">{resultado.registros_antes.toLocaleString()}</span> → 
                       <span className="font-medium text-green-600 ml-1">{resultado.registros_depois?.toLocaleString()}</span>
