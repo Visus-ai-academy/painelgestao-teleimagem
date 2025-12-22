@@ -61,44 +61,40 @@ export function TesteRegras27({ periodoReferencia }: TesteRegras27Props) {
 
       try {
         console.log(`📁 Processando: ${arquivo}`);
+        toast.info(`📁 Processando: ${arquivo}...`);
         
-        // Usar fetch direto com timeout de 5 minutos
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000);
-        
-        const supabaseUrl = 'https://atbvikgxdcohnznkmaus.supabase.co';
-        const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF0YnZpa2d4ZGNvaG56bmttYXVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI2OTY1MzAsImV4cCI6MjA2ODI3MjUzMH0.P2eptjgahiMcUzE9b1eAVAW1HC9Ib52LYpRAO8S_9CE';
-        
-        const response = await fetch(
-          `${supabaseUrl}/functions/v1/aplicar-regras-arquivo-unico`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${supabaseAnonKey}`,
-              'apikey': supabaseAnonKey
-            },
-            body: JSON.stringify({
-              arquivo_fonte: arquivo,
-              periodo_referencia: periodoReferencia
-            }),
-            signal: controller.signal
+        // Usar supabase.functions.invoke que é mais estável
+        const { data, error } = await supabase.functions.invoke('aplicar-regras-arquivo-unico', {
+          body: {
+            arquivo_fonte: arquivo,
+            periodo_referencia: periodoReferencia
           }
-        );
-        
-        clearTimeout(timeoutId);
-        
-        const data = await response.json();
-        const error = response.ok ? null : { message: data?.erro || 'Erro na requisição' };
+        });
 
         if (error) {
           console.error(`❌ Erro no arquivo ${arquivo}:`, error);
-          resultadosProcessamento.push({
-            arquivo,
-            sucesso: false,
-            erro: error.message
-          });
-          toast.error(`❌ Erro em ${arquivo}: ${error.message}`);
+          
+          // Verificar se é erro de timeout/rede vs erro real
+          const erroMsg = error.message || 'Erro na requisição';
+          const isNetworkError = erroMsg.includes('fetch') || erroMsg.includes('Failed') || erroMsg.includes('network');
+          
+          if (isNetworkError) {
+            // Pode ter processado mesmo com erro de rede - verificar logs do servidor
+            resultadosProcessamento.push({
+              arquivo,
+              sucesso: false,
+              erro: `Timeout de rede - verifique os logs. A função pode ter completado no servidor.`,
+              mensagem: 'Verifique os logs do Supabase Edge Functions'
+            });
+            toast.warning(`⚠️ ${arquivo}: Timeout - verifique logs do servidor`, { duration: 8000 });
+          } else {
+            resultadosProcessamento.push({
+              arquivo,
+              sucesso: false,
+              erro: erroMsg
+            });
+            toast.error(`❌ Erro em ${arquivo}: ${erroMsg}`);
+          }
         } else {
           resultadosProcessamento.push({
             arquivo,
@@ -121,12 +117,17 @@ export function TesteRegras27({ periodoReferencia }: TesteRegras27Props) {
 
       } catch (err: any) {
         console.error(`❌ Erro ao processar ${arquivo}:`, err);
+        const erroMsg = err.name === 'AbortError' 
+          ? 'Timeout - a função pode estar processando no servidor' 
+          : (err.message || 'Erro desconhecido');
+        
         resultadosProcessamento.push({
           arquivo,
           sucesso: false,
-          erro: err.message || 'Erro desconhecido'
+          erro: erroMsg,
+          mensagem: 'Verifique os logs do Supabase'
         });
-        toast.error(`❌ Erro em ${arquivo}`);
+        toast.warning(`⚠️ ${arquivo}: ${erroMsg}`, { duration: 8000 });
         setResultados([...resultadosProcessamento]);
       }
     }
