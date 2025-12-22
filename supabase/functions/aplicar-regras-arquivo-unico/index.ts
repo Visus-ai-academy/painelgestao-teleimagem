@@ -400,26 +400,55 @@ async function aplicarRegrasArquivo(
       .eq('MODALIDADE', 'RX')
     regrasAplicadas.push('v010b')
 
-    // v011: Categorias de exames (limitado para performance)
-    const { data: cadastroExames } = await supabase
-      .from('cadastro_exames')
-      .select('nome, categoria')
-      .eq('ativo', true)
-      .not('categoria', 'is', null)
-      .limit(100)
+    // v011: Categorias de exames - buscar TODOS os exames do cadastro
+    console.log(`🏷️ [${jobId}] v011: Buscando todos os exames do cadastro para aplicar categorias...`)
     
-    if (cadastroExames && cadastroExames.length > 0) {
+    let offsetCadastro = 0
+    const limitCadastro = 500
+    let totalCategoriasAplicadas = 0
+    
+    while (true) {
+      const { data: cadastroExames, error: cadastroError } = await supabase
+        .from('cadastro_exames')
+        .select('nome, categoria')
+        .eq('ativo', true)
+        .not('categoria', 'is', null)
+        .range(offsetCadastro, offsetCadastro + limitCadastro - 1)
+      
+      if (cadastroError) {
+        console.error(`❌ [${jobId}] Erro ao buscar cadastro_exames:`, cadastroError)
+        break
+      }
+      
+      if (!cadastroExames || cadastroExames.length === 0) break
+      
+      console.log(`📋 [${jobId}] v011: Processando lote ${Math.floor(offsetCadastro / limitCadastro) + 1} - ${cadastroExames.length} exames`)
+      
       for (const exame of cadastroExames) {
         if (exame.nome && exame.categoria) {
-          await supabase
+          const { count } = await supabase
             .from('volumetria_mobilemed')
-            .update({ CATEGORIA: exame.categoria })
+            .update({ CATEGORIA: exame.categoria, updated_at: new Date().toISOString() }, { count: 'exact' })
             .eq('arquivo_fonte', arquivoFonte)
-            .ilike('ESTUDO_DESCRICAO', exame.nome)
+            .eq('ESTUDO_DESCRICAO', exame.nome)
             .or('CATEGORIA.is.null,CATEGORIA.eq.')
+          
+          if (count && count > 0) {
+            totalCategoriasAplicadas += count
+          }
         }
       }
+      
+      offsetCadastro += limitCadastro
+      
+      // Se retornou menos que o limite, chegamos ao fim
+      if (cadastroExames.length < limitCadastro) break
+      
+      // Pequena pausa para não sobrecarregar
+      await new Promise(resolve => setTimeout(resolve, 50))
     }
+    
+    console.log(`✅ [${jobId}] v011: ${totalCategoriasAplicadas} registros atualizados com categoria`)
     regrasAplicadas.push('v011')
 
     // v012-v014: Especialidades automáticas
