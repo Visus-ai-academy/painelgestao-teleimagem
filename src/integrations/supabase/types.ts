@@ -3014,6 +3014,54 @@ export type Database = {
         }
         Relationships: []
       }
+      processamento_regras_log: {
+        Row: {
+          arquivo_fonte: string
+          completed_at: string | null
+          created_at: string
+          erro: string | null
+          id: string
+          mensagem: string | null
+          periodo_referencia: string
+          registros_antes: number | null
+          registros_depois: number | null
+          registros_excluidos: number | null
+          regras_aplicadas: string[] | null
+          started_at: string | null
+          status: string
+        }
+        Insert: {
+          arquivo_fonte: string
+          completed_at?: string | null
+          created_at?: string
+          erro?: string | null
+          id?: string
+          mensagem?: string | null
+          periodo_referencia: string
+          registros_antes?: number | null
+          registros_depois?: number | null
+          registros_excluidos?: number | null
+          regras_aplicadas?: string[] | null
+          started_at?: string | null
+          status?: string
+        }
+        Update: {
+          arquivo_fonte?: string
+          completed_at?: string | null
+          created_at?: string
+          erro?: string | null
+          id?: string
+          mensagem?: string | null
+          periodo_referencia?: string
+          registros_antes?: number | null
+          registros_depois?: number | null
+          registros_excluidos?: number | null
+          regras_aplicadas?: string[] | null
+          started_at?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       processamento_streaming: {
         Row: {
           arquivo_fonte: string
