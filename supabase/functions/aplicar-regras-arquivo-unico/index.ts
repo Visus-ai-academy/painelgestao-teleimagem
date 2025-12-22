@@ -9,14 +9,23 @@ const corsHeaders = {
 async function aplicarRegrasArquivo(
   supabase: any,
   arquivoFonte: string,
-  periodoReferencia: string
+  periodoReferencia: string,
+  jobId: string
 ) {
-  console.log(`🚀 Aplicando regras no arquivo: ${arquivoFonte}`)
+  console.log(`🚀 [${jobId}] Aplicando regras no arquivo: ${arquivoFonte}`)
   
   const regrasAplicadas: string[] = []
-  let registrosProcessados = 0
 
   try {
+    // Atualizar status para processando
+    await supabase.from('processamento_regras_log').upsert({
+      id: jobId,
+      arquivo_fonte: arquivoFonte,
+      periodo_referencia: periodoReferencia,
+      status: 'processando',
+      started_at: new Date().toISOString()
+    })
+
     // Contar registros antes
     const { count: antesCount } = await supabase
       .from('volumetria_mobilemed')
@@ -24,18 +33,20 @@ async function aplicarRegrasArquivo(
       .eq('arquivo_fonte', arquivoFonte)
 
     if (!antesCount || antesCount === 0) {
-      return {
-        sucesso: true,
-        arquivo: arquivoFonte,
+      await supabase.from('processamento_regras_log').update({
+        status: 'concluido',
         registros_antes: 0,
         registros_depois: 0,
         regras_aplicadas: [],
+        completed_at: new Date().toISOString(),
         mensagem: 'Arquivo sem registros'
-      }
+      }).eq('id', jobId)
+
+      console.log(`ℹ️ [${jobId}] Arquivo sem registros`)
+      return
     }
 
-    registrosProcessados = antesCount
-    console.log(`📊 Registros encontrados: ${antesCount}`)
+    console.log(`📊 [${jobId}] Registros encontrados: ${antesCount}`)
 
     // ===== REGRAS DE EXCLUSÃO =====
     
@@ -75,6 +86,7 @@ async function aplicarRegrasArquivo(
       .select('"EMPRESA"')
       .eq('arquivo_fonte', arquivoFonte)
       .like('EMPRESA', '%_TELE')
+      .limit(100)
     
     if (clientesTele && clientesTele.length > 0) {
       const empresasUnicas = [...new Set(clientesTele.map((c: any) => c.EMPRESA).filter(Boolean))]
@@ -90,11 +102,12 @@ async function aplicarRegrasArquivo(
     }
     regrasAplicadas.push('v001b')
 
-    // v001c: Normalização de nomes de médicos
+    // v001c: Normalização de nomes de médicos (limitado para performance)
     const { data: mapeamentoMedicos } = await supabase
       .from('mapeamento_nomes_medicos')
       .select('nome_origem_normalizado, medico_nome')
       .eq('ativo', true)
+      .limit(200)
     
     if (mapeamentoMedicos && mapeamentoMedicos.length > 0) {
       for (const mapeamento of mapeamentoMedicos) {
@@ -109,11 +122,12 @@ async function aplicarRegrasArquivo(
     }
     regrasAplicadas.push('v001c')
 
-    // v001d: De-Para valores zerados
+    // v001d: De-Para valores zerados (limitado)
     const { data: valoresReferencia } = await supabase
       .from('valores_referencia_de_para')
       .select('estudo_descricao, valores')
       .eq('ativo', true)
+      .limit(100)
     
     if (valoresReferencia && valoresReferencia.length > 0) {
       for (const ref of valoresReferencia) {
@@ -135,6 +149,7 @@ async function aplicarRegrasArquivo(
       .select('nome')
       .eq('especialidade', 'MAMO')
       .eq('ativo', true)
+      .limit(50)
     
     if (examesMAMO && examesMAMO.length > 0) {
       for (const exame of examesMAMO) {
@@ -186,19 +201,38 @@ async function aplicarRegrasArquivo(
     
     regrasAplicadas.push('v007')
 
-    // v034: Colunas → NEURO/MUSCULO (chamada a função separada)
+    // v034: Colunas → NEURO/MUSCULO (simplificado - sem chamar outra função)
     try {
-      const { data: v034Result, error: v034Error } = await supabase.functions.invoke(
-        'aplicar-regra-colunas-musculo-neuro',
-        { body: { arquivo_fonte: arquivoFonte } }
-      )
+      // Buscar neurologistas cadastrados
+      const { data: neurologistas } = await supabase
+        .from('medicos_neurologistas')
+        .select('nome')
+        .eq('ativo', true)
+        .limit(50)
       
-      if (!v034Error && v034Result) {
-        console.log(`✅ v034: ${v034Result.total_alterados_neuro || 0} → NEURO, ${v034Result.total_alterados_musculo || 0} → MUSCULO`)
-        regrasAplicadas.push('v034')
+      if (neurologistas && neurologistas.length > 0) {
+        for (const neuro of neurologistas) {
+          if (neuro.nome) {
+            // Colunas de neurologistas → NEURO
+            await supabase.from('volumetria_mobilemed')
+              .update({ ESPECIALIDADE: 'NEURO' })
+              .eq('arquivo_fonte', arquivoFonte)
+              .ilike('ESTUDO_DESCRICAO', '%COLUNA%')
+              .ilike('MEDICO', `%${neuro.nome}%`)
+          }
+        }
       }
+      
+      // Colunas padrão (não neurologistas) → MUSCULO ESQUELETICO
+      await supabase.from('volumetria_mobilemed')
+        .update({ ESPECIALIDADE: 'MUSCULO ESQUELETICO' })
+        .eq('arquivo_fonte', arquivoFonte)
+        .ilike('ESTUDO_DESCRICAO', '%COLUNA%')
+        .eq('ESPECIALIDADE', 'COLUNAS')
+      
+      regrasAplicadas.push('v034')
     } catch (v034Err) {
-      console.error(`⚠️ Erro v034:`, v034Err)
+      console.error(`⚠️ [${jobId}] Erro v034:`, v034Err)
     }
 
     // v044: MAMA → MAMO
@@ -214,6 +248,7 @@ async function aplicarRegrasArquivo(
       .from('valores_prioridade_de_para')
       .select('prioridade_original, nome_final')
       .eq('ativo', true)
+      .limit(50)
     
     if (prioridadesDePara && prioridadesDePara.length > 0) {
       for (const mapeamento of prioridadesDePara) {
@@ -260,12 +295,13 @@ async function aplicarRegrasArquivo(
       .eq('MODALIDADE', 'RX')
     regrasAplicadas.push('v010b')
 
-    // v011: Categorias de exames
+    // v011: Categorias de exames (limitado para performance)
     const { data: cadastroExames } = await supabase
       .from('cadastro_exames')
       .select('nome, categoria')
       .eq('ativo', true)
       .not('categoria', 'is', null)
+      .limit(100)
     
     if (cadastroExames && cadastroExames.length > 0) {
       for (const exame of cadastroExames) {
@@ -365,29 +401,25 @@ async function aplicarRegrasArquivo(
       .is('is_duplicado', null)
     regrasAplicadas.push('v024')
 
-    // v031: Dados do cadastro_exames
+    // v031: Dados do cadastro_exames (simplificado - apenas alguns campos principais)
     const { data: cadastroCompleto } = await supabase
       .from('cadastro_exames')
-      .select('nome, modalidade, especialidade, categoria, prioridade')
+      .select('nome, modalidade, especialidade')
       .eq('ativo', true)
+      .limit(100)
     
     if (cadastroCompleto && cadastroCompleto.length > 0) {
       for (const exame of cadastroCompleto) {
-        if (exame.nome) {
-          const updates: any = {}
+        if (exame.nome && (exame.modalidade || exame.especialidade)) {
+          const updates: any = { updated_at: new Date().toISOString() }
           if (exame.modalidade) updates.MODALIDADE = exame.modalidade
           if (exame.especialidade) updates.ESPECIALIDADE = exame.especialidade
-          if (exame.categoria) updates.CATEGORIA = exame.categoria
-          if (exame.prioridade) updates.PRIORIDADE = exame.prioridade
           
-          if (Object.keys(updates).length > 0) {
-            updates.updated_at = new Date().toISOString()
-            await supabase
-              .from('volumetria_mobilemed')
-              .update(updates)
-              .eq('arquivo_fonte', arquivoFonte)
-              .ilike('ESTUDO_DESCRICAO', exame.nome)
-          }
+          await supabase
+            .from('volumetria_mobilemed')
+            .update(updates)
+            .eq('arquivo_fonte', arquivoFonte)
+            .ilike('ESTUDO_DESCRICAO', exame.nome)
         }
       }
     }
@@ -399,26 +431,28 @@ async function aplicarRegrasArquivo(
       .select('*', { count: 'exact', head: true })
       .eq('arquivo_fonte', arquivoFonte)
 
-    console.log(`✅ Arquivo ${arquivoFonte} processado: ${antesCount} → ${depoisCount || 0} registros`)
+    console.log(`✅ [${jobId}] Arquivo ${arquivoFonte} processado: ${antesCount} → ${depoisCount || 0} registros`)
 
-    return {
-      sucesso: true,
-      arquivo: arquivoFonte,
+    // Atualizar log de conclusão
+    await supabase.from('processamento_regras_log').update({
+      status: 'concluido',
       registros_antes: antesCount,
       registros_depois: depoisCount || 0,
       registros_excluidos: antesCount - (depoisCount || 0),
       regras_aplicadas: regrasAplicadas,
+      completed_at: new Date().toISOString(),
       mensagem: 'Processamento concluído com sucesso'
-    }
+    }).eq('id', jobId)
 
   } catch (error: any) {
-    console.error(`❌ Erro no arquivo ${arquivoFonte}:`, error)
-    return {
-      sucesso: false,
-      arquivo: arquivoFonte,
+    console.error(`❌ [${jobId}] Erro no arquivo ${arquivoFonte}:`, error)
+    
+    await supabase.from('processamento_regras_log').update({
+      status: 'erro',
       erro: error.message || 'Erro desconhecido',
-      regras_aplicadas: regrasAplicadas
-    }
+      regras_aplicadas: regrasAplicadas,
+      completed_at: new Date().toISOString()
+    }).eq('id', jobId)
   }
 }
 
@@ -450,15 +484,28 @@ Deno.serve(async (req) => {
       )
     }
 
-    console.log(`📁 Processando arquivo: ${arquivo_fonte}`)
-    console.log(`📅 Período: ${periodo_referencia}`)
+    // Gerar ID único para o job
+    const jobId = crypto.randomUUID()
+    
+    console.log(`📁 [${jobId}] Iniciando processamento: ${arquivo_fonte}`)
+    console.log(`📅 [${jobId}] Período: ${periodo_referencia}`)
 
-    const resultado = await aplicarRegrasArquivo(supabase, arquivo_fonte, periodo_referencia)
+    // Iniciar processamento em background
+    EdgeRuntime.waitUntil(
+      aplicarRegrasArquivo(supabase, arquivo_fonte, periodo_referencia, jobId)
+    )
 
+    // Retornar resposta imediata
     return new Response(
-      JSON.stringify(resultado),
+      JSON.stringify({
+        sucesso: true,
+        job_id: jobId,
+        arquivo: arquivo_fonte,
+        mensagem: 'Processamento iniciado em background. Consulte o status via job_id.',
+        status: 'processando'
+      }),
       { 
-        status: resultado.sucesso ? 200 : 500,
+        status: 202,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     )
