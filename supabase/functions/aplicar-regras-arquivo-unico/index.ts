@@ -665,6 +665,124 @@ async function aplicarRegrasArquivo(
     console.log(`✅ [${jobId}] v031: ${totalV031Aplicados} atualizações aplicadas`)
     regrasAplicadas.push('v031')
 
+    // ===== v027: QUEBRA DE EXAMES =====
+    console.log(`🔧 [${jobId}] v027: Aplicando quebra de exames...`)
+    
+    try {
+      // Buscar todas as regras de quebra ativas
+      const { data: regrasQuebra, error: errorRegras } = await supabase
+        .from('regras_quebra_exames')
+        .select('exame_original, exame_quebrado, categoria_quebrada')
+        .eq('ativo', true)
+      
+      if (errorRegras) {
+        console.error(`⚠️ [${jobId}] Erro ao buscar regras de quebra:`, errorRegras)
+      } else if (regrasQuebra && regrasQuebra.length > 0) {
+        // Agrupar quebras por exame original
+        const quebrasAgrupadas = new Map<string, Array<{exame_original: string, exame_quebrado: string, categoria_quebrada: string | null}>>()
+        
+        for (const regra of regrasQuebra) {
+          if (!quebrasAgrupadas.has(regra.exame_original)) {
+            quebrasAgrupadas.set(regra.exame_original, [])
+          }
+          quebrasAgrupadas.get(regra.exame_original)!.push(regra)
+        }
+        
+        console.log(`📋 [${jobId}] v027: ${quebrasAgrupadas.size} tipos de exames com regras de quebra`)
+        
+        let totalQuebrados = 0
+        let totalRegistrosCriados = 0
+        
+        // Processar cada tipo de exame original
+        for (const [exameOriginal, configsQuebra] of quebrasAgrupadas) {
+          const quantidadeQuebras = configsQuebra.length
+          
+          // Buscar TODOS os registros deste exame original em lotes
+          let offsetQuebra = 0
+          const limitQuebra = 500
+          
+          while (true) {
+            const { data: registrosOriginais, error: errorRegistros } = await supabase
+              .from('volumetria_mobilemed')
+              .select('*')
+              .eq('arquivo_fonte', arquivoFonte)
+              .eq('ESTUDO_DESCRICAO', exameOriginal)
+              .range(offsetQuebra, offsetQuebra + limitQuebra - 1)
+            
+            if (errorRegistros) {
+              console.error(`⚠️ [${jobId}] Erro ao buscar registros para quebra ${exameOriginal}:`, errorRegistros)
+              break
+            }
+            
+            if (!registrosOriginais || registrosOriginais.length === 0) break
+            
+            // Processar cada registro original
+            for (const registroOriginal of registrosOriginais) {
+              try {
+                const valorOriginal = registroOriginal.VALOR || registroOriginal.VALORES || 1
+                
+                // Criar registros quebrados
+                const registrosQuebrados = configsQuebra.map((config) => {
+                  const novoRegistro = { ...registroOriginal }
+                  delete novoRegistro.id
+                  delete novoRegistro.created_at
+                  delete novoRegistro.updated_at
+                  
+                  return {
+                    ...novoRegistro,
+                    ESTUDO_DESCRICAO: config.exame_quebrado,
+                    VALOR: 1, // Cada exame quebrado vale 1
+                    VALORES: 1,
+                    CATEGORIA: config.categoria_quebrada || registroOriginal.CATEGORIA || 'SC',
+                    updated_at: new Date().toISOString()
+                  }
+                })
+                
+                // Inserir registros quebrados
+                const { error: errorInsert } = await supabase
+                  .from('volumetria_mobilemed')
+                  .insert(registrosQuebrados)
+                
+                if (errorInsert) {
+                  console.error(`⚠️ [${jobId}] Erro ao inserir quebras:`, errorInsert)
+                  continue
+                }
+                
+                // Remover registro original
+                const { error: errorDelete } = await supabase
+                  .from('volumetria_mobilemed')
+                  .delete()
+                  .eq('id', registroOriginal.id)
+                
+                if (errorDelete) {
+                  console.error(`⚠️ [${jobId}] Erro ao remover original:`, errorDelete)
+                  continue
+                }
+                
+                totalQuebrados++
+                totalRegistrosCriados += quantidadeQuebras
+                
+              } catch (quebraErr: any) {
+                console.error(`⚠️ [${jobId}] Erro ao quebrar registro:`, quebraErr.message)
+              }
+            }
+            
+            offsetQuebra += limitQuebra
+            if (registrosOriginais.length < limitQuebra) break
+            await new Promise(resolve => setTimeout(resolve, 30))
+          }
+        }
+        
+        console.log(`✅ [${jobId}] v027: ${totalQuebrados} exames quebrados → ${totalRegistrosCriados} registros criados`)
+      } else {
+        console.log(`ℹ️ [${jobId}] v027: Nenhuma regra de quebra ativa encontrada`)
+      }
+      
+      regrasAplicadas.push('v027')
+    } catch (v027Err: any) {
+      console.error(`❌ [${jobId}] Erro v027:`, v027Err.message)
+    }
+
     // Contar registros depois
     const { count: depoisCount } = await supabase
       .from('volumetria_mobilemed')
