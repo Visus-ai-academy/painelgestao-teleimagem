@@ -754,8 +754,7 @@ async function aplicarRegrasArquivo(
                   return {
                     ...novoRegistro,
                     ESTUDO_DESCRICAO: config.exame_quebrado,
-                    VALOR: 1, // Cada exame quebrado vale 1
-                    VALORES: 1,
+                    VALORES: 1, // Cada exame quebrado vale 1
                     // ESPECIALIDADE: do cadastro_exames do exame quebrado
                     ESPECIALIDADE: dadosCadastro?.especialidade || registroOriginal.ESPECIALIDADE,
                     // CATEGORIA: do cadastro_exames do exame quebrado (ou categoria_quebrada da regra como fallback)
