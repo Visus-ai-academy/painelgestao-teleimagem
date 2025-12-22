@@ -103,7 +103,7 @@ export function ResumoGeralRepasse({ demonstrativos, periodo }: ResumoGeralRepas
           const especialidade = exame.especialidade || 'Sem Especialidade';
           const modalidade = exame.modalidade || 'Sem Modalidade';
           const prioridade = exame.prioridade || 'Sem Prioridade';
-          const categoria = exame.categoria || 'Sem Categoria';
+          const categoria = exame.categoria || 'SC';
           const quantidade = Number(exame.quantidade) || 0;
           const valorTotal = Number(exame.valor_total) || 0;
 

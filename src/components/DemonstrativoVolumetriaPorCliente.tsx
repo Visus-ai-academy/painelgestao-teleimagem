@@ -244,7 +244,7 @@ export function DemonstrativoVolumetriaPorCliente({ periodo: periodoInicial }: D
         // Criar chave única para a combinação
         const modalidade = item.MODALIDADE || 'SEM MODALIDADE';
         const especialidade = item.ESPECIALIDADE || 'SEM ESPECIALIDADE';
-        const categoria = item.CATEGORIA || 'SEM CATEGORIA';
+        const categoria = item.CATEGORIA || 'SC';
         const prioridade = item.PRIORIDADE || 'SEM PRIORIDADE';
         const chave = `${modalidade}|${especialidade}|${categoria}|${prioridade}`;
 
