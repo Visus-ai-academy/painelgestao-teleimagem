@@ -185,18 +185,25 @@ async function aplicarRegrasArquivo(
       .in('EMPRESA', ['CEDI-RJ','CEDI-RO','CEDI-UNIMED','CEDI_RJ','CEDI_RO','CEDI_UNIMED'])
     regrasAplicadas.push('v001')
 
-    // v001b: Normalizar sufixo _TELE
-    const { data: clientesTele } = await supabase
-      .from('volumetria_mobilemed')
-      .select('"EMPRESA"')
-      .eq('arquivo_fonte', arquivoFonte)
-      .like('EMPRESA', '%_TELE')
-      .limit(100)
+    // v001b: Normalizar sufixo _TELE - buscar TODOS
+    let offsetTele = 0
+    const limitTele = 500
+    const empresasTeleProcessadas = new Set<string>()
     
-    if (clientesTele && clientesTele.length > 0) {
-      const empresasUnicas = [...new Set(clientesTele.map((c: any) => c.EMPRESA).filter(Boolean))]
-      for (const empresaTele of empresasUnicas) {
-        if (empresaTele && typeof empresaTele === 'string' && empresaTele.endsWith('_TELE')) {
+    while (true) {
+      const { data: clientesTele } = await supabase
+        .from('volumetria_mobilemed')
+        .select('"EMPRESA"')
+        .eq('arquivo_fonte', arquivoFonte)
+        .like('EMPRESA', '%_TELE')
+        .range(offsetTele, offsetTele + limitTele - 1)
+      
+      if (!clientesTele || clientesTele.length === 0) break
+      
+      for (const c of clientesTele) {
+        const empresaTele = c.EMPRESA
+        if (empresaTele && typeof empresaTele === 'string' && empresaTele.endsWith('_TELE') && !empresasTeleProcessadas.has(empresaTele)) {
+          empresasTeleProcessadas.add(empresaTele)
           const empresaNormalizada = empresaTele.replace(/_TELE$/, '')
           await supabase.from('volumetria_mobilemed')
             .update({ EMPRESA: empresaNormalizada })
@@ -204,17 +211,26 @@ async function aplicarRegrasArquivo(
             .eq('EMPRESA', empresaTele)
         }
       }
+      
+      offsetTele += limitTele
+      if (clientesTele.length < limitTele) break
+      await new Promise(resolve => setTimeout(resolve, 30))
     }
     regrasAplicadas.push('v001b')
 
-    // v001c: Normalização de nomes de médicos (limitado para performance)
-    const { data: mapeamentoMedicos } = await supabase
-      .from('mapeamento_nomes_medicos')
-      .select('nome_origem_normalizado, medico_nome')
-      .eq('ativo', true)
-      .limit(200)
+    // v001c: Normalização de nomes de médicos - buscar TODOS
+    let offsetMedicos = 0
+    const limitMedicos = 500
     
-    if (mapeamentoMedicos && mapeamentoMedicos.length > 0) {
+    while (true) {
+      const { data: mapeamentoMedicos } = await supabase
+        .from('mapeamento_nomes_medicos')
+        .select('nome_origem_normalizado, medico_nome')
+        .eq('ativo', true)
+        .range(offsetMedicos, offsetMedicos + limitMedicos - 1)
+      
+      if (!mapeamentoMedicos || mapeamentoMedicos.length === 0) break
+      
       for (const mapeamento of mapeamentoMedicos) {
         if (mapeamento.nome_origem_normalizado && mapeamento.medico_nome) {
           await supabase
@@ -224,39 +240,57 @@ async function aplicarRegrasArquivo(
             .ilike('MEDICO', mapeamento.nome_origem_normalizado)
         }
       }
+      
+      offsetMedicos += limitMedicos
+      if (mapeamentoMedicos.length < limitMedicos) break
+      await new Promise(resolve => setTimeout(resolve, 30))
     }
     regrasAplicadas.push('v001c')
 
-    // v001d: De-Para valores zerados (limitado)
-    const { data: valoresReferencia } = await supabase
-      .from('valores_referencia_de_para')
-      .select('estudo_descricao, valores')
-      .eq('ativo', true)
-      .limit(100)
+    // v001d: De-Para valores zerados - buscar TODOS
+    let offsetValores = 0
+    const limitValores = 500
     
-    if (valoresReferencia && valoresReferencia.length > 0) {
+    while (true) {
+      const { data: valoresReferencia } = await supabase
+        .from('valores_referencia_de_para')
+        .select('estudo_descricao, valores')
+        .eq('ativo', true)
+        .range(offsetValores, offsetValores + limitValores - 1)
+      
+      if (!valoresReferencia || valoresReferencia.length === 0) break
+      
       for (const ref of valoresReferencia) {
         if (ref.estudo_descricao && ref.valores && ref.valores > 0) {
           await supabase
             .from('volumetria_mobilemed')
             .update({ VALOR: ref.valores, updated_at: new Date().toISOString() })
             .eq('arquivo_fonte', arquivoFonte)
-            .ilike('ESTUDO_DESCRICAO', ref.estudo_descricao)
+            .eq('ESTUDO_DESCRICAO', ref.estudo_descricao)
             .or('VALOR.is.null,VALOR.eq.0')
         }
       }
+      
+      offsetValores += limitValores
+      if (valoresReferencia.length < limitValores) break
+      await new Promise(resolve => setTimeout(resolve, 30))
     }
     regrasAplicadas.push('v001d')
 
-    // v005: Correções modalidade
-    const { data: examesMAMO } = await supabase
-      .from('cadastro_exames')
-      .select('nome')
-      .eq('especialidade', 'MAMO')
-      .eq('ativo', true)
-      .limit(50)
+    // v005: Correções modalidade - buscar TODOS exames MAMO
+    let offsetMAMO = 0
+    const limitMAMO = 500
     
-    if (examesMAMO && examesMAMO.length > 0) {
+    while (true) {
+      const { data: examesMAMO } = await supabase
+        .from('cadastro_exames')
+        .select('nome')
+        .eq('especialidade', 'MAMO')
+        .eq('ativo', true)
+        .range(offsetMAMO, offsetMAMO + limitMAMO - 1)
+      
+      if (!examesMAMO || examesMAMO.length === 0) break
+      
       for (const exame of examesMAMO) {
         if (exame.nome) {
           await supabase
@@ -264,9 +298,13 @@ async function aplicarRegrasArquivo(
             .update({ MODALIDADE: 'MG' })
             .eq('arquivo_fonte', arquivoFonte)
             .in('MODALIDADE', ['CR', 'DX'])
-            .ilike('ESTUDO_DESCRICAO', exame.nome)
+            .eq('ESTUDO_DESCRICAO', exame.nome)
         }
       }
+      
+      offsetMAMO += limitMAMO
+      if (examesMAMO.length < limitMAMO) break
+      await new Promise(resolve => setTimeout(resolve, 30))
     }
     
     // CR/DX → RX
@@ -306,16 +344,20 @@ async function aplicarRegrasArquivo(
     
     regrasAplicadas.push('v007')
 
-    // v034: Colunas → NEURO/MUSCULO (simplificado - sem chamar outra função)
+    // v034: Colunas → NEURO/MUSCULO - buscar TODOS neurologistas
     try {
-      // Buscar neurologistas cadastrados
-      const { data: neurologistas } = await supabase
-        .from('medicos_neurologistas')
-        .select('nome')
-        .eq('ativo', true)
-        .limit(50)
+      let offsetNeuro = 0
+      const limitNeuro = 500
       
-      if (neurologistas && neurologistas.length > 0) {
+      while (true) {
+        const { data: neurologistas } = await supabase
+          .from('medicos_neurologistas')
+          .select('nome')
+          .eq('ativo', true)
+          .range(offsetNeuro, offsetNeuro + limitNeuro - 1)
+        
+        if (!neurologistas || neurologistas.length === 0) break
+        
         for (const neuro of neurologistas) {
           if (neuro.nome) {
             // Colunas de neurologistas → NEURO
@@ -326,6 +368,10 @@ async function aplicarRegrasArquivo(
               .ilike('MEDICO', `%${neuro.nome}%`)
           }
         }
+        
+        offsetNeuro += limitNeuro
+        if (neurologistas.length < limitNeuro) break
+        await new Promise(resolve => setTimeout(resolve, 30))
       }
       
       // Colunas padrão (não neurologistas) → MUSCULO ESQUELETICO
@@ -348,20 +394,29 @@ async function aplicarRegrasArquivo(
       .eq('ESPECIALIDADE', 'MAMA')
     regrasAplicadas.push('v044')
 
-    // v008: De-Para Prioridades
-    const { data: prioridadesDePara } = await supabase
-      .from('valores_prioridade_de_para')
-      .select('prioridade_original, nome_final')
-      .eq('ativo', true)
-      .limit(50)
+    // v008: De-Para Prioridades - buscar TODOS
+    let offsetPrio = 0
+    const limitPrio = 500
     
-    if (prioridadesDePara && prioridadesDePara.length > 0) {
+    while (true) {
+      const { data: prioridadesDePara } = await supabase
+        .from('valores_prioridade_de_para')
+        .select('prioridade_original, nome_final')
+        .eq('ativo', true)
+        .range(offsetPrio, offsetPrio + limitPrio - 1)
+      
+      if (!prioridadesDePara || prioridadesDePara.length === 0) break
+      
       for (const mapeamento of prioridadesDePara) {
         await supabase.from('volumetria_mobilemed')
           .update({ PRIORIDADE: mapeamento.nome_final })
           .eq('arquivo_fonte', arquivoFonte)
           .eq('PRIORIDADE', mapeamento.prioridade_original)
       }
+      
+      offsetPrio += limitPrio
+      if (prioridadesDePara.length < limitPrio) break
+      await new Promise(resolve => setTimeout(resolve, 30))
     }
     regrasAplicadas.push('v008')
 
@@ -513,12 +568,28 @@ async function aplicarRegrasArquivo(
       .neq('MODALIDADE', 'MG')
     regrasAplicadas.push('v020')
 
-    // v021: Categoria oncologia
+    // v021: Categoria oncologia - corrigido para aplicar apenas onde CATEGORIA está vazio
+    // Aplicar para exames com ONCO no nome
     await supabase.from('volumetria_mobilemed')
       .update({ CATEGORIA: 'ONCO' })
       .eq('arquivo_fonte', arquivoFonte)
-      .or('ESTUDO_DESCRICAO.ilike.%ONCO%,ESTUDO_DESCRICAO.ilike.%PET%,ESTUDO_DESCRICAO.ilike.%CINTILOGRAFIA%')
+      .ilike('ESTUDO_DESCRICAO', '%ONCO%')
       .or('CATEGORIA.is.null,CATEGORIA.eq.')
+    
+    // Aplicar para exames com PET no nome
+    await supabase.from('volumetria_mobilemed')
+      .update({ CATEGORIA: 'ONCO' })
+      .eq('arquivo_fonte', arquivoFonte)
+      .ilike('ESTUDO_DESCRICAO', '%PET%')
+      .or('CATEGORIA.is.null,CATEGORIA.eq.')
+    
+    // Aplicar para exames com CINTILOGRAFIA no nome
+    await supabase.from('volumetria_mobilemed')
+      .update({ CATEGORIA: 'ONCO' })
+      .eq('arquivo_fonte', arquivoFonte)
+      .ilike('ESTUDO_DESCRICAO', '%CINTILOGRAFIA%')
+      .or('CATEGORIA.is.null,CATEGORIA.eq.')
+    
     regrasAplicadas.push('v021')
 
     // v023: Correção valores nulos
@@ -535,28 +606,63 @@ async function aplicarRegrasArquivo(
       .is('is_duplicado', null)
     regrasAplicadas.push('v024')
 
-    // v031: Dados do cadastro_exames (simplificado - apenas alguns campos principais)
-    const { data: cadastroCompleto } = await supabase
-      .from('cadastro_exames')
-      .select('nome, modalidade, especialidade')
-      .eq('ativo', true)
-      .limit(100)
+    // v031: Modalidade e Especialidade do cadastro_exames - buscar TODOS, apenas onde está vazio
+    console.log(`🔧 [${jobId}] v031: Aplicando modalidade/especialidade do cadastro (apenas onde vazio)...`)
     
-    if (cadastroCompleto && cadastroCompleto.length > 0) {
+    let offsetV031 = 0
+    const limitV031 = 500
+    let totalV031Aplicados = 0
+    
+    while (true) {
+      const { data: cadastroCompleto, error: cadastroV031Error } = await supabase
+        .from('cadastro_exames')
+        .select('nome, modalidade, especialidade')
+        .eq('ativo', true)
+        .range(offsetV031, offsetV031 + limitV031 - 1)
+      
+      if (cadastroV031Error) {
+        console.error(`❌ [${jobId}] Erro v031:`, cadastroV031Error)
+        break
+      }
+      
+      if (!cadastroCompleto || cadastroCompleto.length === 0) break
+      
+      console.log(`📋 [${jobId}] v031: Processando lote ${Math.floor(offsetV031 / limitV031) + 1} - ${cadastroCompleto.length} exames`)
+      
       for (const exame of cadastroCompleto) {
-        if (exame.nome && (exame.modalidade || exame.especialidade)) {
-          const updates: any = { updated_at: new Date().toISOString() }
-          if (exame.modalidade) updates.MODALIDADE = exame.modalidade
-          if (exame.especialidade) updates.ESPECIALIDADE = exame.especialidade
+        if (exame.nome) {
+          // Atualizar MODALIDADE apenas onde está vazio
+          if (exame.modalidade) {
+            const { count: countMod } = await supabase
+              .from('volumetria_mobilemed')
+              .update({ MODALIDADE: exame.modalidade, updated_at: new Date().toISOString() }, { count: 'exact' })
+              .eq('arquivo_fonte', arquivoFonte)
+              .eq('ESTUDO_DESCRICAO', exame.nome)
+              .or('MODALIDADE.is.null,MODALIDADE.eq.')
+            
+            if (countMod && countMod > 0) totalV031Aplicados += countMod
+          }
           
-          await supabase
-            .from('volumetria_mobilemed')
-            .update(updates)
-            .eq('arquivo_fonte', arquivoFonte)
-            .ilike('ESTUDO_DESCRICAO', exame.nome)
+          // Atualizar ESPECIALIDADE apenas onde está vazio
+          if (exame.especialidade) {
+            const { count: countEsp } = await supabase
+              .from('volumetria_mobilemed')
+              .update({ ESPECIALIDADE: exame.especialidade, updated_at: new Date().toISOString() }, { count: 'exact' })
+              .eq('arquivo_fonte', arquivoFonte)
+              .eq('ESTUDO_DESCRICAO', exame.nome)
+              .or('ESPECIALIDADE.is.null,ESPECIALIDADE.eq.')
+            
+            if (countEsp && countEsp > 0) totalV031Aplicados += countEsp
+          }
         }
       }
+      
+      offsetV031 += limitV031
+      if (cadastroCompleto.length < limitV031) break
+      await new Promise(resolve => setTimeout(resolve, 50))
     }
+    
+    console.log(`✅ [${jobId}] v031: ${totalV031Aplicados} atualizações aplicadas`)
     regrasAplicadas.push('v031')
 
     // Contar registros depois
