@@ -183,7 +183,7 @@ export function ListaDemonstrativos({ demonstrativos, periodo }: ListaDemonstrat
                               const especialidade = exame.especialidade || 'Sem Especialidade';
                               const modalidade = exame.modalidade || 'Sem Modalidade';
                               const prioridade = exame.prioridade || 'Sem Prioridade';
-                              const categoria = exame.categoria || 'Sem Categoria';
+                              const categoria = exame.categoria || 'SC';
                               
                               if (!especialidadesMap.has(especialidade)) {
                                 especialidadesMap.set(especialidade, {

@@ -194,7 +194,7 @@ export function AlertasPrecosFaltantes({ alertas, onClose, onRefresh, isLoading 
                     <Badge variant="outline">{alerta.modalidade}</Badge>
                   </TableCell>
                   <TableCell>{alerta.especialidade}</TableCell>
-                  <TableCell>{alerta.categoria || 'Sem Categoria'}</TableCell>
+                  <TableCell>{alerta.categoria || 'SC'}</TableCell>
                   <TableCell>
                     <Badge 
                       variant={alerta.prioridade === 'PLANTÃO' ? 'destructive' : 
