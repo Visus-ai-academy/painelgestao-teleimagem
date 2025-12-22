@@ -669,7 +669,7 @@ async function aplicarRegrasArquivo(
     console.log(`🔧 [${jobId}] v027: Aplicando quebra de exames...`)
     
     try {
-      // Buscar todas as regras de quebra ativas
+      // Buscar todas as regras de quebra ativas COM dados do cadastro_exames
       const { data: regrasQuebra, error: errorRegras } = await supabase
         .from('regras_quebra_exames')
         .select('exame_original, exame_quebrado, categoria_quebrada')
@@ -678,6 +678,25 @@ async function aplicarRegrasArquivo(
       if (errorRegras) {
         console.error(`⚠️ [${jobId}] Erro ao buscar regras de quebra:`, errorRegras)
       } else if (regrasQuebra && regrasQuebra.length > 0) {
+        
+        // Buscar dados do cadastro_exames para os exames quebrados (especialidade e categoria)
+        const examesQuebrados = regrasQuebra.map(r => r.exame_quebrado)
+        const { data: cadastroExamesQuebrados } = await supabase
+          .from('cadastro_exames')
+          .select('nome, especialidade, categoria')
+          .in('nome', examesQuebrados)
+          .eq('ativo', true)
+        
+        // Criar mapa de exame quebrado -> dados do cadastro
+        const mapaCadastro = new Map<string, { especialidade: string | null, categoria: string | null }>()
+        if (cadastroExamesQuebrados) {
+          for (const ce of cadastroExamesQuebrados) {
+            mapaCadastro.set(ce.nome, { especialidade: ce.especialidade, categoria: ce.categoria })
+          }
+        }
+        
+        console.log(`📋 [${jobId}] v027: ${mapaCadastro.size} exames quebrados encontrados no cadastro`)
+        
         // Agrupar quebras por exame original
         const quebrasAgrupadas = new Map<string, Array<{exame_original: string, exame_quebrado: string, categoria_quebrada: string | null}>>()
         
@@ -719,21 +738,30 @@ async function aplicarRegrasArquivo(
             // Processar cada registro original
             for (const registroOriginal of registrosOriginais) {
               try {
-                const valorOriginal = registroOriginal.VALOR || registroOriginal.VALORES || 1
+                // Manter a PRIORIDADE original do arquivo de upload
+                const prioridadeOriginal = registroOriginal.PRIORIDADE
                 
-                // Criar registros quebrados
+                // Criar registros quebrados com dados do cadastro_exames
                 const registrosQuebrados = configsQuebra.map((config) => {
                   const novoRegistro = { ...registroOriginal }
                   delete novoRegistro.id
                   delete novoRegistro.created_at
                   delete novoRegistro.updated_at
                   
+                  // Buscar especialidade e categoria do cadastro_exames para este exame quebrado
+                  const dadosCadastro = mapaCadastro.get(config.exame_quebrado)
+                  
                   return {
                     ...novoRegistro,
                     ESTUDO_DESCRICAO: config.exame_quebrado,
                     VALOR: 1, // Cada exame quebrado vale 1
                     VALORES: 1,
-                    CATEGORIA: config.categoria_quebrada || registroOriginal.CATEGORIA || 'SC',
+                    // ESPECIALIDADE: do cadastro_exames do exame quebrado
+                    ESPECIALIDADE: dadosCadastro?.especialidade || registroOriginal.ESPECIALIDADE,
+                    // CATEGORIA: do cadastro_exames do exame quebrado (ou categoria_quebrada da regra como fallback)
+                    CATEGORIA: dadosCadastro?.categoria || config.categoria_quebrada || registroOriginal.CATEGORIA || 'SC',
+                    // PRIORIDADE: mantém a original do arquivo de upload
+                    PRIORIDADE: prioridadeOriginal,
                     updated_at: new Date().toISOString()
                   }
                 })
