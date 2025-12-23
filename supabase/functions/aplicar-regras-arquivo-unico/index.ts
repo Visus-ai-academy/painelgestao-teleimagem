@@ -1047,7 +1047,7 @@ async function processarArquivo(
       .single()
 
     // Atualizar log de conclusão
-    await supabase.from('processamento_regras_log').update({
+    const { error: updateError } = await supabase.from('processamento_regras_log').update({
       status: 'concluido',
       registros_depois: depoisCount || 0,
       registros_excluidos: (logData?.registros_antes || 0) - (depoisCount || 0),
@@ -1056,6 +1056,12 @@ async function processarArquivo(
       mensagem: `Processamento concluído em ${tempoTotal}s`,
       progresso_fase: null
     }).eq('id', jobId)
+
+    if (updateError) {
+      console.error(`❌ [${jobId}] Erro ao atualizar status para concluído:`, updateError)
+    } else {
+      console.log(`✅ [${jobId}] Status atualizado para concluído no banco`)
+    }
 
   } catch (error: any) {
     console.error(`❌ [${jobId}] Erro no arquivo ${arquivoFonte}:`, error)
