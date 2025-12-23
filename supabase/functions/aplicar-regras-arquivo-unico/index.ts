@@ -5,20 +5,48 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Timeout máximo para cada fase (em ms) - 4 minutos por fase
-const MAX_PHASE_TIME = 4 * 60 * 1000
+// Timeout máximo para processamento (em ms) - 5 minutos
+const MAX_PROCESSING_TIME = 5 * 60 * 1000
 
-// Limite de registros para considerar arquivo "grande" e dividir em fases
+// Limite de registros para considerar arquivo "grande"
 const LARGE_FILE_THRESHOLD = 10000
 
 // Tipos de fases
 type ProcessingPhase = 'fase1' | 'fase2' | 'fase3' | 'completo'
+
+interface ProgressoFase {
+  fase: ProcessingPhase
+  regrasAplicadas: string[]
+  regraAtual?: string
+  indiceAtual?: number  // Para regras que processam listas (v011, v031, etc)
+}
 
 interface PhaseResult {
   fase: ProcessingPhase
   regrasAplicadas: string[]
   proximaFase: ProcessingPhase | null
   tempoMs: number
+  completa: boolean
+  progresso?: ProgressoFase
+}
+
+// ===== SALVAR E CARREGAR PROGRESSO =====
+async function carregarProgresso(supabase: any, jobId: string): Promise<ProgressoFase | null> {
+  const { data } = await supabase
+    .from('processamento_regras_log')
+    .select('progresso_fase')
+    .eq('id', jobId)
+    .single()
+  
+  return data?.progresso_fase || null
+}
+
+async function salvarProgresso(supabase: any, jobId: string, progresso: ProgressoFase) {
+  await supabase.from('processamento_regras_log').update({
+    progresso_fase: progresso,
+    regras_aplicadas: progresso.regrasAplicadas,
+    mensagem: `Processando ${progresso.fase} - ${progresso.regraAtual || 'iniciando'}...`
+  }).eq('id', jobId)
 }
 
 // ===== FASE 1: Regras de exclusão e normalização básica =====
@@ -27,22 +55,27 @@ async function executarFase1(
   arquivoFonte: string,
   periodoReferencia: string,
   jobId: string,
-  startTime: number
+  startTime: number,
+  progressoAnterior?: ProgressoFase
 ): Promise<PhaseResult> {
-  const regrasAplicadas: string[] = []
+  const regrasAplicadas: string[] = progressoAnterior?.regrasAplicadas || []
+  const indiceInicial = progressoAnterior?.indiceAtual || 0
+  
+  const jaAplicada = (regra: string) => regrasAplicadas.includes(regra)
   
   const checkTimeout = () => {
-    if (Date.now() - startTime > MAX_PHASE_TIME) {
-      throw new Error('Timeout na Fase 1')
+    if (Date.now() - startTime > MAX_PROCESSING_TIME) {
+      throw new Error('TIMEOUT')
     }
   }
 
   console.log(`🔧 [${jobId}] FASE 1: Iniciando regras de exclusão e normalização`)
+  console.log(`📋 [${jobId}] Regras já aplicadas: ${regrasAplicadas.join(', ') || 'nenhuma'}`)
 
   // ===== VERIFICAR SE É ARQUIVO RETROATIVO PARA APLICAR v002/v003 =====
   const isRetroativo = arquivoFonte.includes('retroativo')
   
-  if (isRetroativo) {
+  if (isRetroativo && !jaAplicada('v003')) {
     console.log(`🔄 [${jobId}] Arquivo retroativo detectado - aplicando regras v002/v003`)
     
     let anoCompleto: number = 0
@@ -101,33 +134,35 @@ async function executarFase1(
       }
       
       console.log(`✅ [${jobId}] v003: ${totalExcludosV003} registros excluídos`)
-      regrasAplicadas.push('v003')
+      if (!jaAplicada('v003')) regrasAplicadas.push('v003')
 
       // v002: Excluir em lotes (DATA_LAUDO fora da janela)
-      let totalExcludosV002 = 0
-      
-      while (true) {
-        checkTimeout()
-        const { data: idsToDelete } = await supabase
-          .from('volumetria_mobilemed')
-          .select('id')
-          .eq('arquivo_fonte', arquivoFonte)
-          .or(`DATA_LAUDO.lt.${dataInicioJanelaLaudoStr},DATA_LAUDO.gt.${dataFimJanelaLaudoStr}`)
-          .limit(BATCH_SIZE)
+      if (!jaAplicada('v002')) {
+        let totalExcludosV002 = 0
+        
+        while (true) {
+          checkTimeout()
+          const { data: idsToDelete } = await supabase
+            .from('volumetria_mobilemed')
+            .select('id')
+            .eq('arquivo_fonte', arquivoFonte)
+            .or(`DATA_LAUDO.lt.${dataInicioJanelaLaudoStr},DATA_LAUDO.gt.${dataFimJanelaLaudoStr}`)
+            .limit(BATCH_SIZE)
 
-        if (!idsToDelete || idsToDelete.length === 0) break
+          if (!idsToDelete || idsToDelete.length === 0) break
 
-        const { count } = await supabase
-          .from('volumetria_mobilemed')
-          .delete({ count: 'exact' })
-          .in('id', idsToDelete.map((r: any) => r.id))
+          const { count } = await supabase
+            .from('volumetria_mobilemed')
+            .delete({ count: 'exact' })
+            .in('id', idsToDelete.map((r: any) => r.id))
 
-        totalExcludosV002 += count || 0
-        if ((count || 0) < BATCH_SIZE) break
+          totalExcludosV002 += count || 0
+          if ((count || 0) < BATCH_SIZE) break
+        }
+        
+        console.log(`✅ [${jobId}] v002: ${totalExcludosV002} registros excluídos`)
+        regrasAplicadas.push('v002')
       }
-      
-      console.log(`✅ [${jobId}] v002: ${totalExcludosV002} registros excluídos`)
-      regrasAplicadas.push('v002')
     }
   }
 
@@ -136,358 +171,424 @@ async function executarFase1(
   // ===== REGRAS DE EXCLUSÃO (operações em lote) =====
   
   // v004: Exclusões de clientes específicos
-  await supabase.from('volumetria_mobilemed')
-    .delete()
-    .eq('arquivo_fonte', arquivoFonte)
-    .in('EMPRESA', ['CLINICA SERCOR', 'INMED', 'MEDICINA OCUPACIONAL'])
-  regrasAplicadas.push('v004')
+  if (!jaAplicada('v004')) {
+    await supabase.from('volumetria_mobilemed')
+      .delete()
+      .eq('arquivo_fonte', arquivoFonte)
+      .in('EMPRESA', ['CLINICA SERCOR', 'INMED', 'MEDICINA OCUPACIONAL'])
+    regrasAplicadas.push('v004')
+  }
 
   // v017: Exclusões registros rejeitados
-  await supabase.from('volumetria_mobilemed')
-    .delete()
-    .eq('arquivo_fonte', arquivoFonte)
-    .or('ESTUDO_DESCRICAO.is.null,ESTUDO_DESCRICAO.eq.,EMPRESA.is.null,EMPRESA.eq.')
-  regrasAplicadas.push('v017')
+  if (!jaAplicada('v017')) {
+    await supabase.from('volumetria_mobilemed')
+      .delete()
+      .eq('arquivo_fonte', arquivoFonte)
+      .or('ESTUDO_DESCRICAO.is.null,ESTUDO_DESCRICAO.eq.,EMPRESA.is.null,EMPRESA.eq.')
+    regrasAplicadas.push('v017')
+  }
 
   // v032: Exclusão de clientes com TESTE
-  await supabase.from('volumetria_mobilemed')
-    .delete()
-    .eq('arquivo_fonte', arquivoFonte)
-    .like('EMPRESA', '%TESTE%')
-  regrasAplicadas.push('v032')
+  if (!jaAplicada('v032')) {
+    await supabase.from('volumetria_mobilemed')
+      .delete()
+      .eq('arquivo_fonte', arquivoFonte)
+      .like('EMPRESA', '%TESTE%')
+    regrasAplicadas.push('v032')
+  }
 
   checkTimeout()
 
   // ===== REGRAS DE NORMALIZAÇÃO =====
 
   // v001: CEDI unificação
-  await supabase.from('volumetria_mobilemed')
-    .update({ EMPRESA: 'CEDIDIAG' })
-    .eq('arquivo_fonte', arquivoFonte)
-    .in('EMPRESA', ['CEDI-RJ','CEDI-RO','CEDI-UNIMED','CEDI_RJ','CEDI_RO','CEDI_UNIMED'])
-  regrasAplicadas.push('v001')
+  if (!jaAplicada('v001')) {
+    await supabase.from('volumetria_mobilemed')
+      .update({ EMPRESA: 'CEDIDIAG' })
+      .eq('arquivo_fonte', arquivoFonte)
+      .in('EMPRESA', ['CEDI-RJ','CEDI-RO','CEDI-UNIMED','CEDI_RJ','CEDI_RO','CEDI_UNIMED'])
+    regrasAplicadas.push('v001')
+  }
 
   // v001b: Normalizar sufixo _TELE
-  const { data: empresasComTele } = await supabase
-    .from('volumetria_mobilemed')
-    .select('"EMPRESA"')
-    .eq('arquivo_fonte', arquivoFonte)
-    .like('EMPRESA', '%_TELE')
-  
-  if (empresasComTele && empresasComTele.length > 0) {
-    const empresasUnicas = [...new Set(empresasComTele.map((c: any) => c.EMPRESA))]
-    for (const empresa of empresasUnicas) {
-      if (typeof empresa === 'string' && empresa.endsWith('_TELE')) {
-        await supabase.from('volumetria_mobilemed')
-          .update({ EMPRESA: empresa.replace(/_TELE$/, '') })
-          .eq('arquivo_fonte', arquivoFonte)
-          .eq('EMPRESA', empresa)
+  if (!jaAplicada('v001b')) {
+    const { data: empresasComTele } = await supabase
+      .from('volumetria_mobilemed')
+      .select('"EMPRESA"')
+      .eq('arquivo_fonte', arquivoFonte)
+      .like('EMPRESA', '%_TELE')
+    
+    if (empresasComTele && empresasComTele.length > 0) {
+      const empresasUnicas = [...new Set(empresasComTele.map((c: any) => c.EMPRESA))]
+      for (const empresa of empresasUnicas) {
+        if (typeof empresa === 'string' && empresa.endsWith('_TELE')) {
+          await supabase.from('volumetria_mobilemed')
+            .update({ EMPRESA: empresa.replace(/_TELE$/, '') })
+            .eq('arquivo_fonte', arquivoFonte)
+            .eq('EMPRESA', empresa)
+        }
       }
     }
+    regrasAplicadas.push('v001b')
   }
-  regrasAplicadas.push('v001b')
 
   checkTimeout()
 
-  // v001c: Normalização de nomes de médicos - SEM LIMITE
-  const { data: mapeamentoMedicos } = await supabase
-    .from('mapeamento_nomes_medicos')
-    .select('nome_origem_normalizado, medico_nome')
-    .eq('ativo', true)
-  
-  if (mapeamentoMedicos && mapeamentoMedicos.length > 0) {
-    console.log(`📋 [${jobId}] v001c: ${mapeamentoMedicos.length} mapeamentos de médicos`)
-    for (const mapeamento of mapeamentoMedicos) {
-      checkTimeout()
-      if (mapeamento.nome_origem_normalizado && mapeamento.medico_nome) {
-        await supabase
-          .from('volumetria_mobilemed')
-          .update({ MEDICO: mapeamento.medico_nome })
-          .eq('arquivo_fonte', arquivoFonte)
-          .ilike('MEDICO', mapeamento.nome_origem_normalizado)
+  // v001c: Normalização de nomes de médicos - COM CHECKPOINT
+  if (!jaAplicada('v001c')) {
+    const { data: mapeamentoMedicos } = await supabase
+      .from('mapeamento_nomes_medicos')
+      .select('nome_origem_normalizado, medico_nome')
+      .eq('ativo', true)
+    
+    if (mapeamentoMedicos && mapeamentoMedicos.length > 0) {
+      console.log(`📋 [${jobId}] v001c: ${mapeamentoMedicos.length} mapeamentos de médicos`)
+      
+      const inicioV001c = progressoAnterior?.regraAtual === 'v001c' ? indiceInicial : 0
+      
+      for (let i = inicioV001c; i < mapeamentoMedicos.length; i++) {
+        checkTimeout()
+        const mapeamento = mapeamentoMedicos[i]
+        if (mapeamento.nome_origem_normalizado && mapeamento.medico_nome) {
+          await supabase
+            .from('volumetria_mobilemed')
+            .update({ MEDICO: mapeamento.medico_nome })
+            .eq('arquivo_fonte', arquivoFonte)
+            .ilike('MEDICO', mapeamento.nome_origem_normalizado)
+        }
+        
+        // Salvar checkpoint a cada 50 registros
+        if (i > 0 && i % 50 === 0) {
+          await salvarProgresso(supabase, jobId, {
+            fase: 'fase1',
+            regrasAplicadas,
+            regraAtual: 'v001c',
+            indiceAtual: i
+          })
+        }
       }
     }
+    regrasAplicadas.push('v001c')
   }
-  regrasAplicadas.push('v001c')
 
   checkTimeout()
 
-  // v001d: De-Para valores zerados - SEM LIMITE
-  const { data: valoresReferencia } = await supabase
-    .from('valores_referencia_de_para')
-    .select('estudo_descricao, valores')
-    .eq('ativo', true)
-  
-  if (valoresReferencia && valoresReferencia.length > 0) {
-    console.log(`📋 [${jobId}] v001d: ${valoresReferencia.length} valores de referência`)
-    for (const ref of valoresReferencia) {
-      checkTimeout()
-      if (ref.estudo_descricao && ref.valores && ref.valores > 0) {
-        await supabase
-          .from('volumetria_mobilemed')
-          .update({ VALOR: ref.valores })
-          .eq('arquivo_fonte', arquivoFonte)
-          .eq('ESTUDO_DESCRICAO', ref.estudo_descricao)
-          .or('VALOR.is.null,VALOR.eq.0')
+  // v001d: De-Para valores zerados - COM CHECKPOINT
+  if (!jaAplicada('v001d')) {
+    const { data: valoresReferencia } = await supabase
+      .from('valores_referencia_de_para')
+      .select('estudo_descricao, valores')
+      .eq('ativo', true)
+    
+    if (valoresReferencia && valoresReferencia.length > 0) {
+      console.log(`📋 [${jobId}] v001d: ${valoresReferencia.length} valores de referência`)
+      
+      const inicioV001d = progressoAnterior?.regraAtual === 'v001d' ? indiceInicial : 0
+      
+      for (let i = inicioV001d; i < valoresReferencia.length; i++) {
+        checkTimeout()
+        const ref = valoresReferencia[i]
+        if (ref.estudo_descricao && ref.valores && ref.valores > 0) {
+          await supabase
+            .from('volumetria_mobilemed')
+            .update({ VALOR: ref.valores })
+            .eq('arquivo_fonte', arquivoFonte)
+            .eq('ESTUDO_DESCRICAO', ref.estudo_descricao)
+            .or('VALOR.is.null,VALOR.eq.0')
+        }
       }
     }
+    regrasAplicadas.push('v001d')
   }
-  regrasAplicadas.push('v001d')
 
   checkTimeout()
 
   // v005: Correções modalidade
-  const { data: examesMAMO } = await supabase
-    .from('cadastro_exames')
-    .select('nome')
-    .eq('especialidade', 'MAMO')
-    .eq('ativo', true)
-  
-  if (examesMAMO && examesMAMO.length > 0) {
-    const nomesMAMO = examesMAMO.map((e: any) => e.nome).filter(Boolean)
-    for (const nome of nomesMAMO) {
-      await supabase
-        .from('volumetria_mobilemed')
-        .update({ MODALIDADE: 'MG' })
-        .eq('arquivo_fonte', arquivoFonte)
-        .in('MODALIDADE', ['CR', 'DX'])
-        .eq('ESTUDO_DESCRICAO', nome)
+  if (!jaAplicada('v005')) {
+    const { data: examesMAMO } = await supabase
+      .from('cadastro_exames')
+      .select('nome')
+      .eq('especialidade', 'MAMO')
+      .eq('ativo', true)
+    
+    if (examesMAMO && examesMAMO.length > 0) {
+      const nomesMAMO = examesMAMO.map((e: any) => e.nome).filter(Boolean)
+      for (const nome of nomesMAMO) {
+        await supabase
+          .from('volumetria_mobilemed')
+          .update({ MODALIDADE: 'MG' })
+          .eq('arquivo_fonte', arquivoFonte)
+          .in('MODALIDADE', ['CR', 'DX'])
+          .eq('ESTUDO_DESCRICAO', nome)
+      }
     }
-  }
-  
-  // CR/DX → RX
-  await supabase.from('volumetria_mobilemed')
-    .update({ MODALIDADE: 'RX' })
-    .eq('arquivo_fonte', arquivoFonte)
-    .in('MODALIDADE', ['CR', 'DX'])
+    
+    // CR/DX → RX
+    await supabase.from('volumetria_mobilemed')
+      .update({ MODALIDADE: 'RX' })
+      .eq('arquivo_fonte', arquivoFonte)
+      .in('MODALIDADE', ['CR', 'DX'])
 
-  // OT/BMD → DO
-  await supabase.from('volumetria_mobilemed')
-    .update({ MODALIDADE: 'DO' })
-    .eq('arquivo_fonte', arquivoFonte)
-    .in('MODALIDADE', ['OT', 'BMD'])
-  
-  regrasAplicadas.push('v005')
+    // OT/BMD → DO
+    await supabase.from('volumetria_mobilemed')
+      .update({ MODALIDADE: 'DO' })
+      .eq('arquivo_fonte', arquivoFonte)
+      .in('MODALIDADE', ['OT', 'BMD'])
+    
+    regrasAplicadas.push('v005')
+  }
 
   checkTimeout()
 
   // v007: Correções de especialidades
-  await supabase.from('volumetria_mobilemed')
-    .update({ ESPECIALIDADE: 'MEDICINA INTERNA' })
-    .eq('arquivo_fonte', arquivoFonte)
-    .in('ESPECIALIDADE', ['ANGIOTCS', 'TÓRAX', 'CORPO', 'TOMOGRAFIA', 'ONCO MEDICINA INTERNA'])
-  
-  await supabase.from('volumetria_mobilemed')
-    .update({ ESPECIALIDADE: 'NEURO' })
-    .eq('arquivo_fonte', arquivoFonte)
-    .eq('ESPECIALIDADE', 'CABEÇA-PESCOÇO')
-  
-  await supabase.from('volumetria_mobilemed')
-    .update({ ESPECIALIDADE: 'D.O' })
-    .eq('arquivo_fonte', arquivoFonte)
-    .eq('MODALIDADE', 'DO')
-  
-  await supabase.from('volumetria_mobilemed')
-    .update({ ESPECIALIDADE: 'CARDIO' })
-    .eq('arquivo_fonte', arquivoFonte)
-    .eq('ESPECIALIDADE', 'CARDIO COM SCORE')
-  
-  regrasAplicadas.push('v007')
+  if (!jaAplicada('v007')) {
+    await supabase.from('volumetria_mobilemed')
+      .update({ ESPECIALIDADE: 'MEDICINA INTERNA' })
+      .eq('arquivo_fonte', arquivoFonte)
+      .in('ESPECIALIDADE', ['ANGIOTCS', 'TÓRAX', 'CORPO', 'TOMOGRAFIA', 'ONCO MEDICINA INTERNA'])
+    
+    await supabase.from('volumetria_mobilemed')
+      .update({ ESPECIALIDADE: 'NEURO' })
+      .eq('arquivo_fonte', arquivoFonte)
+      .eq('ESPECIALIDADE', 'CABEÇA-PESCOÇO')
+    
+    await supabase.from('volumetria_mobilemed')
+      .update({ ESPECIALIDADE: 'D.O' })
+      .eq('arquivo_fonte', arquivoFonte)
+      .eq('MODALIDADE', 'DO')
+    
+    await supabase.from('volumetria_mobilemed')
+      .update({ ESPECIALIDADE: 'CARDIO' })
+      .eq('arquivo_fonte', arquivoFonte)
+      .eq('ESPECIALIDADE', 'CARDIO COM SCORE')
+    
+    regrasAplicadas.push('v007')
+  }
 
   checkTimeout()
 
   // v034: Colunas → NEURO/MUSCULO
-  try {
-    const { data: neurologistas } = await supabase
-      .from('medicos_neurologistas')
-      .select('nome')
-      .eq('ativo', true)
-    
-    if (neurologistas && neurologistas.length > 0) {
-      for (const neuro of neurologistas) {
-        if (neuro.nome) {
-          await supabase.from('volumetria_mobilemed')
-            .update({ ESPECIALIDADE: 'NEURO' })
-            .eq('arquivo_fonte', arquivoFonte)
-            .ilike('ESTUDO_DESCRICAO', '%COLUNA%')
-            .ilike('MEDICO', `%${neuro.nome}%`)
+  if (!jaAplicada('v034')) {
+    try {
+      const { data: neurologistas } = await supabase
+        .from('medicos_neurologistas')
+        .select('nome')
+        .eq('ativo', true)
+      
+      if (neurologistas && neurologistas.length > 0) {
+        for (const neuro of neurologistas) {
+          if (neuro.nome) {
+            await supabase.from('volumetria_mobilemed')
+              .update({ ESPECIALIDADE: 'NEURO' })
+              .eq('arquivo_fonte', arquivoFonte)
+              .ilike('ESTUDO_DESCRICAO', '%COLUNA%')
+              .ilike('MEDICO', `%${neuro.nome}%`)
+          }
         }
       }
+      
+      // Colunas padrão (não neurologistas) → MUSCULO ESQUELETICO
+      await supabase.from('volumetria_mobilemed')
+        .update({ ESPECIALIDADE: 'MUSCULO ESQUELETICO' })
+        .eq('arquivo_fonte', arquivoFonte)
+        .ilike('ESTUDO_DESCRICAO', '%COLUNA%')
+        .eq('ESPECIALIDADE', 'COLUNAS')
+      
+      regrasAplicadas.push('v034')
+    } catch (v034Err) {
+      console.error(`⚠️ [${jobId}] Erro v034:`, v034Err)
     }
-    
-    // Colunas padrão (não neurologistas) → MUSCULO ESQUELETICO
-    await supabase.from('volumetria_mobilemed')
-      .update({ ESPECIALIDADE: 'MUSCULO ESQUELETICO' })
-      .eq('arquivo_fonte', arquivoFonte)
-      .ilike('ESTUDO_DESCRICAO', '%COLUNA%')
-      .eq('ESPECIALIDADE', 'COLUNAS')
-    
-    regrasAplicadas.push('v034')
-  } catch (v034Err) {
-    console.error(`⚠️ [${jobId}] Erro v034:`, v034Err)
   }
 
   // v044: MAMA → MAMO
-  await supabase.from('volumetria_mobilemed')
-    .update({ ESPECIALIDADE: 'MAMO' })
-    .eq('arquivo_fonte', arquivoFonte)
-    .eq('MODALIDADE', 'MG')
-    .eq('ESPECIALIDADE', 'MAMA')
-  regrasAplicadas.push('v044')
+  if (!jaAplicada('v044')) {
+    await supabase.from('volumetria_mobilemed')
+      .update({ ESPECIALIDADE: 'MAMO' })
+      .eq('arquivo_fonte', arquivoFonte)
+      .eq('MODALIDADE', 'MG')
+      .eq('ESPECIALIDADE', 'MAMA')
+    regrasAplicadas.push('v044')
+  }
 
   checkTimeout()
 
   // v008: De-Para Prioridades
-  const { data: prioridadesDePara } = await supabase
-    .from('valores_prioridade_de_para')
-    .select('prioridade_original, nome_final')
-    .eq('ativo', true)
-  
-  if (prioridadesDePara && prioridadesDePara.length > 0) {
-    for (const mapeamento of prioridadesDePara) {
-      await supabase.from('volumetria_mobilemed')
-        .update({ PRIORIDADE: mapeamento.nome_final })
-        .eq('arquivo_fonte', arquivoFonte)
-        .eq('PRIORIDADE', mapeamento.prioridade_original)
+  if (!jaAplicada('v008')) {
+    const { data: prioridadesDePara } = await supabase
+      .from('valores_prioridade_de_para')
+      .select('prioridade_original, nome_final')
+      .eq('ativo', true)
+    
+    if (prioridadesDePara && prioridadesDePara.length > 0) {
+      for (const mapeamento of prioridadesDePara) {
+        await supabase.from('volumetria_mobilemed')
+          .update({ PRIORIDADE: mapeamento.nome_final })
+          .eq('arquivo_fonte', arquivoFonte)
+          .eq('PRIORIDADE', mapeamento.prioridade_original)
+      }
     }
+    regrasAplicadas.push('v008')
   }
-  regrasAplicadas.push('v008')
 
   // v009: Prioridade padrão
-  await supabase.from('volumetria_mobilemed')
-    .update({ PRIORIDADE: 'ROTINA' })
-    .eq('arquivo_fonte', arquivoFonte)
-    .or('PRIORIDADE.is.null,PRIORIDADE.eq.')
-  regrasAplicadas.push('v009')
+  if (!jaAplicada('v009')) {
+    await supabase.from('volumetria_mobilemed')
+      .update({ PRIORIDADE: 'ROTINA' })
+      .eq('arquivo_fonte', arquivoFonte)
+      .or('PRIORIDADE.is.null,PRIORIDADE.eq.')
+    regrasAplicadas.push('v009')
+  }
 
   // v010: Mapeamento de nomes de clientes
-  await supabase.from('volumetria_mobilemed')
-    .update({ EMPRESA: 'HOSPITAL SANTA HELENA' })
-    .eq('arquivo_fonte', arquivoFonte)
-    .like('EMPRESA', '%SANTA HELENA%')
-  regrasAplicadas.push('v010')
+  if (!jaAplicada('v010')) {
+    await supabase.from('volumetria_mobilemed')
+      .update({ EMPRESA: 'HOSPITAL SANTA HELENA' })
+      .eq('arquivo_fonte', arquivoFonte)
+      .like('EMPRESA', '%SANTA HELENA%')
+    regrasAplicadas.push('v010')
+  }
 
   // v010a: P-CEMVALENCA_MG
-  await supabase.from('volumetria_mobilemed')
-    .update({ EMPRESA: 'CEMVALENCA_MG' })
-    .eq('arquivo_fonte', arquivoFonte)
-    .eq('EMPRESA', 'P-CEMVALENCA_MG')
-  regrasAplicadas.push('v010a')
+  if (!jaAplicada('v010a')) {
+    await supabase.from('volumetria_mobilemed')
+      .update({ EMPRESA: 'CEMVALENCA_MG' })
+      .eq('arquivo_fonte', arquivoFonte)
+      .eq('EMPRESA', 'P-CEMVALENCA_MG')
+    regrasAplicadas.push('v010a')
+  }
 
   // v010b: Separação CEMVALENCA
-  await supabase.from('volumetria_mobilemed')
-    .update({ EMPRESA: 'CEMVALENCA_PLANTAO' })
-    .eq('arquivo_fonte', arquivoFonte)
-    .eq('EMPRESA', 'CEMVALENCA')
-    .in('PRIORIDADE', ['URGENTE', 'EMERGENCIA', 'PLANTAO'])
+  if (!jaAplicada('v010b')) {
+    await supabase.from('volumetria_mobilemed')
+      .update({ EMPRESA: 'CEMVALENCA_PLANTAO' })
+      .eq('arquivo_fonte', arquivoFonte)
+      .eq('EMPRESA', 'CEMVALENCA')
+      .in('PRIORIDADE', ['URGENTE', 'EMERGENCIA', 'PLANTAO'])
 
-  await supabase.from('volumetria_mobilemed')
-    .update({ EMPRESA: 'CEMVALENCA_RX' })
-    .eq('arquivo_fonte', arquivoFonte)
-    .eq('EMPRESA', 'CEMVALENCA')
-    .eq('MODALIDADE', 'RX')
-  regrasAplicadas.push('v010b')
+    await supabase.from('volumetria_mobilemed')
+      .update({ EMPRESA: 'CEMVALENCA_RX' })
+      .eq('arquivo_fonte', arquivoFonte)
+      .eq('EMPRESA', 'CEMVALENCA')
+      .eq('MODALIDADE', 'RX')
+    regrasAplicadas.push('v010b')
+  }
 
   checkTimeout()
 
   // v012-v014: Especialidades automáticas
-  await supabase.from('volumetria_mobilemed')
-    .update({ ESPECIALIDADE: 'RX' })
-    .eq('arquivo_fonte', arquivoFonte)
-    .eq('MODALIDADE', 'RX')
-    .or('ESPECIALIDADE.is.null,ESPECIALIDADE.eq.')
-  
-  await supabase.from('volumetria_mobilemed')
-    .update({ ESPECIALIDADE: 'TC' })
-    .eq('arquivo_fonte', arquivoFonte)
-    .eq('MODALIDADE', 'CT')
-    .or('ESPECIALIDADE.is.null,ESPECIALIDADE.eq.')
-  
-  await supabase.from('volumetria_mobilemed')
-    .update({ ESPECIALIDADE: 'RM' })
-    .eq('arquivo_fonte', arquivoFonte)
-    .eq('MODALIDADE', 'MR')
-    .or('ESPECIALIDADE.is.null,ESPECIALIDADE.eq.')
-  
-  regrasAplicadas.push('v012-v014')
+  if (!jaAplicada('v012-v014')) {
+    await supabase.from('volumetria_mobilemed')
+      .update({ ESPECIALIDADE: 'RX' })
+      .eq('arquivo_fonte', arquivoFonte)
+      .eq('MODALIDADE', 'RX')
+      .or('ESPECIALIDADE.is.null,ESPECIALIDADE.eq.')
+    
+    await supabase.from('volumetria_mobilemed')
+      .update({ ESPECIALIDADE: 'TC' })
+      .eq('arquivo_fonte', arquivoFonte)
+      .eq('MODALIDADE', 'CT')
+      .or('ESPECIALIDADE.is.null,ESPECIALIDADE.eq.')
+    
+    await supabase.from('volumetria_mobilemed')
+      .update({ ESPECIALIDADE: 'RM' })
+      .eq('arquivo_fonte', arquivoFonte)
+      .eq('MODALIDADE', 'MR')
+      .or('ESPECIALIDADE.is.null,ESPECIALIDADE.eq.')
+    
+    regrasAplicadas.push('v012-v014')
+  }
 
   // v015: Status padrão
-  await supabase.from('volumetria_mobilemed')
-    .update({ status: 'ativo' })
-    .eq('arquivo_fonte', arquivoFonte)
-    .or('status.is.null,status.eq.')
-  regrasAplicadas.push('v015')
+  if (!jaAplicada('v015')) {
+    await supabase.from('volumetria_mobilemed')
+      .update({ status: 'ativo' })
+      .eq('arquivo_fonte', arquivoFonte)
+      .or('status.is.null,status.eq.')
+    regrasAplicadas.push('v015')
+  }
 
   // v016: Período referência
-  await supabase.from('volumetria_mobilemed')
-    .update({ periodo_referencia: periodoReferencia })
-    .eq('arquivo_fonte', arquivoFonte)
-    .or('periodo_referencia.is.null,periodo_referencia.eq.')
-  regrasAplicadas.push('v016')
+  if (!jaAplicada('v016')) {
+    await supabase.from('volumetria_mobilemed')
+      .update({ periodo_referencia: periodoReferencia })
+      .eq('arquivo_fonte', arquivoFonte)
+      .or('periodo_referencia.is.null,periodo_referencia.eq.')
+    regrasAplicadas.push('v016')
+  }
 
   // v018-v019: Prioridades
-  await supabase.from('volumetria_mobilemed')
-    .update({ PRIORIDADE: 'URGENTE' })
-    .eq('arquivo_fonte', arquivoFonte)
-    .in('PRIORIDADE', ['URG', 'EMERGENCIA', 'EMERGÊNCIA'])
+  if (!jaAplicada('v018-v019')) {
+    await supabase.from('volumetria_mobilemed')
+      .update({ PRIORIDADE: 'URGENTE' })
+      .eq('arquivo_fonte', arquivoFonte)
+      .in('PRIORIDADE', ['URG', 'EMERGENCIA', 'EMERGÊNCIA'])
 
-  await supabase.from('volumetria_mobilemed')
-    .update({ PRIORIDADE: 'ROTINA' })
-    .eq('arquivo_fonte', arquivoFonte)
-    .in('PRIORIDADE', ['ROT', 'AMBULATORIO', 'AMBULATÓRIO', 'INTERNADO'])
-  
-  regrasAplicadas.push('v018-v019')
+    await supabase.from('volumetria_mobilemed')
+      .update({ PRIORIDADE: 'ROTINA' })
+      .eq('arquivo_fonte', arquivoFonte)
+      .in('PRIORIDADE', ['ROT', 'AMBULATORIO', 'AMBULATÓRIO', 'INTERNADO'])
+    
+    regrasAplicadas.push('v018-v019')
+  }
 
   checkTimeout()
 
   // v020: Modalidade mamografia
-  await supabase.from('volumetria_mobilemed')
-    .update({ MODALIDADE: 'MG' })
-    .eq('arquivo_fonte', arquivoFonte)
-    .ilike('ESTUDO_DESCRICAO', '%MAMOGRAFIA%')
-    .neq('MODALIDADE', 'MG')
-  
-  await supabase.from('volumetria_mobilemed')
-    .update({ MODALIDADE: 'MG' })
-    .eq('arquivo_fonte', arquivoFonte)
-    .ilike('ESTUDO_DESCRICAO', '%TOMOSSINTESE%')
-    .neq('MODALIDADE', 'MG')
-  regrasAplicadas.push('v020')
+  if (!jaAplicada('v020')) {
+    await supabase.from('volumetria_mobilemed')
+      .update({ MODALIDADE: 'MG' })
+      .eq('arquivo_fonte', arquivoFonte)
+      .ilike('ESTUDO_DESCRICAO', '%MAMOGRAFIA%')
+      .neq('MODALIDADE', 'MG')
+    
+    await supabase.from('volumetria_mobilemed')
+      .update({ MODALIDADE: 'MG' })
+      .eq('arquivo_fonte', arquivoFonte)
+      .ilike('ESTUDO_DESCRICAO', '%TOMOSSINTESE%')
+      .neq('MODALIDADE', 'MG')
+    regrasAplicadas.push('v020')
+  }
 
   // v021: Categoria oncologia
-  await supabase.from('volumetria_mobilemed')
-    .update({ CATEGORIA: 'ONCO' })
-    .eq('arquivo_fonte', arquivoFonte)
-    .ilike('ESTUDO_DESCRICAO', '%ONCO%')
-    .or('CATEGORIA.is.null,CATEGORIA.eq.')
-  
-  await supabase.from('volumetria_mobilemed')
-    .update({ CATEGORIA: 'ONCO' })
-    .eq('arquivo_fonte', arquivoFonte)
-    .ilike('ESTUDO_DESCRICAO', '%PET%')
-    .or('CATEGORIA.is.null,CATEGORIA.eq.')
-  
-  await supabase.from('volumetria_mobilemed')
-    .update({ CATEGORIA: 'ONCO' })
-    .eq('arquivo_fonte', arquivoFonte)
-    .ilike('ESTUDO_DESCRICAO', '%CINTILOGRAFIA%')
-    .or('CATEGORIA.is.null,CATEGORIA.eq.')
-  
-  regrasAplicadas.push('v021')
+  if (!jaAplicada('v021')) {
+    await supabase.from('volumetria_mobilemed')
+      .update({ CATEGORIA: 'ONCO' })
+      .eq('arquivo_fonte', arquivoFonte)
+      .ilike('ESTUDO_DESCRICAO', '%ONCO%')
+      .or('CATEGORIA.is.null,CATEGORIA.eq.')
+    
+    await supabase.from('volumetria_mobilemed')
+      .update({ CATEGORIA: 'ONCO' })
+      .eq('arquivo_fonte', arquivoFonte)
+      .ilike('ESTUDO_DESCRICAO', '%PET%')
+      .or('CATEGORIA.is.null,CATEGORIA.eq.')
+    
+    await supabase.from('volumetria_mobilemed')
+      .update({ CATEGORIA: 'ONCO' })
+      .eq('arquivo_fonte', arquivoFonte)
+      .ilike('ESTUDO_DESCRICAO', '%CINTILOGRAFIA%')
+      .or('CATEGORIA.is.null,CATEGORIA.eq.')
+    
+    regrasAplicadas.push('v021')
+  }
 
   // v023: Correção valores nulos
-  await supabase.from('volumetria_mobilemed')
-    .update({ VALOR: 1 })
-    .eq('arquivo_fonte', arquivoFonte)
-    .or('VALOR.is.null,VALOR.eq.0')
-  regrasAplicadas.push('v023')
+  if (!jaAplicada('v023')) {
+    await supabase.from('volumetria_mobilemed')
+      .update({ VALOR: 1 })
+      .eq('arquivo_fonte', arquivoFonte)
+      .or('VALOR.is.null,VALOR.eq.0')
+    regrasAplicadas.push('v023')
+  }
 
   // v024: Duplicado padrão
-  await supabase.from('volumetria_mobilemed')
-    .update({ is_duplicado: false })
-    .eq('arquivo_fonte', arquivoFonte)
-    .is('is_duplicado', null)
-  regrasAplicadas.push('v024')
+  if (!jaAplicada('v024')) {
+    await supabase.from('volumetria_mobilemed')
+      .update({ is_duplicado: false })
+      .eq('arquivo_fonte', arquivoFonte)
+      .is('is_duplicado', null)
+    regrasAplicadas.push('v024')
+  }
 
   console.log(`✅ [${jobId}] FASE 1 concluída: ${regrasAplicadas.length} regras aplicadas`)
 
@@ -495,7 +596,8 @@ async function executarFase1(
     fase: 'fase1',
     regrasAplicadas,
     proximaFase: 'fase2',
-    tempoMs: Date.now() - startTime
+    tempoMs: Date.now() - startTime,
+    completa: true
   }
 }
 
@@ -504,93 +606,128 @@ async function executarFase2(
   supabase: any,
   arquivoFonte: string,
   jobId: string,
-  startTime: number
+  startTime: number,
+  progressoAnterior?: ProgressoFase
 ): Promise<PhaseResult> {
-  const regrasAplicadas: string[] = []
+  const regrasAplicadas: string[] = progressoAnterior?.regrasAplicadas || []
+  const indiceInicial = progressoAnterior?.indiceAtual || 0
+  
+  const jaAplicada = (regra: string) => regrasAplicadas.includes(regra)
   
   const checkTimeout = () => {
-    if (Date.now() - startTime > MAX_PHASE_TIME) {
-      throw new Error('Timeout na Fase 2')
+    if (Date.now() - startTime > MAX_PROCESSING_TIME) {
+      throw new Error('TIMEOUT')
     }
   }
 
   console.log(`🔧 [${jobId}] FASE 2: Iniciando regras de mapeamento (v011, v031)`)
+  console.log(`📋 [${jobId}] Regras já aplicadas: ${regrasAplicadas.join(', ') || 'nenhuma'}`)
 
-  // v011: Categorias de exames - SEM LIMITE, processamento otimizado
-  console.log(`🏷️ [${jobId}] v011: Aplicando categorias...`)
-  
-  const { data: cadastroExamesCategoria } = await supabase
-    .from('cadastro_exames')
-    .select('nome, categoria')
-    .eq('ativo', true)
-    .not('categoria', 'is', null)
-  
-  let totalCategoriasAplicadas = 0
-  if (cadastroExamesCategoria && cadastroExamesCategoria.length > 0) {
-    console.log(`📋 [${jobId}] v011: ${cadastroExamesCategoria.length} exames com categoria`)
+  // v011: Categorias de exames - COM CHECKPOINT
+  if (!jaAplicada('v011')) {
+    console.log(`🏷️ [${jobId}] v011: Aplicando categorias...`)
     
-    for (const exame of cadastroExamesCategoria) {
-      checkTimeout()
-      if (exame.nome && exame.categoria) {
-        const { count } = await supabase
-          .from('volumetria_mobilemed')
-          .update({ CATEGORIA: exame.categoria }, { count: 'exact' })
-          .eq('arquivo_fonte', arquivoFonte)
-          .eq('ESTUDO_DESCRICAO', exame.nome)
-          .or('CATEGORIA.is.null,CATEGORIA.eq.')
+    const { data: cadastroExamesCategoria } = await supabase
+      .from('cadastro_exames')
+      .select('nome, categoria')
+      .eq('ativo', true)
+      .not('categoria', 'is', null)
+    
+    let totalCategoriasAplicadas = 0
+    if (cadastroExamesCategoria && cadastroExamesCategoria.length > 0) {
+      console.log(`📋 [${jobId}] v011: ${cadastroExamesCategoria.length} exames com categoria`)
+      
+      const inicioV011 = progressoAnterior?.regraAtual === 'v011' ? indiceInicial : 0
+      
+      for (let i = inicioV011; i < cadastroExamesCategoria.length; i++) {
+        checkTimeout()
+        const exame = cadastroExamesCategoria[i]
+        if (exame.nome && exame.categoria) {
+          const { count } = await supabase
+            .from('volumetria_mobilemed')
+            .update({ CATEGORIA: exame.categoria }, { count: 'exact' })
+            .eq('arquivo_fonte', arquivoFonte)
+            .eq('ESTUDO_DESCRICAO', exame.nome)
+            .or('CATEGORIA.is.null,CATEGORIA.eq.')
+          
+          if (count && count > 0) totalCategoriasAplicadas += count
+        }
         
-        if (count && count > 0) totalCategoriasAplicadas += count
+        // Salvar checkpoint a cada 100 registros
+        if (i > 0 && i % 100 === 0) {
+          await salvarProgresso(supabase, jobId, {
+            fase: 'fase2',
+            regrasAplicadas,
+            regraAtual: 'v011',
+            indiceAtual: i
+          })
+        }
       }
     }
+    
+    console.log(`✅ [${jobId}] v011: ${totalCategoriasAplicadas} registros atualizados com categoria`)
+    regrasAplicadas.push('v011')
   }
-  
-  console.log(`✅ [${jobId}] v011: ${totalCategoriasAplicadas} registros atualizados com categoria`)
-  regrasAplicadas.push('v011')
 
   checkTimeout()
 
-  // v031: Modalidade e Especialidade do cadastro_exames - SEM LIMITE
-  console.log(`🔧 [${jobId}] v031: Aplicando modalidade/especialidade do cadastro...`)
-  
-  const { data: cadastroCompleto } = await supabase
-    .from('cadastro_exames')
-    .select('nome, modalidade, especialidade')
-    .eq('ativo', true)
-  
-  let totalV031Aplicados = 0
-  if (cadastroCompleto && cadastroCompleto.length > 0) {
-    console.log(`📋 [${jobId}] v031: ${cadastroCompleto.length} exames no cadastro`)
+  // v031: Modalidade e Especialidade do cadastro_exames - COM CHECKPOINT
+  if (!jaAplicada('v031')) {
+    console.log(`🔧 [${jobId}] v031: Aplicando modalidade/especialidade do cadastro...`)
     
-    for (const exame of cadastroCompleto) {
-      checkTimeout()
-      if (exame.nome) {
-        if (exame.modalidade) {
-          const { count: countMod } = await supabase
-            .from('volumetria_mobilemed')
-            .update({ MODALIDADE: exame.modalidade }, { count: 'exact' })
-            .eq('arquivo_fonte', arquivoFonte)
-            .eq('ESTUDO_DESCRICAO', exame.nome)
-            .or('MODALIDADE.is.null,MODALIDADE.eq.')
+    const { data: cadastroCompleto } = await supabase
+      .from('cadastro_exames')
+      .select('nome, modalidade, especialidade')
+      .eq('ativo', true)
+    
+    let totalV031Aplicados = 0
+    if (cadastroCompleto && cadastroCompleto.length > 0) {
+      console.log(`📋 [${jobId}] v031: ${cadastroCompleto.length} exames no cadastro`)
+      
+      const inicioV031 = progressoAnterior?.regraAtual === 'v031' ? indiceInicial : 0
+      
+      for (let i = inicioV031; i < cadastroCompleto.length; i++) {
+        checkTimeout()
+        const exame = cadastroCompleto[i]
+        if (exame.nome) {
+          if (exame.modalidade) {
+            const { count: countMod } = await supabase
+              .from('volumetria_mobilemed')
+              .update({ MODALIDADE: exame.modalidade }, { count: 'exact' })
+              .eq('arquivo_fonte', arquivoFonte)
+              .eq('ESTUDO_DESCRICAO', exame.nome)
+              .or('MODALIDADE.is.null,MODALIDADE.eq.')
+            
+            if (countMod && countMod > 0) totalV031Aplicados += countMod
+          }
           
-          if (countMod && countMod > 0) totalV031Aplicados += countMod
+          if (exame.especialidade) {
+            const { count: countEsp } = await supabase
+              .from('volumetria_mobilemed')
+              .update({ ESPECIALIDADE: exame.especialidade }, { count: 'exact' })
+              .eq('arquivo_fonte', arquivoFonte)
+              .eq('ESTUDO_DESCRICAO', exame.nome)
+              .or('ESPECIALIDADE.is.null,ESPECIALIDADE.eq.')
+            
+            if (countEsp && countEsp > 0) totalV031Aplicados += countEsp
+          }
         }
         
-        if (exame.especialidade) {
-          const { count: countEsp } = await supabase
-            .from('volumetria_mobilemed')
-            .update({ ESPECIALIDADE: exame.especialidade }, { count: 'exact' })
-            .eq('arquivo_fonte', arquivoFonte)
-            .eq('ESTUDO_DESCRICAO', exame.nome)
-            .or('ESPECIALIDADE.is.null,ESPECIALIDADE.eq.')
-          
-          if (countEsp && countEsp > 0) totalV031Aplicados += countEsp
+        // Salvar checkpoint a cada 100 registros
+        if (i > 0 && i % 100 === 0) {
+          await salvarProgresso(supabase, jobId, {
+            fase: 'fase2',
+            regrasAplicadas,
+            regraAtual: 'v031',
+            indiceAtual: i
+          })
         }
       }
     }
+    
+    console.log(`✅ [${jobId}] v031: ${totalV031Aplicados} atualizações aplicadas`)
+    regrasAplicadas.push('v031')
   }
-  
-  console.log(`✅ [${jobId}] v031: ${totalV031Aplicados} atualizações aplicadas`)
-  regrasAplicadas.push('v031')
 
   console.log(`✅ [${jobId}] FASE 2 concluída: ${regrasAplicadas.length} regras aplicadas`)
 
@@ -598,7 +735,8 @@ async function executarFase2(
     fase: 'fase2',
     regrasAplicadas,
     proximaFase: 'fase3',
-    tempoMs: Date.now() - startTime
+    tempoMs: Date.now() - startTime,
+    completa: true
   }
 }
 
@@ -607,146 +745,152 @@ async function executarFase3(
   supabase: any,
   arquivoFonte: string,
   jobId: string,
-  startTime: number
+  startTime: number,
+  progressoAnterior?: ProgressoFase
 ): Promise<PhaseResult> {
-  const regrasAplicadas: string[] = []
+  const regrasAplicadas: string[] = progressoAnterior?.regrasAplicadas || []
+  
+  const jaAplicada = (regra: string) => regrasAplicadas.includes(regra)
   
   const checkTimeout = () => {
-    if (Date.now() - startTime > MAX_PHASE_TIME) {
-      throw new Error('Timeout na Fase 3')
+    if (Date.now() - startTime > MAX_PROCESSING_TIME) {
+      throw new Error('TIMEOUT')
     }
   }
 
   console.log(`🔧 [${jobId}] FASE 3: Iniciando regra de quebra de exames (v027)`)
 
-  try {
-    const { data: regrasQuebra, error: errorRegras } = await supabase
-      .from('regras_quebra_exames')
-      .select('exame_original, exame_quebrado, categoria_quebrada')
-      .eq('ativo', true)
-    
-    if (errorRegras) {
-      console.error(`⚠️ [${jobId}] Erro ao buscar regras de quebra:`, errorRegras)
-    } else if (regrasQuebra && regrasQuebra.length > 0) {
-      console.log(`📋 [${jobId}] v027: ${regrasQuebra.length} regras de quebra`)
-      
-      const examesQuebrados = regrasQuebra.map((r: any) => r.exame_quebrado)
-      const { data: cadastroExamesQuebrados } = await supabase
-        .from('cadastro_exames')
-        .select('nome, especialidade, categoria')
-        .in('nome', examesQuebrados)
+  if (!jaAplicada('v027')) {
+    try {
+      const { data: regrasQuebra, error: errorRegras } = await supabase
+        .from('regras_quebra_exames')
+        .select('exame_original, exame_quebrado, categoria_quebrada')
         .eq('ativo', true)
       
-      const mapaCadastro = new Map<string, { especialidade: string | null, categoria: string | null }>()
-      if (cadastroExamesQuebrados) {
-        for (const ce of cadastroExamesQuebrados) {
-          mapaCadastro.set(ce.nome, { especialidade: ce.especialidade, categoria: ce.categoria })
-        }
-      }
-      
-      const quebrasAgrupadas = new Map<string, Array<{exame_original: string, exame_quebrado: string, categoria_quebrada: string | null}>>()
-      
-      for (const regra of regrasQuebra) {
-        if (!quebrasAgrupadas.has(regra.exame_original)) {
-          quebrasAgrupadas.set(regra.exame_original, [])
-        }
-        quebrasAgrupadas.get(regra.exame_original)!.push(regra)
-      }
-      
-      console.log(`📋 [${jobId}] v027: ${quebrasAgrupadas.size} tipos de exames com regras de quebra`)
-      
-      let totalQuebrados = 0
-      let totalRegistrosCriados = 0
-      
-      for (const [exameOriginal, configsQuebra] of quebrasAgrupadas) {
-        checkTimeout()
+      if (errorRegras) {
+        console.error(`⚠️ [${jobId}] Erro ao buscar regras de quebra:`, errorRegras)
+      } else if (regrasQuebra && regrasQuebra.length > 0) {
+        console.log(`📋 [${jobId}] v027: ${regrasQuebra.length} regras de quebra`)
         
-        // Processar em lotes
-        let offsetQuebra = 0
-        const limitQuebra = 500
+        const examesQuebrados = regrasQuebra.map((r: any) => r.exame_quebrado)
+        const { data: cadastroExamesQuebrados } = await supabase
+          .from('cadastro_exames')
+          .select('nome, especialidade, categoria')
+          .in('nome', examesQuebrados)
+          .eq('ativo', true)
         
-        while (true) {
+        const mapaCadastro = new Map<string, { especialidade: string | null, categoria: string | null }>()
+        if (cadastroExamesQuebrados) {
+          for (const ce of cadastroExamesQuebrados) {
+            mapaCadastro.set(ce.nome, { especialidade: ce.especialidade, categoria: ce.categoria })
+          }
+        }
+        
+        const quebrasAgrupadas = new Map<string, Array<{exame_original: string, exame_quebrado: string, categoria_quebrada: string | null}>>()
+        
+        for (const regra of regrasQuebra) {
+          if (!quebrasAgrupadas.has(regra.exame_original)) {
+            quebrasAgrupadas.set(regra.exame_original, [])
+          }
+          quebrasAgrupadas.get(regra.exame_original)!.push(regra)
+        }
+        
+        console.log(`📋 [${jobId}] v027: ${quebrasAgrupadas.size} tipos de exames com regras de quebra`)
+        
+        let totalQuebrados = 0
+        let totalRegistrosCriados = 0
+        
+        for (const [exameOriginal, configsQuebra] of quebrasAgrupadas) {
           checkTimeout()
           
-          const { data: registrosOriginais, error: errorRegistros } = await supabase
-            .from('volumetria_mobilemed')
-            .select('*')
-            .eq('arquivo_fonte', arquivoFonte)
-            .eq('ESTUDO_DESCRICAO', exameOriginal)
-            .range(offsetQuebra, offsetQuebra + limitQuebra - 1)
+          // Processar em lotes
+          let offsetQuebra = 0
+          const limitQuebra = 500
           
-          if (errorRegistros) {
-            console.error(`⚠️ [${jobId}] Erro ao buscar registros para quebra ${exameOriginal}:`, errorRegistros)
-            break
-          }
-          
-          if (!registrosOriginais || registrosOriginais.length === 0) break
-          
-          // Coletar todos os registros para inserção em lote
-          const registrosParaInserir: any[] = []
-          const idsParaDeletar: string[] = []
-          
-          for (const registroOriginal of registrosOriginais) {
-            const prioridadeOriginal = registroOriginal.PRIORIDADE
+          while (true) {
+            checkTimeout()
             
-            const registrosQuebrados = configsQuebra.map((config) => {
-              const novoRegistro = { ...registroOriginal }
-              delete novoRegistro.id
-              delete novoRegistro.created_at
-              delete novoRegistro.updated_at
-              
-              const dadosCadastro = mapaCadastro.get(config.exame_quebrado)
-              
-              return {
-                ...novoRegistro,
-                ESTUDO_DESCRICAO: config.exame_quebrado,
-                VALORES: 1,
-                ESPECIALIDADE: dadosCadastro?.especialidade || registroOriginal.ESPECIALIDADE,
-                CATEGORIA: dadosCadastro?.categoria || config.categoria_quebrada || registroOriginal.CATEGORIA || 'SC',
-                PRIORIDADE: prioridadeOriginal,
-                updated_at: new Date().toISOString()
-              }
-            })
-            
-            registrosParaInserir.push(...registrosQuebrados)
-            idsParaDeletar.push(registroOriginal.id)
-          }
-          
-          // Inserir em lote
-          if (registrosParaInserir.length > 0) {
-            const { error: errorInsert } = await supabase
+            const { data: registrosOriginais, error: errorRegistros } = await supabase
               .from('volumetria_mobilemed')
-              .insert(registrosParaInserir)
+              .select('*')
+              .eq('arquivo_fonte', arquivoFonte)
+              .eq('ESTUDO_DESCRICAO', exameOriginal)
+              .range(offsetQuebra, offsetQuebra + limitQuebra - 1)
             
-            if (errorInsert) {
-              console.error(`⚠️ [${jobId}] Erro ao inserir quebras:`, errorInsert)
-            } else {
-              // Deletar originais em lote
-              const { error: errorDelete } = await supabase
-                .from('volumetria_mobilemed')
-                .delete()
-                .in('id', idsParaDeletar)
+            if (errorRegistros) {
+              console.error(`⚠️ [${jobId}] Erro ao buscar registros para quebra ${exameOriginal}:`, errorRegistros)
+              break
+            }
+            
+            if (!registrosOriginais || registrosOriginais.length === 0) break
+            
+            // Coletar todos os registros para inserção em lote
+            const registrosParaInserir: any[] = []
+            const idsParaDeletar: string[] = []
+            
+            for (const registroOriginal of registrosOriginais) {
+              const prioridadeOriginal = registroOriginal.PRIORIDADE
               
-              if (!errorDelete) {
-                totalQuebrados += idsParaDeletar.length
-                totalRegistrosCriados += registrosParaInserir.length
+              const registrosQuebrados = configsQuebra.map((config) => {
+                const novoRegistro = { ...registroOriginal }
+                delete novoRegistro.id
+                delete novoRegistro.created_at
+                delete novoRegistro.updated_at
+                
+                const dadosCadastro = mapaCadastro.get(config.exame_quebrado)
+                
+                return {
+                  ...novoRegistro,
+                  ESTUDO_DESCRICAO: config.exame_quebrado,
+                  VALORES: 1,
+                  ESPECIALIDADE: dadosCadastro?.especialidade || registroOriginal.ESPECIALIDADE,
+                  CATEGORIA: dadosCadastro?.categoria || config.categoria_quebrada || registroOriginal.CATEGORIA || 'SC',
+                  PRIORIDADE: prioridadeOriginal,
+                  updated_at: new Date().toISOString()
+                }
+              })
+              
+              registrosParaInserir.push(...registrosQuebrados)
+              idsParaDeletar.push(registroOriginal.id)
+            }
+            
+            // Inserir em lote
+            if (registrosParaInserir.length > 0) {
+              const { error: errorInsert } = await supabase
+                .from('volumetria_mobilemed')
+                .insert(registrosParaInserir)
+              
+              if (errorInsert) {
+                console.error(`⚠️ [${jobId}] Erro ao inserir quebras:`, errorInsert)
+              } else {
+                // Deletar originais em lote
+                const { error: errorDelete } = await supabase
+                  .from('volumetria_mobilemed')
+                  .delete()
+                  .in('id', idsParaDeletar)
+                
+                if (!errorDelete) {
+                  totalQuebrados += idsParaDeletar.length
+                  totalRegistrosCriados += registrosParaInserir.length
+                }
               }
             }
+            
+            offsetQuebra += limitQuebra
+            if (registrosOriginais.length < limitQuebra) break
           }
-          
-          offsetQuebra += limitQuebra
-          if (registrosOriginais.length < limitQuebra) break
         }
+        
+        console.log(`✅ [${jobId}] v027: ${totalQuebrados} exames quebrados → ${totalRegistrosCriados} registros criados`)
+      } else {
+        console.log(`ℹ️ [${jobId}] v027: Nenhuma regra de quebra ativa encontrada`)
       }
       
-      console.log(`✅ [${jobId}] v027: ${totalQuebrados} exames quebrados → ${totalRegistrosCriados} registros criados`)
-    } else {
-      console.log(`ℹ️ [${jobId}] v027: Nenhuma regra de quebra ativa encontrada`)
+      regrasAplicadas.push('v027')
+    } catch (v027Err: any) {
+      if (v027Err.message === 'TIMEOUT') throw v027Err
+      console.error(`❌ [${jobId}] Erro v027:`, v027Err.message)
     }
-    
-    regrasAplicadas.push('v027')
-  } catch (v027Err: any) {
-    console.error(`❌ [${jobId}] Erro v027:`, v027Err.message)
   }
 
   console.log(`✅ [${jobId}] FASE 3 concluída: ${regrasAplicadas.length} regras aplicadas`)
@@ -755,7 +899,8 @@ async function executarFase3(
     fase: 'fase3',
     regrasAplicadas,
     proximaFase: null,
-    tempoMs: Date.now() - startTime
+    tempoMs: Date.now() - startTime,
+    completa: true
   }
 }
 
@@ -769,14 +914,23 @@ async function processarArquivo(
 ) {
   console.log(`🚀 [${jobId}] Iniciando processamento: ${arquivoFonte} (fase: ${faseInicial})`)
   
-  const todasRegrasAplicadas: string[] = []
+  let todasRegrasAplicadas: string[] = []
   let faseAtual: ProcessingPhase | null = faseInicial
   const startTimeTotal = Date.now()
+  let tentativas = 0
+  const MAX_TENTATIVAS = 10  // Máximo de re-tentativas por timeout
 
   try {
-    // Atualizar status para processando
-    if (faseInicial === 'fase1') {
-      // Contar registros antes (apenas na fase 1)
+    // Carregar progresso anterior se existir
+    const progressoAnterior = await carregarProgresso(supabase, jobId)
+    if (progressoAnterior) {
+      console.log(`📂 [${jobId}] Retomando da fase ${progressoAnterior.fase}`)
+      faseAtual = progressoAnterior.fase
+      todasRegrasAplicadas = progressoAnterior.regrasAplicadas || []
+    }
+    
+    // Inicializar log se for nova execução
+    if (faseInicial === 'fase1' && !progressoAnterior) {
       const { count: antesCount } = await supabase
         .from('volumetria_mobilemed')
         .select('*', { count: 'exact', head: true })
@@ -807,63 +961,73 @@ async function processarArquivo(
         status: 'processando',
         registros_antes: antesCount,
         started_at: new Date().toISOString(),
-        mensagem: `Iniciando processamento em fases (${antesCount} registros)`
+        mensagem: `Iniciando processamento (${antesCount} registros)`
       })
-    } else {
-      // Atualizar status para fase em andamento
-      await supabase.from('processamento_regras_log').update({
-        status: 'processando',
-        mensagem: `Processando ${faseInicial}...`
-      }).eq('id', jobId)
     }
 
-    // Executar fases em sequência
-    while (faseAtual) {
+    // Executar fases em sequência com retry automático
+    while (faseAtual && tentativas < MAX_TENTATIVAS) {
       const startTimeFase = Date.now()
       let resultado: PhaseResult
 
       try {
+        // Carregar progresso atual para a fase
+        const progressoFase = await carregarProgresso(supabase, jobId)
+        
         switch (faseAtual) {
           case 'fase1':
-            resultado = await executarFase1(supabase, arquivoFonte, periodoReferencia, jobId, startTimeFase)
+            resultado = await executarFase1(supabase, arquivoFonte, periodoReferencia, jobId, startTimeFase, progressoFase || undefined)
             break
           case 'fase2':
-            resultado = await executarFase2(supabase, arquivoFonte, jobId, startTimeFase)
+            resultado = await executarFase2(supabase, arquivoFonte, jobId, startTimeFase, progressoFase || undefined)
             break
           case 'fase3':
-            resultado = await executarFase3(supabase, arquivoFonte, jobId, startTimeFase)
+            resultado = await executarFase3(supabase, arquivoFonte, jobId, startTimeFase, progressoFase || undefined)
             break
           default:
-            resultado = { fase: 'completo', regrasAplicadas: [], proximaFase: null, tempoMs: 0 }
+            resultado = { fase: 'completo', regrasAplicadas: [], proximaFase: null, tempoMs: 0, completa: true }
         }
 
-        todasRegrasAplicadas.push(...resultado.regrasAplicadas)
+        todasRegrasAplicadas = [...new Set([...todasRegrasAplicadas, ...resultado.regrasAplicadas])]
         
         // Atualizar log com progresso
         await supabase.from('processamento_regras_log').update({
           regras_aplicadas: todasRegrasAplicadas,
-          mensagem: `${resultado.fase} concluída em ${Math.round(resultado.tempoMs / 1000)}s`
+          mensagem: `${resultado.fase} concluída em ${Math.round(resultado.tempoMs / 1000)}s`,
+          progresso_fase: null  // Limpar progresso pois a fase foi concluída
         }).eq('id', jobId)
 
+        // Avançar para próxima fase
         faseAtual = resultado.proximaFase
+        tentativas = 0  // Reset tentativas ao completar uma fase
 
       } catch (faseError: any) {
         console.error(`❌ [${jobId}] Erro na ${faseAtual}:`, faseError.message)
         
-        // Se deu timeout, podemos tentar continuar na próxima fase
-        if (faseError.message.includes('Timeout')) {
-          console.log(`⚠️ [${jobId}] Timeout na ${faseAtual}, pulando para próxima fase...`)
+        // Se deu timeout, continuar na mesma fase (não pular!)
+        if (faseError.message === 'TIMEOUT') {
+          tentativas++
+          console.log(`⚠️ [${jobId}] Timeout na ${faseAtual} (tentativa ${tentativas}/${MAX_TENTATIVAS}) - continuando...`)
           
-          // Determinar próxima fase
-          if (faseAtual === 'fase1') faseAtual = 'fase2'
-          else if (faseAtual === 'fase2') faseAtual = 'fase3'
-          else faseAtual = null
+          // Atualizar log
+          await supabase.from('processamento_regras_log').update({
+            mensagem: `Timeout na ${faseAtual} (tentativa ${tentativas}/${MAX_TENTATIVAS}) - continuando...`
+          }).eq('id', jobId)
           
+          // Aguardar um pouco antes de re-tentar
+          await new Promise(resolve => setTimeout(resolve, 2000))
+          
+          // Continuar na mesma fase
           continue
         }
         
         throw faseError
       }
+    }
+
+    // Verificar se excedeu tentativas
+    if (tentativas >= MAX_TENTATIVAS) {
+      throw new Error(`Excedeu ${MAX_TENTATIVAS} tentativas de timeout`)
     }
 
     // Contar registros depois
@@ -889,7 +1053,8 @@ async function processarArquivo(
       registros_excluidos: (logData?.registros_antes || 0) - (depoisCount || 0),
       regras_aplicadas: todasRegrasAplicadas,
       completed_at: new Date().toISOString(),
-      mensagem: `Processamento concluído em ${tempoTotal}s (3 fases)`
+      mensagem: `Processamento concluído em ${tempoTotal}s`,
+      progresso_fase: null
     }).eq('id', jobId)
 
   } catch (error: any) {
@@ -952,7 +1117,7 @@ Deno.serve(async (req) => {
         job_id: jobId,
         arquivo: arquivo_fonte,
         fase_inicial: faseInicial,
-        mensagem: 'Processamento iniciado em background com fases automáticas.',
+        mensagem: 'Processamento iniciado em background com retry automático.',
         status: 'processando'
       }),
       { 
