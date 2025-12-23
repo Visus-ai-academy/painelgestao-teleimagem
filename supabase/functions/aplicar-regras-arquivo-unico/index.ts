@@ -623,10 +623,10 @@ async function executarFase2(
   console.log(`🔧 [${jobId}] FASE 2: Iniciando regras de mapeamento (v011, v031)`)
   console.log(`📋 [${jobId}] Regras já aplicadas: ${regrasAplicadas.join(', ') || 'nenhuma'}`)
 
-  // v011: Categorias de exames - COM CHECKPOINT
-  // Agora usa DUAS fontes: cadastro_exames direto + valores_referencia_de_para (vinculações manuais)
+  // v011: Categorias de exames - OTIMIZADO COM BATCH
+  // Usa DUAS fontes: cadastro_exames direto + valores_referencia_de_para (vinculações manuais)
   if (!jaAplicada('v011')) {
-    console.log(`🏷️ [${jobId}] v011: Aplicando categorias...`)
+    console.log(`🏷️ [${jobId}] v011: Aplicando categorias (modo batch otimizado)...`)
     
     // 1. Buscar exames do cadastro com categoria
     const { data: cadastroExamesCategoria } = await supabase
@@ -642,175 +642,193 @@ async function executarFase2(
       .eq('ativo', true)
       .not('cadastro_exame_id', 'is', null)
     
-    let totalCategoriasAplicadas = 0
+    // 3. Buscar todos registros sem categoria do arquivo
+    const { data: registrosSemCategoria } = await supabase
+      .from('volumetria_mobilemed')
+      .select('id, ESTUDO_DESCRICAO')
+      .eq('arquivo_fonte', arquivoFonte)
+      .or('CATEGORIA.is.null,CATEGORIA.eq.')
+      .limit(50000)
     
-    // Primeiro: aplicar categorias diretas do cadastro
-    if (cadastroExamesCategoria && cadastroExamesCategoria.length > 0) {
-      console.log(`📋 [${jobId}] v011: ${cadastroExamesCategoria.length} exames diretos com categoria`)
+    if (registrosSemCategoria && registrosSemCategoria.length > 0) {
+      console.log(`📋 [${jobId}] v011: ${registrosSemCategoria.length} registros sem categoria`)
       
-      const inicioV011 = progressoAnterior?.regraAtual === 'v011' ? indiceInicial : 0
+      // Criar mapa de ESTUDO_DESCRICAO → categoria
+      const mapaCategorias = new Map<string, string>()
       
-      for (let i = inicioV011; i < cadastroExamesCategoria.length; i++) {
-        checkTimeout()
-        const exame = cadastroExamesCategoria[i]
-        if (exame.nome && exame.categoria) {
-          const { count } = await supabase
-            .from('volumetria_mobilemed')
-            .update({ CATEGORIA: exame.categoria }, { count: 'exact' })
-            .eq('arquivo_fonte', arquivoFonte)
-            .eq('ESTUDO_DESCRICAO', exame.nome)
-            .or('CATEGORIA.is.null,CATEGORIA.eq.')
-          
-          if (count && count > 0) totalCategoriasAplicadas += count
+      // Primeiro as vinculações (prioridade maior)
+      if (vinculacoes) {
+        for (const vinc of vinculacoes) {
+          const categoria = (vinc.cadastro_exames as any)?.categoria
+          if (vinc.estudo_descricao && categoria) {
+            mapaCategorias.set(vinc.estudo_descricao.toUpperCase(), categoria)
+          }
         }
-        
-        // Salvar checkpoint a cada 100 registros
-        if (i > 0 && i % 100 === 0) {
-          await salvarProgresso(supabase, jobId, {
-            fase: 'fase2',
-            regrasAplicadas,
-            regraAtual: 'v011',
-            indiceAtual: i
-          })
-        }
+        console.log(`📋 [${jobId}] v011: ${vinculacoes.length} vinculações mapeadas`)
       }
-    }
-    
-    // Segundo: aplicar categorias via vinculações (exames fora do padrão)
-    if (vinculacoes && vinculacoes.length > 0) {
-      console.log(`📋 [${jobId}] v011: ${vinculacoes.length} vinculações de exames fora do padrão`)
       
-      for (const vinc of vinculacoes) {
-        checkTimeout()
-        const categoria = (vinc.cadastro_exames as any)?.categoria
-        if (vinc.estudo_descricao && categoria) {
-          const { count } = await supabase
-            .from('volumetria_mobilemed')
-            .update({ CATEGORIA: categoria }, { count: 'exact' })
-            .eq('arquivo_fonte', arquivoFonte)
-            .eq('ESTUDO_DESCRICAO', vinc.estudo_descricao)
-            .or('CATEGORIA.is.null,CATEGORIA.eq.')
-          
-          if (count && count > 0) {
-            totalCategoriasAplicadas += count
-            console.log(`🔗 [${jobId}] v011: Vinculação "${vinc.estudo_descricao}" → categoria "${categoria}" (${count} registros)`)
+      // Depois o cadastro direto
+      if (cadastroExamesCategoria) {
+        for (const exame of cadastroExamesCategoria) {
+          if (exame.nome && exame.categoria) {
+            mapaCategorias.set(exame.nome.toUpperCase(), exame.categoria)
+          }
+        }
+        console.log(`📋 [${jobId}] v011: ${cadastroExamesCategoria.length} exames do cadastro`)
+      }
+      
+      // Agrupar registros por categoria a aplicar
+      const porCategoria = new Map<string, string[]>()
+      for (const reg of registrosSemCategoria) {
+        if (reg.ESTUDO_DESCRICAO) {
+          const categoriaEncontrada = mapaCategorias.get(reg.ESTUDO_DESCRICAO.toUpperCase())
+          if (categoriaEncontrada) {
+            if (!porCategoria.has(categoriaEncontrada)) {
+              porCategoria.set(categoriaEncontrada, [])
+            }
+            porCategoria.get(categoriaEncontrada)!.push(reg.id)
           }
         }
       }
+      
+      // Aplicar em batch por categoria
+      let totalAplicadas = 0
+      for (const [categoria, ids] of porCategoria.entries()) {
+        // Processar em chunks de 500 IDs
+        for (let i = 0; i < ids.length; i += 500) {
+          checkTimeout()
+          const chunk = ids.slice(i, i + 500)
+          await supabase
+            .from('volumetria_mobilemed')
+            .update({ CATEGORIA: categoria })
+            .in('id', chunk)
+          totalAplicadas += chunk.length
+        }
+      }
+      
+      console.log(`✅ [${jobId}] v011: ${totalAplicadas} registros atualizados com categoria`)
+    } else {
+      console.log(`✅ [${jobId}] v011: Nenhum registro sem categoria encontrado`)
     }
     
-    console.log(`✅ [${jobId}] v011: ${totalCategoriasAplicadas} registros atualizados com categoria`)
     regrasAplicadas.push('v011')
   }
 
   checkTimeout()
 
-  // v031: Modalidade e Especialidade do cadastro_exames - COM CHECKPOINT
-  // Agora usa DUAS fontes: cadastro_exames direto + valores_referencia_de_para (vinculações manuais)
+  // v031: Modalidade e Especialidade do cadastro_exames - OTIMIZADO COM BATCH
   if (!jaAplicada('v031')) {
-    console.log(`🔧 [${jobId}] v031: Aplicando modalidade/especialidade do cadastro...`)
+    console.log(`🔧 [${jobId}] v031: Aplicando modalidade/especialidade (modo batch otimizado)...`)
     
     const { data: cadastroCompleto } = await supabase
       .from('cadastro_exames')
       .select('nome, modalidade, especialidade')
       .eq('ativo', true)
     
-    // Buscar vinculações da tabela de_para (exames fora do padrão vinculados)
     const { data: vinculacoesV031 } = await supabase
       .from('valores_referencia_de_para')
       .select('estudo_descricao, cadastro_exame_id, cadastro_exames!inner(modalidade, especialidade)')
       .eq('ativo', true)
       .not('cadastro_exame_id', 'is', null)
     
-    let totalV031Aplicados = 0
+    // Buscar registros sem modalidade ou especialidade
+    const { data: registrosSemMod } = await supabase
+      .from('volumetria_mobilemed')
+      .select('id, ESTUDO_DESCRICAO')
+      .eq('arquivo_fonte', arquivoFonte)
+      .or('MODALIDADE.is.null,MODALIDADE.eq.')
+      .limit(50000)
     
-    // Primeiro: aplicar do cadastro direto
-    if (cadastroCompleto && cadastroCompleto.length > 0) {
-      console.log(`📋 [${jobId}] v031: ${cadastroCompleto.length} exames diretos no cadastro`)
-      
-      const inicioV031 = progressoAnterior?.regraAtual === 'v031' ? indiceInicial : 0
-      
-      for (let i = inicioV031; i < cadastroCompleto.length; i++) {
-        checkTimeout()
-        const exame = cadastroCompleto[i]
-        if (exame.nome) {
-          if (exame.modalidade) {
-            const { count: countMod } = await supabase
-              .from('volumetria_mobilemed')
-              .update({ MODALIDADE: exame.modalidade }, { count: 'exact' })
-              .eq('arquivo_fonte', arquivoFonte)
-              .eq('ESTUDO_DESCRICAO', exame.nome)
-              .or('MODALIDADE.is.null,MODALIDADE.eq.')
-            
-            if (countMod && countMod > 0) totalV031Aplicados += countMod
-          }
-          
-          if (exame.especialidade) {
-            const { count: countEsp } = await supabase
-              .from('volumetria_mobilemed')
-              .update({ ESPECIALIDADE: exame.especialidade }, { count: 'exact' })
-              .eq('arquivo_fonte', arquivoFonte)
-              .eq('ESTUDO_DESCRICAO', exame.nome)
-              .or('ESPECIALIDADE.is.null,ESPECIALIDADE.eq.')
-            
-            if (countEsp && countEsp > 0) totalV031Aplicados += countEsp
-          }
-        }
-        
-        // Salvar checkpoint a cada 100 registros
-        if (i > 0 && i % 100 === 0) {
-          await salvarProgresso(supabase, jobId, {
-            fase: 'fase2',
-            regrasAplicadas,
-            regraAtual: 'v031',
-            indiceAtual: i
-          })
-        }
-      }
-    }
+    const { data: registrosSemEsp } = await supabase
+      .from('volumetria_mobilemed')
+      .select('id, ESTUDO_DESCRICAO')
+      .eq('arquivo_fonte', arquivoFonte)
+      .or('ESPECIALIDADE.is.null,ESPECIALIDADE.eq.')
+      .limit(50000)
     
-    // Segundo: aplicar via vinculações (exames fora do padrão)
-    if (vinculacoesV031 && vinculacoesV031.length > 0) {
-      console.log(`📋 [${jobId}] v031: ${vinculacoesV031.length} vinculações de exames fora do padrão`)
-      
+    // Criar mapas de ESTUDO_DESCRICAO → modalidade/especialidade
+    const mapaModalidade = new Map<string, string>()
+    const mapaEspecialidade = new Map<string, string>()
+    
+    // Primeiro as vinculações (prioridade maior)
+    if (vinculacoesV031) {
       for (const vinc of vinculacoesV031) {
-        checkTimeout()
-        const modalidade = (vinc.cadastro_exames as any)?.modalidade
-        const especialidade = (vinc.cadastro_exames as any)?.especialidade
-        
+        const mod = (vinc.cadastro_exames as any)?.modalidade
+        const esp = (vinc.cadastro_exames as any)?.especialidade
         if (vinc.estudo_descricao) {
-          if (modalidade) {
-            const { count: countMod } = await supabase
-              .from('volumetria_mobilemed')
-              .update({ MODALIDADE: modalidade }, { count: 'exact' })
-              .eq('arquivo_fonte', arquivoFonte)
-              .eq('ESTUDO_DESCRICAO', vinc.estudo_descricao)
-              .or('MODALIDADE.is.null,MODALIDADE.eq.')
-            
-            if (countMod && countMod > 0) {
-              totalV031Aplicados += countMod
-              console.log(`🔗 [${jobId}] v031: Vinculação "${vinc.estudo_descricao}" → modalidade "${modalidade}" (${countMod} registros)`)
-            }
+          if (mod) mapaModalidade.set(vinc.estudo_descricao.toUpperCase(), mod)
+          if (esp) mapaEspecialidade.set(vinc.estudo_descricao.toUpperCase(), esp)
+        }
+      }
+      console.log(`📋 [${jobId}] v031: ${vinculacoesV031.length} vinculações mapeadas`)
+    }
+    
+    // Depois o cadastro direto
+    if (cadastroCompleto) {
+      for (const exame of cadastroCompleto) {
+        if (exame.nome) {
+          if (exame.modalidade) mapaModalidade.set(exame.nome.toUpperCase(), exame.modalidade)
+          if (exame.especialidade) mapaEspecialidade.set(exame.nome.toUpperCase(), exame.especialidade)
+        }
+      }
+      console.log(`📋 [${jobId}] v031: ${cadastroCompleto.length} exames do cadastro`)
+    }
+    
+    let totalAplicados = 0
+    
+    // Aplicar modalidades em batch
+    if (registrosSemMod && registrosSemMod.length > 0) {
+      const porModalidade = new Map<string, string[]>()
+      for (const reg of registrosSemMod) {
+        if (reg.ESTUDO_DESCRICAO) {
+          const mod = mapaModalidade.get(reg.ESTUDO_DESCRICAO.toUpperCase())
+          if (mod) {
+            if (!porModalidade.has(mod)) porModalidade.set(mod, [])
+            porModalidade.get(mod)!.push(reg.id)
           }
-          
-          if (especialidade) {
-            const { count: countEsp } = await supabase
-              .from('volumetria_mobilemed')
-              .update({ ESPECIALIDADE: especialidade }, { count: 'exact' })
-              .eq('arquivo_fonte', arquivoFonte)
-              .eq('ESTUDO_DESCRICAO', vinc.estudo_descricao)
-              .or('ESPECIALIDADE.is.null,ESPECIALIDADE.eq.')
-            
-            if (countEsp && countEsp > 0) {
-              totalV031Aplicados += countEsp
-              console.log(`🔗 [${jobId}] v031: Vinculação "${vinc.estudo_descricao}" → especialidade "${especialidade}" (${countEsp} registros)`)
-            }
-          }
+        }
+      }
+      
+      for (const [modalidade, ids] of porModalidade.entries()) {
+        for (let i = 0; i < ids.length; i += 500) {
+          checkTimeout()
+          const chunk = ids.slice(i, i + 500)
+          await supabase
+            .from('volumetria_mobilemed')
+            .update({ MODALIDADE: modalidade })
+            .in('id', chunk)
+          totalAplicados += chunk.length
         }
       }
     }
     
-    console.log(`✅ [${jobId}] v031: ${totalV031Aplicados} atualizações aplicadas`)
+    // Aplicar especialidades em batch
+    if (registrosSemEsp && registrosSemEsp.length > 0) {
+      const porEspecialidade = new Map<string, string[]>()
+      for (const reg of registrosSemEsp) {
+        if (reg.ESTUDO_DESCRICAO) {
+          const esp = mapaEspecialidade.get(reg.ESTUDO_DESCRICAO.toUpperCase())
+          if (esp) {
+            if (!porEspecialidade.has(esp)) porEspecialidade.set(esp, [])
+            porEspecialidade.get(esp)!.push(reg.id)
+          }
+        }
+      }
+      
+      for (const [especialidade, ids] of porEspecialidade.entries()) {
+        for (let i = 0; i < ids.length; i += 500) {
+          checkTimeout()
+          const chunk = ids.slice(i, i + 500)
+          await supabase
+            .from('volumetria_mobilemed')
+            .update({ ESPECIALIDADE: especialidade })
+            .in('id', chunk)
+          totalAplicados += chunk.length
+        }
+      }
+    }
+    
+    console.log(`✅ [${jobId}] v031: ${totalAplicados} atualizações aplicadas`)
     regrasAplicadas.push('v031')
   }
 
