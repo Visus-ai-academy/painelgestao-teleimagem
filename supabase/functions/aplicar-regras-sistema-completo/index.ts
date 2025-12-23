@@ -104,38 +104,80 @@ serve(async (req) => {
       console.log('  ⚡ Limpeza de nomes de clientes...');
       
       // Normalizar sufixo _TELE (ex: CLINICA_CRL_TELE -> CLINICA_CRL)
-      const { data: clientesTele } = await supabase
+      let teleQuery = supabase
         .from('volumetria_mobilemed')
         .select('"EMPRESA"')
         .eq('arquivo_fonte', arquivo)
         .like('EMPRESA', '%_TELE');
+      
+      if (periodo_referencia) {
+        teleQuery = teleQuery.eq('periodo_referencia', periodo_referencia);
+      }
+      
+      const { data: clientesTele } = await teleQuery;
       
       if (clientesTele && clientesTele.length > 0) {
         const empresasUnicas = [...new Set(clientesTele.map((c: any) => c.EMPRESA).filter(Boolean))];
         for (const empresaTele of empresasUnicas) {
           if (empresaTele && empresaTele.endsWith('_TELE')) {
             const empresaNormalizada = empresaTele.replace(/_TELE$/, '');
-            await supabase.from('volumetria_mobilemed')
+            let updateQuery = supabase.from('volumetria_mobilemed')
               .update({ EMPRESA: empresaNormalizada })
               .eq('arquivo_fonte', arquivo)
               .eq('EMPRESA', empresaTele);
+            
+            if (periodo_referencia) {
+              updateQuery = updateQuery.eq('periodo_referencia', periodo_referencia);
+            }
+            
+            await updateQuery;
             console.log(`    📝 ${empresaTele} → ${empresaNormalizada}`);
           }
         }
       }
       
-      // === BUSCAR REGISTROS PARA PROCESSAMENTO ===
-      const { data: registros, error: errorFetch } = await supabase
-        .from('volumetria_mobilemed')
-        .select('id, "ESTUDO_DESCRICAO", "CATEGORIA", "ESPECIALIDADE", "PRIORIDADE", "VALORES", "MODALIDADE"')
-        .eq('arquivo_fonte', arquivo);
-
-      if (errorFetch) {
-        console.error(`❌ Erro: ${errorFetch.message}`);
+      // === BUSCAR REGISTROS PARA PROCESSAMENTO (com paginação para evitar limite de 1000) ===
+      let allRegistros: any[] = [];
+      let offset = 0;
+      const pageSize = 1000;
+      let hasMore = true;
+      
+      while (hasMore) {
+        let query = supabase
+          .from('volumetria_mobilemed')
+          .select('id, "ESTUDO_DESCRICAO", "CATEGORIA", "ESPECIALIDADE", "PRIORIDADE", "VALORES", "MODALIDADE"')
+          .eq('arquivo_fonte', arquivo)
+          .range(offset, offset + pageSize - 1);
+        
+        // Filtrar por período se informado
+        if (periodo_referencia) {
+          query = query.eq('periodo_referencia', periodo_referencia);
+        }
+        
+        const { data: pageData, error: pageError } = await query;
+        
+        if (pageError) {
+          console.error(`❌ Erro na página ${offset}: ${pageError.message}`);
+          break;
+        }
+        
+        if (pageData && pageData.length > 0) {
+          allRegistros = allRegistros.concat(pageData);
+          offset += pageSize;
+          hasMore = pageData.length === pageSize;
+        } else {
+          hasMore = false;
+        }
+      }
+      
+      const registros = allRegistros;
+      
+      if (registros.length === 0) {
+        console.log(`⚠️ Nenhum registro encontrado para ${arquivo} no período ${periodo_referencia}`);
         continue;
       }
 
-      console.log(`📊 ${registros?.length || 0} registros`);
+      console.log(`📊 ${registros.length} registros totais (buscados em ${Math.ceil(offset / pageSize) || 1} páginas)`);
 
       let stats = { modalidades: 0, especialidades: 0, categorias: 0, prioridades: 0, valores: 0, mamaMamo: 0, neuroCorrecao: 0 };
 
@@ -182,19 +224,23 @@ serve(async (req) => {
             stats.especialidades++;
           }
 
-          // Cadastro exames (SEMPRE sobrescreve)
+          // Cadastro exames (SEMPRE sobrescreve - usa valor final considerando alterações anteriores)
           if (reg.ESTUDO_DESCRICAO) {
             const dados = mapaCadastro.get(reg.ESTUDO_DESCRICAO.toUpperCase().trim());
             if (dados) {
-              if (dados.categoria && dados.categoria !== reg.CATEGORIA) {
+              const categoriaAtual = upd.CATEGORIA || reg.CATEGORIA;
+              const especialidadeAtual = upd.ESPECIALIDADE || reg.ESPECIALIDADE;
+              
+              if (dados.categoria && dados.categoria !== categoriaAtual) {
                 upd.CATEGORIA = dados.categoria;
                 changed = true;
                 stats.categorias++;
               }
-              if (dados.especialidade && dados.especialidade !== reg.ESPECIALIDADE) {
+              if (dados.especialidade && dados.especialidade !== especialidadeAtual) {
                 upd.ESPECIALIDADE = dados.especialidade;
                 changed = true;
                 stats.especialidades++;
+                console.log(`📋 Cadastro: ${reg.ESTUDO_DESCRICAO} → ESP: ${dados.especialidade}`);
               }
             } else {
               // Fallback categoria por modalidade
