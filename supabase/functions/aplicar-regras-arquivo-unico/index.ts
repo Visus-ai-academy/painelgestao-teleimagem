@@ -367,7 +367,7 @@ async function executarFase1(
 
   checkTimeout()
 
-  // v034: Colunas → NEURO/MUSCULO (atualiza ESPECIALIDADE e CATEGORIA)
+  // v034: Colunas → NEURO/MUSCULO (apenas ESPECIALIDADE, CATEGORIA mantém original)
   if (!jaAplicada('v034')) {
     try {
       const { data: neurologistas } = await supabase
@@ -378,9 +378,8 @@ async function executarFase1(
       if (neurologistas && neurologistas.length > 0) {
         for (const neuro of neurologistas) {
           if (neuro.nome) {
-            // Neurologistas: ESPECIALIDADE → NEURO, CATEGORIA → NEURO
             await supabase.from('volumetria_mobilemed')
-              .update({ ESPECIALIDADE: 'NEURO', CATEGORIA: 'NEURO' })
+              .update({ ESPECIALIDADE: 'NEURO' })
               .eq('arquivo_fonte', arquivoFonte)
               .ilike('ESTUDO_DESCRICAO', '%COLUNA%')
               .ilike('MEDICO', `%${neuro.nome}%`)
@@ -388,9 +387,9 @@ async function executarFase1(
         }
       }
       
-      // Colunas padrão (não neurologistas) → MUSCULO ESQUELETICO (ESPECIALIDADE e CATEGORIA)
+      // Colunas padrão (não neurologistas) → MUSCULO ESQUELETICO
       await supabase.from('volumetria_mobilemed')
-        .update({ ESPECIALIDADE: 'MUSCULO ESQUELETICO', CATEGORIA: 'MUSCULO ESQUELETICO' })
+        .update({ ESPECIALIDADE: 'MUSCULO ESQUELETICO' })
         .eq('arquivo_fonte', arquivoFonte)
         .ilike('ESTUDO_DESCRICAO', '%COLUNA%')
         .eq('ESPECIALIDADE', 'COLUNAS')
@@ -1240,26 +1239,26 @@ async function executarFase3(
           
           console.log(`📋 [${jobId}] v034: ${idsNeuro.length} → NEURO, ${idsMusculo.length} → MUSCULO ESQUELETICO`)
           
-          // Atualizar NEURO em batch (ESPECIALIDADE e CATEGORIA)
+          // Atualizar NEURO em batch (apenas ESPECIALIDADE)
           if (idsNeuro.length > 0) {
             for (let i = 0; i < idsNeuro.length; i += 500) {
               checkTimeout()
               const batch = idsNeuro.slice(i, i + 500)
               await supabase
                 .from('volumetria_mobilemed')
-                .update({ ESPECIALIDADE: 'NEURO', CATEGORIA: 'NEURO', updated_at: new Date().toISOString() })
+                .update({ ESPECIALIDADE: 'NEURO', updated_at: new Date().toISOString() })
                 .in('id', batch)
             }
           }
           
-          // Atualizar MUSCULO ESQUELETICO em batch (ESPECIALIDADE e CATEGORIA)
+          // Atualizar MUSCULO ESQUELETICO em batch (apenas ESPECIALIDADE)
           if (idsMusculo.length > 0) {
             for (let i = 0; i < idsMusculo.length; i += 500) {
               checkTimeout()
               const batch = idsMusculo.slice(i, i + 500)
               await supabase
                 .from('volumetria_mobilemed')
-                .update({ ESPECIALIDADE: 'MUSCULO ESQUELETICO', CATEGORIA: 'MUSCULO ESQUELETICO', updated_at: new Date().toISOString() })
+                .update({ ESPECIALIDADE: 'MUSCULO ESQUELETICO', updated_at: new Date().toISOString() })
                 .in('id', batch)
             }
           }
