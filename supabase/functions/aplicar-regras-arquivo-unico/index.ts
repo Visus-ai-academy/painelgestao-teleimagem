@@ -996,6 +996,96 @@ async function executarFase3(
     }
   }
 
+  checkTimeout()
+
+  // v034: Regra Colunas x Músculo x Neuro - converte ESPECIALIDADE=COLUNAS para NEURO ou MUSCULO ESQUELETICO
+  if (!jaAplicada('v034')) {
+    try {
+      console.log(`🔧 [${jobId}] v034: Aplicando regra Colunas x Músculo x Neuro...`)
+      
+      // Buscar neurologistas
+      const { data: neurologistasDb } = await supabase
+        .from('medicos_neurologistas')
+        .select('nome')
+        .eq('ativo', true)
+      
+      const medicosNeuroLista = neurologistasDb?.map((n: any) => n.nome.toUpperCase().replace(/^DR[A]?\s+/i, '').trim()) || []
+      
+      if (medicosNeuroLista.length === 0) {
+        console.warn(`⚠️ [${jobId}] v034: Nenhum neurologista cadastrado na tabela`)
+      } else {
+        console.log(`👨‍⚕️ [${jobId}] v034: ${medicosNeuroLista.length} neurologistas carregados`)
+        
+        // Buscar registros com ESPECIALIDADE = COLUNAS
+        const { data: registrosColunas } = await supabase
+          .from('volumetria_mobilemed')
+          .select('id, MEDICO')
+          .eq('arquivo_fonte', arquivoFonte)
+          .or('ESPECIALIDADE.eq.COLUNAS,ESPECIALIDADE.eq.Colunas,ESPECIALIDADE.ilike.colunas')
+        
+        if (registrosColunas && registrosColunas.length > 0) {
+          console.log(`📊 [${jobId}] v034: ${registrosColunas.length} registros com ESPECIALIDADE=COLUNAS`)
+          
+          const idsNeuro: string[] = []
+          const idsMusculo: string[] = []
+          
+          for (const registro of registrosColunas) {
+            const medico = (registro.MEDICO || '').toUpperCase().replace(/^DR[A]?\s+/i, '').trim()
+            
+            let ehNeurologista = false
+            for (const medicoNeuro of medicosNeuroLista) {
+              if (medico === medicoNeuro || medico.startsWith(medicoNeuro.split(' ')[0])) {
+                ehNeurologista = true
+                break
+              }
+            }
+            
+            if (ehNeurologista) {
+              idsNeuro.push(registro.id)
+            } else {
+              idsMusculo.push(registro.id)
+            }
+          }
+          
+          console.log(`📋 [${jobId}] v034: ${idsNeuro.length} → NEURO, ${idsMusculo.length} → MUSCULO ESQUELETICO`)
+          
+          // Atualizar NEURO em batch
+          if (idsNeuro.length > 0) {
+            for (let i = 0; i < idsNeuro.length; i += 500) {
+              checkTimeout()
+              const batch = idsNeuro.slice(i, i + 500)
+              await supabase
+                .from('volumetria_mobilemed')
+                .update({ ESPECIALIDADE: 'NEURO', CATEGORIA: 'SC', updated_at: new Date().toISOString() })
+                .in('id', batch)
+            }
+          }
+          
+          // Atualizar MUSCULO ESQUELETICO em batch
+          if (idsMusculo.length > 0) {
+            for (let i = 0; i < idsMusculo.length; i += 500) {
+              checkTimeout()
+              const batch = idsMusculo.slice(i, i + 500)
+              await supabase
+                .from('volumetria_mobilemed')
+                .update({ ESPECIALIDADE: 'MUSCULO ESQUELETICO', updated_at: new Date().toISOString() })
+                .in('id', batch)
+            }
+          }
+          
+          console.log(`✅ [${jobId}] v034: Atualizações concluídas`)
+        } else {
+          console.log(`✅ [${jobId}] v034: Nenhum registro com ESPECIALIDADE=COLUNAS`)
+        }
+      }
+      
+      regrasAplicadas.push('v034')
+    } catch (v034Err: any) {
+      if (v034Err.message === 'TIMEOUT') throw v034Err
+      console.error(`❌ [${jobId}] Erro v034:`, v034Err.message)
+    }
+  }
+
   console.log(`✅ [${jobId}] FASE 3 concluída: ${regrasAplicadas.length} regras aplicadas`)
 
   return {
