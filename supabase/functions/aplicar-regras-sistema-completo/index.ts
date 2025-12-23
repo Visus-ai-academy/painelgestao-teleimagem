@@ -218,14 +218,14 @@ serve(async (req) => {
           
           if ((modalidadeFinal === 'CT' || modalidadeFinal === 'MR') && 
               especialidadeFinal === 'MEDICINA INTERNA' &&
-              categoriaFinal && (categoriaFinal.toUpperCase().includes('CABEC') || 
-                                 categoriaFinal.toUpperCase().includes('PESCO') ||
-                                 categoriaFinal.toUpperCase() === 'CABEÇA' ||
-                                 categoriaFinal.toUpperCase() === 'PESCOÇO')) {
-            upd.ESPECIALIDADE = 'NEURO';
-            changed = true;
-            stats.neuroCorrecao++;
-            console.log(`🧠 v007b: MEDICINA INTERNA → NEURO: ${reg.ESTUDO_DESCRICAO} (${modalidadeFinal}, ${categoriaFinal})`);
+              categoriaFinal) {
+            const catNorm = categoriaFinal.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            if (catNorm.includes('CABEC') || catNorm.includes('PESCO') || catNorm === 'CABECA' || catNorm === 'PESCOCO') {
+              upd.ESPECIALIDADE = 'NEURO';
+              changed = true;
+              stats.neuroCorrecao++;
+              console.log(`🧠 v007b: MEDICINA INTERNA → NEURO: ${reg.ESTUDO_DESCRICAO} (${modalidadeFinal}, ${categoriaFinal})`);
+            }
           }
 
           // Prioridades
