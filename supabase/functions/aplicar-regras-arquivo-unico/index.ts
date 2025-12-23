@@ -624,18 +624,29 @@ async function executarFase2(
   console.log(`📋 [${jobId}] Regras já aplicadas: ${regrasAplicadas.join(', ') || 'nenhuma'}`)
 
   // v011: Categorias de exames - COM CHECKPOINT
+  // Agora usa DUAS fontes: cadastro_exames direto + valores_referencia_de_para (vinculações manuais)
   if (!jaAplicada('v011')) {
     console.log(`🏷️ [${jobId}] v011: Aplicando categorias...`)
     
+    // 1. Buscar exames do cadastro com categoria
     const { data: cadastroExamesCategoria } = await supabase
       .from('cadastro_exames')
       .select('nome, categoria')
       .eq('ativo', true)
       .not('categoria', 'is', null)
     
+    // 2. Buscar vinculações da tabela de_para (exames fora do padrão vinculados)
+    const { data: vinculacoes } = await supabase
+      .from('valores_referencia_de_para')
+      .select('estudo_descricao, cadastro_exame_id, cadastro_exames!inner(categoria)')
+      .eq('ativo', true)
+      .not('cadastro_exame_id', 'is', null)
+    
     let totalCategoriasAplicadas = 0
+    
+    // Primeiro: aplicar categorias diretas do cadastro
     if (cadastroExamesCategoria && cadastroExamesCategoria.length > 0) {
-      console.log(`📋 [${jobId}] v011: ${cadastroExamesCategoria.length} exames com categoria`)
+      console.log(`📋 [${jobId}] v011: ${cadastroExamesCategoria.length} exames diretos com categoria`)
       
       const inicioV011 = progressoAnterior?.regraAtual === 'v011' ? indiceInicial : 0
       
@@ -665,6 +676,29 @@ async function executarFase2(
       }
     }
     
+    // Segundo: aplicar categorias via vinculações (exames fora do padrão)
+    if (vinculacoes && vinculacoes.length > 0) {
+      console.log(`📋 [${jobId}] v011: ${vinculacoes.length} vinculações de exames fora do padrão`)
+      
+      for (const vinc of vinculacoes) {
+        checkTimeout()
+        const categoria = (vinc.cadastro_exames as any)?.categoria
+        if (vinc.estudo_descricao && categoria) {
+          const { count } = await supabase
+            .from('volumetria_mobilemed')
+            .update({ CATEGORIA: categoria }, { count: 'exact' })
+            .eq('arquivo_fonte', arquivoFonte)
+            .eq('ESTUDO_DESCRICAO', vinc.estudo_descricao)
+            .or('CATEGORIA.is.null,CATEGORIA.eq.')
+          
+          if (count && count > 0) {
+            totalCategoriasAplicadas += count
+            console.log(`🔗 [${jobId}] v011: Vinculação "${vinc.estudo_descricao}" → categoria "${categoria}" (${count} registros)`)
+          }
+        }
+      }
+    }
+    
     console.log(`✅ [${jobId}] v011: ${totalCategoriasAplicadas} registros atualizados com categoria`)
     regrasAplicadas.push('v011')
   }
@@ -672,6 +706,7 @@ async function executarFase2(
   checkTimeout()
 
   // v031: Modalidade e Especialidade do cadastro_exames - COM CHECKPOINT
+  // Agora usa DUAS fontes: cadastro_exames direto + valores_referencia_de_para (vinculações manuais)
   if (!jaAplicada('v031')) {
     console.log(`🔧 [${jobId}] v031: Aplicando modalidade/especialidade do cadastro...`)
     
@@ -680,9 +715,18 @@ async function executarFase2(
       .select('nome, modalidade, especialidade')
       .eq('ativo', true)
     
+    // Buscar vinculações da tabela de_para (exames fora do padrão vinculados)
+    const { data: vinculacoesV031 } = await supabase
+      .from('valores_referencia_de_para')
+      .select('estudo_descricao, cadastro_exame_id, cadastro_exames!inner(modalidade, especialidade)')
+      .eq('ativo', true)
+      .not('cadastro_exame_id', 'is', null)
+    
     let totalV031Aplicados = 0
+    
+    // Primeiro: aplicar do cadastro direto
     if (cadastroCompleto && cadastroCompleto.length > 0) {
-      console.log(`📋 [${jobId}] v031: ${cadastroCompleto.length} exames no cadastro`)
+      console.log(`📋 [${jobId}] v031: ${cadastroCompleto.length} exames diretos no cadastro`)
       
       const inicioV031 = progressoAnterior?.regraAtual === 'v031' ? indiceInicial : 0
       
@@ -721,6 +765,47 @@ async function executarFase2(
             regraAtual: 'v031',
             indiceAtual: i
           })
+        }
+      }
+    }
+    
+    // Segundo: aplicar via vinculações (exames fora do padrão)
+    if (vinculacoesV031 && vinculacoesV031.length > 0) {
+      console.log(`📋 [${jobId}] v031: ${vinculacoesV031.length} vinculações de exames fora do padrão`)
+      
+      for (const vinc of vinculacoesV031) {
+        checkTimeout()
+        const modalidade = (vinc.cadastro_exames as any)?.modalidade
+        const especialidade = (vinc.cadastro_exames as any)?.especialidade
+        
+        if (vinc.estudo_descricao) {
+          if (modalidade) {
+            const { count: countMod } = await supabase
+              .from('volumetria_mobilemed')
+              .update({ MODALIDADE: modalidade }, { count: 'exact' })
+              .eq('arquivo_fonte', arquivoFonte)
+              .eq('ESTUDO_DESCRICAO', vinc.estudo_descricao)
+              .or('MODALIDADE.is.null,MODALIDADE.eq.')
+            
+            if (countMod && countMod > 0) {
+              totalV031Aplicados += countMod
+              console.log(`🔗 [${jobId}] v031: Vinculação "${vinc.estudo_descricao}" → modalidade "${modalidade}" (${countMod} registros)`)
+            }
+          }
+          
+          if (especialidade) {
+            const { count: countEsp } = await supabase
+              .from('volumetria_mobilemed')
+              .update({ ESPECIALIDADE: especialidade }, { count: 'exact' })
+              .eq('arquivo_fonte', arquivoFonte)
+              .eq('ESTUDO_DESCRICAO', vinc.estudo_descricao)
+              .or('ESPECIALIDADE.is.null,ESPECIALIDADE.eq.')
+            
+            if (countEsp && countEsp > 0) {
+              totalV031Aplicados += countEsp
+              console.log(`🔗 [${jobId}] v031: Vinculação "${vinc.estudo_descricao}" → especialidade "${especialidade}" (${countEsp} registros)`)
+            }
+          }
         }
       }
     }
