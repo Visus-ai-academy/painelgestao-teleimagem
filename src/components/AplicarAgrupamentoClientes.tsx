@@ -56,11 +56,6 @@ export function AplicarAgrupamentoClientes({ periodoReferencia }: AplicarAgrupam
         ),
       });
 
-      // Recarregar página após 2 segundos
-      setTimeout(() => {
-        window.location.reload();
-      }, 2000);
-
     } catch (error) {
       console.error('Erro ao aplicar agrupamento:', error);
       toast({
