@@ -3023,6 +3023,7 @@ export type Database = {
           id: string
           mensagem: string | null
           periodo_referencia: string
+          progresso_fase: Json | null
           registros_antes: number | null
           registros_depois: number | null
           registros_excluidos: number | null
@@ -3038,6 +3039,7 @@ export type Database = {
           id?: string
           mensagem?: string | null
           periodo_referencia: string
+          progresso_fase?: Json | null
           registros_antes?: number | null
           registros_depois?: number | null
           registros_excluidos?: number | null
@@ -3053,6 +3055,7 @@ export type Database = {
           id?: string
           mensagem?: string | null
           periodo_referencia?: string
+          progresso_fase?: Json | null
           registros_antes?: number | null
           registros_depois?: number | null
           registros_excluidos?: number | null
