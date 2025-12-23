@@ -5,7 +5,10 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Função para aplicar todas as regras em UM ÚNICO arquivo
+// Timeout máximo para processamento (em ms) - 8 minutos
+const MAX_PROCESSING_TIME = 8 * 60 * 1000
+
+// Função para aplicar todas as regras em UM ÚNICO arquivo - OTIMIZADA
 async function aplicarRegrasArquivo(
   supabase: any,
   arquivoFonte: string,
@@ -15,6 +18,14 @@ async function aplicarRegrasArquivo(
   console.log(`🚀 [${jobId}] Aplicando regras no arquivo: ${arquivoFonte}`)
   
   const regrasAplicadas: string[] = []
+  const startTime = Date.now()
+
+  // Função para verificar timeout
+  const checkTimeout = () => {
+    if (Date.now() - startTime > MAX_PROCESSING_TIME) {
+      throw new Error('Timeout: processamento excedeu limite de 8 minutos')
+    }
+  }
 
   try {
     // Atualizar status para processando
@@ -83,11 +94,9 @@ async function aplicarRegrasArquivo(
       }
 
       if (anoCompleto >= 2020 && mesNumero >= 1 && mesNumero <= 12) {
-        // v003: Excluir DATA_REALIZACAO >= primeiro dia do mês de referência
         const dataLimiteRealizacao = new Date(Date.UTC(anoCompleto, mesNumero - 1, 1))
         const dataLimiteRealizacaoStr = dataLimiteRealizacao.toISOString().split('T')[0]
         
-        // v002: Manter DATA_LAUDO entre dia 8 do mês ref e dia 7 do mês seguinte
         const dataInicioJanelaLaudo = new Date(Date.UTC(anoCompleto, mesNumero - 1, 8))
         const dataFimJanelaLaudo = new Date(Date.UTC(anoCompleto, mesNumero, 7))
         const dataInicioJanelaLaudoStr = dataInicioJanelaLaudo.toISOString().split('T')[0]
@@ -98,9 +107,10 @@ async function aplicarRegrasArquivo(
 
         // v003: Excluir em lotes
         let totalExcludosV003 = 0
-        const BATCH_SIZE = 100
+        const BATCH_SIZE = 500
         
         while (true) {
+          checkTimeout()
           const { data: idsToDelete } = await supabase
             .from('volumetria_mobilemed')
             .select('id')
@@ -113,11 +123,10 @@ async function aplicarRegrasArquivo(
           const { count } = await supabase
             .from('volumetria_mobilemed')
             .delete({ count: 'exact' })
-            .in('id', idsToDelete.map(r => r.id))
+            .in('id', idsToDelete.map((r: any) => r.id))
 
           totalExcludosV003 += count || 0
           if ((count || 0) < BATCH_SIZE) break
-          await new Promise(resolve => setTimeout(resolve, 30))
         }
         
         console.log(`✅ [${jobId}] v003: ${totalExcludosV003} registros excluídos`)
@@ -127,6 +136,7 @@ async function aplicarRegrasArquivo(
         let totalExcludosV002 = 0
         
         while (true) {
+          checkTimeout()
           const { data: idsToDelete } = await supabase
             .from('volumetria_mobilemed')
             .select('id')
@@ -139,11 +149,10 @@ async function aplicarRegrasArquivo(
           const { count } = await supabase
             .from('volumetria_mobilemed')
             .delete({ count: 'exact' })
-            .in('id', idsToDelete.map(r => r.id))
+            .in('id', idsToDelete.map((r: any) => r.id))
 
           totalExcludosV002 += count || 0
           if ((count || 0) < BATCH_SIZE) break
-          await new Promise(resolve => setTimeout(resolve, 30))
         }
         
         console.log(`✅ [${jobId}] v002: ${totalExcludosV002} registros excluídos`)
@@ -153,7 +162,9 @@ async function aplicarRegrasArquivo(
       }
     }
 
-    // ===== REGRAS DE EXCLUSÃO =====
+    checkTimeout()
+
+    // ===== REGRAS DE EXCLUSÃO (operações em lote) =====
     
     // v004: Exclusões de clientes específicos
     await supabase.from('volumetria_mobilemed')
@@ -176,6 +187,8 @@ async function aplicarRegrasArquivo(
       .like('EMPRESA', '%TESTE%')
     regrasAplicadas.push('v032')
 
+    checkTimeout()
+
     // ===== REGRAS DE NORMALIZAÇÃO =====
 
     // v001: CEDI unificação
@@ -185,126 +198,95 @@ async function aplicarRegrasArquivo(
       .in('EMPRESA', ['CEDI-RJ','CEDI-RO','CEDI-UNIMED','CEDI_RJ','CEDI_RO','CEDI_UNIMED'])
     regrasAplicadas.push('v001')
 
-    // v001b: Normalizar sufixo _TELE - buscar TODOS
-    let offsetTele = 0
-    const limitTele = 500
-    const empresasTeleProcessadas = new Set<string>()
+    // v001b: Normalizar sufixo _TELE - buscar distintos e atualizar em lote
+    const { data: empresasComTele } = await supabase
+      .from('volumetria_mobilemed')
+      .select('"EMPRESA"')
+      .eq('arquivo_fonte', arquivoFonte)
+      .like('EMPRESA', '%_TELE')
+      .limit(1000)
     
-    while (true) {
-      const { data: clientesTele } = await supabase
-        .from('volumetria_mobilemed')
-        .select('"EMPRESA"')
-        .eq('arquivo_fonte', arquivoFonte)
-        .like('EMPRESA', '%_TELE')
-        .range(offsetTele, offsetTele + limitTele - 1)
-      
-      if (!clientesTele || clientesTele.length === 0) break
-      
-      for (const c of clientesTele) {
-        const empresaTele = c.EMPRESA
-        if (empresaTele && typeof empresaTele === 'string' && empresaTele.endsWith('_TELE') && !empresasTeleProcessadas.has(empresaTele)) {
-          empresasTeleProcessadas.add(empresaTele)
-          const empresaNormalizada = empresaTele.replace(/_TELE$/, '')
+    if (empresasComTele && empresasComTele.length > 0) {
+      const empresasUnicas = [...new Set(empresasComTele.map((c: any) => c.EMPRESA))]
+      for (const empresa of empresasUnicas) {
+        if (typeof empresa === 'string' && empresa.endsWith('_TELE')) {
           await supabase.from('volumetria_mobilemed')
-            .update({ EMPRESA: empresaNormalizada })
+            .update({ EMPRESA: empresa.replace(/_TELE$/, '') })
             .eq('arquivo_fonte', arquivoFonte)
-            .eq('EMPRESA', empresaTele)
+            .eq('EMPRESA', empresa)
         }
       }
-      
-      offsetTele += limitTele
-      if (clientesTele.length < limitTele) break
-      await new Promise(resolve => setTimeout(resolve, 30))
     }
     regrasAplicadas.push('v001b')
 
-    // v001c: Normalização de nomes de médicos - buscar TODOS
-    let offsetMedicos = 0
-    const limitMedicos = 500
+    checkTimeout()
+
+    // v001c: Normalização de nomes de médicos - buscar TODOS mapeamentos
+    const { data: mapeamentoMedicos } = await supabase
+      .from('mapeamento_nomes_medicos')
+      .select('nome_origem_normalizado, medico_nome')
+      .eq('ativo', true)
+      .limit(2000)
     
-    while (true) {
-      const { data: mapeamentoMedicos } = await supabase
-        .from('mapeamento_nomes_medicos')
-        .select('nome_origem_normalizado, medico_nome')
-        .eq('ativo', true)
-        .range(offsetMedicos, offsetMedicos + limitMedicos - 1)
-      
-      if (!mapeamentoMedicos || mapeamentoMedicos.length === 0) break
-      
+    if (mapeamentoMedicos && mapeamentoMedicos.length > 0) {
       for (const mapeamento of mapeamentoMedicos) {
         if (mapeamento.nome_origem_normalizado && mapeamento.medico_nome) {
           await supabase
             .from('volumetria_mobilemed')
-            .update({ MEDICO: mapeamento.medico_nome, updated_at: new Date().toISOString() })
+            .update({ MEDICO: mapeamento.medico_nome })
             .eq('arquivo_fonte', arquivoFonte)
             .ilike('MEDICO', mapeamento.nome_origem_normalizado)
         }
       }
-      
-      offsetMedicos += limitMedicos
-      if (mapeamentoMedicos.length < limitMedicos) break
-      await new Promise(resolve => setTimeout(resolve, 30))
     }
     regrasAplicadas.push('v001c')
 
-    // v001d: De-Para valores zerados - buscar TODOS
-    let offsetValores = 0
-    const limitValores = 500
+    checkTimeout()
+
+    // v001d: De-Para valores zerados
+    const { data: valoresReferencia } = await supabase
+      .from('valores_referencia_de_para')
+      .select('estudo_descricao, valores')
+      .eq('ativo', true)
+      .limit(2000)
     
-    while (true) {
-      const { data: valoresReferencia } = await supabase
-        .from('valores_referencia_de_para')
-        .select('estudo_descricao, valores')
-        .eq('ativo', true)
-        .range(offsetValores, offsetValores + limitValores - 1)
-      
-      if (!valoresReferencia || valoresReferencia.length === 0) break
-      
+    if (valoresReferencia && valoresReferencia.length > 0) {
       for (const ref of valoresReferencia) {
         if (ref.estudo_descricao && ref.valores && ref.valores > 0) {
           await supabase
             .from('volumetria_mobilemed')
-            .update({ VALOR: ref.valores, updated_at: new Date().toISOString() })
+            .update({ VALOR: ref.valores })
             .eq('arquivo_fonte', arquivoFonte)
             .eq('ESTUDO_DESCRICAO', ref.estudo_descricao)
             .or('VALOR.is.null,VALOR.eq.0')
         }
       }
-      
-      offsetValores += limitValores
-      if (valoresReferencia.length < limitValores) break
-      await new Promise(resolve => setTimeout(resolve, 30))
     }
     regrasAplicadas.push('v001d')
 
-    // v005: Correções modalidade - buscar TODOS exames MAMO
-    let offsetMAMO = 0
-    const limitMAMO = 500
+    checkTimeout()
+
+    // v005: Correções modalidade - buscar exames MAMO
+    const { data: examesMAMO } = await supabase
+      .from('cadastro_exames')
+      .select('nome')
+      .eq('especialidade', 'MAMO')
+      .eq('ativo', true)
+      .limit(500)
     
-    while (true) {
-      const { data: examesMAMO } = await supabase
-        .from('cadastro_exames')
-        .select('nome')
-        .eq('especialidade', 'MAMO')
-        .eq('ativo', true)
-        .range(offsetMAMO, offsetMAMO + limitMAMO - 1)
-      
-      if (!examesMAMO || examesMAMO.length === 0) break
-      
-      for (const exame of examesMAMO) {
-        if (exame.nome) {
+    if (examesMAMO && examesMAMO.length > 0) {
+      const nomesMAMO = examesMAMO.map((e: any) => e.nome).filter(Boolean)
+      if (nomesMAMO.length > 0) {
+        // Atualizar em lote usando IN
+        for (const nome of nomesMAMO) {
           await supabase
             .from('volumetria_mobilemed')
             .update({ MODALIDADE: 'MG' })
             .eq('arquivo_fonte', arquivoFonte)
             .in('MODALIDADE', ['CR', 'DX'])
-            .eq('ESTUDO_DESCRICAO', exame.nome)
+            .eq('ESTUDO_DESCRICAO', nome)
         }
       }
-      
-      offsetMAMO += limitMAMO
-      if (examesMAMO.length < limitMAMO) break
-      await new Promise(resolve => setTimeout(resolve, 30))
     }
     
     // CR/DX → RX
@@ -320,6 +302,8 @@ async function aplicarRegrasArquivo(
       .in('MODALIDADE', ['OT', 'BMD'])
     
     regrasAplicadas.push('v005')
+
+    checkTimeout()
 
     // v007: Correções de especialidades
     await supabase.from('volumetria_mobilemed')
@@ -344,23 +328,19 @@ async function aplicarRegrasArquivo(
     
     regrasAplicadas.push('v007')
 
-    // v034: Colunas → NEURO/MUSCULO - buscar TODOS neurologistas
+    checkTimeout()
+
+    // v034: Colunas → NEURO/MUSCULO
     try {
-      let offsetNeuro = 0
-      const limitNeuro = 500
+      const { data: neurologistas } = await supabase
+        .from('medicos_neurologistas')
+        .select('nome')
+        .eq('ativo', true)
+        .limit(200)
       
-      while (true) {
-        const { data: neurologistas } = await supabase
-          .from('medicos_neurologistas')
-          .select('nome')
-          .eq('ativo', true)
-          .range(offsetNeuro, offsetNeuro + limitNeuro - 1)
-        
-        if (!neurologistas || neurologistas.length === 0) break
-        
+      if (neurologistas && neurologistas.length > 0) {
         for (const neuro of neurologistas) {
           if (neuro.nome) {
-            // Colunas de neurologistas → NEURO
             await supabase.from('volumetria_mobilemed')
               .update({ ESPECIALIDADE: 'NEURO' })
               .eq('arquivo_fonte', arquivoFonte)
@@ -368,10 +348,6 @@ async function aplicarRegrasArquivo(
               .ilike('MEDICO', `%${neuro.nome}%`)
           }
         }
-        
-        offsetNeuro += limitNeuro
-        if (neurologistas.length < limitNeuro) break
-        await new Promise(resolve => setTimeout(resolve, 30))
       }
       
       // Colunas padrão (não neurologistas) → MUSCULO ESQUELETICO
@@ -394,29 +370,22 @@ async function aplicarRegrasArquivo(
       .eq('ESPECIALIDADE', 'MAMA')
     regrasAplicadas.push('v044')
 
-    // v008: De-Para Prioridades - buscar TODOS
-    let offsetPrio = 0
-    const limitPrio = 500
+    checkTimeout()
+
+    // v008: De-Para Prioridades
+    const { data: prioridadesDePara } = await supabase
+      .from('valores_prioridade_de_para')
+      .select('prioridade_original, nome_final')
+      .eq('ativo', true)
+      .limit(500)
     
-    while (true) {
-      const { data: prioridadesDePara } = await supabase
-        .from('valores_prioridade_de_para')
-        .select('prioridade_original, nome_final')
-        .eq('ativo', true)
-        .range(offsetPrio, offsetPrio + limitPrio - 1)
-      
-      if (!prioridadesDePara || prioridadesDePara.length === 0) break
-      
+    if (prioridadesDePara && prioridadesDePara.length > 0) {
       for (const mapeamento of prioridadesDePara) {
         await supabase.from('volumetria_mobilemed')
           .update({ PRIORIDADE: mapeamento.nome_final })
           .eq('arquivo_fonte', arquivoFonte)
           .eq('PRIORIDADE', mapeamento.prioridade_original)
       }
-      
-      offsetPrio += limitPrio
-      if (prioridadesDePara.length < limitPrio) break
-      await new Promise(resolve => setTimeout(resolve, 30))
     }
     regrasAplicadas.push('v008')
 
@@ -455,56 +424,44 @@ async function aplicarRegrasArquivo(
       .eq('MODALIDADE', 'RX')
     regrasAplicadas.push('v010b')
 
-    // v011: Categorias de exames - buscar TODOS os exames do cadastro
-    console.log(`🏷️ [${jobId}] v011: Buscando todos os exames do cadastro para aplicar categorias...`)
+    checkTimeout()
+
+    // v011: Categorias de exames - OTIMIZADO: buscar todos de uma vez
+    console.log(`🏷️ [${jobId}] v011: Aplicando categorias...`)
     
-    let offsetCadastro = 0
-    const limitCadastro = 500
+    const { data: cadastroExamesCategoria } = await supabase
+      .from('cadastro_exames')
+      .select('nome, categoria')
+      .eq('ativo', true)
+      .not('categoria', 'is', null)
+      .limit(5000)
+    
     let totalCategoriasAplicadas = 0
-    
-    while (true) {
-      const { data: cadastroExames, error: cadastroError } = await supabase
-        .from('cadastro_exames')
-        .select('nome, categoria')
-        .eq('ativo', true)
-        .not('categoria', 'is', null)
-        .range(offsetCadastro, offsetCadastro + limitCadastro - 1)
-      
-      if (cadastroError) {
-        console.error(`❌ [${jobId}] Erro ao buscar cadastro_exames:`, cadastroError)
-        break
-      }
-      
-      if (!cadastroExames || cadastroExames.length === 0) break
-      
-      console.log(`📋 [${jobId}] v011: Processando lote ${Math.floor(offsetCadastro / limitCadastro) + 1} - ${cadastroExames.length} exames`)
-      
-      for (const exame of cadastroExames) {
-        if (exame.nome && exame.categoria) {
-          const { count } = await supabase
-            .from('volumetria_mobilemed')
-            .update({ CATEGORIA: exame.categoria, updated_at: new Date().toISOString() }, { count: 'exact' })
-            .eq('arquivo_fonte', arquivoFonte)
-            .eq('ESTUDO_DESCRICAO', exame.nome)
-            .or('CATEGORIA.is.null,CATEGORIA.eq.')
-          
-          if (count && count > 0) {
-            totalCategoriasAplicadas += count
+    if (cadastroExamesCategoria && cadastroExamesCategoria.length > 0) {
+      // Processar em lotes de 50 para evitar timeout
+      for (let i = 0; i < cadastroExamesCategoria.length; i += 50) {
+        checkTimeout()
+        const lote = cadastroExamesCategoria.slice(i, i + 50)
+        
+        for (const exame of lote) {
+          if (exame.nome && exame.categoria) {
+            const { count } = await supabase
+              .from('volumetria_mobilemed')
+              .update({ CATEGORIA: exame.categoria }, { count: 'exact' })
+              .eq('arquivo_fonte', arquivoFonte)
+              .eq('ESTUDO_DESCRICAO', exame.nome)
+              .or('CATEGORIA.is.null,CATEGORIA.eq.')
+            
+            if (count && count > 0) totalCategoriasAplicadas += count
           }
         }
       }
-      
-      offsetCadastro += limitCadastro
-      
-      // Se retornou menos que o limite, chegamos ao fim
-      if (cadastroExames.length < limitCadastro) break
-      
-      // Pequena pausa para não sobrecarregar
-      await new Promise(resolve => setTimeout(resolve, 50))
     }
     
     console.log(`✅ [${jobId}] v011: ${totalCategoriasAplicadas} registros atualizados com categoria`)
     regrasAplicadas.push('v011')
+
+    checkTimeout()
 
     // v012-v014: Especialidades automáticas
     await supabase.from('volumetria_mobilemed')
@@ -554,6 +511,8 @@ async function aplicarRegrasArquivo(
     
     regrasAplicadas.push('v018-v019')
 
+    checkTimeout()
+
     // v020: Modalidade mamografia
     await supabase.from('volumetria_mobilemed')
       .update({ MODALIDADE: 'MG' })
@@ -568,22 +527,19 @@ async function aplicarRegrasArquivo(
       .neq('MODALIDADE', 'MG')
     regrasAplicadas.push('v020')
 
-    // v021: Categoria oncologia - corrigido para aplicar apenas onde CATEGORIA está vazio
-    // Aplicar para exames com ONCO no nome
+    // v021: Categoria oncologia
     await supabase.from('volumetria_mobilemed')
       .update({ CATEGORIA: 'ONCO' })
       .eq('arquivo_fonte', arquivoFonte)
       .ilike('ESTUDO_DESCRICAO', '%ONCO%')
       .or('CATEGORIA.is.null,CATEGORIA.eq.')
     
-    // Aplicar para exames com PET no nome
     await supabase.from('volumetria_mobilemed')
       .update({ CATEGORIA: 'ONCO' })
       .eq('arquivo_fonte', arquivoFonte)
       .ilike('ESTUDO_DESCRICAO', '%PET%')
       .or('CATEGORIA.is.null,CATEGORIA.eq.')
     
-    // Aplicar para exames com CINTILOGRAFIA no nome
     await supabase.from('volumetria_mobilemed')
       .update({ CATEGORIA: 'ONCO' })
       .eq('arquivo_fonte', arquivoFonte)
@@ -606,70 +562,61 @@ async function aplicarRegrasArquivo(
       .is('is_duplicado', null)
     regrasAplicadas.push('v024')
 
-    // v031: Modalidade e Especialidade do cadastro_exames - buscar TODOS, apenas onde está vazio
-    console.log(`🔧 [${jobId}] v031: Aplicando modalidade/especialidade do cadastro (apenas onde vazio)...`)
+    checkTimeout()
+
+    // v031: Modalidade e Especialidade do cadastro_exames - OTIMIZADO
+    console.log(`🔧 [${jobId}] v031: Aplicando modalidade/especialidade do cadastro...`)
     
-    let offsetV031 = 0
-    const limitV031 = 500
+    const { data: cadastroCompleto } = await supabase
+      .from('cadastro_exames')
+      .select('nome, modalidade, especialidade')
+      .eq('ativo', true)
+      .limit(5000)
+    
     let totalV031Aplicados = 0
-    
-    while (true) {
-      const { data: cadastroCompleto, error: cadastroV031Error } = await supabase
-        .from('cadastro_exames')
-        .select('nome, modalidade, especialidade')
-        .eq('ativo', true)
-        .range(offsetV031, offsetV031 + limitV031 - 1)
-      
-      if (cadastroV031Error) {
-        console.error(`❌ [${jobId}] Erro v031:`, cadastroV031Error)
-        break
-      }
-      
-      if (!cadastroCompleto || cadastroCompleto.length === 0) break
-      
-      console.log(`📋 [${jobId}] v031: Processando lote ${Math.floor(offsetV031 / limitV031) + 1} - ${cadastroCompleto.length} exames`)
-      
-      for (const exame of cadastroCompleto) {
-        if (exame.nome) {
-          // Atualizar MODALIDADE apenas onde está vazio
-          if (exame.modalidade) {
-            const { count: countMod } = await supabase
-              .from('volumetria_mobilemed')
-              .update({ MODALIDADE: exame.modalidade, updated_at: new Date().toISOString() }, { count: 'exact' })
-              .eq('arquivo_fonte', arquivoFonte)
-              .eq('ESTUDO_DESCRICAO', exame.nome)
-              .or('MODALIDADE.is.null,MODALIDADE.eq.')
+    if (cadastroCompleto && cadastroCompleto.length > 0) {
+      // Processar em lotes de 50
+      for (let i = 0; i < cadastroCompleto.length; i += 50) {
+        checkTimeout()
+        const lote = cadastroCompleto.slice(i, i + 50)
+        
+        for (const exame of lote) {
+          if (exame.nome) {
+            if (exame.modalidade) {
+              const { count: countMod } = await supabase
+                .from('volumetria_mobilemed')
+                .update({ MODALIDADE: exame.modalidade }, { count: 'exact' })
+                .eq('arquivo_fonte', arquivoFonte)
+                .eq('ESTUDO_DESCRICAO', exame.nome)
+                .or('MODALIDADE.is.null,MODALIDADE.eq.')
+              
+              if (countMod && countMod > 0) totalV031Aplicados += countMod
+            }
             
-            if (countMod && countMod > 0) totalV031Aplicados += countMod
-          }
-          
-          // Atualizar ESPECIALIDADE apenas onde está vazio
-          if (exame.especialidade) {
-            const { count: countEsp } = await supabase
-              .from('volumetria_mobilemed')
-              .update({ ESPECIALIDADE: exame.especialidade, updated_at: new Date().toISOString() }, { count: 'exact' })
-              .eq('arquivo_fonte', arquivoFonte)
-              .eq('ESTUDO_DESCRICAO', exame.nome)
-              .or('ESPECIALIDADE.is.null,ESPECIALIDADE.eq.')
-            
-            if (countEsp && countEsp > 0) totalV031Aplicados += countEsp
+            if (exame.especialidade) {
+              const { count: countEsp } = await supabase
+                .from('volumetria_mobilemed')
+                .update({ ESPECIALIDADE: exame.especialidade }, { count: 'exact' })
+                .eq('arquivo_fonte', arquivoFonte)
+                .eq('ESTUDO_DESCRICAO', exame.nome)
+                .or('ESPECIALIDADE.is.null,ESPECIALIDADE.eq.')
+              
+              if (countEsp && countEsp > 0) totalV031Aplicados += countEsp
+            }
           }
         }
       }
-      
-      offsetV031 += limitV031
-      if (cadastroCompleto.length < limitV031) break
-      await new Promise(resolve => setTimeout(resolve, 50))
     }
     
     console.log(`✅ [${jobId}] v031: ${totalV031Aplicados} atualizações aplicadas`)
     regrasAplicadas.push('v031')
 
-    // ===== v027: QUEBRA DE EXAMES =====
+    checkTimeout()
+
+    // ===== v027: QUEBRA DE EXAMES - OTIMIZADO =====
     console.log(`🔧 [${jobId}] v027: Aplicando quebra de exames...`)
     
     try {
-      // Buscar todas as regras de quebra ativas COM dados do cadastro_exames
       const { data: regrasQuebra, error: errorRegras } = await supabase
         .from('regras_quebra_exames')
         .select('exame_original, exame_quebrado, categoria_quebrada')
@@ -679,15 +626,13 @@ async function aplicarRegrasArquivo(
         console.error(`⚠️ [${jobId}] Erro ao buscar regras de quebra:`, errorRegras)
       } else if (regrasQuebra && regrasQuebra.length > 0) {
         
-        // Buscar dados do cadastro_exames para os exames quebrados (especialidade e categoria)
-        const examesQuebrados = regrasQuebra.map(r => r.exame_quebrado)
+        const examesQuebrados = regrasQuebra.map((r: any) => r.exame_quebrado)
         const { data: cadastroExamesQuebrados } = await supabase
           .from('cadastro_exames')
           .select('nome, especialidade, categoria')
           .in('nome', examesQuebrados)
           .eq('ativo', true)
         
-        // Criar mapa de exame quebrado -> dados do cadastro
         const mapaCadastro = new Map<string, { especialidade: string | null, categoria: string | null }>()
         if (cadastroExamesQuebrados) {
           for (const ce of cadastroExamesQuebrados) {
@@ -697,7 +642,6 @@ async function aplicarRegrasArquivo(
         
         console.log(`📋 [${jobId}] v027: ${mapaCadastro.size} exames quebrados encontrados no cadastro`)
         
-        // Agrupar quebras por exame original
         const quebrasAgrupadas = new Map<string, Array<{exame_original: string, exame_quebrado: string, categoria_quebrada: string | null}>>()
         
         for (const regra of regrasQuebra) {
@@ -712,15 +656,18 @@ async function aplicarRegrasArquivo(
         let totalQuebrados = 0
         let totalRegistrosCriados = 0
         
-        // Processar cada tipo de exame original
         for (const [exameOriginal, configsQuebra] of quebrasAgrupadas) {
+          checkTimeout()
+          
           const quantidadeQuebras = configsQuebra.length
           
-          // Buscar TODOS os registros deste exame original em lotes
+          // Processar em lotes menores
           let offsetQuebra = 0
-          const limitQuebra = 500
+          const limitQuebra = 200
           
           while (true) {
+            checkTimeout()
+            
             const { data: registrosOriginais, error: errorRegistros } = await supabase
               .from('volumetria_mobilemed')
               .select('*')
@@ -735,68 +682,60 @@ async function aplicarRegrasArquivo(
             
             if (!registrosOriginais || registrosOriginais.length === 0) break
             
-            // Processar cada registro original
+            // Coletar todos os registros para inserção em lote
+            const registrosParaInserir: any[] = []
+            const idsParaDeletar: string[] = []
+            
             for (const registroOriginal of registrosOriginais) {
-              try {
-                // Manter a PRIORIDADE original do arquivo de upload
-                const prioridadeOriginal = registroOriginal.PRIORIDADE
+              const prioridadeOriginal = registroOriginal.PRIORIDADE
+              
+              const registrosQuebrados = configsQuebra.map((config) => {
+                const novoRegistro = { ...registroOriginal }
+                delete novoRegistro.id
+                delete novoRegistro.created_at
+                delete novoRegistro.updated_at
                 
-                // Criar registros quebrados com dados do cadastro_exames
-                const registrosQuebrados = configsQuebra.map((config) => {
-                  const novoRegistro = { ...registroOriginal }
-                  delete novoRegistro.id
-                  delete novoRegistro.created_at
-                  delete novoRegistro.updated_at
-                  
-                  // Buscar especialidade e categoria do cadastro_exames para este exame quebrado
-                  const dadosCadastro = mapaCadastro.get(config.exame_quebrado)
-                  
-                  return {
-                    ...novoRegistro,
-                    ESTUDO_DESCRICAO: config.exame_quebrado,
-                    VALORES: 1, // Cada exame quebrado vale 1
-                    // ESPECIALIDADE: do cadastro_exames do exame quebrado
-                    ESPECIALIDADE: dadosCadastro?.especialidade || registroOriginal.ESPECIALIDADE,
-                    // CATEGORIA: do cadastro_exames do exame quebrado (ou categoria_quebrada da regra como fallback)
-                    CATEGORIA: dadosCadastro?.categoria || config.categoria_quebrada || registroOriginal.CATEGORIA || 'SC',
-                    // PRIORIDADE: mantém a original do arquivo de upload
-                    PRIORIDADE: prioridadeOriginal,
-                    updated_at: new Date().toISOString()
-                  }
-                })
+                const dadosCadastro = mapaCadastro.get(config.exame_quebrado)
                 
-                // Inserir registros quebrados
-                const { error: errorInsert } = await supabase
-                  .from('volumetria_mobilemed')
-                  .insert(registrosQuebrados)
-                
-                if (errorInsert) {
-                  console.error(`⚠️ [${jobId}] Erro ao inserir quebras:`, errorInsert)
-                  continue
+                return {
+                  ...novoRegistro,
+                  ESTUDO_DESCRICAO: config.exame_quebrado,
+                  VALORES: 1,
+                  ESPECIALIDADE: dadosCadastro?.especialidade || registroOriginal.ESPECIALIDADE,
+                  CATEGORIA: dadosCadastro?.categoria || config.categoria_quebrada || registroOriginal.CATEGORIA || 'SC',
+                  PRIORIDADE: prioridadeOriginal,
+                  updated_at: new Date().toISOString()
                 }
-                
-                // Remover registro original
+              })
+              
+              registrosParaInserir.push(...registrosQuebrados)
+              idsParaDeletar.push(registroOriginal.id)
+            }
+            
+            // Inserir em lote
+            if (registrosParaInserir.length > 0) {
+              const { error: errorInsert } = await supabase
+                .from('volumetria_mobilemed')
+                .insert(registrosParaInserir)
+              
+              if (errorInsert) {
+                console.error(`⚠️ [${jobId}] Erro ao inserir quebras:`, errorInsert)
+              } else {
+                // Deletar originais em lote
                 const { error: errorDelete } = await supabase
                   .from('volumetria_mobilemed')
                   .delete()
-                  .eq('id', registroOriginal.id)
+                  .in('id', idsParaDeletar)
                 
-                if (errorDelete) {
-                  console.error(`⚠️ [${jobId}] Erro ao remover original:`, errorDelete)
-                  continue
+                if (!errorDelete) {
+                  totalQuebrados += idsParaDeletar.length
+                  totalRegistrosCriados += registrosParaInserir.length
                 }
-                
-                totalQuebrados++
-                totalRegistrosCriados += quantidadeQuebras
-                
-              } catch (quebraErr: any) {
-                console.error(`⚠️ [${jobId}] Erro ao quebrar registro:`, quebraErr.message)
               }
             }
             
             offsetQuebra += limitQuebra
             if (registrosOriginais.length < limitQuebra) break
-            await new Promise(resolve => setTimeout(resolve, 30))
           }
         }
         
@@ -816,7 +755,8 @@ async function aplicarRegrasArquivo(
       .select('*', { count: 'exact', head: true })
       .eq('arquivo_fonte', arquivoFonte)
 
-    console.log(`✅ [${jobId}] Arquivo ${arquivoFonte} processado: ${antesCount} → ${depoisCount || 0} registros`)
+    const tempoTotal = Math.round((Date.now() - startTime) / 1000)
+    console.log(`✅ [${jobId}] Arquivo ${arquivoFonte} processado: ${antesCount} → ${depoisCount || 0} registros em ${tempoTotal}s`)
 
     // Atualizar log de conclusão
     await supabase.from('processamento_regras_log').update({
@@ -826,7 +766,7 @@ async function aplicarRegrasArquivo(
       registros_excluidos: antesCount - (depoisCount || 0),
       regras_aplicadas: regrasAplicadas,
       completed_at: new Date().toISOString(),
-      mensagem: 'Processamento concluído com sucesso'
+      mensagem: `Processamento concluído em ${tempoTotal}s`
     }).eq('id', jobId)
 
   } catch (error: any) {
