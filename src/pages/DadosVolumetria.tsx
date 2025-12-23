@@ -16,6 +16,7 @@ import { CorrigirExamesForaPadrao } from "@/components/CorrigirExamesForaPadrao"
 import { SystemDateTime } from "@/components/SystemDateTime";
 import { LimparUploadTravado } from "@/components/LimparUploadTravado";
 import { FinalizarUploadsTravados } from "@/components/FinalizarUploadsTravados";
+import { FinalizarRegrasEmProcessamento } from "@/components/FinalizarRegrasEmProcessamento";
 import { AplicarTipificacaoGeral } from "@/components/AplicarTipificacaoGeral";
 import { IndicadorTipificacao } from "@/components/IndicadorTipificacao";
 import { DemonstrativoVolumetriaPorCliente } from "@/components/DemonstrativoVolumetriaPorCliente";
@@ -192,6 +193,9 @@ export default function DadosVolumetria() {
 
                 {/* Finalizar uploads travados */}
                 <FinalizarUploadsTravados />
+                
+                {/* Finalizar regras travadas */}
+                <FinalizarRegrasEmProcessamento />
 
                 {/* Detectar e resetar uploads travados */}
                 {uploadStatus.processingUploads > 0 && uploadStatus.progressPercentage < 50 && (
