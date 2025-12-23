@@ -534,9 +534,19 @@ serve(async (req) => {
         }
         
         // Aplicar ajustes em batch
+        // ⚠️ IMPORTANTE: NÃO sobrescrever categoria SC quando especialidade é NEURO
+        // A regra v034 define NEURO + SC para exames de coluna laudados por neurologistas
         let atualizados = 0;
         for (const v of volumetria) {
           const cat = norm(v.CATEGORIA);
+          const esp = norm(v.ESPECIALIDADE || '');
+          
+          // Se categoria é SC e especialidade é NEURO, NÃO sobrescrever
+          // Isso preserva a correção da regra v034
+          if (cat === 'SC' && esp === 'NEURO') {
+            continue; // Pular - já está correto
+          }
+          
           if (!cat || cat === 'SC') {
             const descKey = norm(v.ESTUDO_DESCRICAO || '');
             const cached = categoriaCache.get(descKey);
