@@ -374,28 +374,32 @@ async function executarFase1(
     regrasAplicadas.push('v007')
   }
 
-  // v007b: CT + MEDICINA INTERNA + CATEGORIA PESCOÇO/CABEÇA → NEURO
-  // Exames CT com categoria PESCOÇO ou CABEÇA devem ter especialidade NEURO, não MEDICINA INTERNA
+  // v007b: CT/MR + MEDICINA INTERNA + CATEGORIA PESCOÇO/CABEÇA → NEURO
+  // Exames CT ou MR com categoria PESCOÇO ou CABEÇA devem ter especialidade NEURO, não MEDICINA INTERNA
   if (!jaAplicada('v007b')) {
-    console.log(`🔧 [${jobId}] v007b: Corrigindo CT + MEDICINA INTERNA + PESCOÇO/CABEÇA → NEURO...`)
+    console.log(`🔧 [${jobId}] v007b: Corrigindo CT/MR + MEDICINA INTERNA + PESCOÇO/CABEÇA → NEURO...`)
     
-    // Corrigir registros com CATEGORIA = PESCOÇO
-    await supabase.from('volumetria_mobilemed')
-      .update({ ESPECIALIDADE: 'NEURO' })
-      .eq('arquivo_fonte', arquivoFonte)
-      .eq('MODALIDADE', 'CT')
-      .eq('ESPECIALIDADE', 'MEDICINA INTERNA')
-      .ilike('CATEGORIA', '%PESCO%')
+    const modalidadesNeuro = ['CT', 'MR']
     
-    // Corrigir registros com CATEGORIA = CABEÇA
-    await supabase.from('volumetria_mobilemed')
-      .update({ ESPECIALIDADE: 'NEURO' })
-      .eq('arquivo_fonte', arquivoFonte)
-      .eq('MODALIDADE', 'CT')
-      .eq('ESPECIALIDADE', 'MEDICINA INTERNA')
-      .ilike('CATEGORIA', '%CABEC%')
+    for (const modalidade of modalidadesNeuro) {
+      // Corrigir registros com CATEGORIA = PESCOÇO
+      await supabase.from('volumetria_mobilemed')
+        .update({ ESPECIALIDADE: 'NEURO' })
+        .eq('arquivo_fonte', arquivoFonte)
+        .eq('MODALIDADE', modalidade)
+        .eq('ESPECIALIDADE', 'MEDICINA INTERNA')
+        .ilike('CATEGORIA', '%PESCO%')
+      
+      // Corrigir registros com CATEGORIA = CABEÇA
+      await supabase.from('volumetria_mobilemed')
+        .update({ ESPECIALIDADE: 'NEURO' })
+        .eq('arquivo_fonte', arquivoFonte)
+        .eq('MODALIDADE', modalidade)
+        .eq('ESPECIALIDADE', 'MEDICINA INTERNA')
+        .ilike('CATEGORIA', '%CABEC%')
+    }
     
-    console.log(`✅ [${jobId}] v007b: Correção CT + PESCOÇO/CABEÇA aplicada`)
+    console.log(`✅ [${jobId}] v007b: Correção CT/MR + PESCOÇO/CABEÇA aplicada`)
     regrasAplicadas.push('v007b')
   }
 
