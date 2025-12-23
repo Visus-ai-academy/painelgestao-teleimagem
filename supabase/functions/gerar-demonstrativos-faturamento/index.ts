@@ -500,73 +500,9 @@ serve(async (req) => {
       // Log final count
       console.log(`📊 ${nomeFantasia}: FINAL = ${totalExames} exames faturáveis`);
 
-      // ✅ OTIMIZADO: Ajustar categorias em batch
-      try {
-        const norm = (s: any) => (s ?? '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
-        
-        // Coletar todas as descrições que precisam de ajuste
-        const descricoesParaAjustar = new Set<string>();
-        for (const v of volumetria) {
-          const cat = norm(v.CATEGORIA);
-          if (!cat || cat === 'SC') {
-            const descKey = norm(v.ESTUDO_DESCRICAO || '');
-            if (descKey) descricoesParaAjustar.add(v.ESTUDO_DESCRICAO || '');
-          }
-        }
-        
-        // Buscar todos os cadastros de exames de uma vez
-        let categoriaCache = new Map<string, { categoria: string; especialidade: string }>();
-        if (descricoesParaAjustar.size > 0) {
-          const { data: cadastrosExames } = await supabase
-            .from('cadastro_exames')
-            .select('categoria, especialidade, nome, ativo')
-            .eq('ativo', true)
-            .in('nome', Array.from(descricoesParaAjustar));
-          
-          // Criar cache normalizado
-          (cadastrosExames || []).forEach((ce: any) => {
-            const key = norm(ce.nome);
-            categoriaCache.set(key, {
-              categoria: ce.categoria?.toString() || '',
-              especialidade: ce.especialidade?.toString() || ''
-            });
-          });
-        }
-        
-        // Aplicar ajustes em batch
-        // ⚠️ IMPORTANTE: NÃO sobrescrever categoria SC quando especialidade é NEURO
-        // A regra v034 define NEURO + SC para exames de coluna laudados por neurologistas
-        let atualizados = 0;
-        for (const v of volumetria) {
-          const cat = norm(v.CATEGORIA);
-          const esp = norm(v.ESPECIALIDADE || '');
-          
-          // Se categoria é SC e especialidade é NEURO, NÃO sobrescrever
-          // Isso preserva a correção da regra v034
-          if (cat === 'SC' && esp === 'NEURO') {
-            continue; // Pular - já está correto
-          }
-          
-          if (!cat || cat === 'SC') {
-            const descKey = norm(v.ESTUDO_DESCRICAO || '');
-            const cached = categoriaCache.get(descKey);
-            if (cached) {
-              if (cached.categoria) {
-                v.CATEGORIA = cached.categoria;
-                atualizados++;
-              }
-              if ((!v.ESPECIALIDADE || !norm(v.ESPECIALIDADE)) && cached.especialidade) {
-                v.ESPECIALIDADE = cached.especialidade;
-              }
-            }
-          }
-        }
-        if (atualizados > 0) {
-          console.log(`🛠️ Categorias ajustadas via cadastro_exames: ${atualizados}`);
-        }
-      } catch (e) {
-        console.log('⚠️ Erro ao ajustar categorias:', e?.message || e);
-      }
+      // ✅ REMOVIDO: Lógica de ajuste de categorias via cadastro_exames
+      // As 28 regras do aplicar-regras-arquivo-unico já tratam todos os casos
+      // Essa lógica era redundante e causava conflitos (sobrescrevia NEURO+SC → NEURO+COLUNAS)
 
       // ✅ CORRIGIDO: Aplicar faixas de volume SEMPRE via RPC para clientes com faixas
       let valorExamesCalculado = 0;
