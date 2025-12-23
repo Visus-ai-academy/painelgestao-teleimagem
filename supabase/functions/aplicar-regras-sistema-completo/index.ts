@@ -137,7 +137,7 @@ serve(async (req) => {
 
       console.log(`📊 ${registros?.length || 0} registros`);
 
-      let stats = { modalidades: 0, especialidades: 0, categorias: 0, prioridades: 0, valores: 0, mamaMamo: 0 };
+      let stats = { modalidades: 0, especialidades: 0, categorias: 0, prioridades: 0, valores: 0, mamaMamo: 0, neuroCorrecao: 0 };
 
       const loteSize = 50;
       for (let i = 0; i < (registros?.length || 0); i += loteSize) {
@@ -210,6 +210,24 @@ serve(async (req) => {
             }
           }
 
+          // v007b: CT/MR + MEDICINA INTERNA + CATEGORIA PESCOÇO/CABEÇA → NEURO
+          // Exames CT ou MR com categoria PESCOÇO ou CABEÇA devem ter especialidade NEURO, não MEDICINA INTERNA
+          const modalidadeFinal = upd.MODALIDADE || reg.MODALIDADE;
+          const especialidadeFinal = upd.ESPECIALIDADE || reg.ESPECIALIDADE;
+          const categoriaFinal = upd.CATEGORIA || reg.CATEGORIA;
+          
+          if ((modalidadeFinal === 'CT' || modalidadeFinal === 'MR') && 
+              especialidadeFinal === 'MEDICINA INTERNA' &&
+              categoriaFinal && (categoriaFinal.toUpperCase().includes('CABEC') || 
+                                 categoriaFinal.toUpperCase().includes('PESCO') ||
+                                 categoriaFinal.toUpperCase() === 'CABEÇA' ||
+                                 categoriaFinal.toUpperCase() === 'PESCOÇO')) {
+            upd.ESPECIALIDADE = 'NEURO';
+            changed = true;
+            stats.neuroCorrecao++;
+            console.log(`🧠 v007b: MEDICINA INTERNA → NEURO: ${reg.ESTUDO_DESCRICAO} (${modalidadeFinal}, ${categoriaFinal})`);
+          }
+
           // Prioridades
           if (reg.PRIORIDADE) {
             const novaPrio = mapaPrioridades.get(reg.PRIORIDADE.toUpperCase().trim());
@@ -252,7 +270,7 @@ serve(async (req) => {
         detalhes: { registros_processados: registros?.length || 0, ...stats, total_correções: totalCorrecoes }
       });
 
-      console.log(`✅ ${totalCorrecoes} correções: M:${stats.modalidades} E:${stats.especialidades} C:${stats.categorias} P:${stats.prioridades} V:${stats.valores} MAMA→MAMO:${stats.mamaMamo}`);
+      console.log(`✅ ${totalCorrecoes} correções: M:${stats.modalidades} E:${stats.especialidades} C:${stats.categorias} P:${stats.prioridades} V:${stats.valores} MAMA→MAMO:${stats.mamaMamo} NEURO:${stats.neuroCorrecao}`);
       totalProcessados += registros?.length || 0;
     }
 
