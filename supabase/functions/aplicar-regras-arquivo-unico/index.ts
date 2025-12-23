@@ -367,7 +367,7 @@ async function executarFase1(
 
   checkTimeout()
 
-  // v034: Colunas → NEURO/MUSCULO (apenas ESPECIALIDADE, CATEGORIA mantém original)
+  // v034: Colunas → NEURO (+ CATEGORIA=SC) ou MUSCULO ESQUELETICO
   if (!jaAplicada('v034')) {
     try {
       const { data: neurologistas } = await supabase
@@ -378,16 +378,22 @@ async function executarFase1(
       if (neurologistas && neurologistas.length > 0) {
         for (const neuro of neurologistas) {
           if (neuro.nome) {
+            // Normalizar nome para matching mais flexível
+            const nomeParts = neuro.nome.split(' ')
+            const primeiroNome = nomeParts[0]
+            const ultimoNome = nomeParts[nomeParts.length - 1]
+            
+            // Neurologistas: ESPECIALIDADE → NEURO, CATEGORIA → SC
             await supabase.from('volumetria_mobilemed')
-              .update({ ESPECIALIDADE: 'NEURO' })
+              .update({ ESPECIALIDADE: 'NEURO', CATEGORIA: 'SC' })
               .eq('arquivo_fonte', arquivoFonte)
               .ilike('ESTUDO_DESCRICAO', '%COLUNA%')
-              .ilike('MEDICO', `%${neuro.nome}%`)
+              .ilike('MEDICO', `%${primeiroNome}%${ultimoNome}%`)
           }
         }
       }
       
-      // Colunas padrão (não neurologistas) → MUSCULO ESQUELETICO
+      // Colunas padrão (não neurologistas) → MUSCULO ESQUELETICO (mantém CATEGORIA original)
       await supabase.from('volumetria_mobilemed')
         .update({ ESPECIALIDADE: 'MUSCULO ESQUELETICO' })
         .eq('arquivo_fonte', arquivoFonte)
@@ -1188,7 +1194,7 @@ async function executarFase3(
 
   checkTimeout()
 
-  // v034: Regra Colunas x Músculo x Neuro - converte ESPECIALIDADE=COLUNAS para NEURO ou MUSCULO ESQUELETICO
+  // v034: Regra Colunas x Músculo x Neuro - NEURO recebe CATEGORIA=SC
   if (!jaAplicada('v034')) {
     try {
       console.log(`🔧 [${jobId}] v034: Aplicando regra Colunas x Músculo x Neuro...`)
@@ -1199,59 +1205,90 @@ async function executarFase3(
         .select('nome')
         .eq('ativo', true)
       
-      const medicosNeuroLista = neurologistasDb?.map((n: any) => n.nome.toUpperCase().replace(/^DR[A]?\s+/i, '').trim()) || []
+      // Função para normalizar nome (remove acentos, prefixos, etc.)
+      const normalizarNome = (nome: string): string => {
+        return nome
+          .toUpperCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+          .replace(/^DR[A]?\.?\s*/i, '') // Remove Dr./Dra.
+          .trim()
+      }
       
-      if (medicosNeuroLista.length === 0) {
+      // Extrair primeiro e último nome de cada neurologista para matching flexível
+      const neurologistasInfo = neurologistasDb?.map((n: any) => {
+        const nomeNorm = normalizarNome(n.nome)
+        const parts = nomeNorm.split(/\s+/)
+        return {
+          nomeCompleto: nomeNorm,
+          primeiroNome: parts[0],
+          ultimoNome: parts[parts.length - 1],
+          partes: parts
+        }
+      }) || []
+      
+      if (neurologistasInfo.length === 0) {
         console.warn(`⚠️ [${jobId}] v034: Nenhum neurologista cadastrado na tabela`)
       } else {
-        console.log(`👨‍⚕️ [${jobId}] v034: ${medicosNeuroLista.length} neurologistas carregados`)
+        console.log(`👨‍⚕️ [${jobId}] v034: ${neurologistasInfo.length} neurologistas carregados`)
         
-        // Buscar registros com ESPECIALIDADE = COLUNAS
+        // Buscar registros com ESPECIALIDADE = COLUNAS OU exames de coluna que precisam verificação
         const { data: registrosColunas } = await supabase
           .from('volumetria_mobilemed')
-          .select('id, MEDICO')
+          .select('id, MEDICO, ESPECIALIDADE, CATEGORIA')
           .eq('arquivo_fonte', arquivoFonte)
-          .or('ESPECIALIDADE.eq.COLUNAS,ESPECIALIDADE.eq.Colunas,ESPECIALIDADE.ilike.colunas')
+          .ilike('ESTUDO_DESCRICAO', '%COLUNA%')
         
         if (registrosColunas && registrosColunas.length > 0) {
-          console.log(`📊 [${jobId}] v034: ${registrosColunas.length} registros com ESPECIALIDADE=COLUNAS`)
+          console.log(`📊 [${jobId}] v034: ${registrosColunas.length} registros de exames de coluna`)
           
           const idsNeuro: string[] = []
           const idsMusculo: string[] = []
           
           for (const registro of registrosColunas) {
-            const medico = (registro.MEDICO || '').toUpperCase().replace(/^DR[A]?\s+/i, '').trim()
+            const medicoNorm = normalizarNome(registro.MEDICO || '')
             
             let ehNeurologista = false
-            for (const medicoNeuro of medicosNeuroLista) {
-              if (medico === medicoNeuro || medico.startsWith(medicoNeuro.split(' ')[0])) {
+            for (const neuroInfo of neurologistasInfo) {
+              // Matching flexível: primeiro + último nome, ou nome completo contido
+              const matchPrimeiroUltimo = medicoNorm.includes(neuroInfo.primeiroNome) && 
+                                          medicoNorm.includes(neuroInfo.ultimoNome)
+              const matchCompleto = medicoNorm.includes(neuroInfo.nomeCompleto) ||
+                                    neuroInfo.nomeCompleto.includes(medicoNorm)
+              
+              if (matchPrimeiroUltimo || matchCompleto) {
                 ehNeurologista = true
                 break
               }
             }
             
+            // Só adicionar se precisar atualizar
             if (ehNeurologista) {
-              idsNeuro.push(registro.id)
+              if (registro.ESPECIALIDADE !== 'NEURO' || registro.CATEGORIA !== 'SC') {
+                idsNeuro.push(registro.id)
+              }
             } else {
-              idsMusculo.push(registro.id)
+              if (registro.ESPECIALIDADE === 'COLUNAS') {
+                idsMusculo.push(registro.id)
+              }
             }
           }
           
-          console.log(`📋 [${jobId}] v034: ${idsNeuro.length} → NEURO, ${idsMusculo.length} → MUSCULO ESQUELETICO`)
+          console.log(`📋 [${jobId}] v034: ${idsNeuro.length} → NEURO+SC, ${idsMusculo.length} → MUSCULO ESQUELETICO`)
           
-          // Atualizar NEURO em batch (apenas ESPECIALIDADE)
+          // Atualizar NEURO em batch (ESPECIALIDADE + CATEGORIA = SC)
           if (idsNeuro.length > 0) {
             for (let i = 0; i < idsNeuro.length; i += 500) {
               checkTimeout()
               const batch = idsNeuro.slice(i, i + 500)
               await supabase
                 .from('volumetria_mobilemed')
-                .update({ ESPECIALIDADE: 'NEURO', updated_at: new Date().toISOString() })
+                .update({ ESPECIALIDADE: 'NEURO', CATEGORIA: 'SC', updated_at: new Date().toISOString() })
                 .in('id', batch)
             }
           }
           
-          // Atualizar MUSCULO ESQUELETICO em batch (apenas ESPECIALIDADE)
+          // Atualizar MUSCULO ESQUELETICO em batch (apenas ESPECIALIDADE, mantém CATEGORIA)
           if (idsMusculo.length > 0) {
             for (let i = 0; i < idsMusculo.length; i += 500) {
               checkTimeout()
@@ -1265,7 +1302,7 @@ async function executarFase3(
           
           console.log(`✅ [${jobId}] v034: Atualizações concluídas`)
         } else {
-          console.log(`✅ [${jobId}] v034: Nenhum registro com ESPECIALIDADE=COLUNAS`)
+          console.log(`✅ [${jobId}] v034: Nenhum registro de exame de coluna encontrado`)
         }
       }
       
