@@ -374,34 +374,7 @@ async function executarFase1(
     regrasAplicadas.push('v007')
   }
 
-  // v007b: CT/MR + MEDICINA INTERNA + CATEGORIA PESCOÇO/CABEÇA → NEURO
-  // Exames CT ou MR com categoria PESCOÇO ou CABEÇA devem ter especialidade NEURO, não MEDICINA INTERNA
-  if (!jaAplicada('v007b')) {
-    console.log(`🔧 [${jobId}] v007b: Corrigindo CT/MR + MEDICINA INTERNA + PESCOÇO/CABEÇA → NEURO...`)
-    
-    const modalidadesNeuro = ['CT', 'MR']
-    
-    for (const modalidade of modalidadesNeuro) {
-      // Corrigir registros com CATEGORIA = PESCOÇO
-      await supabase.from('volumetria_mobilemed')
-        .update({ ESPECIALIDADE: 'NEURO' })
-        .eq('arquivo_fonte', arquivoFonte)
-        .eq('MODALIDADE', modalidade)
-        .eq('ESPECIALIDADE', 'MEDICINA INTERNA')
-        .ilike('CATEGORIA', '%PESCO%')
-      
-      // Corrigir registros com CATEGORIA = CABEÇA
-      await supabase.from('volumetria_mobilemed')
-        .update({ ESPECIALIDADE: 'NEURO' })
-        .eq('arquivo_fonte', arquivoFonte)
-        .eq('MODALIDADE', modalidade)
-        .eq('ESPECIALIDADE', 'MEDICINA INTERNA')
-        .ilike('CATEGORIA', '%CABEC%')
-    }
-    
-    console.log(`✅ [${jobId}] v007b: Correção CT/MR + PESCOÇO/CABEÇA aplicada`)
-    regrasAplicadas.push('v007b')
-  }
+  // v007b foi movida para FASE 2 (executa DEPOIS de v028 aplicar as categorias)
 
   checkTimeout()
 
@@ -1073,6 +1046,41 @@ async function executarFase2(
     }
     
     regrasAplicadas.push('v028')
+  }
+
+  checkTimeout()
+
+  // v007b: CT/MR + MEDICINA INTERNA + CATEGORIA PESCOÇO/CABEÇA → NEURO
+  // IMPORTANTE: Esta regra DEVE rodar DEPOIS de v011/v028 que aplicam as CATEGORIAS
+  // Exames CT ou MR com categoria PESCOÇO ou CABEÇA devem ter especialidade NEURO, não MEDICINA INTERNA
+  if (!jaAplicada('v007b')) {
+    console.log(`🔧 [${jobId}] v007b: Corrigindo CT/MR + MEDICINA INTERNA + PESCOÇO/CABEÇA → NEURO...`)
+    
+    const modalidadesNeuro = ['CT', 'MR']
+    let totalCorrigidos = 0
+    
+    for (const modalidade of modalidadesNeuro) {
+      // Corrigir registros com CATEGORIA = PESCOÇO
+      const { count: countPescoco } = await supabase.from('volumetria_mobilemed')
+        .update({ ESPECIALIDADE: 'NEURO' }, { count: 'exact' })
+        .eq('arquivo_fonte', arquivoFonte)
+        .eq('MODALIDADE', modalidade)
+        .eq('ESPECIALIDADE', 'MEDICINA INTERNA')
+        .ilike('CATEGORIA', '%PESCO%')
+      
+      // Corrigir registros com CATEGORIA = CABEÇA
+      const { count: countCabeca } = await supabase.from('volumetria_mobilemed')
+        .update({ ESPECIALIDADE: 'NEURO' }, { count: 'exact' })
+        .eq('arquivo_fonte', arquivoFonte)
+        .eq('MODALIDADE', modalidade)
+        .eq('ESPECIALIDADE', 'MEDICINA INTERNA')
+        .ilike('CATEGORIA', '%CABEC%')
+      
+      totalCorrigidos += (countPescoco || 0) + (countCabeca || 0)
+    }
+    
+    console.log(`✅ [${jobId}] v007b: ${totalCorrigidos} registros corrigidos (MEDICINA INTERNA → NEURO para PESCOÇO/CABEÇA)`)
+    regrasAplicadas.push('v007b')
   }
 
   console.log(`✅ [${jobId}] FASE 2 concluída: ${regrasAplicadas.length} regras aplicadas`)
