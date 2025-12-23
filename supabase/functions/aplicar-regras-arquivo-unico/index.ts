@@ -11,6 +11,15 @@ const MAX_PROCESSING_TIME = 5 * 60 * 1000
 // Limite de registros para considerar arquivo "grande"
 const LARGE_FILE_THRESHOLD = 10000
 
+// ===== FUNÇÃO DE NORMALIZAÇÃO (remove acentos, uppercase, trim) =====
+const normalizar = (s: any): string => {
+  return (s ?? '').toString()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .trim()
+}
+
 // Tipos de fases
 type ProcessingPhase = 'fase1' | 'fase2' | 'fase3' | 'completo'
 
@@ -365,6 +374,31 @@ async function executarFase1(
     regrasAplicadas.push('v007')
   }
 
+  // v007b: CT + MEDICINA INTERNA + CATEGORIA PESCOÇO/CABEÇA → NEURO
+  // Exames CT com categoria PESCOÇO ou CABEÇA devem ter especialidade NEURO, não MEDICINA INTERNA
+  if (!jaAplicada('v007b')) {
+    console.log(`🔧 [${jobId}] v007b: Corrigindo CT + MEDICINA INTERNA + PESCOÇO/CABEÇA → NEURO...`)
+    
+    // Corrigir registros com CATEGORIA = PESCOÇO
+    await supabase.from('volumetria_mobilemed')
+      .update({ ESPECIALIDADE: 'NEURO' })
+      .eq('arquivo_fonte', arquivoFonte)
+      .eq('MODALIDADE', 'CT')
+      .eq('ESPECIALIDADE', 'MEDICINA INTERNA')
+      .ilike('CATEGORIA', '%PESCO%')
+    
+    // Corrigir registros com CATEGORIA = CABEÇA
+    await supabase.from('volumetria_mobilemed')
+      .update({ ESPECIALIDADE: 'NEURO' })
+      .eq('arquivo_fonte', arquivoFonte)
+      .eq('MODALIDADE', 'CT')
+      .eq('ESPECIALIDADE', 'MEDICINA INTERNA')
+      .ilike('CATEGORIA', '%CABEC%')
+    
+    console.log(`✅ [${jobId}] v007b: Correção CT + PESCOÇO/CABEÇA aplicada`)
+    regrasAplicadas.push('v007b')
+  }
+
   checkTimeout()
 
   // v034: Colunas → NEURO (+ CATEGORIA=SC) ou MUSCULO ESQUELETICO
@@ -659,7 +693,8 @@ async function executarFase2(
     if (registrosSemCategoria && registrosSemCategoria.length > 0) {
       console.log(`📋 [${jobId}] v011: ${registrosSemCategoria.length} registros sem categoria`)
       
-      // Criar mapa de ESTUDO_DESCRICAO → categoria
+      // Criar mapa de ESTUDO_DESCRICAO NORMALIZADO → categoria
+      // Usar função normalizar() para remover acentos e garantir matching
       const mapaCategorias = new Map<string, string>()
       
       // Primeiro as vinculações (prioridade maior)
@@ -667,7 +702,7 @@ async function executarFase2(
         for (const vinc of vinculacoes) {
           const categoria = (vinc.cadastro_exames as any)?.categoria
           if (vinc.estudo_descricao && categoria) {
-            mapaCategorias.set(vinc.estudo_descricao.toUpperCase(), categoria)
+            mapaCategorias.set(normalizar(vinc.estudo_descricao), categoria)
           }
         }
         console.log(`📋 [${jobId}] v011: ${vinculacoes.length} vinculações mapeadas`)
@@ -677,7 +712,7 @@ async function executarFase2(
       if (cadastroExamesCategoria) {
         for (const exame of cadastroExamesCategoria) {
           if (exame.nome && exame.categoria) {
-            mapaCategorias.set(exame.nome.toUpperCase(), exame.categoria)
+            mapaCategorias.set(normalizar(exame.nome), exame.categoria)
           }
         }
         console.log(`📋 [${jobId}] v011: ${cadastroExamesCategoria.length} exames do cadastro`)
@@ -687,7 +722,8 @@ async function executarFase2(
       const porCategoria = new Map<string, string[]>()
       for (const reg of registrosSemCategoria) {
         if (reg.ESTUDO_DESCRICAO) {
-          const categoriaEncontrada = mapaCategorias.get(reg.ESTUDO_DESCRICAO.toUpperCase())
+          // Usar normalizar() para buscar no mapa (remove acentos)
+          const categoriaEncontrada = mapaCategorias.get(normalizar(reg.ESTUDO_DESCRICAO))
           if (categoriaEncontrada) {
             if (!porCategoria.has(categoriaEncontrada)) {
               porCategoria.set(categoriaEncontrada, [])
@@ -752,7 +788,8 @@ async function executarFase2(
       .or('ESPECIALIDADE.is.null,ESPECIALIDADE.eq.')
       .limit(50000)
     
-    // Criar mapas de ESTUDO_DESCRICAO → modalidade/especialidade
+    // Criar mapas de ESTUDO_DESCRICAO NORMALIZADO → modalidade/especialidade
+    // Usar função normalizar() para remover acentos e garantir matching
     const mapaModalidade = new Map<string, string>()
     const mapaEspecialidade = new Map<string, string>()
     
@@ -762,8 +799,8 @@ async function executarFase2(
         const mod = (vinc.cadastro_exames as any)?.modalidade
         const esp = (vinc.cadastro_exames as any)?.especialidade
         if (vinc.estudo_descricao) {
-          if (mod) mapaModalidade.set(vinc.estudo_descricao.toUpperCase(), mod)
-          if (esp) mapaEspecialidade.set(vinc.estudo_descricao.toUpperCase(), esp)
+          if (mod) mapaModalidade.set(normalizar(vinc.estudo_descricao), mod)
+          if (esp) mapaEspecialidade.set(normalizar(vinc.estudo_descricao), esp)
         }
       }
       console.log(`📋 [${jobId}] v031: ${vinculacoesV031.length} vinculações mapeadas`)
@@ -773,8 +810,8 @@ async function executarFase2(
     if (cadastroCompleto) {
       for (const exame of cadastroCompleto) {
         if (exame.nome) {
-          if (exame.modalidade) mapaModalidade.set(exame.nome.toUpperCase(), exame.modalidade)
-          if (exame.especialidade) mapaEspecialidade.set(exame.nome.toUpperCase(), exame.especialidade)
+          if (exame.modalidade) mapaModalidade.set(normalizar(exame.nome), exame.modalidade)
+          if (exame.especialidade) mapaEspecialidade.set(normalizar(exame.nome), exame.especialidade)
         }
       }
       console.log(`📋 [${jobId}] v031: ${cadastroCompleto.length} exames do cadastro`)
@@ -787,7 +824,8 @@ async function executarFase2(
       const porModalidade = new Map<string, string[]>()
       for (const reg of registrosSemMod) {
         if (reg.ESTUDO_DESCRICAO) {
-          const mod = mapaModalidade.get(reg.ESTUDO_DESCRICAO.toUpperCase())
+          // Usar normalizar() para buscar no mapa (remove acentos)
+          const mod = mapaModalidade.get(normalizar(reg.ESTUDO_DESCRICAO))
           if (mod) {
             if (!porModalidade.has(mod)) porModalidade.set(mod, [])
             porModalidade.get(mod)!.push(reg.id)
@@ -813,7 +851,8 @@ async function executarFase2(
       const porEspecialidade = new Map<string, string[]>()
       for (const reg of registrosSemEsp) {
         if (reg.ESTUDO_DESCRICAO) {
-          const esp = mapaEspecialidade.get(reg.ESTUDO_DESCRICAO.toUpperCase())
+          // Usar normalizar() para buscar no mapa (remove acentos)
+          const esp = mapaEspecialidade.get(normalizar(reg.ESTUDO_DESCRICAO))
           if (esp) {
             if (!porEspecialidade.has(esp)) porEspecialidade.set(esp, [])
             porEspecialidade.get(esp)!.push(reg.id)
@@ -876,11 +915,12 @@ async function executarFase2(
       .select('nome, especialidade, categoria')
       .eq('ativo', true)
     
+    // Usar função normalizar() para remover acentos e garantir matching
     const mapaExamesV033 = new Map<string, { especialidade: string, categoria: string }>()
     if (cadastroV033) {
       for (const ex of cadastroV033) {
         if (ex.nome) {
-          mapaExamesV033.set(ex.nome.toUpperCase(), { especialidade: ex.especialidade, categoria: ex.categoria })
+          mapaExamesV033.set(normalizar(ex.nome), { especialidade: ex.especialidade, categoria: ex.categoria })
         }
       }
     }
@@ -897,7 +937,8 @@ async function executarFase2(
       let totalV033 = 0
       for (const reg of registrosV033) {
         if (reg.ESTUDO_DESCRICAO) {
-          const dados = mapaExamesV033.get(reg.ESTUDO_DESCRICAO.toUpperCase())
+          // Usar normalizar() para buscar no mapa (remove acentos)
+          const dados = mapaExamesV033.get(normalizar(reg.ESTUDO_DESCRICAO))
           if (dados) {
             await supabase.from('volumetria_mobilemed')
               .update({ ESPECIALIDADE: dados.especialidade, CATEGORIA: dados.categoria })
@@ -990,11 +1031,12 @@ async function executarFase2(
         .not('categoria', 'is', null)
         .neq('categoria', 'SC')
       
+      // Usar função normalizar() para remover acentos e garantir matching
       const mapaCategoriasV028 = new Map<string, string>()
       if (cadastroV028) {
         for (const ex of cadastroV028) {
           if (ex.nome && ex.categoria) {
-            mapaCategoriasV028.set(ex.nome.toUpperCase(), ex.categoria)
+            mapaCategoriasV028.set(normalizar(ex.nome), ex.categoria)
           }
         }
       }
@@ -1002,7 +1044,8 @@ async function executarFase2(
       const porCategoriaV028 = new Map<string, string[]>()
       for (const reg of semCategoriaV028) {
         if (reg.ESTUDO_DESCRICAO) {
-          const cat = mapaCategoriasV028.get(reg.ESTUDO_DESCRICAO.toUpperCase())
+          // Usar normalizar() para buscar no mapa (remove acentos)
+          const cat = mapaCategoriasV028.get(normalizar(reg.ESTUDO_DESCRICAO))
           if (cat) {
             if (!porCategoriaV028.has(cat)) porCategoriaV028.set(cat, [])
             porCategoriaV028.get(cat)!.push(reg.id)
