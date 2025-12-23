@@ -832,6 +832,196 @@ async function executarFase2(
     regrasAplicadas.push('v031')
   }
 
+  checkTimeout()
+
+  // v030: Correção detalhada CR/DX → RX (não mamografia) ou MG (mamografia)
+  if (!jaAplicada('v030')) {
+    console.log(`🔧 [${jobId}] v030: Aplicando correção detalhada CR/DX...`)
+    
+    // CR/DX que NÃO são mamografia → RX
+    await supabase.from('volumetria_mobilemed')
+      .update({ MODALIDADE: 'RX' })
+      .eq('arquivo_fonte', arquivoFonte)
+      .in('MODALIDADE', ['CR', 'DX'])
+      .not('ESTUDO_DESCRICAO', 'ilike', '%mamografia%')
+      .not('ESTUDO_DESCRICAO', 'ilike', '%mamogra%')
+      .not('ESTUDO_DESCRICAO', 'ilike', '%tomossintese%')
+    
+    // CR/DX que SÃO mamografia → MG
+    await supabase.from('volumetria_mobilemed')
+      .update({ MODALIDADE: 'MG' })
+      .eq('arquivo_fonte', arquivoFonte)
+      .in('MODALIDADE', ['CR', 'DX'])
+      .or('ESTUDO_DESCRICAO.ilike.%mamografia%,ESTUDO_DESCRICAO.ilike.%mamogra%,ESTUDO_DESCRICAO.ilike.%tomossintese%')
+    
+    console.log(`✅ [${jobId}] v030: Correção CR/DX aplicada`)
+    regrasAplicadas.push('v030')
+  }
+
+  checkTimeout()
+
+  // v033: Substituição de Especialidade para Cardio com Score e Onco Medicina Interna
+  if (!jaAplicada('v033')) {
+    console.log(`🔧 [${jobId}] v033: Aplicando substituição de especialidades...`)
+    
+    // Buscar cadastro de exames
+    const { data: cadastroV033 } = await supabase
+      .from('cadastro_exames')
+      .select('nome, especialidade, categoria')
+      .eq('ativo', true)
+    
+    const mapaExamesV033 = new Map<string, { especialidade: string, categoria: string }>()
+    if (cadastroV033) {
+      for (const ex of cadastroV033) {
+        if (ex.nome) {
+          mapaExamesV033.set(ex.nome.toUpperCase(), { especialidade: ex.especialidade, categoria: ex.categoria })
+        }
+      }
+    }
+    
+    // Buscar registros com especialidades alvo
+    const { data: registrosV033 } = await supabase
+      .from('volumetria_mobilemed')
+      .select('id, ESTUDO_DESCRICAO')
+      .eq('arquivo_fonte', arquivoFonte)
+      .in('ESPECIALIDADE', ['Cardio com Score', 'CARDIO COM SCORE', 'Onco Medicina Interna', 'ONCO MEDICINA INTERNA'])
+      .limit(50000)
+    
+    if (registrosV033 && registrosV033.length > 0) {
+      let totalV033 = 0
+      for (const reg of registrosV033) {
+        if (reg.ESTUDO_DESCRICAO) {
+          const dados = mapaExamesV033.get(reg.ESTUDO_DESCRICAO.toUpperCase())
+          if (dados) {
+            await supabase.from('volumetria_mobilemed')
+              .update({ ESPECIALIDADE: dados.especialidade, CATEGORIA: dados.categoria })
+              .eq('id', reg.id)
+            totalV033++
+          }
+        }
+        if (totalV033 % 100 === 0) checkTimeout()
+      }
+      console.log(`✅ [${jobId}] v033: ${totalV033} registros substituídos`)
+    }
+    
+    regrasAplicadas.push('v033')
+  }
+
+  checkTimeout()
+
+  // v035: Mapeamento de nome cliente (nome_mobilemed → nome_fantasia)
+  if (!jaAplicada('v035')) {
+    console.log(`🔧 [${jobId}] v035: Aplicando mapeamento de nomes de clientes...`)
+    
+    // Buscar mapeamentos de clientes
+    const { data: clientesMap } = await supabase
+      .from('clientes')
+      .select('nome_mobilemed, nome_fantasia')
+      .not('nome_mobilemed', 'is', null)
+      .not('nome_fantasia', 'is', null)
+    
+    if (clientesMap && clientesMap.length > 0) {
+      let totalV035 = 0
+      for (const cliente of clientesMap) {
+        if (cliente.nome_mobilemed && cliente.nome_fantasia && cliente.nome_mobilemed !== cliente.nome_fantasia) {
+          const { count } = await supabase.from('volumetria_mobilemed')
+            .update({ EMPRESA: cliente.nome_fantasia })
+            .eq('arquivo_fonte', arquivoFonte)
+            .eq('EMPRESA', cliente.nome_mobilemed)
+            .select('id', { count: 'exact', head: true })
+          
+          totalV035 += count || 0
+        }
+        if (totalV035 % 50 === 0) checkTimeout()
+      }
+      console.log(`✅ [${jobId}] v035: ${totalV035} registros com nome de cliente mapeado`)
+    }
+    
+    regrasAplicadas.push('v035')
+  }
+
+  checkTimeout()
+
+  // v026: De-Para automático de valores (via RPC)
+  if (!jaAplicada('v026')) {
+    console.log(`🔧 [${jobId}] v026: Aplicando De-Para automático de valores...`)
+    
+    try {
+      const { data: deParaResult, error: deParaError } = await supabase
+        .rpc('aplicar_de_para_automatico', { arquivo_fonte_param: arquivoFonte })
+      
+      if (deParaError) {
+        console.warn(`⚠️ [${jobId}] v026: De-Para falhou - ${deParaError.message}`)
+      } else {
+        console.log(`✅ [${jobId}] v026: De-Para aplicado - ${deParaResult?.registros_atualizados || 0} registros`)
+      }
+    } catch (v026Err: any) {
+      console.warn(`⚠️ [${jobId}] v026: Erro - ${v026Err.message}`)
+    }
+    
+    regrasAplicadas.push('v026')
+  }
+
+  checkTimeout()
+
+  // v028: Aplicar categorias adicionais do cadastro_exames (complementa v011)
+  if (!jaAplicada('v028')) {
+    console.log(`🔧 [${jobId}] v028: Aplicando categorias adicionais do cadastro...`)
+    
+    // Buscar registros ainda sem categoria ou com SC
+    const { data: semCategoriaV028 } = await supabase
+      .from('volumetria_mobilemed')
+      .select('id, ESTUDO_DESCRICAO')
+      .eq('arquivo_fonte', arquivoFonte)
+      .or('CATEGORIA.is.null,CATEGORIA.eq.,CATEGORIA.eq.SC')
+      .limit(50000)
+    
+    if (semCategoriaV028 && semCategoriaV028.length > 0) {
+      const { data: cadastroV028 } = await supabase
+        .from('cadastro_exames')
+        .select('nome, categoria')
+        .eq('ativo', true)
+        .not('categoria', 'is', null)
+        .neq('categoria', 'SC')
+      
+      const mapaCategoriasV028 = new Map<string, string>()
+      if (cadastroV028) {
+        for (const ex of cadastroV028) {
+          if (ex.nome && ex.categoria) {
+            mapaCategoriasV028.set(ex.nome.toUpperCase(), ex.categoria)
+          }
+        }
+      }
+      
+      const porCategoriaV028 = new Map<string, string[]>()
+      for (const reg of semCategoriaV028) {
+        if (reg.ESTUDO_DESCRICAO) {
+          const cat = mapaCategoriasV028.get(reg.ESTUDO_DESCRICAO.toUpperCase())
+          if (cat) {
+            if (!porCategoriaV028.has(cat)) porCategoriaV028.set(cat, [])
+            porCategoriaV028.get(cat)!.push(reg.id)
+          }
+        }
+      }
+      
+      let totalV028 = 0
+      for (const [categoria, ids] of porCategoriaV028.entries()) {
+        for (let i = 0; i < ids.length; i += 500) {
+          checkTimeout()
+          const chunk = ids.slice(i, i + 500)
+          await supabase.from('volumetria_mobilemed')
+            .update({ CATEGORIA: categoria })
+            .in('id', chunk)
+          totalV028 += chunk.length
+        }
+      }
+      
+      console.log(`✅ [${jobId}] v028: ${totalV028} registros com categoria aplicada`)
+    }
+    
+    regrasAplicadas.push('v028')
+  }
+
   console.log(`✅ [${jobId}] FASE 2 concluída: ${regrasAplicadas.length} regras aplicadas`)
 
   return {
