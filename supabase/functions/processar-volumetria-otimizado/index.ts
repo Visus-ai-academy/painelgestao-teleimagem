@@ -150,6 +150,25 @@ serve(async (req) => {
             continue; // Pular este registro
           }
           
+          // 🚫 FILTRO 3: REGRA V003 - Para arquivos RETROATIVOS, excluir registros com DATA_REALIZACAO >= primeiro dia do mês de referência
+          const isRetroativo = arquivo_fonte.includes('retroativo');
+          if (isRetroativo && record.DATA_REALIZACAO) {
+            const dataRealizacao = new Date(record.DATA_REALIZACAO);
+            const [anoRef, mesRef] = periodoReferenciaDb.split('-').map(Number);
+            const primeiroDiaMesRef = new Date(Date.UTC(anoRef, mesRef - 1, 1));
+            
+            if (dataRealizacao >= primeiroDiaMesRef) {
+              registrosRejeitados.push({
+                linha_original: linhaOriginal,
+                dados_originais: record,
+                motivo_rejeicao: 'REGRA_V003_DATA_REALIZACAO_FORA_PERIODO',
+                detalhes_erro: `Registro retroativo com DATA_REALIZACAO (${record.DATA_REALIZACAO}) >= primeiro dia do mês de referência (${primeiroDiaMesRef.toISOString().split('T')[0]}). Para arquivos retroativos, apenas exames realizados ANTES do mês de referência devem ser considerados.`
+              });
+              totalErros++;
+              continue; // Pular este registro
+            }
+          }
+          
           // ✅ ACEITAR DEMAIS REGISTROS - Gravar com periodo_referencia correto
           // CRÍTICO: Remover tipo_faturamento e tipo_cliente do record para evitar tipificação automática
           // Esses campos devem ser aplicados APENAS via "Aplicar Tipificação Geral" manualmente
