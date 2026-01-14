@@ -81,99 +81,10 @@ async function executarFase1(
   console.log(`🔧 [${jobId}] FASE 1: Iniciando regras de exclusão e normalização`)
   console.log(`📋 [${jobId}] Regras já aplicadas: ${regrasAplicadas.join(', ') || 'nenhuma'}`)
 
-  // ===== VERIFICAR SE É ARQUIVO RETROATIVO PARA APLICAR v002/v003 =====
-  const isRetroativo = arquivoFonte.includes('retroativo')
-  
-  if (isRetroativo && !jaAplicada('v003')) {
-    console.log(`🔄 [${jobId}] Arquivo retroativo detectado - aplicando regras v002/v003`)
-    
-    let anoCompleto: number = 0
-    let mesNumero: number = 0
-    const periodoStr = String(periodoReferencia || '').trim()
-    
-    if (/^\d{4}-\d{2}$/.test(periodoStr)) {
-      const [ano, mes] = periodoStr.split('-')
-      anoCompleto = parseInt(ano)
-      mesNumero = parseInt(mes)
-    } else if (/^[a-zA-Z]{3}\/\d{2}$/.test(periodoStr)) {
-      const [mes, ano] = periodoStr.split('/')
-      const meses: { [key: string]: number } = {
-        'jan': 1, 'fev': 2, 'mar': 3, 'abr': 4, 'mai': 5, 'jun': 6,
-        'jul': 7, 'ago': 8, 'set': 9, 'out': 10, 'nov': 11, 'dez': 12
-      }
-      anoCompleto = 2000 + parseInt(ano)
-      mesNumero = meses[mes.toLowerCase()] || 0
-    } else if (/^\d{4}\/\d{2}$/.test(periodoStr)) {
-      const [ano, mes] = periodoStr.split('/')
-      anoCompleto = parseInt(ano)
-      mesNumero = parseInt(mes)
-    }
-
-    if (anoCompleto >= 2020 && mesNumero >= 1 && mesNumero <= 12) {
-      const dataLimiteRealizacao = new Date(Date.UTC(anoCompleto, mesNumero - 1, 1))
-      const dataLimiteRealizacaoStr = dataLimiteRealizacao.toISOString().split('T')[0]
-      
-      const dataInicioJanelaLaudo = new Date(Date.UTC(anoCompleto, mesNumero - 1, 8))
-      const dataFimJanelaLaudo = new Date(Date.UTC(anoCompleto, mesNumero, 7))
-      const dataInicioJanelaLaudoStr = dataInicioJanelaLaudo.toISOString().split('T')[0]
-      const dataFimJanelaLaudoStr = dataFimJanelaLaudo.toISOString().split('T')[0]
-
-      // v003: Excluir em lotes
-      let totalExcludosV003 = 0
-      const BATCH_SIZE = 1000
-      
-      while (true) {
-        checkTimeout()
-        const { data: idsToDelete } = await supabase
-          .from('volumetria_mobilemed')
-          .select('id')
-          .eq('arquivo_fonte', arquivoFonte)
-          .gte('DATA_REALIZACAO', dataLimiteRealizacaoStr)
-          .limit(BATCH_SIZE)
-
-        if (!idsToDelete || idsToDelete.length === 0) break
-
-        const { count } = await supabase
-          .from('volumetria_mobilemed')
-          .delete({ count: 'exact' })
-          .in('id', idsToDelete.map((r: any) => r.id))
-
-        totalExcludosV003 += count || 0
-        if ((count || 0) < BATCH_SIZE) break
-      }
-      
-      console.log(`✅ [${jobId}] v003: ${totalExcludosV003} registros excluídos`)
-      if (!jaAplicada('v003')) regrasAplicadas.push('v003')
-
-      // v002: Excluir em lotes (DATA_LAUDO fora da janela)
-      if (!jaAplicada('v002')) {
-        let totalExcludosV002 = 0
-        
-        while (true) {
-          checkTimeout()
-          const { data: idsToDelete } = await supabase
-            .from('volumetria_mobilemed')
-            .select('id')
-            .eq('arquivo_fonte', arquivoFonte)
-            .or(`DATA_LAUDO.lt.${dataInicioJanelaLaudoStr},DATA_LAUDO.gt.${dataFimJanelaLaudoStr}`)
-            .limit(BATCH_SIZE)
-
-          if (!idsToDelete || idsToDelete.length === 0) break
-
-          const { count } = await supabase
-            .from('volumetria_mobilemed')
-            .delete({ count: 'exact' })
-            .in('id', idsToDelete.map((r: any) => r.id))
-
-          totalExcludosV002 += count || 0
-          if ((count || 0) < BATCH_SIZE) break
-        }
-        
-        console.log(`✅ [${jobId}] v002: ${totalExcludosV002} registros excluídos`)
-        regrasAplicadas.push('v002')
-      }
-    }
-  }
+  // ===== REGRAS v002/v003 REMOVIDAS DAQUI =====
+  // As regras v002/v003 agora são aplicadas DURANTE o upload em processar-volumetria-otimizado
+  // Isso evita processamento duplicado e melhora a performance
+  // Se necessário aplicar manualmente, use a função aplicar-exclusoes-periodo
 
   checkTimeout()
 
