@@ -698,19 +698,32 @@ export async function processVolumetriaOtimizado(
       // ========================================
       
       if (arquivoFonte.includes('retroativo')) {
-        // ⚠️ REGRAS v002/v003 DESATIVADAS NO UPLOAD AUTOMÁTICO ⚠️
-        // As regras v002/v003 NÃO devem ser aplicadas automaticamente durante o upload
-        // Motivo: Excluem registros baseados no período selecionado, mas a lógica precisa 
-        // ser aplicada MANUALMENTE após análise correta do período de faturamento vs período dos dados
-        // 
-        // Para aplicar manualmente, o usuário deve usar:
-        // - Menu "Sistema de Regras" → "Correção v002/v003"
-        // - Ou chamar a edge function aplicar-exclusoes-periodo com o período CORRETO
-        console.log('⚠️ === REGRAS v002/v003 NÃO APLICADAS AUTOMATICAMENTE ===');
+        // 🚀 REGRAS V002/V003 APLICADAS AUTOMATICAMENTE PARA ARQUIVOS RETROATIVOS 🚀
+        // Período informado pelo usuário é usado para as exclusões
+        console.log('🚀 === APLICANDO REGRAS V002/V003 AUTOMATICAMENTE ===');
         console.log(`   📝 Arquivo retroativo detectado: ${arquivoFonte}`);
-        console.log(`   📝 As regras v002/v003 devem ser aplicadas MANUALMENTE`);
-        console.log(`   📝 Use o menu "Sistema de Regras" → "Correção v002/v003"`);
-        console.log(`   📝 Período informado no upload: ${periodo?.ano}-${periodo?.mes?.toString().padStart(2, '0')}`);
+        console.log(`   📝 Período de referência: ${periodoReferencia}`);
+        
+        try {
+          // Aplicar exclusões por período (V002 e V003)
+          const { data: exclusoesResult, error: exclusoesError } = await supabase.functions.invoke(
+            'aplicar-exclusoes-periodo',
+            {
+              body: {
+                arquivo_fonte: arquivoFonte,
+                periodo_referencia: periodoReferencia
+              }
+            }
+          );
+          
+          if (exclusoesError) {
+            console.error('❌ Erro ao aplicar regras V002/V003:', exclusoesError);
+          } else {
+            console.log('✅ REGRAS V002/V003 APLICADAS COM SUCESSO:', exclusoesResult);
+          }
+        } catch (errorExclusoes) {
+          console.error('❌ Erro ao aplicar regras V002/V003:', errorExclusoes);
+        }
         
       } else if (arquivoFonte.includes('volumetria_padrao') || arquivoFonte.includes('volumetria_fora_padrao')) {
         // PRIORIDADE MÁXIMA: Aplicar regra v031 PRIMEIRO para arquivos não-retroativos
@@ -740,68 +753,54 @@ export async function processVolumetriaOtimizado(
       // ========================================
       // SEGUNDA PRIORIDADE: Aplicar todas as outras regras através do lote
       // ========================================
-      // ⚠️ DESATIVADO PARA ARQUIVOS RETROATIVOS - regras v002/v003 devem ser manuais
-      if (!arquivoFonte.includes('retroativo')) {
-        console.log('🔧 Aplicando demais regras de negócio via aplicar-regras-lote (apenas não-retroativos)...');
-        try {
-          console.log(`📂 Parâmetros: arquivo_fonte=${arquivoFonte}, periodo_referencia=${periodoReferencia}`);
-          
-          const { data: resultRegras, error: errorRegras } = await supabase.functions.invoke('aplicar-regras-lote', {
-            body: { 
-              arquivo_fonte: arquivoFonte,
-              periodo_referencia: periodoEdgeFormat
-            }
-          });
-
-          if (errorRegras) {
-            console.error('⚠️ Erro ao aplicar regras em lote:', errorRegras);
-          } else {
-            console.log('✅ REGRAS EM LOTE APLICADAS COM SUCESSO!');
+      console.log('🔧 Aplicando demais regras de negócio via aplicar-regras-lote...');
+      try {
+        console.log(`📂 Parâmetros: arquivo_fonte=${arquivoFonte}, periodo_referencia=${periodoReferencia}`);
+        
+        const { data: resultRegras, error: errorRegras } = await supabase.functions.invoke('aplicar-regras-lote', {
+          body: { 
+            arquivo_fonte: arquivoFonte,
+            periodo_referencia: periodoEdgeFormat
           }
-        } catch (error) {
-          console.error('⚠️ Erro ao aplicar regras em lote:', error);
+        });
+
+        if (errorRegras) {
+          console.error('⚠️ Erro ao aplicar regras em lote:', errorRegras);
+        } else {
+          console.log('✅ REGRAS EM LOTE APLICADAS COM SUCESSO!');
         }
-      } else {
-        console.log('⚠️ Arquivos retroativos: regras em lote DESATIVADAS para preservar dados');
-        console.log('📝 As regras v002/v003 devem ser aplicadas MANUALMENTE após análise');
+      } catch (error) {
+        console.error('⚠️ Erro ao aplicar regras em lote:', error);
       }
       
       // ========================================
       // TERCEIRA PRIORIDADE: Aplicar regras automáticas complementares
       // ========================================
-      // ⚠️ DESATIVADO PARA ARQUIVOS RETROATIVOS
-      // As regras v002/v003 DEVEM ser aplicadas MANUALMENTE através do botão "Executar 28 Regras"
-      // Não chamar auto-aplicar-regras-pos-upload para evitar exclusão automática de registros
-      if (!arquivoFonte.includes('retroativo')) {
-        console.log('🚀 Aplicando regras automáticas complementares (apenas para arquivos não-retroativos)...');
-        
-        try {
-          const { data: regrasCompletas, error: errorRegrasCompletas } = await supabase.functions.invoke(
-            'auto-aplicar-regras-pos-upload',
-            {
-              body: {
-                arquivo_fonte: arquivoFonte,
-                upload_id: 'auto-process',
-                arquivo_nome: `auto-${arquivoFonte}`,
-                status: 'concluido',
-                total_registros: result.totalInserted,
-                auto_aplicar: true,
-                periodo_referencia: periodoEdgeFormat
-              }
+      console.log('🚀 Aplicando regras automáticas complementares...');
+      
+      try {
+        const { data: regrasCompletas, error: errorRegrasCompletas } = await supabase.functions.invoke(
+          'auto-aplicar-regras-pos-upload',
+          {
+            body: {
+              arquivo_fonte: arquivoFonte,
+              upload_id: 'auto-process',
+              arquivo_nome: `auto-${arquivoFonte}`,
+              status: 'concluido',
+              total_registros: result.totalInserted,
+              auto_aplicar: true,
+              periodo_referencia: periodoEdgeFormat
             }
-          );
-          
-          if (errorRegrasCompletas) {
-            console.warn('⚠️ Aviso: Falha nas regras automáticas completas:', errorRegrasCompletas);
-          } else {
-            console.log('✅ Regras automáticas complementares aplicadas:', regrasCompletas);
           }
-        } catch (errorRegrasFull) {
-          console.warn('⚠️ Erro ao aplicar regras automáticas completas:', errorRegrasFull);
+        );
+        
+        if (errorRegrasCompletas) {
+          console.warn('⚠️ Aviso: Falha nas regras automáticas completas:', errorRegrasCompletas);
+        } else {
+          console.log('✅ Regras automáticas complementares aplicadas:', regrasCompletas);
         }
-      } else {
-        console.log('⚠️ Arquivos retroativos: regras automáticas DESATIVADAS');
-        console.log('📝 Use o botão "Executar 28 Regras Completas" para aplicar manualmente');
+      } catch (errorRegrasFull) {
+        console.warn('⚠️ Erro ao aplicar regras automáticas completas:', errorRegrasFull);
       }
     }
     
