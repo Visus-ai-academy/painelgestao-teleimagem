@@ -153,16 +153,78 @@ serve(async (req) => {
           // 🚫 FILTRO 3: REGRA V003 - Para arquivos RETROATIVOS, excluir registros com DATA_REALIZACAO >= primeiro dia do mês de referência
           const isRetroativo = arquivo_fonte.includes('retroativo');
           if (isRetroativo && record.DATA_REALIZACAO) {
-            const dataRealizacao = new Date(record.DATA_REALIZACAO);
-            const [anoRef, mesRef] = periodoReferenciaDb.split('-').map(Number);
-            const primeiroDiaMesRef = new Date(Date.UTC(anoRef, mesRef - 1, 1));
+            // Converter DATA_REALIZACAO para string YYYY-MM-DD de forma robusta
+            let dataRealizacaoStr: string;
+            const dataRaw = record.DATA_REALIZACAO;
             
-            if (dataRealizacao >= primeiroDiaMesRef) {
+            if (typeof dataRaw === 'number') {
+              // É um número de série do Excel (dias desde 1900-01-01)
+              const excelEpoch = new Date(Date.UTC(1899, 11, 30)); // Excel epoch
+              const dataDate = new Date(excelEpoch.getTime() + dataRaw * 24 * 60 * 60 * 1000);
+              dataRealizacaoStr = dataDate.toISOString().split('T')[0];
+            } else if (typeof dataRaw === 'string') {
+              // Tentar parsear como data
+              const parsed = new Date(dataRaw);
+              if (!isNaN(parsed.getTime())) {
+                dataRealizacaoStr = parsed.toISOString().split('T')[0];
+              } else {
+                dataRealizacaoStr = dataRaw; // Manter como está se já for YYYY-MM-DD
+              }
+            } else {
+              dataRealizacaoStr = String(dataRaw);
+            }
+            
+            const [anoRef, mesRef] = periodoReferenciaDb.split('-').map(Number);
+            const primeiroDiaMesRefStr = `${anoRef}-${String(mesRef).padStart(2, '0')}-01`;
+            
+            // Comparação por string YYYY-MM-DD é segura e precisa
+            if (dataRealizacaoStr >= primeiroDiaMesRefStr) {
               registrosRejeitados.push({
                 linha_original: linhaOriginal,
                 dados_originais: record,
                 motivo_rejeicao: 'REGRA_V003_DATA_REALIZACAO_FORA_PERIODO',
-                detalhes_erro: `Registro retroativo com DATA_REALIZACAO (${record.DATA_REALIZACAO}) >= primeiro dia do mês de referência (${primeiroDiaMesRef.toISOString().split('T')[0]}). Para arquivos retroativos, apenas exames realizados ANTES do mês de referência devem ser considerados.`
+                detalhes_erro: `Registro retroativo com DATA_REALIZACAO (${dataRealizacaoStr}) >= primeiro dia do mês de referência (${primeiroDiaMesRefStr}). Para arquivos retroativos, apenas exames realizados ANTES do mês de referência devem ser considerados.`
+              });
+              totalErros++;
+              continue; // Pular este registro
+            }
+          }
+          
+          // 🚫 FILTRO 4: REGRA V002 - Para arquivos RETROATIVOS, excluir registros com DATA_LAUDO fora da janela (08/mês até 07/mês+1)
+          if (isRetroativo && record.DATA_LAUDO) {
+            // Converter DATA_LAUDO para string YYYY-MM-DD de forma robusta
+            let dataLaudoStr: string;
+            const laudoRaw = record.DATA_LAUDO;
+            
+            if (typeof laudoRaw === 'number') {
+              const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+              const dataDate = new Date(excelEpoch.getTime() + laudoRaw * 24 * 60 * 60 * 1000);
+              dataLaudoStr = dataDate.toISOString().split('T')[0];
+            } else if (typeof laudoRaw === 'string') {
+              const parsed = new Date(laudoRaw);
+              if (!isNaN(parsed.getTime())) {
+                dataLaudoStr = parsed.toISOString().split('T')[0];
+              } else {
+                dataLaudoStr = laudoRaw;
+              }
+            } else {
+              dataLaudoStr = String(laudoRaw);
+            }
+            
+            const [anoRef, mesRef] = periodoReferenciaDb.split('-').map(Number);
+            // Janela de laudo: dia 08 do mês de referência até dia 07 do mês seguinte
+            const dataInicioJanela = `${anoRef}-${String(mesRef).padStart(2, '0')}-08`;
+            const mesProximo = mesRef === 12 ? 1 : mesRef + 1;
+            const anoProximo = mesRef === 12 ? anoRef + 1 : anoRef;
+            const dataFimJanela = `${anoProximo}-${String(mesProximo).padStart(2, '0')}-07`;
+            
+            // Excluir se DATA_LAUDO está fora da janela
+            if (dataLaudoStr < dataInicioJanela || dataLaudoStr > dataFimJanela) {
+              registrosRejeitados.push({
+                linha_original: linhaOriginal,
+                dados_originais: record,
+                motivo_rejeicao: 'REGRA_V002_DATA_LAUDO_FORA_JANELA',
+                detalhes_erro: `Registro retroativo com DATA_LAUDO (${dataLaudoStr}) fora da janela permitida (${dataInicioJanela} até ${dataFimJanela}). Apenas laudos emitidos dentro desta janela são válidos para o período.`
               });
               totalErros++;
               continue; // Pular este registro
