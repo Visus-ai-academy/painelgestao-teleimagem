@@ -7,6 +7,7 @@ import { VolumetriaPeriodoSelector } from "@/components/volumetria/VolumetriaPer
 import { VolumetriaUploadStats } from "@/components/volumetria/VolumetriaUploadStats";
 import { VolumetriaExamesNaoIdentificados } from "@/components/volumetria/VolumetriaExamesNaoIdentificados";
 import { VolumetriaStatusPanel } from "@/components/VolumetriaStatusPanel";
+import { AplicarExclusoesPeriodo } from "@/components/volumetria/AplicarExclusoesPeriodo";
 
 import { AutoRegrasMaster } from "@/components/AutoRegrasMaster";
 import { TesteRegras27 } from "@/components/TesteRegras27";
@@ -258,6 +259,9 @@ export default function DadosVolumetria() {
                     Para garantir o processamento correto dos dados, execute as regras na seguinte ordem:
                   </p>
                   <ol className="list-decimal list-inside text-amber-700 text-sm space-y-1">
+                    <li className="text-red-700 font-semibold">
+                      <strong>Aplicar Exclusões V002/V003</strong> - Para arquivos retroativos que precisam de correção
+                    </li>
                     <li>
                       <strong>Corrigir Exames Fora do Padrão</strong> - Vincula exames não identificados ao cadastro
                     </li>
@@ -275,11 +279,14 @@ export default function DadosVolumetria() {
                     </li>
                   </ol>
                   <p className="text-amber-600 text-xs mt-2 italic">
-                    Nota: Exames com modalidade "US" são excluídos automaticamente durante o upload.
+                    Nota: As regras V002/V003 são aplicadas automaticamente no upload de retroativos, mas podem ser reaplicadas manualmente se necessário.
                   </p>
                 </div>
               </div>
             </div>
+
+            {/* 0. Aplicar Exclusões V002/V003 para Retroativos (EXECUTAR PRIMEIRO SE NECESSÁRIO) */}
+            <AplicarExclusoesPeriodo periodoFaturamento={periodoFaturamentoVolumetria ?? undefined} />
 
             {/* 1. Corrigir Exames Fora do Padrão */}
             <CorrigirExamesForaPadrao />
