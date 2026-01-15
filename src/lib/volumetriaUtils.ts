@@ -346,9 +346,99 @@ export async function processVolumetriaFile(
             continue;
           }
 
-          // NOTA: Regras de exclusão por DATA_LAUDO (v002) e DATA_REALIZACAO (v003) 
-          // são aplicadas MANUALMENTE através do botão "Executar 28 Regras Completas"
-          // NÃO filtrar aqui durante a inserção inicial
+          // ========================================
+          // REGRAS V002/V003 PARA ARQUIVOS RETROATIVOS
+          // APLICADAS DURANTE A INSERÇÃO - CRÍTICO!
+          // ========================================
+          const isRetroativo = arquivoFonte.includes('retroativo');
+          
+          if (isRetroativo && periodoFaturamento) {
+            const [anoRef, mesRef] = [periodoFaturamento.ano, periodoFaturamento.mes];
+            
+            // Converter DATA_REALIZACAO para comparação
+            const dataRealizacaoRaw = row['DATA_REALIZACAO'];
+            if (dataRealizacaoRaw) {
+              let dataRealizacaoStr: string | null = null;
+              
+              // Converter para YYYY-MM-DD
+              if (typeof dataRealizacaoRaw === 'number') {
+                // Número serial do Excel
+                const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+                const dataDate = new Date(excelEpoch.getTime() + dataRealizacaoRaw * 24 * 60 * 60 * 1000);
+                dataRealizacaoStr = dataDate.toISOString().split('T')[0];
+              } else if (typeof dataRealizacaoRaw === 'string') {
+                const cleanDate = dataRealizacaoRaw.trim();
+                // Formato DD/MM/YYYY ou DD-MM-YYYY
+                const brMatch = cleanDate.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+                if (brMatch) {
+                  let [, day, month, year] = brMatch;
+                  if (year.length === 2) year = '20' + year;
+                  dataRealizacaoStr = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                } else {
+                  // Tentar como ISO
+                  const parsed = new Date(cleanDate);
+                  if (!isNaN(parsed.getTime())) {
+                    dataRealizacaoStr = parsed.toISOString().split('T')[0];
+                  }
+                }
+              }
+              
+              if (dataRealizacaoStr) {
+                // REGRA V003: Excluir se DATA_REALIZACAO >= primeiro dia do mês de referência
+                const primeiroDiaMesRef = `${anoRef}-${String(mesRef).padStart(2, '0')}-01`;
+                
+                if (dataRealizacaoStr >= primeiroDiaMesRef) {
+                  console.log(`🚫 V003: Excluído DATA_REALIZACAO ${dataRealizacaoStr} >= ${primeiroDiaMesRef}`);
+                  totalErrors++;
+                  continue;
+                }
+              }
+            }
+            
+            // REGRA V002: Verificar DATA_LAUDO dentro da janela
+            const dataLaudoRaw = row['DATA_LAUDO'];
+            if (dataLaudoRaw) {
+              let dataLaudoStr: string | null = null;
+              
+              // Converter para YYYY-MM-DD
+              if (typeof dataLaudoRaw === 'number') {
+                const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+                const dataDate = new Date(excelEpoch.getTime() + dataLaudoRaw * 24 * 60 * 60 * 1000);
+                dataLaudoStr = dataDate.toISOString().split('T')[0];
+              } else if (typeof dataLaudoRaw === 'string') {
+                const cleanDate = dataLaudoRaw.trim();
+                const brMatch = cleanDate.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+                if (brMatch) {
+                  let [, day, month, year] = brMatch;
+                  if (year.length === 2) year = '20' + year;
+                  dataLaudoStr = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                } else {
+                  const parsed = new Date(cleanDate);
+                  if (!isNaN(parsed.getTime())) {
+                    dataLaudoStr = parsed.toISOString().split('T')[0];
+                  }
+                }
+              }
+              
+              if (dataLaudoStr) {
+                // Janela de laudo: dia 08 do mês de referência até dia 07 do mês seguinte
+                const dataInicioJanela = `${anoRef}-${String(mesRef).padStart(2, '0')}-08`;
+                const mesProximo = mesRef === 12 ? 1 : mesRef + 1;
+                const anoProximo = mesRef === 12 ? anoRef + 1 : anoRef;
+                const dataFimJanela = `${anoProximo}-${String(mesProximo).padStart(2, '0')}-07`;
+                
+                if (dataLaudoStr < dataInicioJanela || dataLaudoStr > dataFimJanela) {
+                  console.log(`🚫 V002: Excluído DATA_LAUDO ${dataLaudoStr} fora da janela ${dataInicioJanela} - ${dataFimJanela}`);
+                  totalErrors++;
+                  dbgExcludedByLaudoCutoff++;
+                  continue;
+                }
+              }
+            }
+          }
+          // ========================================
+          // FIM DAS REGRAS V002/V003
+          // ========================================
 
           const safeString = (value: any): string | undefined => {
             if (value === null || value === undefined || value === '') return undefined;
@@ -686,36 +776,13 @@ export async function processVolumetriaOtimizado(
       // ========================================
       // REGRAS V002/V003 PARA ARQUIVOS RETROATIVOS
       // ========================================
+      // NOTA: Regras V002/V003 agora são aplicadas DURANTE a inserção em processVolumetriaFile
+      // Não é mais necessário chamar aplicar-exclusoes-periodo separadamente
       if (arquivoFonte.includes('retroativo')) {
-        console.log('🚀 === APLICANDO REGRAS V002/V003 ===');
+        console.log('✅ === REGRAS V002/V003 JÁ APLICADAS DURANTE INSERÇÃO ===');
         console.log(`   📝 Arquivo: ${arquivoFonte}`);
         console.log(`   📝 Período (YYYY-MM): ${periodoDbFormat}`);
-        
-        try {
-          const { data: exclusoesResult, error: exclusoesError } = await supabase.functions.invoke(
-            'aplicar-exclusoes-periodo',
-            {
-              body: {
-                arquivo_fonte: arquivoFonte,
-                periodo_referencia: periodoDbFormat // SEMPRE YYYY-MM
-              }
-            }
-          );
-          
-          if (exclusoesError) {
-            console.error('❌ ERRO V002/V003:', exclusoesError);
-            console.error('❌ Detalhes:', JSON.stringify(exclusoesError));
-          } else {
-            console.log('✅ V002/V003 SUCESSO:', JSON.stringify(exclusoesResult));
-            if (exclusoesResult) {
-              console.log(`   📊 Inicial: ${exclusoesResult.registros_inicial}`);
-              console.log(`   📊 Excluídos: ${exclusoesResult.registros_excluidos}`);
-              console.log(`   📊 Restantes: ${exclusoesResult.registros_restantes}`);
-            }
-          }
-        } catch (errorExclusoes) {
-          console.error('❌ EXCEÇÃO V002/V003:', errorExclusoes);
-        }
+        console.log('   📝 Registros inválidos foram filtrados antes da inserção');
         
       } else if (arquivoFonte.includes('volumetria_padrao') || arquivoFonte.includes('volumetria_fora_padrao')) {
         // Aplicar regra v031 para arquivos não-retroativos
