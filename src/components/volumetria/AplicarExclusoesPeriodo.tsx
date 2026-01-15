@@ -130,15 +130,16 @@ export function AplicarExclusoesPeriodo({ periodoFaturamento }: AplicarExclusoes
   };
 
   return (
-    <Card className="border-orange-200 bg-orange-50/30">
+    <Card className="border-green-200 bg-green-50/30">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-orange-800">
-          <AlertTriangle className="h-5 w-5" />
-          Aplicar Exclusões V002/V003 (Retroativos)
+        <CardTitle className="flex items-center gap-2 text-green-800">
+          <CheckCircle2 className="h-5 w-5" />
+          Regras V002/V003 - Correção de Dados Antigos
         </CardTitle>
-        <CardDescription className="text-orange-700">
-          Aplica as regras de exclusão por data de realização (V003) e janela de laudo (V002) 
-          nos arquivos retroativos para o período selecionado.
+        <CardDescription className="text-green-700">
+          <strong>✅ Novos uploads:</strong> As regras V002/V003 são aplicadas automaticamente durante a inserção.
+          <br />
+          <strong>🔧 Use este botão apenas para corrigir dados antigos</strong> que foram inseridos antes da correção.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
