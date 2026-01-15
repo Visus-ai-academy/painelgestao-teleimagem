@@ -515,6 +515,42 @@ export async function processVolumetriaFile(
             }
           };
 
+          // ========================================
+          // REGRA V030: Correção de Modalidade CR/DX → RX/MG
+          // APLICADA DURANTE A INSERÇÃO
+          // ========================================
+          let modalidadeCorrigida = safeString(row['MODALIDADE']);
+          const estudoDescricao = cleanExameName(row['ESTUDO_DESCRICAO']) || '';
+          const estudoDescUpper = estudoDescricao.toUpperCase();
+          
+          if (modalidadeCorrigida) {
+            const modalidadeUpper = modalidadeCorrigida.toUpperCase();
+            
+            // Se modalidade é CR ou DX
+            if (modalidadeUpper === 'CR' || modalidadeUpper === 'DX') {
+              // Verificar se é mamografia (contém 'mamogra', 'mamografia' ou 'tomo' no contexto de mama)
+              const isMamografia = estudoDescUpper.includes('MAMOGRA') || 
+                                   estudoDescUpper.includes('MAMOGRAFIA') ||
+                                   (estudoDescUpper.includes('TOMO') && estudoDescUpper.includes('MAMA'));
+              
+              if (isMamografia) {
+                // Converter para MG (Mamografia)
+                console.log(`🔄 V030: ${modalidadeCorrigida} → MG (mamografia detectada em: ${estudoDescricao.substring(0, 50)}...)`);
+                modalidadeCorrigida = 'MG';
+              } else {
+                // Converter para RX (Raio-X)
+                console.log(`🔄 V030: ${modalidadeCorrigida} → RX`);
+                modalidadeCorrigida = 'RX';
+              }
+            }
+            
+            // Correção adicional: BMD → DO
+            if (modalidadeUpper === 'BMD') {
+              console.log(`🔄 V030: BMD → DO`);
+              modalidadeCorrigida = 'DO';
+            }
+          }
+
           const record: VolumetriaRecord = {
             EMPRESA: String(empresa).trim(),
             NOME_PACIENTE: String(nomePaciente).trim(),
@@ -523,9 +559,9 @@ export async function processVolumetriaFile(
             periodo_referencia: periodoReferenciaDb,
             
             CODIGO_PACIENTE: safeString(row['CODIGO_PACIENTE']),
-            ESTUDO_DESCRICAO: cleanExameName(row['ESTUDO_DESCRICAO']),
+            ESTUDO_DESCRICAO: estudoDescricao || undefined,
             ACCESSION_NUMBER: safeString(row['ACCESSION_NUMBER']),
-            MODALIDADE: safeString(row['MODALIDADE']),
+            MODALIDADE: modalidadeCorrigida, // Usar modalidade já corrigida
             PRIORIDADE: safeString(row['PRIORIDADE']),
             ESPECIALIDADE: safeString(row['ESPECIALIDADE']),
             MEDICO: safeString(row['MEDICO']),
