@@ -664,60 +664,62 @@ export async function processVolumetriaOtimizado(
     const result = await processVolumetriaFile(file, arquivoFonte as any, onProgress, periodo);
     
     if (result.success && periodo) {
-      console.log('✅ DADOS INSERIDOS COM SUCESSO - Iniciando aplicação de regras prioritárias...');
+      console.log('✅ DADOS INSERIDOS COM SUCESSO - Iniciando aplicação de regras...');
       
-      // CRÍTICO: Usar SEMPRE o período selecionado pelo usuário - NUNCA buscar do banco
-      // Formato YYYY-MM é o mais robusto e deve ser preferido
+      // CRÍTICO: Usar SEMPRE o período selecionado pelo usuário
+      // Formato YYYY-MM é OBRIGATÓRIO para aplicar-exclusoes-periodo
       const periodoDbFormat = `${periodo.ano}-${periodo.mes.toString().padStart(2, '0')}`;
       
-      // Formato para edge functions que precisam de mmm/YY
+      // Formato mmm/YY para outras edge functions que ainda usam esse formato
       const meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
       const mesAbrev = meses[periodo.mes - 1];
       const anoAbrev = periodo.ano.toString().slice(-2);
       const periodoEdgeFormat = `${mesAbrev}/${anoAbrev}`;
       
       console.log(`========================================`);
-      console.log(`📅 PERÍODO USADO NAS REGRAS (CRÍTICO):`);
+      console.log(`📅 PERÍODO PARA REGRAS:`);
       console.log(`📅 Formato DB (YYYY-MM): ${periodoDbFormat}`);
       console.log(`📅 Formato Edge (mmm/YY): ${periodoEdgeFormat}`);
-      console.log(`📅 Origem: Selecionado pelo usuário (ano=${periodo.ano}, mes=${periodo.mes})`);
+      console.log(`📅 Origem: Usuário selecionou ano=${periodo.ano}, mes=${periodo.mes}`);
       console.log(`========================================`);
       
       // ========================================
-      // PRIMEIRA PRIORIDADE: Aplicar regras específicas por tipo de arquivo
+      // REGRAS V002/V003 PARA ARQUIVOS RETROATIVOS
       // ========================================
-      
       if (arquivoFonte.includes('retroativo')) {
-        // 🚀 REGRAS V002/V003 APLICADAS AUTOMATICAMENTE PARA ARQUIVOS RETROATIVOS 🚀
-        // CRÍTICO: Usar formato YYYY-MM para evitar problemas de parsing
-        console.log('🚀 === APLICANDO REGRAS V002/V003 AUTOMATICAMENTE ===');
-        console.log(`   📝 Arquivo retroativo detectado: ${arquivoFonte}`);
-        console.log(`   📝 Período de referência (YYYY-MM): ${periodoDbFormat}`);
+        console.log('🚀 === APLICANDO REGRAS V002/V003 ===');
+        console.log(`   📝 Arquivo: ${arquivoFonte}`);
+        console.log(`   📝 Período (YYYY-MM): ${periodoDbFormat}`);
         
         try {
-          // Aplicar exclusões por período (V002 e V003) - USAR FORMATO YYYY-MM
           const { data: exclusoesResult, error: exclusoesError } = await supabase.functions.invoke(
             'aplicar-exclusoes-periodo',
             {
               body: {
                 arquivo_fonte: arquivoFonte,
-                periodo_referencia: periodoDbFormat // CRÍTICO: Formato YYYY-MM
+                periodo_referencia: periodoDbFormat // SEMPRE YYYY-MM
               }
             }
           );
           
           if (exclusoesError) {
-            console.error('❌ Erro ao aplicar regras V002/V003:', exclusoesError);
+            console.error('❌ ERRO V002/V003:', exclusoesError);
+            console.error('❌ Detalhes:', JSON.stringify(exclusoesError));
           } else {
-            console.log('✅ REGRAS V002/V003 APLICADAS COM SUCESSO:', exclusoesResult);
+            console.log('✅ V002/V003 SUCESSO:', JSON.stringify(exclusoesResult));
+            if (exclusoesResult) {
+              console.log(`   📊 Inicial: ${exclusoesResult.registros_inicial}`);
+              console.log(`   📊 Excluídos: ${exclusoesResult.registros_excluidos}`);
+              console.log(`   📊 Restantes: ${exclusoesResult.registros_restantes}`);
+            }
           }
         } catch (errorExclusoes) {
-          console.error('❌ Erro ao aplicar regras V002/V003:', errorExclusoes);
+          console.error('❌ EXCEÇÃO V002/V003:', errorExclusoes);
         }
         
       } else if (arquivoFonte.includes('volumetria_padrao') || arquivoFonte.includes('volumetria_fora_padrao')) {
-        // PRIORIDADE MÁXIMA: Aplicar regra v031 PRIMEIRO para arquivos não-retroativos
-        console.log('🚀🚀🚀 APLICANDO REGRA v031 COMO PRIMEIRA PRIORIDADE...');
+        // Aplicar regra v031 para arquivos não-retroativos
+        console.log('🚀 Aplicando regra v031...');
         
         try {
           const { data: regraV031, error: errorV031 } = await supabase.functions.invoke(
@@ -731,22 +733,20 @@ export async function processVolumetriaOtimizado(
           );
           
           if (errorV031) {
-            console.error('❌ ERRO CRÍTICO: Falha na regra v031 PRIORITÁRIA:', errorV031);
+            console.error('❌ Erro v031:', errorV031);
           } else {
-            console.log('✅✅✅ REGRA v031 PRIORITÁRIA APLICADA COM SUCESSO:', regraV031);
+            console.log('✅ v031 aplicada:', regraV031);
           }
         } catch (errorV031) {
-          console.error('❌ ERRO CRÍTICO ao aplicar regra v031 prioritária:', errorV031);
+          console.error('❌ Exceção v031:', errorV031);
         }
       }
       
       // ========================================
-      // SEGUNDA PRIORIDADE: Aplicar todas as outras regras através do lote
+      // APLICAR REGRAS EM LOTE (28 regras)
       // ========================================
-      console.log('🔧 Aplicando demais regras de negócio via aplicar-regras-lote...');
+      console.log('🔧 Aplicando regras em lote...');
       try {
-        console.log(`📂 Parâmetros: arquivo_fonte=${arquivoFonte}, periodo_referencia=${periodoEdgeFormat}`);
-        
         const { data: resultRegras, error: errorRegras } = await supabase.functions.invoke('aplicar-regras-lote', {
           body: { 
             arquivo_fonte: arquivoFonte,
@@ -755,42 +755,12 @@ export async function processVolumetriaOtimizado(
         });
 
         if (errorRegras) {
-          console.error('⚠️ Erro ao aplicar regras em lote:', errorRegras);
+          console.warn('⚠️ Erro regras lote:', errorRegras);
         } else {
-          console.log('✅ REGRAS EM LOTE APLICADAS COM SUCESSO!');
+          console.log('✅ Regras lote aplicadas');
         }
       } catch (error) {
-        console.error('⚠️ Erro ao aplicar regras em lote:', error);
-      }
-      
-      // ========================================
-      // TERCEIRA PRIORIDADE: Aplicar regras automáticas complementares
-      // ========================================
-      console.log('🚀 Aplicando regras automáticas complementares...');
-      
-      try {
-        const { data: regrasCompletas, error: errorRegrasCompletas } = await supabase.functions.invoke(
-          'auto-aplicar-regras-pos-upload',
-          {
-            body: {
-              arquivo_fonte: arquivoFonte,
-              upload_id: 'auto-process',
-              arquivo_nome: `auto-${arquivoFonte}`,
-              status: 'concluido',
-              total_registros: result.totalInserted,
-              auto_aplicar: true,
-              periodo_referencia: periodoEdgeFormat
-            }
-          }
-        );
-        
-        if (errorRegrasCompletas) {
-          console.warn('⚠️ Aviso: Falha nas regras automáticas completas:', errorRegrasCompletas);
-        } else {
-          console.log('✅ Regras automáticas complementares aplicadas:', regrasCompletas);
-        }
-      } catch (errorRegrasFull) {
-        console.warn('⚠️ Erro ao aplicar regras automáticas completas:', errorRegrasFull);
+        console.warn('⚠️ Exceção regras lote:', error);
       }
     }
     
