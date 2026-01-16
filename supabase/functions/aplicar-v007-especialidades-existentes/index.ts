@@ -352,11 +352,100 @@ serve(async (req) => {
       totalCorrecoesOncoMedInt = 0;
     }
 
-    // Verificar resultado final
+    // 4. Corrigir especialidades inválidas (RX, CT, US, MR, RM, TC) → MEDICINA INTERNA
+    // Estas são MODALIDADES, não especialidades. Especialidades válidas: CARDIO, D.O, MAMA, MAMO, MEDICINA INTERNA, MUSCULO ESQUELETICO, NEURO
+    console.log('📋 Corrigindo especialidades inválidas (RX, CT, US, MR, RM, TC) → MEDICINA INTERNA');
+    
+    let totalCorrecoesEspecInvalidas = 0;
+    const especialidadesInvalidas = ['RX', 'CT', 'US', 'MR', 'RM', 'TC', 'DR', 'CR', 'DX', 'RF'];
+    
+    try {
+      const { count: countInvalidas, error: countErrorInv } = await supabase
+        .from('volumetria_mobilemed')
+        .select('*', { count: 'exact', head: true })
+        .in('"ESPECIALIDADE"', especialidadesInvalidas);
+
+      if (countErrorInv) {
+        console.error('❌ Erro ao contar registros com especialidades inválidas:', countErrorInv);
+        totalErros++;
+      } else {
+        totalCorrecoesEspecInvalidas = countInvalidas || 0;
+        console.log(`📊 Encontrados ${totalCorrecoesEspecInvalidas} registros com especialidades inválidas para correção`);
+        
+        if (totalCorrecoesEspecInvalidas > 0) {
+          const { error: errorInvalidas } = await supabase
+            .from('volumetria_mobilemed')
+            .update({ 
+              'ESPECIALIDADE': 'MEDICINA INTERNA',
+              updated_at: new Date().toISOString()
+            })
+            .in('"ESPECIALIDADE"', especialidadesInvalidas);
+
+          if (errorInvalidas) {
+            console.error('❌ Erro ao corrigir especialidades inválidas:', errorInvalidas);
+            totalErros++;
+            totalCorrecoesEspecInvalidas = 0;
+          } else {
+            console.log(`✅ ${totalCorrecoesEspecInvalidas} correções de especialidades inválidas → MEDICINA INTERNA aplicadas`);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('❌ Erro na correção de especialidades inválidas:', error);
+      totalErros++;
+      totalCorrecoesEspecInvalidas = 0;
+    }
+
+    // 5. Corrigir categorias inválidas (RX, CT, US, MR, etc.) → SC
+    // Estas são MODALIDADES usadas como categoria. Categorias válidas: ANGIO, CABEÇA, COLUNAS, SC, ONCO, etc.
+    console.log('📋 Corrigindo categorias inválidas (RX, CT, US, MR, etc.) → SC');
+    
+    let totalCorrecoesCatInvalidas = 0;
+    const categoriasInvalidas = ['RX', 'CT', 'US', 'MR', 'RM', 'TC', 'DR', 'CR', 'DX', 'RF', 'DO', 'MG'];
+    
+    try {
+      const { count: countCatInv, error: countErrorCat } = await supabase
+        .from('volumetria_mobilemed')
+        .select('*', { count: 'exact', head: true })
+        .in('"CATEGORIA"', categoriasInvalidas);
+
+      if (countErrorCat) {
+        console.error('❌ Erro ao contar registros com categorias inválidas:', countErrorCat);
+        totalErros++;
+      } else {
+        totalCorrecoesCatInvalidas = countCatInv || 0;
+        console.log(`📊 Encontrados ${totalCorrecoesCatInvalidas} registros com categorias inválidas para correção`);
+        
+        if (totalCorrecoesCatInvalidas > 0) {
+          const { error: errorCatInv } = await supabase
+            .from('volumetria_mobilemed')
+            .update({ 
+              'CATEGORIA': 'SC',
+              updated_at: new Date().toISOString()
+            })
+            .in('"CATEGORIA"', categoriasInvalidas);
+
+          if (errorCatInv) {
+            console.error('❌ Erro ao corrigir categorias inválidas:', errorCatInv);
+            totalErros++;
+            totalCorrecoesCatInvalidas = 0;
+          } else {
+            console.log(`✅ ${totalCorrecoesCatInvalidas} correções de categorias inválidas → SC aplicadas`);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('❌ Erro na correção de categorias inválidas:', error);
+      totalErros++;
+      totalCorrecoesCatInvalidas = 0;
+    }
+
+    // Verificar resultado final - incluir todas especialidades inválidas
+    const especialidadesInvalidasCheck = ['COLUNAS', 'ONCO MEDICINA INTERNA', ...especialidadesInvalidas];
     const { data: verificacao, error: errorVerif } = await supabase
       .from('volumetria_mobilemed')
       .select('"ESPECIALIDADE"')
-      .in('"ESPECIALIDADE"', ['COLUNAS', 'ONCO MEDICINA INTERNA']);
+      .in('"ESPECIALIDADE"', especialidadesInvalidasCheck);
 
     const registrosRestantes = verificacao?.length || 0;
 
@@ -371,6 +460,8 @@ serve(async (req) => {
           total_correcoes_colunas: totalCorrecoesColunas,
           total_correcoes_neuro: totalCorrecoesNeuro,
           total_correcoes_onco_med_int: totalCorrecoesOncoMedInt,
+          total_correcoes_especialidades_invalidas: totalCorrecoesEspecInvalidas,
+          total_correcoes_categorias_invalidas: totalCorrecoesCatInvalidas,
           total_categorias_aplicadas: totalCategoriasAplicadas,
           total_erros: totalErros,
           registros_restantes: registrosRestantes,
@@ -385,10 +476,12 @@ serve(async (req) => {
       total_correcoes_colunas: totalCorrecoesColunas,
       total_correcoes_neuro: totalCorrecoesNeuro,
       total_correcoes_onco_med_int: totalCorrecoesOncoMedInt,
+      total_correcoes_especialidades_invalidas: totalCorrecoesEspecInvalidas,
+      total_correcoes_categorias_invalidas: totalCorrecoesCatInvalidas,
       total_categorias_aplicadas: totalCategoriasAplicadas,
       total_erros: totalErros,
       registros_restantes: registrosRestantes,
-      observacoes: `Regra v007 aplicada. ${totalCorrecoesColunas} → Músculo Esquelético, ${totalCorrecoesNeuro} → Neuro, ${totalCorrecoesOncoMedInt} → Medicina Interna, ${totalCategoriasAplicadas} categorias aplicadas.`
+      observacoes: `Regra v007 aplicada. ${totalCorrecoesColunas} COLUNAS → Músculo Esquelético, ${totalCorrecoesNeuro} → Neuro, ${totalCorrecoesOncoMedInt} ONCO MEDICINA INTERNA → Medicina Interna, ${totalCorrecoesEspecInvalidas} especialidades inválidas → Medicina Interna, ${totalCorrecoesCatInvalidas} categorias inválidas → SC.`
     };
 
     console.log('✅ Regra v007 aplicada com sucesso:', resultado);

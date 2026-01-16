@@ -85,14 +85,8 @@ function gerarRegrasPorArquivo(periodoReferencia?: string): Record<string, Regra
         valor: 1,
         aplicar_em: ['volumetria_padrao'],
         ativo: true
-      },
-      {
-        campo: 'MODALIDADE',
-        tipo: 'valor_padrao',
-        valor: 'RX', // CORRIGIDO: CR/DX não existem, usar RX diretamente
-        aplicar_em: ['volumetria_padrao'],
-        ativo: true
       }
+      // REMOVIDO: Regra de MODALIDADE padrão não faz sentido - sempre vem preenchida do arquivo
     ],
     'volumetria_fora_padrao': [
       {

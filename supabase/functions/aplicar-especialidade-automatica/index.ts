@@ -43,22 +43,24 @@ serve(async (req) => {
     const exemplosAplicados: any[] = [];
 
     // Regras de aplicação automática de especialidade baseado na modalidade
-    // IMPORTANTE: Consulte cadastro_exames para modalidade/especialidade/categoria específicas
-    // NOTA: Esta função só deve ser usada para modalidades genéricas
-    // Para exames específicos (ex: MAMOGRAFIA), use a função aplicar-especialidades-cadastro
+    // IMPORTANTE: NÃO usar modalidade como especialidade diretamente!
+    // Especialidades válidas: CARDIO, D.O, MAMA, MAMO, MEDICINA INTERNA, MUSCULO ESQUELETICO, NEURO
+    // NOTA: Esta função só deve ser usada quando cadastro_exames não tiver o exame
+    // Para exames específicos, use a função aplicar-especialidades-cadastro
     const regrasEspecialidade: Record<string, string> = {
-      'RX': 'RX',
-      'CT': 'CT',
-      'MR': 'RM',
-      'US': 'US',
-      'DR': 'RX',
-      'CR': 'RX',
-      'DX': 'RX',
-      'RF': 'RX',
-      'RM': 'RM',
-      'TC': 'CT',
-      'ECO': 'US',
-      'MG': 'MAMO'  // Mamografia/Tomossíntese sempre MAMO
+      'RX': 'MEDICINA INTERNA',  // CORRIGIDO: RX → MEDICINA INTERNA (não existe especialidade RX)
+      'CT': 'MEDICINA INTERNA',  // CORRIGIDO: CT → MEDICINA INTERNA (será refinado pelo cadastro)
+      'MR': 'MEDICINA INTERNA',  // CORRIGIDO: MR/RM → MEDICINA INTERNA (será refinado pelo cadastro)
+      'US': 'MEDICINA INTERNA',  // CORRIGIDO: US → MEDICINA INTERNA
+      'DR': 'MEDICINA INTERNA',  // DR (Digital Radiography) → MEDICINA INTERNA
+      'CR': 'MEDICINA INTERNA',  // CR → MEDICINA INTERNA (modalidade já convertida para RX)
+      'DX': 'MEDICINA INTERNA',  // DX → MEDICINA INTERNA (modalidade já convertida para RX)
+      'RF': 'MEDICINA INTERNA',  // RF (Fluoroscopia) → MEDICINA INTERNA
+      'RM': 'MEDICINA INTERNA',  // RM → MEDICINA INTERNA (será refinado pelo cadastro)
+      'TC': 'MEDICINA INTERNA',  // TC → MEDICINA INTERNA
+      'ECO': 'CARDIO',           // ECO → CARDIO (ecocardiograma)
+      'MG': 'MAMO',              // Mamografia/Tomossíntese → MAMO
+      'DO': 'D.O'                // Densitometria → D.O
     };
 
     // Processar em lotes de 100 registros
