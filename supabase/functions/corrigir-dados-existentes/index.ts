@@ -77,12 +77,13 @@ serve(async (req) => {
       resultadoArquivo.correcoes.modalidades_bmd = bmdCorrigidas?.length || 0;
 
       // 4. Aplicar especialidades baseadas na modalidade para registros vazios
+      // IMPORTANTE: NÃO usar 'RX' como especialidade - usar TORAX!
       console.log(`  🔧 Aplicando especialidades automáticas...`);
       
-      // RX
+      // Modalidade RX → Especialidade TORAX (NÃO 'RX'!)
       await supabase
         .from('volumetria_mobilemed')
-        .update({ "ESPECIALIDADE": 'RX', updated_at: new Date().toISOString() })
+        .update({ "ESPECIALIDADE": 'TORAX', updated_at: new Date().toISOString() })
         .eq('arquivo_fonte', arquivo)
         .eq('MODALIDADE', 'RX')
         .or('ESPECIALIDADE.is.null,ESPECIALIDADE.eq.');
@@ -90,7 +91,7 @@ serve(async (req) => {
       // CT  
       await supabase
         .from('volumetria_mobilemed')
-        .update({ "ESPECIALIDADE": 'CT', updated_at: new Date().toISOString() })
+        .update({ "ESPECIALIDADE": 'TC', updated_at: new Date().toISOString() })
         .eq('arquivo_fonte', arquivo)
         .eq('MODALIDADE', 'CT')
         .or('ESPECIALIDADE.is.null,ESPECIALIDADE.eq.');
@@ -106,10 +107,61 @@ serve(async (req) => {
       // DO
       await supabase
         .from('volumetria_mobilemed')
-        .update({ "ESPECIALIDADE": 'DO', updated_at: new Date().toISOString() })
+        .update({ "ESPECIALIDADE": 'D.O', updated_at: new Date().toISOString() })
         .eq('arquivo_fonte', arquivo)
         .eq('MODALIDADE', 'DO')
         .or('ESPECIALIDADE.is.null,ESPECIALIDADE.eq.');
+      
+      // CORREÇÃO DE ESPECIALIDADES INVÁLIDAS EXISTENTES
+      console.log(`  🔧 Corrigindo especialidades inválidas existentes...`);
+      
+      // RX como especialidade → TORAX
+      const { data: rxCorrigidos } = await supabase
+        .from('volumetria_mobilemed')
+        .update({ "ESPECIALIDADE": 'TORAX', updated_at: new Date().toISOString() })
+        .eq('arquivo_fonte', arquivo)
+        .eq('ESPECIALIDADE', 'RX')
+        .select('id');
+      if (rxCorrigidos?.length) console.log(`    ✅ RX→TORAX: ${rxCorrigidos.length}`);
+      
+      // COLUNAS fora de contexto → MUSCULO ESQUELETICO
+      const { data: colunasForaContexto } = await supabase
+        .from('volumetria_mobilemed')
+        .select('id')
+        .eq('arquivo_fonte', arquivo)
+        .eq('ESPECIALIDADE', 'COLUNAS')
+        .not('ESTUDO_DESCRICAO', 'ilike', '%coluna%')
+        .limit(10000);
+      
+      if (colunasForaContexto && colunasForaContexto.length > 0) {
+        const ids = colunasForaContexto.map((r: any) => r.id);
+        for (let i = 0; i < ids.length; i += 500) {
+          const chunk = ids.slice(i, i + 500);
+          await supabase.from('volumetria_mobilemed')
+            .update({ "ESPECIALIDADE": 'MUSCULO ESQUELETICO', updated_at: new Date().toISOString() })
+            .in('id', chunk);
+        }
+        console.log(`    ✅ COLUNAS→MUSCULO: ${colunasForaContexto.length}`);
+      }
+      
+      // CT/MR + MEDICINA INTERNA + CABEÇA/PESCOÇO → NEURO
+      const modalidadesNeuro = ['CT', 'MR'];
+      const categoriasNeuro = ['CABEÇA', 'CABECA', 'PESCOÇO', 'PESCOCO'];
+      
+      for (const mod of modalidadesNeuro) {
+        for (const cat of categoriasNeuro) {
+          const { data: neuroCorrigidos } = await supabase.from('volumetria_mobilemed')
+            .update({ "ESPECIALIDADE": 'NEURO', updated_at: new Date().toISOString() })
+            .eq('arquivo_fonte', arquivo)
+            .eq('MODALIDADE', mod)
+            .eq('ESPECIALIDADE', 'MEDICINA INTERNA')
+            .eq('CATEGORIA', cat)
+            .select('id');
+          if (neuroCorrigidos?.length) {
+            console.log(`    ✅ MEDICINA INTERNA+${cat}→NEURO: ${neuroCorrigidos.length}`);
+          }
+        }
+      }
 
       // 5. Aplicar categorias do cadastro de exames
       console.log(`  🔧 Aplicando categorias do cadastro...`);
