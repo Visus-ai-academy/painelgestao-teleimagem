@@ -150,45 +150,12 @@ serve(async (req) => {
             continue; // Pular este registro
           }
           
-          // 🚫 FILTRO 3: REGRA V003 - Para arquivos RETROATIVOS, excluir registros com DATA_REALIZACAO >= primeiro dia do mês de referência
+          // ✅ REGRA V003 REMOVIDA - Era incorreta!
+          // A DATA_REALIZACAO pode ser qualquer data, inclusive do mês de referência.
+          // O que importa para arquivos retroativos é a DATA_LAUDO estar na janela de fechamento (REGRA V002).
+          // Exemplo: Um exame realizado em outubro pode ser laudado no período retroativo de outubro.
+          
           const isRetroativo = arquivo_fonte.includes('retroativo');
-          if (isRetroativo && record.DATA_REALIZACAO) {
-            // Converter DATA_REALIZACAO para string YYYY-MM-DD de forma robusta
-            let dataRealizacaoStr: string;
-            const dataRaw = record.DATA_REALIZACAO;
-            
-            if (typeof dataRaw === 'number') {
-              // É um número de série do Excel (dias desde 1900-01-01)
-              const excelEpoch = new Date(Date.UTC(1899, 11, 30)); // Excel epoch
-              const dataDate = new Date(excelEpoch.getTime() + dataRaw * 24 * 60 * 60 * 1000);
-              dataRealizacaoStr = dataDate.toISOString().split('T')[0];
-            } else if (typeof dataRaw === 'string') {
-              // Tentar parsear como data
-              const parsed = new Date(dataRaw);
-              if (!isNaN(parsed.getTime())) {
-                dataRealizacaoStr = parsed.toISOString().split('T')[0];
-              } else {
-                dataRealizacaoStr = dataRaw; // Manter como está se já for YYYY-MM-DD
-              }
-            } else {
-              dataRealizacaoStr = String(dataRaw);
-            }
-            
-            const [anoRef, mesRef] = periodoReferenciaDb.split('-').map(Number);
-            const primeiroDiaMesRefStr = `${anoRef}-${String(mesRef).padStart(2, '0')}-01`;
-            
-            // Comparação por string YYYY-MM-DD é segura e precisa
-            if (dataRealizacaoStr >= primeiroDiaMesRefStr) {
-              registrosRejeitados.push({
-                linha_original: linhaOriginal,
-                dados_originais: record,
-                motivo_rejeicao: 'REGRA_V003_DATA_REALIZACAO_FORA_PERIODO',
-                detalhes_erro: `Registro retroativo com DATA_REALIZACAO (${dataRealizacaoStr}) >= primeiro dia do mês de referência (${primeiroDiaMesRefStr}). Para arquivos retroativos, apenas exames realizados ANTES do mês de referência devem ser considerados.`
-              });
-              totalErros++;
-              continue; // Pular este registro
-            }
-          }
           
           // 🚫 FILTRO 4: REGRA V002 - Para arquivos RETROATIVOS, excluir registros com DATA_LAUDO fora da janela (08/mês até 07/mês+1)
           if (isRetroativo && record.DATA_LAUDO) {
