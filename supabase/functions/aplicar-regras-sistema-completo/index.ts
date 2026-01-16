@@ -255,13 +255,11 @@ serve(async (req) => {
             console.log(`🔄 MAMA → MAMO: ${reg.ESTUDO_DESCRICAO} (MG)`);
           }
 
-          // Especialidades diretas (case-insensitive)
+          // Especialidades inválidas - apenas ONCO MEDICINA INTERNA e COLUNAS são corrigidas
+          // RX e TORAX NÃO devem ser corrigidas automaticamente - devem vir do cadastro_exames
           const espMapNormalized: Record<string, string> = {
             'ONCO MEDICINA INTERNA': 'MEDICINA INTERNA',
-            'CT': 'MEDICINA INTERNA',
-            'COLUNAS': 'MUSCULO ESQUELETICO',
-            'RX': 'MEDICINA INTERNA',  // Especialidade RX não existe, converter para MEDICINA INTERNA
-            'TORAX': 'MEDICINA INTERNA'  // Especialidade TORAX não existe, converter para MEDICINA INTERNA
+            'COLUNAS': 'MUSCULO ESQUELETICO'
           };
           const especialidadeUpper = reg.ESPECIALIDADE?.toUpperCase().trim();
           if (especialidadeUpper && espMapNormalized[especialidadeUpper] && !upd.ESPECIALIDADE) {

@@ -18,23 +18,19 @@ Deno.serve(async (req) => {
 
     const resultados: Record<string, number> = {}
 
-    // 1. RX como especialidade → MEDICINA INTERNA
-    console.log('🔧 Corrigindo ESPECIALIDADE = RX → MEDICINA INTERNA...')
-    const { count: countRX } = await supabase
-      .from('volumetria_mobilemed')
-      .update({ ESPECIALIDADE: 'MEDICINA INTERNA' }, { count: 'exact' })
-      .eq('ESPECIALIDADE', 'RX')
-    resultados['RX_para_MEDICINA_INTERNA'] = countRX || 0
-    console.log(`✅ ${countRX || 0} registros corrigidos`)
+    // REMOVIDO: Correções automáticas de RX e TORAX
+    // Especialidades devem vir do cadastro_exames, não serem assumidas
+    console.log('ℹ️ Especialidades devem vir do cadastro_exames - correções automáticas desabilitadas')
+    console.log('ℹ️ Se existem especialidades inválidas, corrija no cadastro_exames e reprocesse')
     
-    // 1b. TORAX como especialidade → MEDICINA INTERNA
-    console.log('🔧 Corrigindo ESPECIALIDADE = TORAX → MEDICINA INTERNA...')
-    const { count: countTorax } = await supabase
+    // Apenas correção de ONCO MEDICINA INTERNA → MEDICINA INTERNA (esta é válida)
+    console.log('🔧 Corrigindo ESPECIALIDADE = ONCO MEDICINA INTERNA → MEDICINA INTERNA...')
+    const { count: countOnco } = await supabase
       .from('volumetria_mobilemed')
       .update({ ESPECIALIDADE: 'MEDICINA INTERNA' }, { count: 'exact' })
-      .eq('ESPECIALIDADE', 'TORAX')
-    resultados['TORAX_para_MEDICINA_INTERNA'] = countTorax || 0
-    console.log(`✅ ${countTorax || 0} registros corrigidos`)
+      .eq('ESPECIALIDADE', 'ONCO MEDICINA INTERNA')
+    resultados['ONCO_para_MEDICINA_INTERNA'] = countOnco || 0
+    console.log(`✅ ${countOnco || 0} registros corrigidos`)
 
     // 2. COLUNAS fora de contexto → MUSCULO ESQUELETICO
     console.log('🔧 Corrigindo ESPECIALIDADE = COLUNAS (sem COLUNA no nome)...')

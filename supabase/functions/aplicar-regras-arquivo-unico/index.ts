@@ -403,30 +403,10 @@ async function executarFase1(
 
   checkTimeout()
 
-  // v012-v014: Especialidades automáticas baseadas em modalidade
-  // IMPORTANTE: RX não é uma especialidade válida - usar MEDICINA INTERNA como padrão para modalidade RX
+  // v012-v014: REMOVIDO - Especialidades devem vir do cadastro_exames (regra v031)
+  // Não definir especialidades automaticamente baseado em modalidade
   if (!jaAplicada('v012-v014')) {
-    // Modalidade RX sem especialidade → MEDICINA INTERNA (não usar 'RX' como especialidade!)
-    await supabase.from('volumetria_mobilemed')
-      .update({ ESPECIALIDADE: 'MEDICINA INTERNA' })
-      .eq('arquivo_fonte', arquivoFonte)
-      .eq('MODALIDADE', 'RX')
-      .or('ESPECIALIDADE.is.null,ESPECIALIDADE.eq.')
-    
-    // Modalidade CT sem especialidade → TC
-    await supabase.from('volumetria_mobilemed')
-      .update({ ESPECIALIDADE: 'TC' })
-      .eq('arquivo_fonte', arquivoFonte)
-      .eq('MODALIDADE', 'CT')
-      .or('ESPECIALIDADE.is.null,ESPECIALIDADE.eq.')
-    
-    // Modalidade MR sem especialidade → RM
-    await supabase.from('volumetria_mobilemed')
-      .update({ ESPECIALIDADE: 'RM' })
-      .eq('arquivo_fonte', arquivoFonte)
-      .eq('MODALIDADE', 'MR')
-      .or('ESPECIALIDADE.is.null,ESPECIALIDADE.eq.')
-    
+    console.log(`⏭️ [${jobId}] v012-v014: Pulada - especialidades devem vir do cadastro_exames (v031)`)
     regrasAplicadas.push('v012-v014')
   }
 
@@ -1006,48 +986,10 @@ async function executarFase2(
     regrasAplicadas.push('v007b')
   }
   
-  // v045: Correção de especialidades inválidas (RX, COLUNAS fora de contexto)
-  // RX não é uma especialidade válida - deve ser convertida baseado na modalidade
-  // COLUNAS deve ser MUSCULO ESQUELETICO quando não é exame de coluna
+  // v045: REMOVIDO - Especialidades devem vir do cadastro_exames (regra v031)
+  // Não corrigir especialidades automaticamente - isso deve ser feito via cadastro_exames
   if (!jaAplicada('v045')) {
-    console.log(`🔧 [${jobId}] v045: Corrigindo especialidades inválidas (RX, COLUNAS)...`)
-    
-    // RX como especialidade → converter para MEDICINA INTERNA
-    // Modalidade RX → especialidade MEDICINA INTERNA
-    const { count: countRX } = await supabase.from('volumetria_mobilemed')
-      .update({ ESPECIALIDADE: 'MEDICINA INTERNA' }, { count: 'exact' })
-      .eq('arquivo_fonte', arquivoFonte)
-      .eq('ESPECIALIDADE', 'RX')
-    
-    // TORAX como especialidade também não é válida → MEDICINA INTERNA
-    const { count: countTorax } = await supabase.from('volumetria_mobilemed')
-      .update({ ESPECIALIDADE: 'MEDICINA INTERNA' }, { count: 'exact' })
-      .eq('arquivo_fonte', arquivoFonte)
-      .eq('ESPECIALIDADE', 'TORAX')
-    
-    // COLUNAS como especialidade para exames que NÃO são de coluna → MUSCULO ESQUELETICO
-    // Primeiro, buscar exames com ESPECIALIDADE = 'COLUNAS' mas ESTUDO_DESCRICAO não contém 'COLUNA'
-    const { data: colunasForaContexto } = await supabase
-      .from('volumetria_mobilemed')
-      .select('id')
-      .eq('arquivo_fonte', arquivoFonte)
-      .eq('ESPECIALIDADE', 'COLUNAS')
-      .not('ESTUDO_DESCRICAO', 'ilike', '%coluna%')
-      .limit(10000)
-    
-    let countColunas = 0
-    if (colunasForaContexto && colunasForaContexto.length > 0) {
-      const ids = colunasForaContexto.map(r => r.id)
-      for (let i = 0; i < ids.length; i += 500) {
-        const chunk = ids.slice(i, i + 500)
-        await supabase.from('volumetria_mobilemed')
-          .update({ ESPECIALIDADE: 'MUSCULO ESQUELETICO' })
-          .in('id', chunk)
-        countColunas += chunk.length
-      }
-    }
-    
-    console.log(`✅ [${jobId}] v045: RX→MED.INTERNA: ${countRX || 0}, TORAX→MED.INTERNA: ${countTorax || 0}, COLUNAS→MUSCULO: ${countColunas}`)
+    console.log(`⏭️ [${jobId}] v045: Pulada - especialidades devem ser definidas via cadastro_exames`)
     regrasAplicadas.push('v045')
   }
 
