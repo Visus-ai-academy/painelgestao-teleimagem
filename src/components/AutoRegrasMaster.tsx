@@ -390,11 +390,11 @@ export function AutoRegrasMaster() {
 
       toast.error(`❌ Falha na aplicação automática: ${error.message}`);
 
-      // Atualizar status de falha
+      // Atualizar status de falha - sistema continua ativo, apenas registra a falha
       setStatus((prev) => ({
         ...prev,
         falhas_automaticas: prev.falhas_automaticas + 1,
-        sistema_ativo: false,
+        // Sistema permanece ativo pois está monitorando - apenas registra a falha
       }));
 
       // Registrar falha no audit log
