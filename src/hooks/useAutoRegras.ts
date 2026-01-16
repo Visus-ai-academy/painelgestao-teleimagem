@@ -171,6 +171,11 @@ export function useAutoRegras() {
       });
 
       if (error) {
+        // Tratamento específico para erro de autenticação
+        if (error.message?.includes('401') || error.message?.includes('Unauthorized') || error.message?.includes('expirada')) {
+          toast.error('🔐 Sessão expirada. Faça login novamente para aplicar as regras.', { duration: 8000 });
+          throw new Error('Sessão expirada. Faça login novamente.');
+        }
         throw new Error(error.message);
       }
 
@@ -180,11 +185,21 @@ export function useAutoRegras() {
         toast.success(`✅ Regras aplicadas! ${totalCorrigidos} correções em ${totalProcessados} registros`);
         return data;
       } else {
-        toast.warning(`⚠️ Algumas regras falharam: ${data.erro}`);
-        return data;
+        // Mostrar erro específico retornado pela função
+        const mensagemErro = data.erro || 'Erro desconhecido na aplicação das regras';
+        toast.error(`❌ Falha na aplicação das regras: ${mensagemErro}`, { duration: 8000 });
+        console.error('❌ Detalhes do erro:', data);
+        throw new Error(mensagemErro);
       }
     } catch (error: any) {
-      toast.error(`❌ Erro ao aplicar regras: ${error.message}`);
+      const mensagem = error.message || 'Erro desconhecido';
+      
+      // Não duplicar toast se já foi mostrado
+      if (!mensagem.includes('Sessão expirada') && !mensagem.includes('Falha na aplicação')) {
+        toast.error(`❌ Erro ao aplicar regras: ${mensagem}`, { duration: 8000 });
+      }
+      
+      console.error('❌ Erro completo:', error);
       throw error;
     } finally {
       setProcessandoRegras(false);
@@ -246,21 +261,37 @@ export function useAutoRegras() {
       });
 
       if (error) {
+        // Tratamento específico para erro de autenticação
+        if (error.message?.includes('401') || error.message?.includes('Unauthorized') || error.message?.includes('expirada')) {
+          toast.error('🔐 Sessão expirada. Faça login novamente para aplicar as regras.', { duration: 8000 });
+          throw new Error('Sessão expirada. Faça login novamente.');
+        }
         throw new Error(error.message);
       }
 
       if (data.success) {
         const totalCorrigidos = data.total_corrigidos || 0;
         const totalProcessados = data.total_processados || 0;
-        toast.success(`✅ TODAS as 27 regras aplicadas! ${totalCorrigidos} correções em ${totalProcessados} registros`);
-        console.log('📋 Detalhes da aplicação das 27 regras:', data);
+        toast.success(`✅ TODAS as 28 regras aplicadas! ${totalCorrigidos} correções em ${totalProcessados} registros`, { duration: 5000 });
+        console.log('📋 Detalhes da aplicação das 28 regras:', data);
       } else {
-        toast.error(`❌ Falha na aplicação das regras: ${data.erro}`);
+        // Mostrar erro específico retornado pela função
+        const mensagemErro = data.erro || 'Erro desconhecido na aplicação das regras';
+        toast.error(`❌ Falha na aplicação das 28 regras: ${mensagemErro}`, { duration: 8000 });
+        console.error('❌ Detalhes do erro:', data);
+        throw new Error(mensagemErro);
       }
       
       return data;
     } catch (error: any) {
-      toast.error(`❌ Erro ao corrigir todos os dados: ${error.message}`);
+      const mensagem = error.message || 'Erro desconhecido';
+      
+      // Não duplicar toast se já foi mostrado
+      if (!mensagem.includes('Sessão expirada') && !mensagem.includes('Falha na aplicação')) {
+        toast.error(`❌ Erro ao corrigir todos os dados: ${mensagem}`, { duration: 8000 });
+      }
+      
+      console.error('❌ Erro completo:', error);
       throw error;
     } finally {
       setProcessandoRegras(false);
