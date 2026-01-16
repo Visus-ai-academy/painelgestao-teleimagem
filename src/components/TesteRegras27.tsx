@@ -205,7 +205,10 @@ export function TesteRegras27({ periodoReferencia }: TesteRegras27Props) {
 
   const totalRegistrosAntes = resultados.reduce((acc, r) => acc + (r.registros_antes || 0), 0);
   const totalRegistrosDepois = resultados.reduce((acc, r) => acc + (r.registros_depois || 0), 0);
-  const totalExcluidos = resultados.reduce((acc, r) => acc + (r.registros_excluidos || 0), 0);
+  // Calcular diferença real: positivo = excluídos, negativo = inserções paralelas
+  const diferencaRegistros = totalRegistrosAntes - totalRegistrosDepois;
+  const totalExcluidos = Math.max(0, diferencaRegistros);
+  const insercoesParalelas = diferencaRegistros < 0 ? Math.abs(diferencaRegistros) : 0;
 
   return (
     <Card className="w-full">
@@ -331,10 +334,21 @@ export function TesteRegras27({ periodoReferencia }: TesteRegras27Props) {
                   <div className="text-sm text-gray-600">Total Depois</div>
                 </div>
                 <div className="bg-white p-3 rounded border">
-                  <div className="text-2xl font-bold text-red-600">
-                    {totalExcluidos.toLocaleString()}
-                  </div>
-                  <div className="text-sm text-gray-600">Excluídos</div>
+                  {insercoesParalelas > 0 ? (
+                    <>
+                      <div className="text-2xl font-bold text-blue-600">
+                        +{insercoesParalelas.toLocaleString()}
+                      </div>
+                      <div className="text-sm text-gray-600">Inserções Paralelas</div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-2xl font-bold text-red-600">
+                        {totalExcluidos.toLocaleString()}
+                      </div>
+                      <div className="text-sm text-gray-600">Excluídos</div>
+                    </>
+                  )}
                 </div>
               </div>
             )}
