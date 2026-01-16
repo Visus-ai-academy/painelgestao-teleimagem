@@ -403,20 +403,24 @@ async function executarFase1(
 
   checkTimeout()
 
-  // v012-v014: Especialidades automáticas
+  // v012-v014: Especialidades automáticas baseadas em modalidade
+  // IMPORTANTE: RX não é uma especialidade válida - usar TORAX como padrão para modalidade RX
   if (!jaAplicada('v012-v014')) {
+    // Modalidade RX sem especialidade → TORAX (não usar 'RX' como especialidade!)
     await supabase.from('volumetria_mobilemed')
-      .update({ ESPECIALIDADE: 'RX' })
+      .update({ ESPECIALIDADE: 'TORAX' })
       .eq('arquivo_fonte', arquivoFonte)
       .eq('MODALIDADE', 'RX')
       .or('ESPECIALIDADE.is.null,ESPECIALIDADE.eq.')
     
+    // Modalidade CT sem especialidade → TC
     await supabase.from('volumetria_mobilemed')
       .update({ ESPECIALIDADE: 'TC' })
       .eq('arquivo_fonte', arquivoFonte)
       .eq('MODALIDADE', 'CT')
       .or('ESPECIALIDADE.is.null,ESPECIALIDADE.eq.')
     
+    // Modalidade MR sem especialidade → RM
     await supabase.from('volumetria_mobilemed')
       .update({ ESPECIALIDADE: 'RM' })
       .eq('arquivo_fonte', arquivoFonte)
@@ -970,28 +974,75 @@ async function executarFase2(
     const modalidadesNeuro = ['CT', 'MR']
     let totalCorrigidos = 0
     
+    // Categorias de cabeça e pescoço (com e sem acentos para garantir matching)
+    const categoriasCabeca = ['CABEÇA', 'CABECA', 'CABEÇA-PESCOÇO', 'CABECA-PESCOCO', 'HEAD']
+    const categoriasPescoco = ['PESCOÇO', 'PESCOCO', 'NECK']
+    
     for (const modalidade of modalidadesNeuro) {
-      // Corrigir registros com CATEGORIA = PESCOÇO
-      const { count: countPescoco } = await supabase.from('volumetria_mobilemed')
-        .update({ ESPECIALIDADE: 'NEURO' }, { count: 'exact' })
-        .eq('arquivo_fonte', arquivoFonte)
-        .eq('MODALIDADE', modalidade)
-        .eq('ESPECIALIDADE', 'MEDICINA INTERNA')
-        .ilike('CATEGORIA', '%PESCO%')
+      // Corrigir registros com CATEGORIA exatamente igual às categorias de cabeça
+      for (const categoria of categoriasCabeca) {
+        const { count } = await supabase.from('volumetria_mobilemed')
+          .update({ ESPECIALIDADE: 'NEURO' }, { count: 'exact' })
+          .eq('arquivo_fonte', arquivoFonte)
+          .eq('MODALIDADE', modalidade)
+          .eq('ESPECIALIDADE', 'MEDICINA INTERNA')
+          .eq('CATEGORIA', categoria)
+        totalCorrigidos += (count || 0)
+      }
       
-      // Corrigir registros com CATEGORIA = CABEÇA
-      const { count: countCabeca } = await supabase.from('volumetria_mobilemed')
-        .update({ ESPECIALIDADE: 'NEURO' }, { count: 'exact' })
-        .eq('arquivo_fonte', arquivoFonte)
-        .eq('MODALIDADE', modalidade)
-        .eq('ESPECIALIDADE', 'MEDICINA INTERNA')
-        .ilike('CATEGORIA', '%CABEC%')
-      
-      totalCorrigidos += (countPescoco || 0) + (countCabeca || 0)
+      // Corrigir registros com CATEGORIA exatamente igual às categorias de pescoço
+      for (const categoria of categoriasPescoco) {
+        const { count } = await supabase.from('volumetria_mobilemed')
+          .update({ ESPECIALIDADE: 'NEURO' }, { count: 'exact' })
+          .eq('arquivo_fonte', arquivoFonte)
+          .eq('MODALIDADE', modalidade)
+          .eq('ESPECIALIDADE', 'MEDICINA INTERNA')
+          .eq('CATEGORIA', categoria)
+        totalCorrigidos += (count || 0)
+      }
     }
     
     console.log(`✅ [${jobId}] v007b: ${totalCorrigidos} registros corrigidos (MEDICINA INTERNA → NEURO para PESCOÇO/CABEÇA)`)
     regrasAplicadas.push('v007b')
+  }
+  
+  // v045: Correção de especialidades inválidas (RX, COLUNAS fora de contexto)
+  // RX não é uma especialidade válida - deve ser convertida baseado na modalidade
+  // COLUNAS deve ser MUSCULO ESQUELETICO quando não é exame de coluna
+  if (!jaAplicada('v045')) {
+    console.log(`🔧 [${jobId}] v045: Corrigindo especialidades inválidas (RX, COLUNAS)...`)
+    
+    // RX como especialidade → converter para especialidade apropriada baseado na modalidade
+    // Modalidade RX → especialidade deve ser baseada na categoria ou TORAX como padrão
+    const { count: countRX } = await supabase.from('volumetria_mobilemed')
+      .update({ ESPECIALIDADE: 'TORAX' }, { count: 'exact' })
+      .eq('arquivo_fonte', arquivoFonte)
+      .eq('ESPECIALIDADE', 'RX')
+    
+    // COLUNAS como especialidade para exames que NÃO são de coluna → MUSCULO ESQUELETICO
+    // Primeiro, buscar exames com ESPECIALIDADE = 'COLUNAS' mas ESTUDO_DESCRICAO não contém 'COLUNA'
+    const { data: colunasForaContexto } = await supabase
+      .from('volumetria_mobilemed')
+      .select('id')
+      .eq('arquivo_fonte', arquivoFonte)
+      .eq('ESPECIALIDADE', 'COLUNAS')
+      .not('ESTUDO_DESCRICAO', 'ilike', '%coluna%')
+      .limit(10000)
+    
+    let countColunas = 0
+    if (colunasForaContexto && colunasForaContexto.length > 0) {
+      const ids = colunasForaContexto.map(r => r.id)
+      for (let i = 0; i < ids.length; i += 500) {
+        const chunk = ids.slice(i, i + 500)
+        await supabase.from('volumetria_mobilemed')
+          .update({ ESPECIALIDADE: 'MUSCULO ESQUELETICO' })
+          .in('id', chunk)
+        countColunas += chunk.length
+      }
+    }
+    
+    console.log(`✅ [${jobId}] v045: RX→TORAX: ${countRX || 0}, COLUNAS→MUSCULO: ${countColunas}`)
+    regrasAplicadas.push('v045')
   }
 
   console.log(`✅ [${jobId}] FASE 2 concluída: ${regrasAplicadas.length} regras aplicadas`)
