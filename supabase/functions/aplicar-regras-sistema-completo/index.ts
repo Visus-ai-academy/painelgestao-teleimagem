@@ -212,16 +212,19 @@ serve(async (req) => {
             console.log(`🔄 MAMA → MAMO: ${reg.ESTUDO_DESCRICAO} (MG)`);
           }
 
-          // Especialidades diretas
-          const espMap: Record<string, string> = {
+          // Especialidades diretas (case-insensitive)
+          const espMapNormalized: Record<string, string> = {
             'ONCO MEDICINA INTERNA': 'MEDICINA INTERNA',
             'CT': 'MEDICINA INTERNA',
-            'Colunas': 'MUSCULO ESQUELETICO'
+            'COLUNAS': 'MUSCULO ESQUELETICO',
+            'RX': 'TORAX'  // Especialidade RX não existe, converter para TORAX
           };
-          if (reg.ESPECIALIDADE && espMap[reg.ESPECIALIDADE] && !upd.ESPECIALIDADE) {
-            upd.ESPECIALIDADE = espMap[reg.ESPECIALIDADE];
+          const especialidadeUpper = reg.ESPECIALIDADE?.toUpperCase().trim();
+          if (especialidadeUpper && espMapNormalized[especialidadeUpper] && !upd.ESPECIALIDADE) {
+            upd.ESPECIALIDADE = espMapNormalized[especialidadeUpper];
             changed = true;
             stats.especialidades++;
+            console.log(`🔄 ESP: ${reg.ESPECIALIDADE} → ${espMapNormalized[especialidadeUpper]}`);
           }
 
           // Cadastro exames (SEMPRE sobrescreve - usa valor final considerando alterações anteriores)
