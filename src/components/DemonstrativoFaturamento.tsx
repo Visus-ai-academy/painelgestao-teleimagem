@@ -1285,15 +1285,9 @@ export default function DemonstrativoFaturamento() {
       return;
     }
 
-    // Filtrar clientes com valores zerados antes de exportar
-    const clientesParaExportar = clientesFiltrados.filter(c => 
-      c.total_exames > 0 && c.valor_bruto > 0 && c.valor_liquido > 0
-    );
-
-    if (clientesParaExportar.length === 0) {
-      toast({ title: "Sem dados", description: "Nenhum cliente com valores para exportar.", variant: "destructive" });
-      return;
-    }
+    // ✅ CRÍTICO: Usar EXATAMENTE os mesmos clientes que o Resumo Geral (sem filtro adicional)
+    // Isso garante que o somatório do Excel seja idêntico ao valor mostrado no componente
+    const clientesParaExportar = clientesFiltrados;
 
     // ✅ Usar EXATAMENTE os valores que estão no demonstrativo visível, sem recálculos
     const dados = clientesParaExportar.map((c) => ({

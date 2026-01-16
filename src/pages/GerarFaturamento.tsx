@@ -490,173 +490,152 @@ export default function GerarFaturamento() {
   }, [periodoSelecionado]);
 
   // Função para exportar relatórios do faturamento em Excel (Quadro 2)
+  // ✅ CRÍTICO: Esta função agora usa SOMENTE dados dos demonstrativos calculados como fonte de verdade
   const handleExportarRelatoriosFaturamentoExcel = async () => {
     try {
       toast({
-        title: "Exportando dados do Quadro 2...",
-        description: "Buscando dados de faturamento e calculando valores...",
+        title: "Exportando dados...",
+        description: "Buscando dados dos demonstrativos calculados...",
       });
 
-      // 1. Buscar demonstrativos com detalhes de exames para obter preços
+      // ✅ FONTE ÚNICA DE VERDADE: Buscar TUDO dos demonstrativos calculados
       const { data: demonstrativos, error: demoError } = await supabase
         .from('demonstrativos_faturamento_calculados')
-        .select('cliente_nome, detalhes_exames')
-        .eq('periodo_referencia', periodoSelecionado);
+        .select('*')
+        .eq('periodo_referencia', periodoSelecionado)
+        .order('cliente_nome', { ascending: true });
 
       if (demoError) throw demoError;
 
-      // Criar mapa de preços por cliente+modalidade+especialidade+categoria+prioridade
-      const precosMap = new Map<string, { valor_unitario: number; valor_total: number }>();
-      // Criar set de clientes que têm demonstrativos gerados (fonte de verdade)
-      const clientesComDemonstrativo = new Set<string>();
-      
-      demonstrativos?.forEach((demo: any) => {
-        const clienteNome = demo.cliente_nome;
-        clientesComDemonstrativo.add(clienteNome.toUpperCase().trim());
+      if (!demonstrativos || demonstrativos.length === 0) {
+        toast({
+          title: "Nenhum demonstrativo encontrado",
+          description: `Não há demonstrativos calculados para o período ${periodoSelecionado}. Gere os demonstrativos primeiro.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log(`📊 Exportando ${demonstrativos.length} demonstrativos calculados`);
+
+      // ✅ ABA 1: Resumo por Cliente (valores consolidados - MESMA FONTE QUE O RESUMO GERAL)
+      const dadosResumoCliente = demonstrativos.map((demo: any) => ({
+        'Cliente': demo.cliente_nome,
+        'Tipo Cliente': demo.tipo_cliente || '',
+        'Tipo Faturamento': demo.tipo_faturamento || '',
+        'Total Exames': demo.total_exames || 0,
+        'Valor Exames': Number(demo.valor_exames || 0),
+        'Valor Franquia': Number(demo.valor_franquia || 0),
+        'Valor Portal Laudos': Number(demo.valor_portal_laudos || 0),
+        'Valor Integração': Number(demo.valor_integracao || 0),
+        'Valor Bruto': Number(demo.valor_bruto_total || 0),
+        'Valor Impostos': Number(demo.valor_total_impostos || 0),
+        'Valor Líquido': Number(demo.valor_liquido || 0),
+      }));
+
+      // ✅ ABA 2: Detalhamento de Exames (todos os exames de todos os clientes)
+      const dadosDetalhamento: any[] = [];
+      demonstrativos.forEach((demo: any) => {
         const detalhes = demo.detalhes_exames || [];
         detalhes.forEach((d: any) => {
-          const key = `${clienteNome}|${d.modalidade}|${d.especialidade}|${d.categoria}|${d.prioridade}`;
-          precosMap.set(key, { 
-            valor_unitario: d.valor_unitario || 0, 
-            valor_total: d.valor_total || 0 
+          dadosDetalhamento.push({
+            'Cliente': demo.cliente_nome,
+            'Modalidade': d.modalidade || '',
+            'Especialidade': d.especialidade || '',
+            'Categoria': d.categoria || '',
+            'Prioridade': d.prioridade || '',
+            'Quantidade': d.quantidade || 0,
+            'Valor Unitário': Number(d.valor_unitario || 0),
+            'Valor Total': Number(d.valor_total || 0),
           });
         });
       });
 
-      console.log(`📊 Quadro 2: ${clientesComDemonstrativo.size} clientes com demonstrativo gerado`);
-
-      // 2. Buscar dados do Quadro 2 (volumetria faturada)
-      const { data: dadosVolumetria, error } = await supabase
-        .from('volumetria_mobilemed')
-        .select('*')
-        .eq('periodo_referencia', periodoSelecionado)
-        .in('tipo_faturamento', ['CO-FT', 'NC-FT', 'NC1-FT'])
-        .order('Cliente_Nome_Fantasia', { ascending: true })
-        .order('DATA_REALIZACAO', { ascending: false });
-
-      if (error) throw error;
-
-      if (!dadosVolumetria || dadosVolumetria.length === 0) {
-        toast({
-          title: "Nenhum dado faturado encontrado",
-          description: `Não há exames faturados (CO-FT, NC-FT, NC1-FT) para o período ${periodoSelecionado}`,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // 3. Filtrar volumetria para incluir APENAS clientes com demonstrativo gerado
-      const dadosVolumetriaFiltrados = dadosVolumetria.filter((item: any) => {
-        const clienteNome = item.Cliente_Nome_Fantasia || item.EMPRESA || '';
-        const clienteNomeUpper = clienteNome.toUpperCase().trim();
-        return clientesComDemonstrativo.has(clienteNomeUpper);
-      });
-
-      // Log de clientes excluídos por não ter demonstrativo
-      const clientesSemDemonstrativo = new Set<string>();
-      dadosVolumetria.forEach((item: any) => {
-        const clienteNome = item.Cliente_Nome_Fantasia || item.EMPRESA || '';
-        const clienteNomeUpper = clienteNome.toUpperCase().trim();
-        if (!clientesComDemonstrativo.has(clienteNomeUpper)) {
-          clientesSemDemonstrativo.add(clienteNome);
-        }
-      });
-      
-      if (clientesSemDemonstrativo.size > 0) {
-        console.warn(`⚠️ Quadro 2: ${clientesSemDemonstrativo.size} clientes excluídos por não ter demonstrativo:`, 
-          Array.from(clientesSemDemonstrativo));
-      }
-
-      if (dadosVolumetriaFiltrados.length === 0) {
-        toast({
-          title: "Nenhum dado faturado encontrado",
-          description: `Não há exames faturados com demonstrativo gerado para o período ${periodoSelecionado}`,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // 4. Preparar dados para o Excel - Quadro 2 com valores
-      const dadosExcel = dadosVolumetriaFiltrados.map((item: any) => {
-        const clienteNome = item.Cliente_Nome_Fantasia || item.EMPRESA || '';
-        const chavePreco = `${clienteNome}|${item.MODALIDADE}|${item.ESPECIALIDADE}|${item.CATEGORIA}|${item.PRIORIDADE}`;
-        const preco = precosMap.get(chavePreco);
-        const quantidade = item.VALORES || 1;
-        const valorUnitario = preco?.valor_unitario || 0;
-        const valorTotal = valorUnitario * quantidade;
-
-        return {
-          'Cliente': clienteNome,
-          'Data Realização': item.DATA_REALIZACAO || '',
-          'Data Laudo': item.DATA_LAUDO || '',
-          'Paciente': item.NOME_PACIENTE || '',
-          'Médico': item.MEDICO || '',
-          'Exame': item.ESTUDO_DESCRICAO || '',
-          'Modalidade': item.MODALIDADE || '',
-          'Especialidade': item.ESPECIALIDADE || '',
-          'Categoria': item.CATEGORIA || '',
-          'Prioridade': item.PRIORIDADE || '',
-          'Accession': item.ACCESSION_NUMBER || '',
-          'Tipo Faturamento': item.tipo_faturamento || '',
-          'Quantidade': quantidade,
-          'Valor Unitário': valorUnitario,
-          'Valor Total': valorTotal
-        };
-      });
-
-      // 4. Criar workbook e worksheet
+      // Criar workbook
       const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.json_to_sheet(dadosExcel);
 
-      // Ajustar largura das colunas
-      const colWidths = [
-        { wch: 25 }, // Cliente
-        { wch: 14 }, // Data Realização
-        { wch: 12 }, // Data Laudo
-        { wch: 30 }, // Paciente
-        { wch: 30 }, // Médico
-        { wch: 40 }, // Exame
-        { wch: 10 }, // Modalidade
-        { wch: 20 }, // Especialidade
-        { wch: 15 }, // Categoria
-        { wch: 12 }, // Prioridade
-        { wch: 18 }, // Accession
+      // Aba 1: Resumo por Cliente
+      const wsResumo = XLSX.utils.json_to_sheet(dadosResumoCliente);
+      wsResumo['!cols'] = [
+        { wch: 35 }, // Cliente
+        { wch: 12 }, // Tipo Cliente
         { wch: 14 }, // Tipo Faturamento
-        { wch: 10 }, // Quantidade
-        { wch: 14 }, // Valor Unitário
-        { wch: 14 }, // Valor Total
+        { wch: 12 }, // Total Exames
+        { wch: 16 }, // Valor Exames
+        { wch: 14 }, // Valor Franquia
+        { wch: 18 }, // Valor Portal Laudos
+        { wch: 16 }, // Valor Integração
+        { wch: 14 }, // Valor Bruto
+        { wch: 14 }, // Valor Impostos
+        { wch: 14 }, // Valor Líquido
       ];
-      ws['!cols'] = colWidths;
-
-      XLSX.utils.book_append_sheet(wb, ws, 'Quadro 2 - Detalhamento');
-
-      // 5. Criar aba de resumo por cliente
-      const resumoPorCliente = new Map<string, { quantidade: number; valorTotal: number }>();
-      dadosExcel.forEach((item: any) => {
-        const cliente = item['Cliente'];
-        const atual = resumoPorCliente.get(cliente) || { quantidade: 0, valorTotal: 0 };
-        atual.quantidade += item['Quantidade'];
-        atual.valorTotal += item['Valor Total'];
-        resumoPorCliente.set(cliente, atual);
-      });
-
-      const dadosResumo = Array.from(resumoPorCliente.entries()).map(([cliente, dados]) => ({
-        'Cliente': cliente,
-        'Total Exames': dados.quantidade,
-        'Valor Total': dados.valorTotal
-      })).sort((a, b) => a['Cliente'].localeCompare(b['Cliente']));
-
-      const wsResumo = XLSX.utils.json_to_sheet(dadosResumo);
-      wsResumo['!cols'] = [{ wch: 30 }, { wch: 15 }, { wch: 18 }];
       XLSX.utils.book_append_sheet(wb, wsResumo, 'Resumo por Cliente');
 
-      // 6. Gerar nome do arquivo e fazer download
-      const nomeArquivo = `Quadro_2_Faturamento_Detalhado_${periodoSelecionado}.xlsx`;
+      // Aba 2: Detalhamento de Exames
+      if (dadosDetalhamento.length > 0) {
+        const wsDetalhes = XLSX.utils.json_to_sheet(dadosDetalhamento);
+        wsDetalhes['!cols'] = [
+          { wch: 35 }, // Cliente
+          { wch: 12 }, // Modalidade
+          { wch: 20 }, // Especialidade
+          { wch: 12 }, // Categoria
+          { wch: 12 }, // Prioridade
+          { wch: 12 }, // Quantidade
+          { wch: 14 }, // Valor Unitário
+          { wch: 14 }, // Valor Total
+        ];
+        XLSX.utils.book_append_sheet(wb, wsDetalhes, 'Detalhamento Exames');
+      }
+
+      // ✅ ABA 3: Totais Gerais (para verificação - deve bater com Resumo Geral)
+      const totaisGerais = demonstrativos.reduce((acc: any, demo: any) => {
+        acc.total_clientes++;
+        acc.total_exames += Number(demo.total_exames || 0);
+        acc.valor_exames += Number(demo.valor_exames || 0);
+        acc.valor_franquia += Number(demo.valor_franquia || 0);
+        acc.valor_portal += Number(demo.valor_portal_laudos || 0);
+        acc.valor_integracao += Number(demo.valor_integracao || 0);
+        acc.valor_bruto += Number(demo.valor_bruto_total || 0);
+        acc.valor_impostos += Number(demo.valor_total_impostos || 0);
+        acc.valor_liquido += Number(demo.valor_liquido || 0);
+        return acc;
+      }, {
+        total_clientes: 0,
+        total_exames: 0,
+        valor_exames: 0,
+        valor_franquia: 0,
+        valor_portal: 0,
+        valor_integracao: 0,
+        valor_bruto: 0,
+        valor_impostos: 0,
+        valor_liquido: 0,
+      });
+
+      const dadosTotais = [
+        { 'Métrica': 'Total de Clientes', 'Valor': totaisGerais.total_clientes },
+        { 'Métrica': 'Total de Exames', 'Valor': totaisGerais.total_exames },
+        { 'Métrica': 'Valor Exames', 'Valor': totaisGerais.valor_exames },
+        { 'Métrica': 'Valor Franquias', 'Valor': totaisGerais.valor_franquia },
+        { 'Métrica': 'Valor Portal Laudos', 'Valor': totaisGerais.valor_portal },
+        { 'Métrica': 'Valor Integração', 'Valor': totaisGerais.valor_integracao },
+        { 'Métrica': 'Valor Bruto Total', 'Valor': totaisGerais.valor_bruto },
+        { 'Métrica': 'Valor Impostos Total', 'Valor': totaisGerais.valor_impostos },
+        { 'Métrica': 'Valor Líquido Total', 'Valor': totaisGerais.valor_liquido },
+      ];
+
+      const wsTotais = XLSX.utils.json_to_sheet(dadosTotais);
+      wsTotais['!cols'] = [{ wch: 25 }, { wch: 20 }];
+      XLSX.utils.book_append_sheet(wb, wsTotais, 'Totais Gerais');
+
+      // Gerar nome do arquivo e fazer download
+      const nomeArquivo = `Faturamento_${periodoSelecionado}.xlsx`;
       XLSX.writeFile(wb, nomeArquivo);
+
+      console.log('✅ Excel exportado com totais:', totaisGerais);
 
       toast({
         title: "Exportação concluída!",
-        description: `${dadosExcel.length} registros exportados em ${nomeArquivo}`,
+        description: `${demonstrativos.length} cliente(s) exportado(s). Valor Líquido Total: ${totaisGerais.valor_liquido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`,
       });
     } catch (error) {
       console.error('Erro ao exportar:', error);
