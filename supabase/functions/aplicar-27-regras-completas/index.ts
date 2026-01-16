@@ -338,61 +338,10 @@ async function processarRegrasBackground(
       }
       regrasAplicadasArquivo.add('v011')
 
-      // REGRA v012/v013/v014: Especialidades automáticas
-      // IMPORTANTE: NÃO usar 'RX' como especialidade - usar MEDICINA INTERNA!
-      console.log(`  ⚡ [JOB ${jobId}] Aplicando v012-v014 - Especialidades automáticas`)
-      
-      // Modalidade RX → Especialidade MEDICINA INTERNA (NÃO 'RX' nem 'TORAX'!)
-      await supabase.from('volumetria_mobilemed')
-        .update({ ESPECIALIDADE: 'MEDICINA INTERNA' })
-        .eq('arquivo_fonte', arquivoAtual)
-        .eq('MODALIDADE', 'RX')
-        .or('ESPECIALIDADE.is.null,ESPECIALIDADE.eq.')
-      
-      await supabase.from('volumetria_mobilemed')
-        .update({ ESPECIALIDADE: 'TC' })
-        .eq('arquivo_fonte', arquivoAtual)
-        .eq('MODALIDADE', 'CT')
-        .or('ESPECIALIDADE.is.null,ESPECIALIDADE.eq.')
-      
-      await supabase.from('volumetria_mobilemed')
-        .update({ ESPECIALIDADE: 'RM' })
-        .eq('arquivo_fonte', arquivoAtual)
-        .eq('MODALIDADE', 'MR')
-        .or('ESPECIALIDADE.is.null,ESPECIALIDADE.eq.')
-      
-      // v045: Corrigir especialidades inválidas que já existem
-      // RX como especialidade → MEDICINA INTERNA
-      await supabase.from('volumetria_mobilemed')
-        .update({ ESPECIALIDADE: 'MEDICINA INTERNA' })
-        .eq('arquivo_fonte', arquivoAtual)
-        .eq('ESPECIALIDADE', 'RX')
-      
-      // TORAX como especialidade → MEDICINA INTERNA
-      await supabase.from('volumetria_mobilemed')
-        .update({ ESPECIALIDADE: 'MEDICINA INTERNA' })
-        .eq('arquivo_fonte', arquivoAtual)
-        .eq('ESPECIALIDADE', 'TORAX')
-      
-      // COLUNAS fora de contexto → MUSCULO ESQUELETICO
-      const { data: colunasForaContexto } = await supabase
-        .from('volumetria_mobilemed')
-        .select('id')
-        .eq('arquivo_fonte', arquivoAtual)
-        .eq('ESPECIALIDADE', 'COLUNAS')
-        .not('ESTUDO_DESCRICAO', 'ilike', '%coluna%')
-        .limit(10000)
-      
-      if (colunasForaContexto && colunasForaContexto.length > 0) {
-        const ids = colunasForaContexto.map(r => r.id)
-        for (let i = 0; i < ids.length; i += 500) {
-          const chunk = ids.slice(i, i + 500)
-          await supabase.from('volumetria_mobilemed')
-            .update({ ESPECIALIDADE: 'MUSCULO ESQUELETICO' })
-            .in('id', chunk)
-        }
-        console.log(`    ✅ COLUNAS→MUSCULO: ${colunasForaContexto.length} corrigidos`)
-      }
+      // REGRA v012/v013/v014: REMOVIDO - Especialidades devem vir do cadastro_exames
+      // Não definir especialidades automaticamente baseado em modalidade
+      console.log(`  ⏭️ [JOB ${jobId}] v012-v014: Pulada - especialidades devem vir do cadastro_exames`)
+      regrasAplicadasArquivo.add('v012-v014')
       
       // v007b: CT/MR + MEDICINA INTERNA + CABEÇA/PESCOÇO → NEURO
       const modalidadesNeuro = ['CT', 'MR']

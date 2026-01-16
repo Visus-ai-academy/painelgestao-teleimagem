@@ -76,62 +76,9 @@ serve(async (req) => {
 
       resultadoArquivo.correcoes.modalidades_bmd = bmdCorrigidas?.length || 0;
 
-      // 4. Aplicar especialidades baseadas na modalidade para registros vazios
-      // IMPORTANTE: NÃO usar 'RX' como especialidade - usar MEDICINA INTERNA!
-      console.log(`  🔧 Aplicando especialidades automáticas...`);
-      
-      // Modalidade RX → Especialidade MEDICINA INTERNA (NÃO 'RX' nem 'TORAX'!)
-      await supabase
-        .from('volumetria_mobilemed')
-        .update({ "ESPECIALIDADE": 'MEDICINA INTERNA', updated_at: new Date().toISOString() })
-        .eq('arquivo_fonte', arquivo)
-        .eq('MODALIDADE', 'RX')
-        .or('ESPECIALIDADE.is.null,ESPECIALIDADE.eq.');
-
-      // CT  
-      await supabase
-        .from('volumetria_mobilemed')
-        .update({ "ESPECIALIDADE": 'TC', updated_at: new Date().toISOString() })
-        .eq('arquivo_fonte', arquivo)
-        .eq('MODALIDADE', 'CT')
-        .or('ESPECIALIDADE.is.null,ESPECIALIDADE.eq.');
-
-      // RM
-      await supabase
-        .from('volumetria_mobilemed')
-        .update({ "ESPECIALIDADE": 'RM', updated_at: new Date().toISOString() })
-        .eq('arquivo_fonte', arquivo)
-        .eq('MODALIDADE', 'MR')
-        .or('ESPECIALIDADE.is.null,ESPECIALIDADE.eq.');
-
-      // DO
-      await supabase
-        .from('volumetria_mobilemed')
-        .update({ "ESPECIALIDADE": 'D.O', updated_at: new Date().toISOString() })
-        .eq('arquivo_fonte', arquivo)
-        .eq('MODALIDADE', 'DO')
-        .or('ESPECIALIDADE.is.null,ESPECIALIDADE.eq.');
-      
-      // CORREÇÃO DE ESPECIALIDADES INVÁLIDAS EXISTENTES
-      console.log(`  🔧 Corrigindo especialidades inválidas existentes...`);
-      
-      // RX como especialidade → MEDICINA INTERNA
-      const { data: rxCorrigidos } = await supabase
-        .from('volumetria_mobilemed')
-        .update({ "ESPECIALIDADE": 'MEDICINA INTERNA', updated_at: new Date().toISOString() })
-        .eq('arquivo_fonte', arquivo)
-        .eq('ESPECIALIDADE', 'RX')
-        .select('id');
-      if (rxCorrigidos?.length) console.log(`    ✅ RX→MEDICINA INTERNA: ${rxCorrigidos.length}`);
-      
-      // TORAX como especialidade → MEDICINA INTERNA
-      const { data: toraxCorrigidos } = await supabase
-        .from('volumetria_mobilemed')
-        .update({ "ESPECIALIDADE": 'MEDICINA INTERNA', updated_at: new Date().toISOString() })
-        .eq('arquivo_fonte', arquivo)
-        .eq('ESPECIALIDADE', 'TORAX')
-        .select('id');
-      if (toraxCorrigidos?.length) console.log(`    ✅ TORAX→MEDICINA INTERNA: ${toraxCorrigidos.length}`);
+      // 4. Especialidades devem vir do cadastro_exames - NÃO definir automaticamente
+      // REMOVIDO: Não aplicar especialidades automáticas baseadas em modalidade
+      console.log(`  ⏭️ Especialidades automáticas removidas - usar cadastro_exames`);
       
       // COLUNAS fora de contexto → MUSCULO ESQUELETICO
       const { data: colunasForaContexto } = await supabase
