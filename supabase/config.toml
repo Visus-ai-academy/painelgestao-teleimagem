@@ -203,8 +203,10 @@ verify_jwt = true
 [functions.corrigir-dados-problematicos]
 verify_jwt = true
 
+# CRITICAL: verify_jwt = false para evitar erro 401 por sessão expirada
+# A validação é feita no código da função
 [functions.aplicar-regras-sistema-completo]
-verify_jwt = true
+verify_jwt = false
 
 [functions.corrigir-todos-dados-existentes]
 verify_jwt = true

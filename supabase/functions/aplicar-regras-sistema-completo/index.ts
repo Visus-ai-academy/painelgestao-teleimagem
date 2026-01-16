@@ -19,10 +19,53 @@ serve(async (req) => {
   }
 
   try {
+    // Validar autenticação - requer header Authorization
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      console.error('❌ Requisição sem token de autenticação');
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          erro: 'Autenticação obrigatória. Faça login novamente.' 
+        }),
+        { 
+          status: 401, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    // Criar cliente com service role para operações administrativas
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
+
+    // Validar que o token é válido
+    const anonClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
+    
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await anonClient.auth.getUser(token);
+    
+    if (claimsError || !claimsData?.user) {
+      console.error('❌ Token inválido ou expirado:', claimsError?.message);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          erro: 'Sessão expirada. Faça login novamente para aplicar as regras.' 
+        }),
+        { 
+          status: 401, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    console.log(`✅ Usuário autenticado: ${claimsData.user.email}`);
 
     let body: any = {};
     try {
