@@ -89,7 +89,7 @@ function gerarRegrasPorArquivo(periodoReferencia?: string): Record<string, Regra
       {
         campo: 'MODALIDADE',
         tipo: 'valor_padrao',
-        valor: 'CR',
+        valor: 'RX', // CORRIGIDO: CR/DX não existem, usar RX diretamente
         aplicar_em: ['volumetria_padrao'],
         ativo: true
       }

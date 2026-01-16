@@ -236,8 +236,34 @@ serve(async (req) => {
           // Esses campos devem ser aplicados APENAS via "Aplicar Tipificação Geral" manualmente
           const { tipo_faturamento, tipo_cliente, ...recordSemTipificacao } = record as any;
           
+          // 🔧 REGRA V030: Normalizar MODALIDADE CR/DX ANTES de inserir no banco
+          // Esta correção é aplicada na raiz, evitando que CR/DX sejam gravados incorretamente
+          let modalidadeNormalizada = recordSemTipificacao.MODALIDADE;
+          
+          if (modalidadeNormalizada === 'CR' || modalidadeNormalizada === 'DX') {
+            const descricaoExame = (recordSemTipificacao.ESTUDO_DESCRICAO || '').toLowerCase();
+            
+            // Se é mamografia/tomossíntese → MG, caso contrário → RX
+            if (descricaoExame.includes('mamografia') || 
+                descricaoExame.includes('mamogra') || 
+                descricaoExame.includes('tomossintese') || 
+                descricaoExame.includes('tomo de mama') ||
+                descricaoExame.includes('tomo mama')) {
+              modalidadeNormalizada = 'MG';
+              console.log(`🔧 CR/DX → MG (mamografia): ${descricaoExame.substring(0, 40)}...`);
+            } else {
+              modalidadeNormalizada = 'RX';
+            }
+          }
+          
+          // 🔧 REGRA V031: Normalizar MODALIDADE BMD → DO
+          if (modalidadeNormalizada === 'BMD') {
+            modalidadeNormalizada = 'DO';
+          }
+          
           const recordToInsert = {
             ...recordSemTipificacao,
+            MODALIDADE: modalidadeNormalizada, // Modalidade já normalizada
             tipo_faturamento: null, // Forçar NULL - tipificação é manual
             tipo_cliente: null, // Forçar NULL - tipificação é manual
             periodo_referencia: periodoReferenciaDb,
