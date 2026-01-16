@@ -1432,14 +1432,29 @@ async function processarArquivo(
       .eq('id', jobId)
       .single()
 
+    // Calcular diferença de registros
+    const antesValue = logData?.registros_antes || 0
+    const depoisValue = depoisCount || 0
+    const diferenca = antesValue - depoisValue
+    
+    // Se diferença for negativa (mais registros depois), significa que houve inserções paralelas
+    // Neste caso, registros_excluidos = 0 (nenhum registro foi excluído pelas regras)
+    const registrosExcluidos = Math.max(0, diferenca)
+    
+    // Mensagem de conclusão com contexto
+    let mensagemConclusao = `Processamento concluído em ${tempoTotal}s`
+    if (diferenca < 0) {
+      mensagemConclusao += ` (Nota: ${Math.abs(diferenca)} registros inseridos paralelamente durante o processamento)`
+    }
+
     // Atualizar log de conclusão
     const { error: updateError } = await supabase.from('processamento_regras_log').update({
       status: 'concluido',
-      registros_depois: depoisCount || 0,
-      registros_excluidos: (logData?.registros_antes || 0) - (depoisCount || 0),
+      registros_depois: depoisValue,
+      registros_excluidos: registrosExcluidos,
       regras_aplicadas: todasRegrasAplicadas,
       completed_at: new Date().toISOString(),
-      mensagem: `Processamento concluído em ${tempoTotal}s`,
+      mensagem: mensagemConclusao,
       progresso_fase: null
     }).eq('id', jobId)
 
