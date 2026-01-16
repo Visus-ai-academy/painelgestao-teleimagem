@@ -260,7 +260,8 @@ serve(async (req) => {
             'ONCO MEDICINA INTERNA': 'MEDICINA INTERNA',
             'CT': 'MEDICINA INTERNA',
             'COLUNAS': 'MUSCULO ESQUELETICO',
-            'RX': 'TORAX'  // Especialidade RX não existe, converter para TORAX
+            'RX': 'MEDICINA INTERNA',  // Especialidade RX não existe, converter para MEDICINA INTERNA
+            'TORAX': 'MEDICINA INTERNA'  // Especialidade TORAX não existe, converter para MEDICINA INTERNA
           };
           const especialidadeUpper = reg.ESPECIALIDADE?.toUpperCase().trim();
           if (especialidadeUpper && espMapNormalized[especialidadeUpper] && !upd.ESPECIALIDADE) {

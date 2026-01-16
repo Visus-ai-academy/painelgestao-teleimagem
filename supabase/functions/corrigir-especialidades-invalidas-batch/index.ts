@@ -18,14 +18,23 @@ Deno.serve(async (req) => {
 
     const resultados: Record<string, number> = {}
 
-    // 1. RX como especialidade → TORAX
-    console.log('🔧 Corrigindo ESPECIALIDADE = RX → TORAX...')
+    // 1. RX como especialidade → MEDICINA INTERNA
+    console.log('🔧 Corrigindo ESPECIALIDADE = RX → MEDICINA INTERNA...')
     const { count: countRX } = await supabase
       .from('volumetria_mobilemed')
-      .update({ ESPECIALIDADE: 'TORAX' }, { count: 'exact' })
+      .update({ ESPECIALIDADE: 'MEDICINA INTERNA' }, { count: 'exact' })
       .eq('ESPECIALIDADE', 'RX')
-    resultados['RX_para_TORAX'] = countRX || 0
+    resultados['RX_para_MEDICINA_INTERNA'] = countRX || 0
     console.log(`✅ ${countRX || 0} registros corrigidos`)
+    
+    // 1b. TORAX como especialidade → MEDICINA INTERNA
+    console.log('🔧 Corrigindo ESPECIALIDADE = TORAX → MEDICINA INTERNA...')
+    const { count: countTorax } = await supabase
+      .from('volumetria_mobilemed')
+      .update({ ESPECIALIDADE: 'MEDICINA INTERNA' }, { count: 'exact' })
+      .eq('ESPECIALIDADE', 'TORAX')
+    resultados['TORAX_para_MEDICINA_INTERNA'] = countTorax || 0
+    console.log(`✅ ${countTorax || 0} registros corrigidos`)
 
     // 2. COLUNAS fora de contexto → MUSCULO ESQUELETICO
     console.log('🔧 Corrigindo ESPECIALIDADE = COLUNAS (sem COLUNA no nome)...')

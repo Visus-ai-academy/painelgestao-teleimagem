@@ -77,13 +77,13 @@ serve(async (req) => {
       resultadoArquivo.correcoes.modalidades_bmd = bmdCorrigidas?.length || 0;
 
       // 4. Aplicar especialidades baseadas na modalidade para registros vazios
-      // IMPORTANTE: NÃO usar 'RX' como especialidade - usar TORAX!
+      // IMPORTANTE: NÃO usar 'RX' como especialidade - usar MEDICINA INTERNA!
       console.log(`  🔧 Aplicando especialidades automáticas...`);
       
-      // Modalidade RX → Especialidade TORAX (NÃO 'RX'!)
+      // Modalidade RX → Especialidade MEDICINA INTERNA (NÃO 'RX' nem 'TORAX'!)
       await supabase
         .from('volumetria_mobilemed')
-        .update({ "ESPECIALIDADE": 'TORAX', updated_at: new Date().toISOString() })
+        .update({ "ESPECIALIDADE": 'MEDICINA INTERNA', updated_at: new Date().toISOString() })
         .eq('arquivo_fonte', arquivo)
         .eq('MODALIDADE', 'RX')
         .or('ESPECIALIDADE.is.null,ESPECIALIDADE.eq.');
@@ -115,14 +115,23 @@ serve(async (req) => {
       // CORREÇÃO DE ESPECIALIDADES INVÁLIDAS EXISTENTES
       console.log(`  🔧 Corrigindo especialidades inválidas existentes...`);
       
-      // RX como especialidade → TORAX
+      // RX como especialidade → MEDICINA INTERNA
       const { data: rxCorrigidos } = await supabase
         .from('volumetria_mobilemed')
-        .update({ "ESPECIALIDADE": 'TORAX', updated_at: new Date().toISOString() })
+        .update({ "ESPECIALIDADE": 'MEDICINA INTERNA', updated_at: new Date().toISOString() })
         .eq('arquivo_fonte', arquivo)
         .eq('ESPECIALIDADE', 'RX')
         .select('id');
-      if (rxCorrigidos?.length) console.log(`    ✅ RX→TORAX: ${rxCorrigidos.length}`);
+      if (rxCorrigidos?.length) console.log(`    ✅ RX→MEDICINA INTERNA: ${rxCorrigidos.length}`);
+      
+      // TORAX como especialidade → MEDICINA INTERNA
+      const { data: toraxCorrigidos } = await supabase
+        .from('volumetria_mobilemed')
+        .update({ "ESPECIALIDADE": 'MEDICINA INTERNA', updated_at: new Date().toISOString() })
+        .eq('arquivo_fonte', arquivo)
+        .eq('ESPECIALIDADE', 'TORAX')
+        .select('id');
+      if (toraxCorrigidos?.length) console.log(`    ✅ TORAX→MEDICINA INTERNA: ${toraxCorrigidos.length}`);
       
       // COLUNAS fora de contexto → MUSCULO ESQUELETICO
       const { data: colunasForaContexto } = await supabase

@@ -339,12 +339,12 @@ async function processarRegrasBackground(
       regrasAplicadasArquivo.add('v011')
 
       // REGRA v012/v013/v014: Especialidades automáticas
-      // IMPORTANTE: NÃO usar 'RX' como especialidade - usar TORAX!
+      // IMPORTANTE: NÃO usar 'RX' como especialidade - usar MEDICINA INTERNA!
       console.log(`  ⚡ [JOB ${jobId}] Aplicando v012-v014 - Especialidades automáticas`)
       
-      // Modalidade RX → Especialidade TORAX (NÃO 'RX'!)
+      // Modalidade RX → Especialidade MEDICINA INTERNA (NÃO 'RX' nem 'TORAX'!)
       await supabase.from('volumetria_mobilemed')
-        .update({ ESPECIALIDADE: 'TORAX' })
+        .update({ ESPECIALIDADE: 'MEDICINA INTERNA' })
         .eq('arquivo_fonte', arquivoAtual)
         .eq('MODALIDADE', 'RX')
         .or('ESPECIALIDADE.is.null,ESPECIALIDADE.eq.')
@@ -362,11 +362,17 @@ async function processarRegrasBackground(
         .or('ESPECIALIDADE.is.null,ESPECIALIDADE.eq.')
       
       // v045: Corrigir especialidades inválidas que já existem
-      // RX como especialidade → TORAX
+      // RX como especialidade → MEDICINA INTERNA
       await supabase.from('volumetria_mobilemed')
-        .update({ ESPECIALIDADE: 'TORAX' })
+        .update({ ESPECIALIDADE: 'MEDICINA INTERNA' })
         .eq('arquivo_fonte', arquivoAtual)
         .eq('ESPECIALIDADE', 'RX')
+      
+      // TORAX como especialidade → MEDICINA INTERNA
+      await supabase.from('volumetria_mobilemed')
+        .update({ ESPECIALIDADE: 'MEDICINA INTERNA' })
+        .eq('arquivo_fonte', arquivoAtual)
+        .eq('ESPECIALIDADE', 'TORAX')
       
       // COLUNAS fora de contexto → MUSCULO ESQUELETICO
       const { data: colunasForaContexto } = await supabase

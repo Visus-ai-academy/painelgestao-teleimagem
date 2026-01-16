@@ -404,11 +404,11 @@ async function executarFase1(
   checkTimeout()
 
   // v012-v014: Especialidades automáticas baseadas em modalidade
-  // IMPORTANTE: RX não é uma especialidade válida - usar TORAX como padrão para modalidade RX
+  // IMPORTANTE: RX não é uma especialidade válida - usar MEDICINA INTERNA como padrão para modalidade RX
   if (!jaAplicada('v012-v014')) {
-    // Modalidade RX sem especialidade → TORAX (não usar 'RX' como especialidade!)
+    // Modalidade RX sem especialidade → MEDICINA INTERNA (não usar 'RX' como especialidade!)
     await supabase.from('volumetria_mobilemed')
-      .update({ ESPECIALIDADE: 'TORAX' })
+      .update({ ESPECIALIDADE: 'MEDICINA INTERNA' })
       .eq('arquivo_fonte', arquivoFonte)
       .eq('MODALIDADE', 'RX')
       .or('ESPECIALIDADE.is.null,ESPECIALIDADE.eq.')
@@ -1012,12 +1012,18 @@ async function executarFase2(
   if (!jaAplicada('v045')) {
     console.log(`🔧 [${jobId}] v045: Corrigindo especialidades inválidas (RX, COLUNAS)...`)
     
-    // RX como especialidade → converter para especialidade apropriada baseado na modalidade
-    // Modalidade RX → especialidade deve ser baseada na categoria ou TORAX como padrão
+    // RX como especialidade → converter para MEDICINA INTERNA
+    // Modalidade RX → especialidade MEDICINA INTERNA
     const { count: countRX } = await supabase.from('volumetria_mobilemed')
-      .update({ ESPECIALIDADE: 'TORAX' }, { count: 'exact' })
+      .update({ ESPECIALIDADE: 'MEDICINA INTERNA' }, { count: 'exact' })
       .eq('arquivo_fonte', arquivoFonte)
       .eq('ESPECIALIDADE', 'RX')
+    
+    // TORAX como especialidade também não é válida → MEDICINA INTERNA
+    const { count: countTorax } = await supabase.from('volumetria_mobilemed')
+      .update({ ESPECIALIDADE: 'MEDICINA INTERNA' }, { count: 'exact' })
+      .eq('arquivo_fonte', arquivoFonte)
+      .eq('ESPECIALIDADE', 'TORAX')
     
     // COLUNAS como especialidade para exames que NÃO são de coluna → MUSCULO ESQUELETICO
     // Primeiro, buscar exames com ESPECIALIDADE = 'COLUNAS' mas ESTUDO_DESCRICAO não contém 'COLUNA'
@@ -1041,7 +1047,7 @@ async function executarFase2(
       }
     }
     
-    console.log(`✅ [${jobId}] v045: RX→TORAX: ${countRX || 0}, COLUNAS→MUSCULO: ${countColunas}`)
+    console.log(`✅ [${jobId}] v045: RX→MED.INTERNA: ${countRX || 0}, TORAX→MED.INTERNA: ${countTorax || 0}, COLUNAS→MUSCULO: ${countColunas}`)
     regrasAplicadas.push('v045')
   }
 
