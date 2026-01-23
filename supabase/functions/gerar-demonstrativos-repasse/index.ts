@@ -22,9 +22,18 @@ serve(async (req) => {
       }
     );
 
-    const { periodo } = await req.json();
+    let body;
+    try {
+      body = await req.json();
+    } catch (e) {
+      console.error('[Repasse] Erro ao parsear JSON do body:', e);
+      throw new Error('Body da requisição inválido ou vazio');
+    }
 
-    if (!periodo) {
+    const periodo = body?.periodo;
+
+    if (!periodo || typeof periodo !== 'string' || periodo.trim() === '') {
+      console.error('[Repasse] Período inválido recebido:', periodo);
       throw new Error('Período não informado');
     }
 
