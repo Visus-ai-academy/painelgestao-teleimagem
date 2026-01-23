@@ -146,8 +146,20 @@ export default function PagamentosMedicos() {
   };
 
   const handleGerarDemonstrativos = async () => {
+    // Validar período antes de chamar a função
+    if (!periodoSelecionado || periodoSelecionado.trim() === '') {
+      toast({
+        title: "Período não selecionado",
+        description: "Por favor, selecione um período antes de gerar os demonstrativos.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       setGerandoDemonstrativos(true);
+
+      console.log('[Repasse] Chamando edge function com período:', periodoSelecionado);
 
       const { data, error } = await supabase.functions.invoke('gerar-demonstrativos-repasse', {
         body: { periodo: periodoSelecionado }
