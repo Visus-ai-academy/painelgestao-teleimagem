@@ -281,14 +281,14 @@ serve(async (req: Request) => {
     let volumetriaFiltrada = volumetria || [];
     const nomeClienteUpper = (cliente.nome_fantasia || cliente.nome || '').toUpperCase();
     
-    // CRITICAL: Filter out NC-NF, EXCLUSAO and NULL tipo_faturamento records FIRST
-    // Exames sem tipificação (NULL) não devem entrar no relatório
+    // CRITICAL: Filter out only NC-NF and EXCLUSAO records
+    // Exames com NULL tipo_faturamento DEVEM ser incluídos no detalhamento (Quadro 2)
     volumetriaFiltrada = volumetriaFiltrada.filter(vol => {
       const tipoFat = vol.tipo_faturamento;
-      // Excluir: NULL, NC-NF, EXCLUSAO
-      return tipoFat && tipoFat !== 'NC-NF' && tipoFat !== 'EXCLUSAO';
+      // Excluir APENAS: NC-NF e EXCLUSAO - manter NULL para incluir no relatório
+      return tipoFat !== 'NC-NF' && tipoFat !== 'EXCLUSAO';
     });
-    console.log(`🔍 Após remover NULL/NC-NF/EXCLUSAO: ${volumetriaFiltrada.length} registros`);
+    console.log(`🔍 Após remover NC-NF/EXCLUSAO (mantendo NULL): ${volumetriaFiltrada.length} registros`);
     
     // Filtros de clientes específicos removidos - relatório deve refletir exatamente o demonstrativo
     // Os filtros de faturamento (NC-FT, NC-NF, etc.) já foram aplicados durante a geração do demonstrativo
