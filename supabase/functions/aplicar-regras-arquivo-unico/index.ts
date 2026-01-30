@@ -316,10 +316,10 @@ async function executarFase1(
       }
       
       // Colunas padrão (não neurologistas) → MUSCULO ESQUELETICO (mantém CATEGORIA original)
-      // CORREÇÃO: Buscar qualquer registro com ESPECIALIDADE = COLUNAS (independente da descrição)
       await supabase.from('volumetria_mobilemed')
         .update({ ESPECIALIDADE: 'MUSCULO ESQUELETICO' })
         .eq('arquivo_fonte', arquivoFonte)
+        .ilike('ESTUDO_DESCRICAO', '%COLUNA%')
         .eq('ESPECIALIDADE', 'COLUNAS')
       
       regrasAplicadas.push('v034')
@@ -1198,30 +1198,11 @@ async function executarFase3(
         console.log(`👨‍⚕️ [${jobId}] v034: ${neurologistasInfo.length} neurologistas carregados`)
         
         // Buscar registros com ESPECIALIDADE = COLUNAS OU exames de coluna que precisam verificação
-        // IMPORTANTE: Buscar TAMBÉM registros onde ESPECIALIDADE já é COLUNAS (independente da descrição)
-        // pois alguns exames recebem especialidade COLUNAS incorretamente do cadastro_exames
-        const { data: registrosColunaPorDesc } = await supabase
+        const { data: registrosColunas } = await supabase
           .from('volumetria_mobilemed')
           .select('id, MEDICO, ESPECIALIDADE, CATEGORIA')
           .eq('arquivo_fonte', arquivoFonte)
           .ilike('ESTUDO_DESCRICAO', '%COLUNA%')
-        
-        const { data: registrosColunaPorEsp } = await supabase
-          .from('volumetria_mobilemed')
-          .select('id, MEDICO, ESPECIALIDADE, CATEGORIA')
-          .eq('arquivo_fonte', arquivoFonte)
-          .eq('ESPECIALIDADE', 'COLUNAS')
-        
-        // Combinar resultados (evitando duplicatas)
-        const idsVistos = new Set<string>()
-        const registrosColunas: Array<{id: string, MEDICO: string | null, ESPECIALIDADE: string | null, CATEGORIA: string | null}> = []
-        
-        for (const reg of [...(registrosColunaPorDesc || []), ...(registrosColunaPorEsp || [])]) {
-          if (!idsVistos.has(reg.id)) {
-            idsVistos.add(reg.id)
-            registrosColunas.push(reg)
-          }
-        }
         
         if (registrosColunas && registrosColunas.length > 0) {
           console.log(`📊 [${jobId}] v034: ${registrosColunas.length} registros de exames de coluna`)
