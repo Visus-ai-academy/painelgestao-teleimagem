@@ -489,6 +489,194 @@ export default function GerarFaturamento() {
     }
   }, [periodoSelecionado]);
 
+  // Função para exportar Excel com DETALHAMENTO COMPLETO POR PACIENTE
+  // Inclui todos os dados: paciente, médico, exame, accession number, data, etc.
+  const handleExportarExcelDetalhamentoPaciente = async () => {
+    try {
+      toast({
+        title: "Exportando dados detalhados...",
+        description: "Buscando dados completos da volumetria...",
+      });
+
+      // Buscar dados completos da volumetria para o período
+      const { data: volumetriaData, error: volumetriaError } = await supabase
+        .from('volumetria_mobilemed')
+        .select('*')
+        .eq('periodo_referencia', periodoSelecionado)
+        .order('EMPRESA', { ascending: true });
+
+      if (volumetriaError) throw volumetriaError;
+
+      if (!volumetriaData || volumetriaData.length === 0) {
+        toast({
+          title: "Nenhum dado encontrado",
+          description: `Não há dados de volumetria para o período ${periodoSelecionado}`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log(`📊 Exportando ${volumetriaData.length} registros detalhados de volumetria`);
+
+      // Buscar demonstrativos para valores calculados
+      const { data: demonstrativos, error: demoError } = await supabase
+        .from('demonstrativos_faturamento_calculados')
+        .select('cliente_nome, detalhes_exames')
+        .eq('periodo_referencia', periodoSelecionado);
+
+      // Criar mapa de preços do demonstrativo
+      const precosMap = new Map<string, number>();
+      demonstrativos?.forEach((demo: any) => {
+        const detalhes = demo.detalhes_exames || [];
+        detalhes.forEach((d: any) => {
+          const key = `${demo.cliente_nome}|${d.modalidade}|${d.especialidade}|${d.categoria}|${d.prioridade}`;
+          precosMap.set(key, d.valor_unitario || 0);
+        });
+      });
+
+      // Criar workbook
+      const wb = XLSX.utils.book_new();
+
+      // Preparar dados detalhados por paciente
+      const dadosDetalhados = volumetriaData.map((reg: any) => {
+        // Buscar preço do demonstrativo
+        const chavePreco = `${reg.EMPRESA}|${reg.MODALIDADE}|${reg.ESPECIALIDADE}|${reg.CATEGORIA}|${reg.PRIORIDADE}`;
+        const valorUnitario = precosMap.get(chavePreco) || 0;
+        const laudos = reg.VALORES || 1;
+        const valorTotal = valorUnitario * laudos;
+
+        return {
+          'Cliente': reg.EMPRESA || '',
+          'Tipo Cliente': reg.tipo_cliente || '',
+          'Tipo Faturamento': reg.tipo_faturamento || '',
+          'Data Exame': reg.DATA_REALIZACAO ? new Date(reg.DATA_REALIZACAO).toLocaleDateString('pt-BR') : '',
+          'Hora Exame': reg.HORA_REALIZACAO || '',
+          'Data Laudo': reg.DATA_LAUDO ? new Date(reg.DATA_LAUDO).toLocaleDateString('pt-BR') : '',
+          'Hora Laudo': reg.HORA_LAUDO || '',
+          'Paciente': reg.NOME_PACIENTE || '',
+          'Código Paciente': reg.CODIGO_PACIENTE || '',
+          'Médico': reg.MEDICO || '',
+          'Exame': reg.ESTUDO_DESCRICAO || '',
+          'Accession Number': reg.ACCESSION_NUMBER || '',
+          'Modalidade': reg.MODALIDADE || '',
+          'Especialidade': reg.ESPECIALIDADE || '',
+          'Categoria': reg.CATEGORIA || '',
+          'Prioridade': reg.PRIORIDADE || '',
+          'Laudos (VALORES)': laudos,
+          'Valor Unitário': valorUnitario,
+          'Valor Total': valorTotal,
+          'Status': reg.STATUS || '',
+          'Duplicado': reg.DUPLICADO || '',
+          'Data Prazo': reg.DATA_PRAZO ? new Date(reg.DATA_PRAZO).toLocaleDateString('pt-BR') : '',
+          'Hora Prazo': reg.HORA_PRAZO || '',
+          'Código Interno': reg.CODIGO_INTERNO || '',
+          'Digitador': reg.DIGITADOR || '',
+          'Complementar': reg.COMPLEMENTAR || '',
+        };
+      });
+
+      // Aba 1: Detalhamento Completo por Paciente
+      const wsDetalhado = XLSX.utils.json_to_sheet(dadosDetalhados);
+      wsDetalhado['!cols'] = [
+        { wch: 25 }, // Cliente
+        { wch: 12 }, // Tipo Cliente
+        { wch: 14 }, // Tipo Faturamento
+        { wch: 12 }, // Data Exame
+        { wch: 10 }, // Hora Exame
+        { wch: 12 }, // Data Laudo
+        { wch: 10 }, // Hora Laudo
+        { wch: 35 }, // Paciente
+        { wch: 15 }, // Código Paciente
+        { wch: 30 }, // Médico
+        { wch: 50 }, // Exame
+        { wch: 15 }, // Accession Number
+        { wch: 12 }, // Modalidade
+        { wch: 20 }, // Especialidade
+        { wch: 15 }, // Categoria
+        { wch: 12 }, // Prioridade
+        { wch: 12 }, // Laudos
+        { wch: 14 }, // Valor Unitário
+        { wch: 14 }, // Valor Total
+        { wch: 12 }, // Status
+        { wch: 10 }, // Duplicado
+        { wch: 12 }, // Data Prazo
+        { wch: 10 }, // Hora Prazo
+        { wch: 12 }, // Código Interno
+        { wch: 15 }, // Digitador
+        { wch: 20 }, // Complementar
+      ];
+      XLSX.utils.book_append_sheet(wb, wsDetalhado, 'Detalhamento Pacientes');
+
+      // Aba 2: Resumo por Cliente
+      const resumoPorCliente = volumetriaData.reduce((acc: any, reg: any) => {
+        const cliente = reg.EMPRESA || 'SEM CLIENTE';
+        if (!acc[cliente]) {
+          acc[cliente] = {
+            cliente,
+            tipo_cliente: reg.tipo_cliente || '',
+            tipo_faturamento: reg.tipo_faturamento || '',
+            total_registros: 0,
+            total_laudos: 0,
+          };
+        }
+        acc[cliente].total_registros++;
+        acc[cliente].total_laudos += reg.VALORES || 1;
+        return acc;
+      }, {});
+
+      const dadosResumoCliente = Object.values(resumoPorCliente).map((r: any) => ({
+        'Cliente': r.cliente,
+        'Tipo Cliente': r.tipo_cliente,
+        'Tipo Faturamento': r.tipo_faturamento,
+        'Total Registros': r.total_registros,
+        'Total Laudos': r.total_laudos,
+      }));
+
+      const wsResumo = XLSX.utils.json_to_sheet(dadosResumoCliente);
+      wsResumo['!cols'] = [
+        { wch: 35 },
+        { wch: 12 },
+        { wch: 14 },
+        { wch: 15 },
+        { wch: 15 },
+      ];
+      XLSX.utils.book_append_sheet(wb, wsResumo, 'Resumo por Cliente');
+
+      // Aba 3: Totais Gerais
+      const totais = {
+        total_registros: volumetriaData.length,
+        total_laudos: volumetriaData.reduce((sum: number, r: any) => sum + (r.VALORES || 1), 0),
+        total_clientes: Object.keys(resumoPorCliente).length,
+      };
+
+      const dadosTotais = [
+        { 'Métrica': 'Total de Registros', 'Valor': totais.total_registros },
+        { 'Métrica': 'Total de Laudos', 'Valor': totais.total_laudos },
+        { 'Métrica': 'Total de Clientes', 'Valor': totais.total_clientes },
+      ];
+
+      const wsTotais = XLSX.utils.json_to_sheet(dadosTotais);
+      wsTotais['!cols'] = [{ wch: 25 }, { wch: 20 }];
+      XLSX.utils.book_append_sheet(wb, wsTotais, 'Totais Gerais');
+
+      // Gerar nome do arquivo e fazer download
+      const nomeArquivo = `Faturamento_Detalhado_Pacientes_${periodoSelecionado}.xlsx`;
+      XLSX.writeFile(wb, nomeArquivo);
+
+      toast({
+        title: "Exportação concluída!",
+        description: `${volumetriaData.length} registros exportados com detalhamento completo por paciente`,
+      });
+    } catch (error) {
+      console.error('Erro ao exportar:', error);
+      toast({
+        title: "Erro na exportação",
+        description: error instanceof Error ? error.message : "Erro desconhecido ao exportar dados",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Função para exportar relatórios do faturamento em Excel (Quadro 2)
   // ✅ CRÍTICO: Esta função agora usa SOMENTE dados dos demonstrativos calculados como fonte de verdade
   const handleExportarRelatoriosFaturamentoExcel = async () => {
@@ -2651,6 +2839,15 @@ export default function GerarFaturamento() {
                   >
                     <FileSpreadsheet className="h-4 w-4 mr-2" />
                     Exportar Excel
+                  </Button>
+                  <Button
+                    onClick={handleExportarExcelDetalhamentoPaciente}
+                    variant="default"
+                    size="sm"
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                    Excel Detalhado (Pacientes)
                   </Button>
                 </div>
               </div>
