@@ -89,6 +89,20 @@ Deno.serve(async (req) => {
 
     console.log(`✅ Agrupados ${diagnosticaData?.length || 0} registros de DIAGNOSTICA PLANTAO_* para DIAGNOSTICA`)
 
+    // 2.5. Agrupar PRN TELE_* como PRN (regra genérica para todas as unidades PRN)
+    const { data: prnTeleData, error: prnTeleError } = await supabase
+      .from('volumetria_mobilemed')
+      .update({ EMPRESA: 'PRN' })
+      .ilike('EMPRESA', 'PRN TELE_%')
+      .select('id')
+
+    if (prnTeleError) {
+      console.error('❌ Erro ao agrupar PRN TELE_*:', prnTeleError)
+      throw prnTeleError
+    }
+
+    console.log(`✅ Agrupados ${prnTeleData?.length || 0} registros de PRN TELE_* para PRN`)
+
     // ========================================
     // REGRAS CEMVALENCA - ORDEM IMPORTANTE:
     // 1. RX ou DX → CEMVALENCA_RX (independente de prioridade)
@@ -198,6 +212,7 @@ Deno.serve(async (req) => {
       success: true,
       total_mapeados: totalMapeados,
       diagnostica_agrupados: diagnosticaData?.length || 0,
+      prn_tele_agrupados: prnTeleData?.length || 0,
       cemvalenca_rx_movidos: (cemvalencaRxData?.length || 0) + (cemvalencaDxData?.length || 0),
       cemvalenca_pl_movidos: cemvalencaPlData?.length || 0,
       cemvalenca_pl_retorno: cemvalencaPlRetData?.length || 0,
