@@ -518,29 +518,52 @@ export default function GerarFaturamento() {
 
       console.log(`📊 Exportando ${volumetriaData.length} registros detalhados de volumetria`);
 
+      // Buscar mapeamento nome_mobilemed -> nome_fantasia de parametros_faturamento
+      const { data: parametros, error: paramError } = await supabase
+        .from('parametros_faturamento')
+        .select('nome_mobilemed, nome_fantasia');
+      
+      // Criar mapa de nome_mobilemed -> nome_fantasia (para correlacionar EMPRESA com cliente_nome do demonstrativo)
+      const nomeMap = new Map<string, string>();
+      parametros?.forEach((p: any) => {
+        if (p.nome_mobilemed && p.nome_fantasia) {
+          // Normalizar: remover espaços extras e uppercase
+          const mobilemed = (p.nome_mobilemed || '').trim().toUpperCase();
+          const fantasia = (p.nome_fantasia || '').trim().toUpperCase();
+          nomeMap.set(mobilemed, fantasia);
+        }
+      });
+      console.log(`📋 Mapeamento de nomes carregado: ${nomeMap.size} clientes`);
+
       // Buscar demonstrativos para valores calculados
       const { data: demonstrativos, error: demoError } = await supabase
         .from('demonstrativos_faturamento_calculados')
         .select('cliente_nome, detalhes_exames')
         .eq('periodo_referencia', periodoSelecionado);
 
-      // Criar mapa de preços do demonstrativo
+      // Criar mapa de preços do demonstrativo (usando cliente_nome normalizado)
       const precosMap = new Map<string, number>();
       demonstrativos?.forEach((demo: any) => {
+        const clienteNome = (demo.cliente_nome || '').trim().toUpperCase();
         const detalhes = demo.detalhes_exames || [];
         detalhes.forEach((d: any) => {
-          const key = `${demo.cliente_nome}|${d.modalidade}|${d.especialidade}|${d.categoria}|${d.prioridade}`;
+          const key = `${clienteNome}|${(d.modalidade || '').toUpperCase()}|${(d.especialidade || '').toUpperCase()}|${(d.categoria || '').toUpperCase()}|${(d.prioridade || '').toUpperCase()}`;
           precosMap.set(key, d.valor_unitario || 0);
         });
       });
+      console.log(`💰 Mapa de preços carregado: ${precosMap.size} arranjos`);
 
       // Criar workbook
       const wb = XLSX.utils.book_new();
 
       // Preparar dados detalhados por paciente
       const dadosDetalhados = volumetriaData.map((reg: any) => {
-        // Buscar preço do demonstrativo
-        const chavePreco = `${reg.EMPRESA}|${reg.MODALIDADE}|${reg.ESPECIALIDADE}|${reg.CATEGORIA}|${reg.PRIORIDADE}`;
+        // Converter EMPRESA para nome_fantasia do demonstrativo usando parametros_faturamento
+        const empresaNorm = (reg.EMPRESA || '').trim().toUpperCase();
+        const clienteDemo = nomeMap.get(empresaNorm) || empresaNorm; // Fallback para o próprio nome se não tiver mapeamento
+        
+        // Buscar preço do demonstrativo usando cliente_nome correto
+        const chavePreco = `${clienteDemo}|${(reg.MODALIDADE || '').toUpperCase()}|${(reg.ESPECIALIDADE || '').toUpperCase()}|${(reg.CATEGORIA || '').toUpperCase()}|${(reg.PRIORIDADE || '').toUpperCase()}`;
         const valorUnitario = precosMap.get(chavePreco) || 0;
         const laudos = reg.VALORES || 1;
         const valorTotal = valorUnitario * laudos;
