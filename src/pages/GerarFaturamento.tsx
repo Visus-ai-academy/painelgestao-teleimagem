@@ -588,14 +588,27 @@ export default function GerarFaturamento() {
         const laudos = reg.VALORES || 1;
         const valorTotal = valorUnitario * laudos;
 
+        // CRÍTICO: Formatar datas usando componentes locais para evitar shift de timezone
+        // A data no banco está em formato ISO (yyyy-MM-dd), usar split para preservar data exata
+        const formatarDataLocal = (dataStr: string | null): string => {
+          if (!dataStr) return '';
+          // Se a data está em formato ISO (yyyy-MM-dd), converter para dd/MM/yyyy
+          if (dataStr.includes('-')) {
+            const [ano, mes, dia] = dataStr.split('T')[0].split('-');
+            return `${dia}/${mes}/${ano}`;
+          }
+          // Se já está em formato brasileiro, retornar como está
+          return dataStr;
+        };
+
         return {
           'Cliente': reg.EMPRESA || '',
           'Cliente Demonstrativo': clienteDemo,
           'Tipo Cliente': reg.tipo_cliente || '',
           'Tipo Faturamento': reg.tipo_faturamento || '',
-          'Data Exame': reg.DATA_REALIZACAO ? new Date(reg.DATA_REALIZACAO).toLocaleDateString('pt-BR') : '',
+          'Data Exame': formatarDataLocal(reg.DATA_REALIZACAO),
           'Hora Exame': reg.HORA_REALIZACAO || '',
-          'Data Laudo': reg.DATA_LAUDO ? new Date(reg.DATA_LAUDO).toLocaleDateString('pt-BR') : '',
+          'Data Laudo': formatarDataLocal(reg.DATA_LAUDO),
           'Hora Laudo': reg.HORA_LAUDO || '',
           'Paciente': reg.NOME_PACIENTE || '',
           'Código Paciente': reg.CODIGO_PACIENTE || '',
@@ -611,7 +624,7 @@ export default function GerarFaturamento() {
           'Valor Total': valorTotal,
           'Status Preço': valorUnitario > 0 ? 'com_preco' : 'sem_preco',
           'Duplicado': reg.DUPLICADO || '',
-          'Data Prazo': reg.DATA_PRAZO ? new Date(reg.DATA_PRAZO).toLocaleDateString('pt-BR') : '',
+          'Data Prazo': formatarDataLocal(reg.DATA_PRAZO),
           'Código Interno': reg.CODIGO_INTERNO || '',
         };
       });
