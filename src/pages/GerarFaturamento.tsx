@@ -490,15 +490,16 @@ export default function GerarFaturamento() {
   }, [periodoSelecionado]);
 
   // Função para exportar Excel com DETALHAMENTO COMPLETO POR PACIENTE
-  // Inclui todos os dados: paciente, médico, exame, accession number, data, etc.
+  // CRÍTICO: Usa EXATAMENTE a mesma lógica do relatório PDF (gerar-relatorio-faturamento)
+  // Inclui todos os dados: paciente, médico, exame, accession number, data, valores do demonstrativo
   const handleExportarExcelDetalhamentoPaciente = async () => {
     try {
       toast({
         title: "Exportando dados detalhados...",
-        description: "Buscando dados completos da volumetria...",
+        description: "Buscando dados completos da volumetria e demonstrativos...",
       });
 
-      // Buscar dados completos da volumetria para o período
+      // 1. Buscar dados completos da volumetria para o período
       const { data: volumetriaData, error: volumetriaError } = await supabase
         .from('volumetria_mobilemed')
         .select('*')
@@ -516,10 +517,19 @@ export default function GerarFaturamento() {
         return;
       }
 
-      console.log(`📊 Exportando ${volumetriaData.length} registros detalhados de volumetria`);
+      console.log(`📊 Volumetria bruta: ${volumetriaData.length} registros`);
 
-      // Buscar mapeamento nome_mobilemed -> nome_fantasia de parametros_faturamento
-      const { data: parametros, error: paramError } = await supabase
+      // 2. Aplicar mesmos filtros do relatório PDF: excluir NC-NF e EXCLUSAO
+      // Exames com NULL tipo_faturamento são incluídos (igual ao PDF)
+      const volumetriaFiltrada = volumetriaData.filter((reg: any) => {
+        const tipoFat = reg.tipo_faturamento;
+        return tipoFat !== 'NC-NF' && tipoFat !== 'EXCLUSAO';
+      });
+
+      console.log(`📊 Após filtros (excluir NC-NF/EXCLUSAO): ${volumetriaFiltrada.length} registros`);
+
+      // 3. Buscar mapeamento nome_mobilemed -> nome_fantasia de parametros_faturamento
+      const { data: parametros } = await supabase
         .from('parametros_faturamento')
         .select('nome_mobilemed, nome_fantasia');
       
@@ -527,7 +537,6 @@ export default function GerarFaturamento() {
       const nomeMap = new Map<string, string>();
       parametros?.forEach((p: any) => {
         if (p.nome_mobilemed && p.nome_fantasia) {
-          // Normalizar: remover espaços extras e uppercase
           const mobilemed = (p.nome_mobilemed || '').trim().toUpperCase();
           const fantasia = (p.nome_fantasia || '').trim().toUpperCase();
           nomeMap.set(mobilemed, fantasia);
@@ -535,19 +544,25 @@ export default function GerarFaturamento() {
       });
       console.log(`📋 Mapeamento de nomes carregado: ${nomeMap.size} clientes`);
 
-      // Buscar demonstrativos para valores calculados
-      const { data: demonstrativos, error: demoError } = await supabase
+      // 4. Buscar demonstrativos com detalhes_exames (fonte autoritativa de preços)
+      const { data: demonstrativos } = await supabase
         .from('demonstrativos_faturamento_calculados')
-        .select('cliente_nome, detalhes_exames')
+        .select('cliente_nome, detalhes_exames, valor_exames, total_exames')
         .eq('periodo_referencia', periodoSelecionado);
 
-      // Criar mapa de preços do demonstrativo (usando cliente_nome normalizado)
+      // 5. Criar mapa de preços do demonstrativo usando cliente_nome normalizado
+      // Chave: CLIENTE|MODALIDADE|ESPECIALIDADE|CATEGORIA|PRIORIDADE
       const precosMap = new Map<string, number>();
       demonstrativos?.forEach((demo: any) => {
         const clienteNome = (demo.cliente_nome || '').trim().toUpperCase();
         const detalhes = demo.detalhes_exames || [];
         detalhes.forEach((d: any) => {
-          const key = `${clienteNome}|${(d.modalidade || '').toUpperCase()}|${(d.especialidade || '').toUpperCase()}|${(d.categoria || '').toUpperCase()}|${(d.prioridade || '').toUpperCase()}`;
+          // Usar mesma estrutura de chave do PDF
+          const modalidade = (d.modalidade || '').toUpperCase();
+          const especialidade = (d.especialidade || '').toUpperCase();
+          const categoria = (d.categoria || 'N/A').toUpperCase();
+          const prioridade = (d.prioridade || 'ROTINA').toUpperCase();
+          const key = `${clienteNome}|${modalidade}|${especialidade}|${categoria}|${prioridade}`;
           precosMap.set(key, d.valor_unitario || 0);
         });
       });
@@ -556,20 +571,26 @@ export default function GerarFaturamento() {
       // Criar workbook
       const wb = XLSX.utils.book_new();
 
-      // Preparar dados detalhados por paciente
-      const dadosDetalhados = volumetriaData.map((reg: any) => {
-        // Converter EMPRESA para nome_fantasia do demonstrativo usando parametros_faturamento
+      // 6. Preparar dados detalhados por paciente (mesmo approach do PDF)
+      const dadosDetalhados = volumetriaFiltrada.map((reg: any) => {
+        // Converter EMPRESA para nome_fantasia do demonstrativo
         const empresaNorm = (reg.EMPRESA || '').trim().toUpperCase();
-        const clienteDemo = nomeMap.get(empresaNorm) || empresaNorm; // Fallback para o próprio nome se não tiver mapeamento
+        const clienteDemo = nomeMap.get(empresaNorm) || empresaNorm;
         
-        // Buscar preço do demonstrativo usando cliente_nome correto
-        const chavePreco = `${clienteDemo}|${(reg.MODALIDADE || '').toUpperCase()}|${(reg.ESPECIALIDADE || '').toUpperCase()}|${(reg.CATEGORIA || '').toUpperCase()}|${(reg.PRIORIDADE || '').toUpperCase()}`;
+        // Buscar preço do demonstrativo usando mesma estrutura de chave do PDF
+        const modalidade = (reg.MODALIDADE || '').toUpperCase();
+        const especialidade = (reg.ESPECIALIDADE || '').toUpperCase();
+        const categoria = (reg.CATEGORIA || 'N/A').toUpperCase();
+        const prioridade = (reg.PRIORIDADE || 'ROTINA').toUpperCase();
+        const chavePreco = `${clienteDemo}|${modalidade}|${especialidade}|${categoria}|${prioridade}`;
+        
         const valorUnitario = precosMap.get(chavePreco) || 0;
         const laudos = reg.VALORES || 1;
         const valorTotal = valorUnitario * laudos;
 
         return {
           'Cliente': reg.EMPRESA || '',
+          'Cliente Demonstrativo': clienteDemo,
           'Tipo Cliente': reg.tipo_cliente || '',
           'Tipo Faturamento': reg.tipo_faturamento || '',
           'Data Exame': reg.DATA_REALIZACAO ? new Date(reg.DATA_REALIZACAO).toLocaleDateString('pt-BR') : '',
@@ -588,20 +609,18 @@ export default function GerarFaturamento() {
           'Laudos (VALORES)': laudos,
           'Valor Unitário': valorUnitario,
           'Valor Total': valorTotal,
-          'Status': reg.STATUS || '',
+          'Status Preço': valorUnitario > 0 ? 'com_preco' : 'sem_preco',
           'Duplicado': reg.DUPLICADO || '',
           'Data Prazo': reg.DATA_PRAZO ? new Date(reg.DATA_PRAZO).toLocaleDateString('pt-BR') : '',
-          'Hora Prazo': reg.HORA_PRAZO || '',
           'Código Interno': reg.CODIGO_INTERNO || '',
-          'Digitador': reg.DIGITADOR || '',
-          'Complementar': reg.COMPLEMENTAR || '',
         };
       });
 
       // Aba 1: Detalhamento Completo por Paciente
       const wsDetalhado = XLSX.utils.json_to_sheet(dadosDetalhados);
       wsDetalhado['!cols'] = [
-        { wch: 25 }, // Cliente
+        { wch: 22 }, // Cliente
+        { wch: 22 }, // Cliente Demonstrativo
         { wch: 12 }, // Tipo Cliente
         { wch: 14 }, // Tipo Faturamento
         { wch: 12 }, // Data Exame
@@ -620,62 +639,82 @@ export default function GerarFaturamento() {
         { wch: 12 }, // Laudos
         { wch: 14 }, // Valor Unitário
         { wch: 14 }, // Valor Total
-        { wch: 12 }, // Status
+        { wch: 12 }, // Status Preço
         { wch: 10 }, // Duplicado
         { wch: 12 }, // Data Prazo
-        { wch: 10 }, // Hora Prazo
         { wch: 12 }, // Código Interno
-        { wch: 15 }, // Digitador
-        { wch: 20 }, // Complementar
       ];
       XLSX.utils.book_append_sheet(wb, wsDetalhado, 'Detalhamento Pacientes');
 
-      // Aba 2: Resumo por Cliente
-      const resumoPorCliente = volumetriaData.reduce((acc: any, reg: any) => {
+      // Aba 2: Resumo por Cliente (com valores calculados - igual demonstrativo)
+      const resumoPorCliente = volumetriaFiltrada.reduce((acc: any, reg: any) => {
+        const empresaNorm = (reg.EMPRESA || '').trim().toUpperCase();
+        const clienteDemo = nomeMap.get(empresaNorm) || empresaNorm;
         const cliente = reg.EMPRESA || 'SEM CLIENTE';
+        
         if (!acc[cliente]) {
           acc[cliente] = {
             cliente,
+            cliente_demo: clienteDemo,
             tipo_cliente: reg.tipo_cliente || '',
             tipo_faturamento: reg.tipo_faturamento || '',
             total_registros: 0,
             total_laudos: 0,
+            valor_total: 0,
           };
         }
+        
+        // Calcular valor igual ao detalhamento
+        const modalidade = (reg.MODALIDADE || '').toUpperCase();
+        const especialidade = (reg.ESPECIALIDADE || '').toUpperCase();
+        const categoria = (reg.CATEGORIA || 'N/A').toUpperCase();
+        const prioridade = (reg.PRIORIDADE || 'ROTINA').toUpperCase();
+        const chavePreco = `${clienteDemo}|${modalidade}|${especialidade}|${categoria}|${prioridade}`;
+        const valorUnitario = precosMap.get(chavePreco) || 0;
+        const laudos = reg.VALORES || 1;
+        
         acc[cliente].total_registros++;
-        acc[cliente].total_laudos += reg.VALORES || 1;
+        acc[cliente].total_laudos += laudos;
+        acc[cliente].valor_total += valorUnitario * laudos;
         return acc;
       }, {});
 
       const dadosResumoCliente = Object.values(resumoPorCliente).map((r: any) => ({
-        'Cliente': r.cliente,
+        'Cliente (Volumetria)': r.cliente,
+        'Cliente (Demonstrativo)': r.cliente_demo,
         'Tipo Cliente': r.tipo_cliente,
         'Tipo Faturamento': r.tipo_faturamento,
         'Total Registros': r.total_registros,
         'Total Laudos': r.total_laudos,
+        'Valor Total': r.valor_total,
       }));
 
       const wsResumo = XLSX.utils.json_to_sheet(dadosResumoCliente);
       wsResumo['!cols'] = [
-        { wch: 35 },
+        { wch: 25 },
+        { wch: 25 },
         { wch: 12 },
         { wch: 14 },
+        { wch: 15 },
         { wch: 15 },
         { wch: 15 },
       ];
       XLSX.utils.book_append_sheet(wb, wsResumo, 'Resumo por Cliente');
 
-      // Aba 3: Totais Gerais
+      // Aba 3: Totais Gerais (com valores)
+      const valorTotalGeral = dadosDetalhados.reduce((sum: number, r: any) => sum + (r['Valor Total'] || 0), 0);
       const totais = {
-        total_registros: volumetriaData.length,
-        total_laudos: volumetriaData.reduce((sum: number, r: any) => sum + (r.VALORES || 1), 0),
+        total_registros: volumetriaFiltrada.length,
+        total_laudos: volumetriaFiltrada.reduce((sum: number, r: any) => sum + (r.VALORES || 1), 0),
         total_clientes: Object.keys(resumoPorCliente).length,
+        valor_total: valorTotalGeral,
       };
 
       const dadosTotais = [
         { 'Métrica': 'Total de Registros', 'Valor': totais.total_registros },
         { 'Métrica': 'Total de Laudos', 'Valor': totais.total_laudos },
         { 'Métrica': 'Total de Clientes', 'Valor': totais.total_clientes },
+        { 'Métrica': 'Valor Total (R$)', 'Valor': totais.valor_total.toFixed(2) },
       ];
 
       const wsTotais = XLSX.utils.json_to_sheet(dadosTotais);
@@ -688,7 +727,7 @@ export default function GerarFaturamento() {
 
       toast({
         title: "Exportação concluída!",
-        description: `${volumetriaData.length} registros exportados com detalhamento completo por paciente`,
+        description: `${volumetriaFiltrada.length} registros exportados (mesma base do Demonstrativo/PDF)`,
       });
     } catch (error) {
       console.error('Erro ao exportar:', error);
