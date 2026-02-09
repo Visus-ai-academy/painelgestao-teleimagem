@@ -231,6 +231,47 @@ serve(async (req) => {
             }
           }
           
+          // 🚫 FILTRO 5: Para arquivos PADRÃO (01 e 02), excluir registros com DATA_LAUDO posterior ao dia 07 do mês seguinte ao período de referência
+          const isPadrao = !arquivo_fonte.includes('retroativo');
+          if (isPadrao && record.DATA_LAUDO) {
+            // Converter DATA_LAUDO para string YYYY-MM-DD de forma robusta
+            let dataLaudoPadraoStr: string;
+            const laudoPadraoRaw = record.DATA_LAUDO;
+            
+            if (typeof laudoPadraoRaw === 'number') {
+              const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+              const dataDate = new Date(excelEpoch.getTime() + laudoPadraoRaw * 24 * 60 * 60 * 1000);
+              dataLaudoPadraoStr = dataDate.toISOString().split('T')[0];
+            } else if (typeof laudoPadraoRaw === 'string') {
+              const parsed = new Date(laudoPadraoRaw);
+              if (!isNaN(parsed.getTime())) {
+                dataLaudoPadraoStr = parsed.toISOString().split('T')[0];
+              } else {
+                dataLaudoPadraoStr = laudoPadraoRaw;
+              }
+            } else {
+              dataLaudoPadraoStr = String(laudoPadraoRaw);
+            }
+            
+            const [anoRef, mesRef] = periodoReferenciaDb.split('-').map(Number);
+            // Limite: dia 07 do mês seguinte ao período de referência
+            const mesProximoPadrao = mesRef === 12 ? 1 : mesRef + 1;
+            const anoProximoPadrao = mesRef === 12 ? anoRef + 1 : anoRef;
+            const dataLimiteLaudoPadrao = `${anoProximoPadrao}-${String(mesProximoPadrao).padStart(2, '0')}-07`;
+            
+            // Excluir se DATA_LAUDO é posterior ao dia 07 do mês seguinte (> limite)
+            if (dataLaudoPadraoStr > dataLimiteLaudoPadrao) {
+              registrosRejeitados.push({
+                linha_original: linhaOriginal,
+                dados_originais: record,
+                motivo_rejeicao: 'REGRA_PADRAO_DATA_LAUDO_APOS_LIMITE',
+                detalhes_erro: `Arquivo padrão com DATA_LAUDO (${dataLaudoPadraoStr}) posterior ao limite permitido (${dataLimiteLaudoPadrao}). Para arquivos padrão, laudos devem ser emitidos até o dia 07 do mês seguinte ao período de referência.`
+              });
+              totalErros++;
+              continue; // Pular este registro
+            }
+          }
+          
           // ✅ ACEITAR DEMAIS REGISTROS - Gravar com periodo_referencia correto
           // CRÍTICO: Remover tipo_faturamento e tipo_cliente do record para evitar tipificação automática
           // Esses campos devem ser aplicados APENAS via "Aplicar Tipificação Geral" manualmente
